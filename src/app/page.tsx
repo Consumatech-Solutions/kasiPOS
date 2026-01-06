@@ -288,8 +288,8 @@ export default function PosPage() {
                     <span>R {vat.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
-                    <span>Items:</span>
-                    <span>{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
+                    <span>Discount Applied:</span>
+                    <span>-R 0.00</span>
                 </div>
                 </div>
                 
