@@ -14,7 +14,7 @@ export const navItems = [
   { href: '/inventory', label: 'Inventory', icon: LayoutGrid },
   { href: '/transactions', label: 'Orders', icon: ScrollText },
   { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/vouchers', label: 'Vouchers', icon: Ticket },
+  { href: '/vouchers', label: 'Campaigns', icon: Ticket },
   { href: '/reports', label: 'Reports', icon: BarChart },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
