@@ -11,7 +11,7 @@ import {
 
 export const navItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/inventory', label: 'Catalogue', icon: LayoutGrid },
+  { href: '/inventory', label: 'Inventory', icon: LayoutGrid },
   { href: '/transactions', label: 'Orders', icon: ScrollText },
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/vouchers', label: 'Vouchers', icon: Ticket },
