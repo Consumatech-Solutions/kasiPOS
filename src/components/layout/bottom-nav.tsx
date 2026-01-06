@@ -13,12 +13,13 @@ export default function BottomNav() {
       <div className="flex h-full w-full justify-center items-center font-medium gap-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
+          const Icon = item.icon;
           return (
             <Button key={item.label} variant={isActive ? 'secondary' : 'ghost'} asChild className="flex-col h-full px-4 text-xs">
               <Link
                 href={item.href}
               >
-                <item.icon className="w-5 h-5 mb-1" />
+                <Icon className="w-5 h-5 mb-1" />
                 <span>{item.label}</span>
               </Link>
             </Button>
