@@ -246,7 +246,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="-mx-4 h-[40%]">
+        <ScrollArea className="-mx-4 h-[35%]">
           <div className="px-4">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -276,7 +276,7 @@ export default function PosPage() {
         </ScrollArea>
 
         {cartItems.length > 0 && (
-          <div className="h-[55%] flex flex-col">
+          <div className="h-[60%] flex flex-col">
             <div className="pt-4 border-t">
                 <div className="text-sm space-y-2 mb-4">
                 <div className="flex justify-between text-gray-500">
