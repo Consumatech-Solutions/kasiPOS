@@ -9,18 +9,28 @@ import { db } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { PlusCircle, MinusCircle, XCircle, ShoppingCart, User, Percent } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, CircleUserRound } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks'];
 
 export default function PosPage() {
   const [cart, setCart] = useState<Map<number, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
   const { toast } = useToast();
 
-  const products = useLiveQuery(() => db.products.toArray(), []);
+  const products = useLiveQuery(() => 
+    activeCategory 
+      ? db.products.where('category').equalsIgnoreCase(activeCategory).toArray()
+      : db.products.toArray()
+  , [activeCategory]);
+  
   const customers = useLiveQuery(() => db.customers.toArray(), []);
 
   const addToCart = (product: Product) => {
@@ -37,6 +47,8 @@ export default function PosPage() {
           quantity: 1,
           unitPrice: product.price,
           totalPrice: product.price,
+          imageUrl: product.imageUrl,
+          stock: product.stock,
         });
       }
       return newCart;
@@ -59,10 +71,16 @@ export default function PosPage() {
     });
   };
 
-  const cartSubtotal = Array.from(cart.values()).reduce((acc, item) => acc + item.totalPrice, 0);
-  const cartTotal = cartSubtotal; // For now, no discounts or taxes
+  const clearCart = () => {
+    setCart(new Map());
+  }
 
-  const handleCheckout = async () => {
+  const cartItems = Array.from(cart.values());
+  const cartSubtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
+  const vat = cartSubtotal * 0.15;
+  const cartTotal = cartSubtotal; // Simplified for now
+
+  const handleCheckout = async (method: 'Cash' | 'Card') => {
     if (cart.size === 0) {
       toast({
         title: "Cart is empty",
@@ -75,24 +93,21 @@ export default function PosPage() {
     const newTransaction: Transaction = {
       customerId: selectedCustomerId,
       date: new Date(),
-      items: Array.from(cart.values()),
+      items: cartItems,
       total: cartTotal,
-      paymentMethod: 'Cash', // Simplified
+      paymentMethod: method,
     };
     
     try {
       await db.transaction('rw', db.transactions, db.products, db.customers, async () => {
-        // Add transaction
         const transactionId = await db.transactions.add(newTransaction);
         
-        // Update stock
         for (const item of newTransaction.items) {
           await db.products.where({ id: item.productId }).modify(p => {
             p.stock -= item.quantity;
           });
         }
         
-        // Update customer points
         if (selectedCustomerId) {
           await db.customers.where({ id: selectedCustomerId }).modify(c => {
             c.loyaltyPoints = (c.loyaltyPoints || 0) + Math.floor(cartTotal);
@@ -102,7 +117,7 @@ export default function PosPage() {
       
       toast({
         title: "Checkout successful",
-        description: `Transaction completed. Total: R${cartTotal.toFixed(2)}`,
+        description: `Transaction completed with ${method}. Total: R${cartTotal.toFixed(2)}`,
       });
       setCart(new Map());
       setSelectedCustomerId(undefined);
@@ -118,107 +133,132 @@ export default function PosPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-8rem)]">
-      <div className="lg:col-span-2">
-        <Card className="h-full flex flex-col">
-          <CardHeader>
-            <CardTitle>Products</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-grow">
-            <ScrollArea className="h-full pr-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                {products?.map((product) => (
-                  <Card key={product.id} className="overflow-hidden flex flex-col">
-                    <div className="relative w-full aspect-square">
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.name}
-                        fill
-                        className="object-cover"
-                        data-ai-hint={product.imageHint}
-                      />
-                    </div>
-                    <CardHeader className="p-4 flex-grow">
-                      <CardTitle className="text-base font-medium">{product.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{product.category}</p>
-                    </CardHeader>
-                    <CardFooter className="p-4 flex justify-between items-center">
-                      <p className="font-semibold">R{product.price.toFixed(2)}</p>
-                      <Button size="sm" onClick={() => addToCart(product)}>Add</Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-6 h-[calc(100vh-80px)]">
+      {/* Product Selection */}
+      <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col">
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Input placeholder="Scan barcode or search item..." className="pl-10 h-12" />
+          <QrCode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+        </div>
+
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-500 mb-2">QUICK ACCESS</p>
+          <div className="flex flex-wrap gap-2">
+            {quickAccessCategories.map(cat => (
+              <Button key={cat} variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(activeCategory === cat ? null : cat)} className="bg-gray-100 border-gray-200">
+                {cat}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-xs font-semibold text-gray-500 mb-2">ALL PRODUCTS</p>
+        <ScrollArea className="flex-grow">
+          <div className="space-y-2 pr-4">
+            {products?.map(product => (
+              <button key={product.id} onClick={() => addToCart(product)} className="w-full text-left p-3 rounded-lg hover:bg-gray-50 flex items-center gap-4">
+                <Image src={product.imageUrl} alt={product.name} width={40} height={40} className="rounded-md bg-gray-200 object-cover" data-ai-hint={product.imageHint} />
+                <div className="flex-grow">
+                  <p className="font-medium text-sm">{product.name}</p>
+                  <p className="text-xs text-gray-500">Stock: {product.stock}</p>
+                </div>
+                <p className="font-semibold text-sm">R{product.price.toFixed(2)}</p>
+              </button>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
-      <div className="lg:col-span-1">
-        <Card className="h-full flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-6 w-6" />
-              Cart
-            </CardTitle>
-            <div className="flex items-center gap-2">
-                <Select value={selectedCustomerId?.toString()} onValueChange={(val) => setSelectedCustomerId(Number(val))}>
-                    <SelectTrigger className="w-[180px]">
-                        <User className="h-4 w-4 mr-2"/>
-                        <SelectValue placeholder="Select Customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="0">No Customer</SelectItem>
-                        {customers?.map(c => <SelectItem key={c.id} value={c.id!.toString()}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                </Select>
+      {/* Cart Section */}
+      <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col h-full">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-semibold text-lg">Current Sale #8832</h2>
+          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={clearCart}>Clear All</Button>
+        </div>
+
+        <ScrollArea className="flex-grow -mx-4">
+          <div className="px-4">
+          {cartItems.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              <p>Cart is empty</p>
             </div>
-          </CardHeader>
-          <CardContent className="flex-grow">
-            <ScrollArea className="h-full pr-4">
-              {cart.size === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p>Cart is empty</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {Array.from(cart.values()).map((item) => (
-                    <div key={item.productId} className="flex items-center gap-4">
-                      <div className="flex-grow">
-                        <p className="font-medium">{item.productName}</p>
-                        <p className="text-sm text-muted-foreground">R{item.unitPrice.toFixed(2)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.productId, item.quantity - 1)}>
-                          <MinusCircle className="h-4 w-4" />
-                        </Button>
-                        <span>{item.quantity}</span>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => updateQuantity(item.productId, item.quantity + 1)}>
-                          <PlusCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="w-20 text-right font-semibold">R{item.totalPrice.toFixed(2)}</p>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => updateQuantity(item.productId, 0)}>
-                        <XCircle className="h-4 w-4" />
-                      </Button>
+          ) : (
+            <div className="space-y-3">
+              {cartItems.map(item => (
+                <Card key={item.productId} className="p-3">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-grow">
+                      <p className="font-medium">{item.productName}</p>
+                      <p className="text-sm text-gray-500">R {item.unitPrice.toFixed(2)} / unit</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-          {cart.size > 0 && (
-            <CardFooter className="flex flex-col gap-4 !p-6 border-t">
-              <div className="w-full flex justify-between text-lg font-semibold">
-                <span>Total</span>
-                <span>R{cartTotal.toFixed(2)}</span>
-              </div>
-              <Button size="lg" className="w-full" onClick={handleCheckout}>
-                Checkout
-              </Button>
-            </CardFooter>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-4 w-4" /></Button>
+                      <span className="font-bold w-4 text-center">{item.quantity}</span>
+                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-4 w-4" /></Button>
+                    </div>
+                    <p className="font-bold w-24 text-right">R {item.totalPrice.toFixed(2)}</p>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
-        </Card>
+          </div>
+        </ScrollArea>
+
+        <div className="mt-auto pt-4 border-t-2 border-dashed">
+          <div className="text-sm text-gray-500 space-y-1 mb-4">
+             <div className="flex justify-between">
+              <span>Subtotal:</span>
+              <span className="font-medium">R {cartSubtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>VAT (15%):</span>
+              <span className="font-medium">R {vat.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Items:</span>
+              <span className="font-medium">{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
+            </div>
+          </div>
+          
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-lg font-bold">Total To Pay</span>
+            <span className="text-3xl font-bold text-green-600">R {cartTotal.toFixed(2)}</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <Button size="lg" className="h-16 text-lg bg-green-500 hover:bg-green-600 text-white col-span-1" onClick={() => handleCheckout('Cash')}>
+              CASH
+              <span className="text-xs ml-2 opacity-80">(F12 KEY)</span>
+            </Button>
+            <Button size="lg" variant="outline" className="h-16 text-lg col-span-1" onClick={() => handleCheckout('Card')}>
+              <CreditCard className="mr-2"/> CARD / Yoco
+            </Button>
+             <Button size="lg" variant="outline" className="h-16 text-lg col-span-1">
+              <MoreHorizontal className="mr-2"/> MORE
+            </Button>
+          </div>
+
+          <Separator className="my-3"/>
+
+          <div className="flex justify-around items-center text-sm font-medium">
+             <Button variant="ghost" className="flex-1">
+                <User className="mr-2 h-4 w-4"/>
+                Add Customer
+              </Button>
+              <Button variant="ghost" className="flex-1">
+                <Ticket className="mr-2 h-4 w-4"/>
+                Redeem Voucher
+              </Button>
+              <Button variant="ghost" className="flex-1">
+                <Search className="mr-2 h-4 w-4"/>
+                Search Products
+              </Button>
+          </div>
+
+        </div>
       </div>
     </div>
   );

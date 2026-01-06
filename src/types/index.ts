@@ -23,6 +23,8 @@ export interface TransactionItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  imageUrl?: string;
+  stock?: number;
 }
 
 export interface Transaction {
