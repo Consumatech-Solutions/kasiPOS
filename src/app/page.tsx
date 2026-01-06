@@ -230,7 +230,7 @@ export default function PosPage() {
 
       {/* Cart Section */}
       <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col h-full">
-        <div className="flex justify-between items-center mb-4 border-b pb-3">
+        <div className="flex justify-between items-center mb-4 border-b pb-3 flex-shrink-0">
             <div>
                 <h2 className="font-semibold text-lg">Sale #8822</h2>
             </div>
@@ -246,7 +246,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="-mx-4">
+        <ScrollArea className="flex-1 -mx-4">
           <div className="px-4">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -276,7 +276,7 @@ export default function PosPage() {
         </ScrollArea>
 
         {cartItems.length > 0 && (
-          <div className="mt-auto pt-4 border-t">
+          <div className="flex-shrink-0 pt-4 border-t">
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                 <span>Subtotal</span>
