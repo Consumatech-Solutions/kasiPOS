@@ -246,7 +246,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="flex-grow -mx-4">
+        <ScrollArea className="-mx-4">
           <div className="px-4">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
