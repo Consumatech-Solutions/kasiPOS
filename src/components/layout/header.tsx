@@ -20,7 +20,7 @@ export default function Header() {
         <div className="bg-green-500 p-2 rounded-md">
           <Store className="h-6 w-6 text-white" />
         </div>
-        <span className="text-xl font-bold">SOMSA</span>
+        <span className="text-xl font-bold">kasiPOS</span>
       </div>
 
       <div className="flex items-center gap-4">

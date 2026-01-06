@@ -3,24 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard,
+  Home,
+  LayoutGrid,
   Boxes,
-  Users,
-  Receipt,
-  BarChart2,
-  Ticket,
-  Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/', label: 'Home', icon: Home },
+  { href: '/inventory', label: 'Catalogue', icon: LayoutGrid },
   { href: '/inventory', label: 'Inventory', icon: Boxes },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/transactions', label: 'Transactions', icon: Receipt },
-  { href: '/reports', label: 'Reports', icon: BarChart2 },
-  { href: '/vouchers', label: 'Vouchers', icon: Ticket },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function BottomNav() {
@@ -28,12 +20,12 @@ export default function BottomNav() {
 
   return (
     <div className="md:hidden sticky bottom-0 left-0 z-50 w-full h-20 bg-white border-t bottom-nav">
-      <div className="grid h-full max-w-lg grid-cols-7 mx-auto font-medium">
+      <div className="grid h-full max-w-lg grid-cols-3 mx-auto font-medium">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
-              key={item.href}
+              key={item.label}
               href={item.href}
               className={cn(
                 'inline-flex flex-col items-center justify-center px-2 text-gray-500 hover:bg-gray-50 hover:text-primary group',
@@ -41,7 +33,7 @@ export default function BottomNav() {
               )}
             >
               <item.icon className="w-6 h-6 mb-1" />
-              <span className="text-[10px]">{item.label}</span>
+              <span className="text-sm">{item.label}</span>
             </Link>
           );
         })}

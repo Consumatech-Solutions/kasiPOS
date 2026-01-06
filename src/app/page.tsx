@@ -10,13 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, CircleUserRound } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
-const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks'];
+const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
 export default function PosPage() {
   const [cart, setCart] = useState<Map<number, TransactionItem>>(new Map());
@@ -142,18 +143,35 @@ export default function PosPage() {
           <QrCode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         </div>
 
-        <div className="mb-4">
-          <p className="text-xs font-semibold text-gray-500 mb-2">QUICK ACCESS</p>
-          <div className="flex flex-wrap gap-2">
-            {quickAccessCategories.map(cat => (
-              <Button key={cat} variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(activeCategory === cat ? null : cat)} className="bg-gray-100 border-gray-200">
-                {cat}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <Collapsible defaultOpen={true}>
+          <CollapsibleTrigger className="flex justify-between items-center w-full mb-2">
+            <p className="text-xs font-semibold text-gray-500">CATEGORIES</p>
+            <ChevronDown className="h-4 w-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+             <Carousel opts={{ align: "start", slidesToScroll: 'auto' }} className="w-full mb-4">
+              <CarouselContent className="-ml-2">
+                <CarouselItem className="basis-auto pl-2">
+                    <Button variant={activeCategory === null ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(null)} className="bg-gray-100 border-gray-200">
+                      All
+                    </Button>
+                </CarouselItem>
+                {quickAccessCategories.map(cat => (
+                  <CarouselItem key={cat} className="basis-auto pl-2">
+                    <Button variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(activeCategory === cat ? null : cat)} className="bg-gray-100 border-gray-200">
+                      {cat}
+                    </Button>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2" />
+              <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2" />
+            </Carousel>
+          </CollapsibleContent>
+        </Collapsible>
 
-        <p className="text-xs font-semibold text-gray-500 mb-2">ALL PRODUCTS</p>
+
+        <p className="text-xs font-semibold text-gray-500 mb-2">PRODUCTS</p>
         <ScrollArea className="flex-grow">
           <div className="space-y-2 pr-4">
             {products?.map(product => (
