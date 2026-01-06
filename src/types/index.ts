@@ -1,0 +1,46 @@
+export interface Product {
+  id?: number;
+  name: string;
+  price: number;
+  stock: number;
+  category: string;
+  barcode?: string;
+  imageUrl: string;
+  imageHint: string;
+}
+
+export interface Customer {
+  id?: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  loyaltyPoints: number;
+}
+
+export interface TransactionItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface Transaction {
+  id?: number;
+  customerId?: number;
+  date: Date;
+  items: TransactionItem[];
+  total: number;
+  paymentMethod: 'Cash' | 'Card' | 'E-wallet';
+  voucherCode?: string;
+  discountAmount?: number;
+}
+
+export interface Voucher {
+  id?: number;
+  code: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  minPurchase: number;
+  isActive: boolean;
+}
