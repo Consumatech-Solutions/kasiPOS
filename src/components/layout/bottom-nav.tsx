@@ -5,21 +5,22 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   LayoutGrid,
-  Boxes,
   Users,
   ScrollText,
   Ticket,
+  BarChart,
+  Settings,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
-  { href: '/transactions', label: 'Orders', icon: ScrollText },
   { href: '/inventory', label: 'Catalogue', icon: LayoutGrid },
-  { href: '/inventory', label: 'Inventory', icon: Boxes },
+  { href: '/transactions', label: 'Orders', icon: ScrollText },
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/vouchers', label: 'Vouchers', icon: Ticket },
+  { href: '/reports', label: 'Reports', icon: BarChart },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function BottomNav() {
