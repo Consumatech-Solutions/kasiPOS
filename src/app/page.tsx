@@ -10,12 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, ChevronDown } from 'lucide-react';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, ChevronDown, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
@@ -173,18 +176,55 @@ export default function PosPage() {
 
         <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Products</p>
         <ScrollArea className="flex-grow pr-1">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {products?.map(product => (
-              <button key={product.id} onClick={() => addToCart(product)} className="w-full text-left p-2 rounded-lg hover:bg-gray-50 flex flex-col gap-2 border items-center">
-                <Image src={product.imageUrl} alt={product.name} width={80} height={80} className="rounded-md bg-gray-200 object-cover aspect-square" data-ai-hint={product.imageHint} />
-                <div className="flex-grow w-full">
-                  <p className="font-medium text-sm truncate">{product.name}</p>
-                  <p className="text-xs text-gray-500">Stock: {product.stock}</p>
-                </div>
-                <p className="font-semibold text-sm self-end">R{product.price.toFixed(2)}</p>
-              </button>
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[50px]">View</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Stock</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {products?.map(product => (
+                <TableRow key={product.id}>
+                  <TableCell>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                          <DialogTitle>{product.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex items-center justify-center">
+                          <Image 
+                            src={product.imageUrl} 
+                            alt={product.name} 
+                            width={300} 
+                            height={300} 
+                            className="rounded-md object-cover"
+                            data-ai-hint={product.imageHint}
+                          />
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </TableCell>
+                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell>{product.stock}</TableCell>
+                  <TableCell>R{product.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button size="sm" onClick={() => addToCart(product)}>
+                      <Plus className="h-4 w-4 mr-2" /> Add
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </ScrollArea>
       </div>
 
