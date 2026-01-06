@@ -275,39 +275,41 @@ export default function PosPage() {
           </div>
         </ScrollArea>
 
-        <div className="mt-auto pt-4 border-t">
-          <div className="text-sm space-y-2 mb-4">
-             <div className="flex justify-between text-gray-500">
-              <span>Subtotal</span>
-              <span>R {cartSubtotal.toFixed(2)}</span>
+        {cartItems.length > 0 && (
+          <div className="mt-auto pt-4 border-t">
+            <div className="text-sm space-y-2 mb-4">
+              <div className="flex justify-between text-gray-500">
+                <span>Subtotal</span>
+                <span>R {cartSubtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>VAT (15%)</span>
+                <span>R {vat.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                <span>Items:</span>
+                <span>{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
+              </div>
             </div>
-            <div className="flex justify-between text-gray-500">
-              <span>VAT (15%)</span>
-              <span>R {vat.toFixed(2)}</span>
+            
+            <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
+              <span className="text-lg font-bold">Total to Pay</span>
+              <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-gray-500">
-              <span>Items:</span>
-              <span>{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
-            <span className="text-lg font-bold">Total to Pay</span>
-            <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
-          </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <Button size="lg" className="h-14 text-base bg-green-500 hover:bg-green-600 text-white" onClick={() => handleCheckout('Cash')}>
-              CASH
-            </Button>
-            <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Card')}>
-              CARD
-            </Button>
-             <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Mobile Money')}>
-              MOBILE
-            </Button>
+            <div className="grid grid-cols-3 gap-3">
+              <Button size="lg" className="h-14 text-base bg-green-500 hover:bg-green-600 text-white" onClick={() => handleCheckout('Cash')}>
+                CASH
+              </Button>
+              <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Card')}>
+                CARD
+              </Button>
+              <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Mobile Money')}>
+                MOBILE
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
