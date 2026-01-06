@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, ChevronDown, Eye } from 'lucide-react';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, ChevronDown, Eye, Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -246,7 +246,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="-mx-4 h-[50%]">
+        <ScrollArea className="-mx-4 h-[40%]">
           <div className="px-4">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -276,7 +276,7 @@ export default function PosPage() {
         </ScrollArea>
 
         {cartItems.length > 0 && (
-          <div className="h-[45%] flex flex-col">
+          <div className="h-[55%] flex flex-col">
             <div className="pt-4 border-t">
                 <div className="text-sm space-y-2 mb-4">
                 <div className="flex justify-between text-gray-500">
