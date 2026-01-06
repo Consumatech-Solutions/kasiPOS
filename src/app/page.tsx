@@ -81,7 +81,7 @@ export default function PosPage() {
   const vat = cartSubtotal * 0.15;
   const cartTotal = cartSubtotal; // Simplified for now
 
-  const handleCheckout = async (method: 'Cash' | 'Card') => {
+  const handleCheckout = async (method: 'Cash' | 'Card' | 'Mobile Money') => {
     if (cart.size === 0) {
       toast({
         title: "Cart is empty",
@@ -134,9 +134,9 @@ export default function PosPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-6 h-[calc(100vh-80px)]">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-gray-50">
       {/* Product Selection */}
-      <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col">
+      <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col">
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input placeholder="Scan barcode or search item..." className="pl-10 h-12" />
@@ -145,20 +145,20 @@ export default function PosPage() {
 
         <Collapsible defaultOpen={true}>
           <CollapsibleTrigger className="flex justify-between items-center w-full mb-2">
-            <p className="text-xs font-semibold text-gray-500">CATEGORIES</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase">Categories</p>
             <ChevronDown className="h-4 w-4" />
           </CollapsibleTrigger>
           <CollapsibleContent>
              <Carousel opts={{ align: "start", slidesToScroll: 'auto' }} className="w-full mb-4">
               <CarouselContent className="-ml-2">
                 <CarouselItem className="basis-auto pl-2">
-                    <Button variant={activeCategory === null ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(null)} className="bg-gray-100 border-gray-200">
+                    <Button variant={activeCategory === null ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(null)}>
                       All
                     </Button>
                 </CarouselItem>
                 {quickAccessCategories.map(cat => (
                   <CarouselItem key={cat} className="basis-auto pl-2">
-                    <Button variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(activeCategory === cat ? null : cat)} className="bg-gray-100 border-gray-200">
+                    <Button variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}>
                       {cat}
                     </Button>
                   </CarouselItem>
@@ -171,17 +171,17 @@ export default function PosPage() {
         </Collapsible>
 
 
-        <p className="text-xs font-semibold text-gray-500 mb-2">PRODUCTS</p>
-        <ScrollArea className="flex-grow">
-          <div className="space-y-2 pr-4">
+        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Products</p>
+        <ScrollArea className="flex-grow pr-1">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
             {products?.map(product => (
-              <button key={product.id} onClick={() => addToCart(product)} className="w-full text-left p-3 rounded-lg hover:bg-gray-50 flex items-center gap-4">
-                <Image src={product.imageUrl} alt={product.name} width={40} height={40} className="rounded-md bg-gray-200 object-cover" data-ai-hint={product.imageHint} />
-                <div className="flex-grow">
-                  <p className="font-medium text-sm">{product.name}</p>
+              <button key={product.id} onClick={() => addToCart(product)} className="w-full text-left p-2 rounded-lg hover:bg-gray-50 flex flex-col gap-2 border items-center">
+                <Image src={product.imageUrl} alt={product.name} width={80} height={80} className="rounded-md bg-gray-200 object-cover aspect-square" data-ai-hint={product.imageHint} />
+                <div className="flex-grow w-full">
+                  <p className="font-medium text-sm truncate">{product.name}</p>
                   <p className="text-xs text-gray-500">Stock: {product.stock}</p>
                 </div>
-                <p className="font-semibold text-sm">R{product.price.toFixed(2)}</p>
+                <p className="font-semibold text-sm self-end">R{product.price.toFixed(2)}</p>
               </button>
             ))}
           </div>
@@ -189,10 +189,21 @@ export default function PosPage() {
       </div>
 
       {/* Cart Section */}
-      <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col h-full">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="font-semibold text-lg">Current Sale #8832</h2>
-          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={clearCart}>Clear All</Button>
+      <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col h-full">
+        <div className="flex justify-between items-center mb-4 border-b pb-3">
+            <div>
+                <h2 className="font-semibold text-lg">Sale #8822</h2>
+            </div>
+            <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm">
+                    <User className="mr-2 h-4 w-4"/>
+                    Add Customer
+                </Button>
+                <Button variant="ghost" size="sm">
+                    <Ticket className="mr-2 h-4 w-4"/>
+                    Redeem Voucher
+                </Button>
+            </div>
         </div>
 
         <ScrollArea className="flex-grow -mx-4">
@@ -202,80 +213,60 @@ export default function PosPage() {
               <p>Cart is empty</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {cartItems.map(item => (
-                <Card key={item.productId} className="p-3">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-grow">
-                      <p className="font-medium">{item.productName}</p>
-                      <p className="text-sm text-gray-500">R {item.unitPrice.toFixed(2)} / unit</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-4 w-4" /></Button>
-                      <span className="font-bold w-4 text-center">{item.quantity}</span>
-                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                    <p className="font-bold w-24 text-right">R {item.totalPrice.toFixed(2)}</p>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
+                <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50">
+                  <Image src={item.imageUrl || ''} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
+                  <div className="flex-grow">
+                    <p className="font-medium text-sm">{item.productName}</p>
+                    <p className="text-xs text-gray-500">R {item.unitPrice.toFixed(2)}</p>
                   </div>
-                </Card>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
+                    <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
+                    <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
+                  </div>
+                  <p className="font-semibold text-sm w-20 text-right">R{item.totalPrice.toFixed(2)}</p>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
               ))}
             </div>
           )}
           </div>
         </ScrollArea>
 
-        <div className="mt-auto pt-4 border-t-2 border-dashed">
-          <div className="text-sm text-gray-500 space-y-1 mb-4">
-             <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span className="font-medium">R {cartSubtotal.toFixed(2)}</span>
+        <div className="mt-auto pt-4 border-t">
+          <div className="text-sm space-y-2 mb-4">
+             <div className="flex justify-between text-gray-500">
+              <span>Subtotal</span>
+              <span>R {cartSubtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between">
-              <span>VAT (15%):</span>
-              <span className="font-medium">R {vat.toFixed(2)}</span>
+            <div className="flex justify-between text-gray-500">
+              <span>VAT (15%)</span>
+              <span>R {vat.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between text-gray-500">
               <span>Items:</span>
-              <span className="font-medium">{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
+              <span>{cartItems.reduce((acc, item) => acc + item.quantity, 0)}</span>
             </div>
           </div>
           
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-lg font-bold">Total To Pay</span>
-            <span className="text-3xl font-bold text-green-600">R {cartTotal.toFixed(2)}</span>
+          <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
+            <span className="text-lg font-bold">Total to Pay</span>
+            <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mb-3">
-            <Button size="lg" className="h-16 text-lg bg-green-500 hover:bg-green-600 text-white col-span-1" onClick={() => handleCheckout('Cash')}>
+          <div className="grid grid-cols-3 gap-3">
+            <Button size="lg" className="h-14 text-base bg-green-500 hover:bg-green-600 text-white" onClick={() => handleCheckout('Cash')}>
               CASH
-              <span className="text-xs ml-2 opacity-80">(F12 KEY)</span>
             </Button>
-            <Button size="lg" variant="outline" className="h-16 text-lg col-span-1" onClick={() => handleCheckout('Card')}>
-              <CreditCard className="mr-2"/> CARD / Yoco
+            <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Card')}>
+              CARD
             </Button>
-             <Button size="lg" variant="outline" className="h-16 text-lg col-span-1">
-              <MoreHorizontal className="mr-2"/> MORE
+             <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Mobile Money')}>
+              MOBILE
             </Button>
           </div>
-
-          <Separator className="my-3"/>
-
-          <div className="flex justify-around items-center text-sm font-medium">
-             <Button variant="ghost" className="flex-1">
-                <User className="mr-2 h-4 w-4"/>
-                Add Customer
-              </Button>
-              <Button variant="ghost" className="flex-1">
-                <Ticket className="mr-2 h-4 w-4"/>
-                Redeem Voucher
-              </Button>
-              <Button variant="ghost" className="flex-1">
-                <Search className="mr-2 h-4 w-4"/>
-                Search Products
-              </Button>
-          </div>
-
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col h-screen bg-background">
       <Header />
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+      <main className="flex-1 overflow-hidden">
         {children}
       </main>
       <BottomNav />
