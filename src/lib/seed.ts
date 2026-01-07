@@ -2,7 +2,34 @@ import { db } from './db';
 import { PlaceHolderImages } from './placeholder-images';
 
 export async function seedDatabase() {
-    await db.transaction('rw', db.products, db.customers, db.vouchers, async () => {
+    await db.transaction('rw', db.products, db.customers, db.vouchers, db.categories, async () => {
+
+        const productCount = await db.products.count();
+        if (productCount > 0) {
+            console.log('Database already seeded.');
+            return;
+        }
+
+        // Seed Categories first if they don't exist
+        const categoryCount = await db.categories.count();
+        if (categoryCount === 0) {
+            const initialCategories = [
+                { name: 'Drinks' },
+                { name: 'Snacks' },
+                { name: 'Bakery' },
+                { name: 'Dairy' },
+                { name: 'Confectionery' },
+                { name: 'Groceries' },
+                { name: 'Beverages' },
+                { name: 'Toiletries' },
+                { name: 'Airtime' },
+                { name: 'Cigs' },
+                { name: 'Veg' },
+                { name: 'Cool Drinks' },
+            ];
+            await db.categories.bulkAdd(initialCategories);
+        }
+
         // Seed Products
         const products = [
             { name: 'Coca-Cola 330ml', price: 12.50, stock: 150, category: 'Drinks', barcode: '1234567890123', imageUrl: PlaceHolderImages[0].imageUrl, imageHint: PlaceHolderImages[0].imageHint },

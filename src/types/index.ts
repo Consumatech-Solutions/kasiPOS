@@ -46,3 +46,8 @@ export interface Voucher {
   minPurchase: number;
   isActive: boolean;
 }
+
+export interface Category {
+    id?: number;
+    name: string;
+}
