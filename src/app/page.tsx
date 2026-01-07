@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 
@@ -10,14 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, MoreHorizontal, ChevronDown, Eye, Package } from 'lucide-react';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, LayoutGrid, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Eye } from 'lucide-react';
 
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
@@ -26,16 +27,43 @@ export default function PosPage() {
   const [cart, setCart] = useState<Map<number, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [categoryView, setCategoryView] = useState<'carousel' | 'grid'>('carousel');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
 
   const { toast } = useToast();
 
-  const products = useLiveQuery(() => 
-    activeCategory 
-      ? db.products.where('category').equalsIgnoreCase(activeCategory).toArray()
-      : db.products.toArray()
-  , [activeCategory]);
+  const allProducts = useLiveQuery(() => db.products.toArray(), []);
+
+  const products = useMemo(() => {
+    if (!allProducts) return [];
+    let filtered = allProducts;
+    if (activeCategory) {
+      filtered = filtered.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase());
+    }
+    if (productSearch) {
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.barcode?.includes(productSearch));
+    }
+    return filtered;
+  }, [allProducts, activeCategory, productSearch]);
+
+  const allCategories = useMemo(() => {
+    if (!allProducts) return [];
+    const categories = new Set(allProducts.map(p => p.category));
+    return Array.from(categories);
+  }, [allProducts]);
+
+  const filteredCategories = useMemo(() => {
+    if (!allCategories) return [];
+    return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
+  }, [allCategories, categorySearch]);
   
   const customers = useLiveQuery(() => db.customers.toArray(), []);
+
+  const selectCategory = (category: string | null) => {
+    setActiveCategory(category);
+    setCategoryView('carousel');
+  };
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -142,90 +170,113 @@ export default function PosPage() {
       <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col">
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <Input placeholder="Scan barcode or search item..." className="pl-10 h-12" />
+          <Input 
+            placeholder={categoryView === 'grid' ? "Search categories..." : "Scan barcode or search item..."}
+            className="pl-10 h-12"
+            value={categoryView === 'grid' ? categorySearch : productSearch}
+            onChange={(e) => categoryView === 'grid' ? setCategorySearch(e.target.value) : setProductSearch(e.target.value)}
+          />
           <QrCode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
         </div>
 
-        <Collapsible defaultOpen={true}>
-          <CollapsibleTrigger className="flex justify-between items-center w-full mb-2">
+        <div className="flex justify-between items-center mb-2">
             <p className="text-xs font-semibold text-gray-500 uppercase">Categories</p>
-            <ChevronDown className="h-4 w-4" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-             <Carousel opts={{ align: "start", slidesToScroll: 'auto' }} className="w-full mb-4">
-              <CarouselContent className="-ml-2">
-                <CarouselItem className="basis-auto pl-2">
-                    <Button variant={activeCategory === null ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(null)}>
-                      All
-                    </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCategoryView(prev => prev === 'carousel' ? 'grid' : 'carousel')}>
+                {categoryView === 'carousel' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+            </Button>
+        </div>
+
+        {categoryView === 'carousel' ? (
+            <Carousel opts={{ align: "start", slidesToScroll: 'auto' }} className="w-full mb-4">
+            <CarouselContent className="-ml-2">
+              <CarouselItem className="basis-auto pl-2">
+                  <Button variant={activeCategory === null ? 'secondary' : 'outline'} size="sm" onClick={() => selectCategory(null)}>
+                    All
+                  </Button>
+              </CarouselItem>
+              {quickAccessCategories.map(cat => (
+                <CarouselItem key={cat} className="basis-auto pl-2">
+                  <Button variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => selectCategory(activeCategory === cat ? null : cat)}>
+                    {cat}
+                  </Button>
                 </CarouselItem>
-                {quickAccessCategories.map(cat => (
-                  <CarouselItem key={cat} className="basis-auto pl-2">
-                    <Button variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}>
-                      {cat}
-                    </Button>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2" />
-              <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2" />
-            </Carousel>
-          </CollapsibleContent>
-        </Collapsible>
-
-
-        <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Products</p>
-        <ScrollArea className="flex-grow pr-1">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">View</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products?.map(product => (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                          <DialogTitle>{product.name}</DialogTitle>
-                        </DialogHeader>
-                        <div className="flex items-center justify-center">
-                          <Image 
-                            src={product.imageUrl} 
-                            alt={product.name} 
-                            width={300} 
-                            height={300} 
-                            className="rounded-md object-cover"
-                            data-ai-hint={product.imageHint}
-                          />
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell>{product.stock}</TableCell>
-                  <TableCell>R{product.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" onClick={() => addToCart(product)}>
-                      <Plus className="h-4 w-4 mr-2" /> Add
-                    </Button>
-                  </TableCell>
-                </TableRow>
               ))}
-            </TableBody>
-          </Table>
-        </ScrollArea>
+            </CarouselContent>
+            <CarouselPrevious className="absolute left-0 top-1/2 -translate-y-1/2" />
+            <CarouselNext className="absolute right-0 top-1/2 -translate-y-1/2" />
+          </Carousel>
+        ) : null}
+
+
+        {categoryView === 'grid' ? (
+            <ScrollArea className="flex-grow pr-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <button onClick={() => selectCategory(null)} className={`aspect-square rounded-lg flex items-center justify-center text-center p-2 transition-colors ${activeCategory === null ? 'bg-secondary text-secondary-foreground' : 'bg-card hover:bg-accent hover:text-accent-foreground border'}`}>
+                        <p className="font-semibold">All</p>
+                    </button>
+                    {filteredCategories?.map(cat => (
+                        <button key={cat} onClick={() => selectCategory(cat)} className={`aspect-square rounded-lg flex items-center justify-center text-center p-2 transition-colors ${activeCategory === cat ? 'bg-secondary text-secondary-foreground' : 'bg-card hover:bg-accent hover:text-accent-foreground border'}`}>
+                            <p className="font-semibold">{cat}</p>
+                        </button>
+                    ))}
+                </div>
+            </ScrollArea>
+        ) : (
+          <>
+            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Products</p>
+            <ScrollArea className="flex-grow pr-1">
+            <Table>
+                <TableHeader>
+                <TableRow>
+                    <TableHead className="w-[50px]">View</TableHead>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Stock</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+                </TableHeader>
+                <TableBody>
+                {products?.map(product => (
+                    <TableRow key={product.id}>
+                    <TableCell>
+                        <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                            <Eye className="h-4 w-4" />
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                            <DialogTitle>{product.name}</DialogTitle>
+                            </DialogHeader>
+                            <div className="flex items-center justify-center">
+                            <Image 
+                                src={product.imageUrl} 
+                                alt={product.name} 
+                                width={300} 
+                                height={300} 
+                                className="rounded-md object-cover"
+                                data-ai-hint={product.imageHint}
+                            />
+                            </div>
+                        </DialogContent>
+                        </Dialog>
+                    </TableCell>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.stock}</TableCell>
+                    <TableCell>R{product.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                        <Button size="sm" onClick={() => addToCart(product)}>
+                        <Plus className="h-4 w-4 mr-2" /> Add
+                        </Button>
+                    </TableCell>
+                    </TableRow>
+                ))}
+                </TableBody>
+            </Table>
+            </ScrollArea>
+          </>
+        )}
       </div>
 
       {/* Cart Section */}
@@ -246,7 +297,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="-mx-4 flex-grow">
+        <ScrollArea className="flex-grow -mx-4">
           <div className="px-4">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -314,3 +365,5 @@ export default function PosPage() {
     </div>
   );
 }
+
+    
