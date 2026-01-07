@@ -8,6 +8,7 @@ import {
   BarChart,
   Settings,
   BookOpen,
+  ShoppingBasket,
 } from 'lucide-react';
 
 export const navItems = [
@@ -17,6 +18,7 @@ export const navItems = [
   { href: '/transactions', label: 'Orders', icon: ScrollText },
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/vouchers', label: 'Campaigns', icon: Ticket },
+  { href: '/marketplace', label: 'Marketplace', icon: ShoppingBasket },
   { href: '/reports', label: 'Reports', icon: BarChart },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
