@@ -230,7 +230,7 @@ export default function PosPage() {
 
       {/* Cart Section */}
       <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col h-full">
-        <div className="flex justify-between items-center mb-4 border-b pb-3 h-[5%]">
+        <div className="flex justify-between items-center mb-4 border-b pb-3 shrink-0">
             <div>
                 <h2 className="font-semibold text-lg">Sale #8822</h2>
             </div>
@@ -246,7 +246,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="-mx-4 h-[35%]">
+        <ScrollArea className="-mx-4 flex-grow">
           <div className="px-4">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
@@ -276,39 +276,37 @@ export default function PosPage() {
         </ScrollArea>
 
         {cartItems.length > 0 && (
-          <div className="h-[60%] flex flex-col">
-            <div className="pt-4 border-t">
-                <div className="text-sm space-y-2 mb-4">
-                <div className="flex justify-between text-gray-500">
-                    <span>Subtotal</span>
-                    <span>R {cartSubtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-500">
-                    <span>VAT (15%)</span>
-                    <span>R {vat.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-gray-500">
-                    <span>Discount Applied:</span>
-                    <span>-R 0.00</span>
-                </div>
-                </div>
-                
-                <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
-                <span className="text-lg font-bold">Total to Pay</span>
-                <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
-                </div>
+          <div className="mt-auto pt-4 border-t shrink-0">
+            <div className="text-sm space-y-2 mb-4">
+              <div className="flex justify-between text-gray-500">
+                  <span>Subtotal</span>
+                  <span>R {cartSubtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                  <span>VAT (15%)</span>
+                  <span>R {vat.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500">
+                  <span>Discount Applied</span>
+                  <span>-R 0.00</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
+              <span className="text-lg font-bold">Total to Pay</span>
+              <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
+            </div>
 
-                <div className="grid grid-cols-3 gap-3">
-                <Button size="lg" className="h-14 text-base bg-green-500 hover:bg-green-600 text-white" onClick={() => handleCheckout('Cash')}>
-                    CASH
-                </Button>
-                <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Card')}>
-                    CARD
-                </Button>
-                <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Mobile Money')}>
-                    MOBILE
-                </Button>
-                </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Button size="lg" className="h-14 text-base bg-green-500 hover:bg-green-600 text-white" onClick={() => handleCheckout('Cash')}>
+                  CASH
+              </Button>
+              <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Card')}>
+                  CARD
+              </Button>
+              <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Mobile Money')}>
+                  MOBILE
+              </Button>
             </div>
           </div>
         )}
