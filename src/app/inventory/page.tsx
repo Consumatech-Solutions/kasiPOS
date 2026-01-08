@@ -1,24 +1,49 @@
+
 'use client';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { db } from '@/lib/db';
-import type { Product } from '@/types';
+import type { Product, Category } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Minus, Check } from 'lucide-react';
+import { Plus, Minus, Check, Search } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+
 
 export default function InventoryPage() {
-  const products = useLiveQuery(() => db.products.toArray(), []);
+  const allProducts = useLiveQuery(() => db.products.toArray(), []);
+  const categories = useLiveQuery(() => db.categories.toArray(), []);
   const { toast } = useToast();
+  
   const [editingValues, setEditingValues] = useState<Record<string, { stock?: number; threshold?: number }>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+
+  const filteredProducts = useMemo(() => {
+    if (!allProducts) return [];
+    return allProducts.filter(product => {
+      const stock = editingValues[product.id!]?.stock ?? product.stock;
+      const threshold = editingValues[product.id!]?.threshold ?? product.lowStockThreshold ?? 0;
+      
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+      const matchesLowStock = !showLowStockOnly || (stock <= threshold && threshold > 0);
+
+      return matchesSearch && matchesCategory && matchesLowStock;
+    });
+  }, [allProducts, searchTerm, selectedCategory, showLowStockOnly, editingValues]);
+
 
   const getStockBadgeVariant = (stock: number, threshold?: number) => {
-    if (threshold !== undefined && stock <= threshold) return 'destructive';
+    if (threshold !== undefined && threshold > 0 && stock <= threshold) return 'destructive';
     if (stock < 50) return 'secondary';
     return 'default';
   };
@@ -96,6 +121,34 @@ export default function InventoryPage() {
         <CardDescription>Manage your product inventory and set low stock alerts.</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input 
+                    placeholder="Search by product name..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories?.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                </SelectContent>
+            </Select>
+            <div className="flex items-center space-x-2">
+                <Switch 
+                    id="low-stock-filter" 
+                    checked={showLowStockOnly}
+                    onCheckedChange={setShowLowStockOnly}
+                />
+                <Label htmlFor="low-stock-filter">Low Stock Only</Label>
+            </div>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -108,8 +161,8 @@ export default function InventoryPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products && products.length > 0 ? (
-              products.map(product => {
+            {filteredProducts && filteredProducts.length > 0 ? (
+              filteredProducts.map(product => {
                 const isEditing = !!editingValues[product.id!];
                 const editingStock = editingValues[product.id!]?.stock;
                 const editingThreshold = editingValues[product.id!]?.threshold;
