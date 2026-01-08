@@ -47,9 +47,9 @@ export async function seedDatabase() {
 
         // Seed Customers
         const customers = [
-            { name: 'John Doe', email: 'john.doe@example.com', phone: '0821234567', loyaltyPoints: 150 },
-            { name: 'Jane Smith', email: 'jane.smith@example.com', phone: '0731234567', loyaltyPoints: 45 },
-            { name: 'Sipho Williams', email: 'sipho.w@example.com', phone: '0841234567', loyaltyPoints: 320 },
+            { name: 'John Doe', phone: '0821234567', loyaltyPoints: 150 },
+            { name: 'Jane Smith', phone: '0731234567', loyaltyPoints: 45 },
+            { name: 'Sipho Williams', phone: '0841234567', loyaltyPoints: 320 },
         ];
         await db.customers.bulkAdd(customers);
 
