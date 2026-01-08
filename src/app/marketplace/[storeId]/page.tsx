@@ -1,10 +1,10 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 
 import type { Product, Transaction, TransactionItem, Customer } from '@/types';
 import { db } from '@/lib/db';
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Search, QrCode, CreditCard, LayoutGrid, List } from 'lucide-react';
+import { Plus, Minus, Trash2, User, Search, QrCode, CreditCard, LayoutGrid, List, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -287,7 +287,15 @@ export default function StorePosPage() {
         {/* Child 1: Header */}
         <div className="p-4 border-b shrink-0">
             <div className="flex justify-between items-center">
-                <h2 className="font-semibold text-lg">Order for {storeName}</h2>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" className="h-8 w-8" asChild>
+                        <Link href="/marketplace">
+                            <ArrowLeft className="h-4 w-4" />
+                            <span className="sr-only">Back to Marketplace</span>
+                        </Link>
+                    </Button>
+                    <h2 className="font-semibold text-lg">Order for {storeName}</h2>
+                </div>
                 <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
                     <DialogTrigger asChild>
                         <Button variant="ghost" size="sm" onClick={() => setCustomerSearchTerm('')}>
