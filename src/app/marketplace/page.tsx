@@ -10,28 +10,52 @@ import { Search } from 'lucide-react';
 
 const marketplaces = [
   {
-    id: 'boxer',
-    name: 'Boxer',
-    logoUrl: 'https://placehold.co/200x100/F3722C/FFFFFF?text=Boxer',
-    description: 'Your favourite local supermarket with everyday low prices.'
+    id: 'takealot',
+    name: 'Takealot',
+    logoUrl: 'https://placehold.co/200x100/00549F/FFFFFF?text=Takealot',
+    description: "South Africa's leading online store for electronics, appliances, and more."
   },
   {
-    id: 'picknpay',
-    name: 'Pick n Pay',
-    logoUrl: 'https://placehold.co/200x100/00479C/FFFFFF?text=Pick+n+Pay',
-    description: 'Fresh groceries, quality products, and great value.'
+    id: 'amazon',
+    name: 'Amazon',
+    logoUrl: 'https://placehold.co/200x100/FF9900/000000?text=amazon',
+    description: 'Global marketplace for millions of products from A to Z.'
   },
   {
-    id: 'checkers',
-    name: 'Checkers',
-    logoUrl: 'https://placehold.co/200x100/D9231D/FFFFFF?text=Checkers',
-    description: 'Better and better deals on a wide range of products.'
+    id: 'makro',
+    name: 'Makro',
+    logoUrl: 'https://placehold.co/200x100/D9002D/FFFFFF?text=Makro',
+    description: 'Big on life. Get everything you need for your home and business.'
   },
   {
-    id: 'usave',
-    name: 'Shoprite U-Save',
-    logoUrl: 'https://placehold.co/200x100/FFC82E/000000?text=U-Save',
-    description: 'Saving you money on your daily essentials.'
+    id: 'temu',
+    name: 'Temu',
+    logoUrl: 'https://placehold.co/200x100/F26322/FFFFFF?text=Temu',
+    description: 'Shop like a billionaire with deals on fashion, home, and tech.'
+  },
+  {
+    id: 'checkers-hyper',
+    name: 'Checkers Hyper',
+    logoUrl: 'https://placehold.co/200x100/D9231D/FFFFFF?text=Checkers+Hyper',
+    description: 'Better and better deals on a wide range of groceries and goods.'
+  },
+  {
+    id: 'pnp-hyper',
+    name: 'Pick n Pay Hyper',
+    logoUrl: 'https://placehold.co/200x100/00479C/FFFFFF?text=PnP+Hyper',
+    description: 'Your one-stop shop for groceries, clothing, and general merchandise.'
+  },
+  {
+    id: 'bash',
+    name: 'Bash',
+    logoUrl: 'https://placehold.co/200x100/000000/FFFFFF?text=Bash',
+    description: 'The home of fashion. Shop the latest trends from your favourite brands.'
+  },
+  {
+    id: 'tfg',
+    name: 'TFG',
+    logoUrl: 'https://placehold.co/200x100/0033A0/FFFFFF?text=TFG',
+    description: 'A diverse portfolio of fashion, jewellery, and homeware brands.'
   },
 ];
 
