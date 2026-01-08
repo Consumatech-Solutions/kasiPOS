@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Product, Customer, Transaction, Voucher, Category } from '@/types';
+import type { Product, Customer, Transaction, Voucher, Category, StockAdjustment } from '@/types';
 
 export class KasiPosDexie extends Dexie {
   products!: Table<Product>;
@@ -7,9 +7,18 @@ export class KasiPosDexie extends Dexie {
   transactions!: Table<Transaction>;
   vouchers!: Table<Voucher>;
   categories!: Table<Category>;
+  stockAdjustments!: Table<StockAdjustment>;
 
   constructor() {
     super('kasiPosDatabase');
+    this.version(3).stores({
+      products: '++id, name, category, barcode',
+      customers: '++id, name, email',
+      transactions: '++id, customerId, date',
+      vouchers: '++id, code, isActive',
+      categories: '++id, name',
+      stockAdjustments: '++id, productId, date',
+    });
     this.version(2).stores({
       products: '++id, name, category, barcode',
       customers: '++id, name, email',

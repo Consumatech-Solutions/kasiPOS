@@ -53,4 +53,16 @@ export interface Category {
     name: string;
 }
 
+export type StockAdjustmentReason = 'New stock received' | 'Shrinkage' | 'Damages' | 'Expired' | 'Other';
+
+export interface StockAdjustment {
+  id?: number;
+  productId: number;
+  productName: string; // denormalized for easier display
+  date: Date;
+  oldStock: number;
+  newStock: number;
+  reason: StockAdjustmentReason;
+  note?: string;
+}
     
