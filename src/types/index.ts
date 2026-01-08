@@ -7,6 +7,7 @@ export interface Product {
   barcode?: string;
   imageUrl: string;
   imageHint?: string;
+  lowStockThreshold?: number;
 }
 
 export interface Customer {
