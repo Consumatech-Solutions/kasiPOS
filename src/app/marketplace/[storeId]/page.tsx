@@ -336,7 +336,7 @@ export default function StorePosPage() {
         </div>
 
         {/* Child 2: Cart Items */}
-        <div className="overflow-y-auto" style={{ height: '45%' }}>
+        <div className="overflow-y-auto" style={{ height: '35%' }}>
           <ScrollArea className="h-full">
             {cartItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -367,7 +367,7 @@ export default function StorePosPage() {
 
         {/* Child 3: Payment Section */}
         {cartItems.length > 0 && (
-          <div className="p-4 border-t" style={{ height: '55%' }}>
+          <div className="p-4 border-t" style={{ height: '65%' }}>
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
