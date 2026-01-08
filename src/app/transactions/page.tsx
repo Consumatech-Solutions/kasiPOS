@@ -15,8 +15,8 @@ import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar as CalendarIcon, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Calendar as CalendarIcon, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function TransactionsPage() {
@@ -24,8 +24,13 @@ export default function TransactionsPage() {
   const customers = useLiveQuery(() => db.customers.toArray(), []);
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
+
+  const getCustomerName = (customerId: number | undefined) => {
+    if (!customers || !customerId) return 'N/A';
+    return customers.find(c => c.id === customerId)?.name || 'Unknown';
+  };
 
   const filteredTransactions = useMemo(() => {
     if (!allTransactions) return [];
@@ -35,22 +40,21 @@ export default function TransactionsPage() {
         transaction.date >= startOfDay(selectedDate) && transaction.date <= endOfDay(selectedDate)
       );
 
-      const customerMatch = selectedCustomerId === 'all' || 
-                           (transaction.customerId !== undefined && String(transaction.customerId) === selectedCustomerId);
+      const searchTermLower = searchTerm.toLowerCase();
+      const searchMatch = !searchTerm || (
+        String(transaction.id).includes(searchTermLower) ||
+        getCustomerName(transaction.customerId).toLowerCase().includes(searchTermLower)
+      );
 
-      return dateMatch && customerMatch;
+      return dateMatch && searchMatch;
     });
 
-  }, [allTransactions, selectedDate, selectedCustomerId]);
+  }, [allTransactions, selectedDate, searchTerm, customers]);
 
-  const getCustomerName = (customerId: number | undefined) => {
-    if (!customers || !customerId) return 'N/A';
-    return customers.find(c => c.id === customerId)?.name || 'Unknown';
-  };
 
   const clearFilters = () => {
     setSelectedDate(undefined);
-    setSelectedCustomerId('all');
+    setSearchTerm('');
   }
 
   return (
@@ -84,19 +88,19 @@ export default function TransactionsPage() {
               </PopoverContent>
             </Popover>
 
-            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-              <SelectTrigger className="w-full sm:w-[240px]">
-                <SelectValue placeholder="Filter by customer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Customers</SelectItem>
-                {customers?.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="relative w-full sm:w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search by Order # or Customer"
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
 
-            {(selectedDate || selectedCustomerId !== 'all') && (
+            {(selectedDate || searchTerm) && (
               <Button variant="ghost" onClick={clearFilters}>
-                <X className="mr-2 h-4 w-4" /> Clear
+                <X className="mr-2 h-4 w-4" /> Clear Filters
               </Button>
             )}
         </div>
