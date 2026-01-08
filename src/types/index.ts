@@ -6,7 +6,7 @@ export interface Product {
   category: string;
   barcode?: string;
   imageUrl: string;
-  imageHint: string;
+  imageHint?: string;
 }
 
 export interface Customer {
@@ -33,7 +33,7 @@ export interface Transaction {
   date: Date;
   items: TransactionItem[];
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'E-wallet';
+  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
   voucherCode?: string;
   discountAmount?: number;
 }
@@ -51,3 +51,5 @@ export interface Category {
     id?: number;
     name: string;
 }
+
+    

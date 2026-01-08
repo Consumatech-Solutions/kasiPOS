@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
@@ -19,21 +19,32 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, QrCode } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+
 
 // Zod Schemas for validation
 const categorySchema = z.object({
   name: z.string().min(2, { message: "Category name must be at least 2 characters." }),
 });
 
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
 const productSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
-  stock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }),
+  stock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }).optional(),
   category: z.string().min(1, { message: "Please select a category." }),
   barcode: z.string().optional(),
-  imageUrl: z.string().url({ message: "Please enter a valid image URL." }),
+  image: z.any()
+    .refine((files) => files?.length === 0 || files?.[0]?.size <= MAX_FILE_SIZE, `Max image size is 2MB.`)
+    .refine(
+      (files) => files?.length === 0 || ACCEPTED_IMAGE_TYPES.includes(files?.[0]?.type),
+      "Only .jpg, .jpeg, .png and .webp formats are supported."
+    ).optional(),
+  imageUrl: z.string().optional(),
   imageHint: z.string().optional(),
 });
 
@@ -44,8 +55,13 @@ export default function CataloguePage() {
   // Dialog states
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [scannerDialogOpen, setScannerDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
 
   // Live queries
   const products = useLiveQuery(() => db.products.toArray(), []);
@@ -60,8 +76,6 @@ export default function CataloguePage() {
       stock: 0,
       category: '',
       barcode: '',
-      imageUrl: '',
-      imageHint: '',
     },
   });
 
@@ -72,36 +86,116 @@ export default function CataloguePage() {
     },
   });
 
+  // Barcode Scanner Effect
+  useEffect(() => {
+    if (scannerDialogOpen) {
+      const getCameraPermission = async () => {
+        try {
+          // Check for mediaDevices support
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error('Media Devices API not supported.');
+            setHasCameraPermission(false);
+            toast({
+              variant: 'destructive',
+              title: 'Not Supported',
+              description: 'Your browser does not support camera access.',
+            });
+            return;
+          }
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+          setHasCameraPermission(true);
+  
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings.',
+          });
+        }
+      };
+      getCameraPermission();
+    } else {
+      // Cleanup: stop video stream when dialog is closed
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    }
+  }, [scannerDialogOpen, toast]);
+
+  const fileRef = productForm.register("image");
+
   // Handlers for Products
   const openProductDialog = (product?: Product) => {
+    productForm.reset();
+    setImagePreview(null);
     if (product) {
       setEditingProduct(product);
-      productForm.reset(product);
+      productForm.setValue('name', product.name);
+      productForm.setValue('price', product.price);
+      productForm.setValue('stock', product.stock);
+      productForm.setValue('category', product.category);
+      productForm.setValue('barcode', product.barcode);
+      productForm.setValue('imageUrl', product.imageUrl);
+      productForm.setValue('imageHint', product.imageHint);
+      setImagePreview(product.imageUrl);
     } else {
       setEditingProduct(null);
-      productForm.reset({
-        name: '',
-        price: 0,
-        stock: 0,
-        category: '',
-        barcode: '',
-        imageUrl: PlaceHolderImages[0].imageUrl,
-        imageHint: PlaceHolderImages[0].imageHint
-      });
+       const defaultImage = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
+      productForm.setValue('name', '');
+      productForm.setValue('price', 0);
+      productForm.setValue('stock', 0);
+      productForm.setValue('category', '');
+      productForm.setValue('barcode', '');
+      productForm.setValue('imageUrl', defaultImage.imageUrl);
+      productForm.setValue('imageHint', defaultImage.imageHint);
+      setImagePreview(defaultImage.imageUrl);
     }
     setProductDialogOpen(true);
   };
 
   const handleProductSubmit = async (values: z.infer<typeof productSchema>) => {
     try {
+      let imageUrl = values.imageUrl;
+      let imageHint = values.imageHint;
+
+      // Handle image upload
+      if (values.image && values.image.length > 0) {
+        const file = values.image[0];
+        // For simplicity, we'll use a data URL. In a real app, you'd upload to a service.
+        imageUrl = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+        imageHint = ''; // No hint for custom uploaded images
+      }
+      
+      const productData: Omit<Product, 'id'> = {
+        name: values.name,
+        price: values.price,
+        stock: values.stock || 0,
+        category: values.category,
+        barcode: values.barcode,
+        imageUrl: imageUrl || '',
+        imageHint: imageHint || '',
+      };
+
       if (editingProduct) {
-        await db.products.update(editingProduct.id!, values);
+        await db.products.update(editingProduct.id!, productData);
         toast({ title: "Success", description: "Product updated successfully." });
       } else {
-        await db.products.add(values as Product);
+        await db.products.add(productData as Product);
         toast({ title: "Success", description: "Product added successfully." });
       }
       setProductDialogOpen(false);
+      productForm.reset();
     } catch (error) {
       console.error("Failed to save product:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to save product." });
@@ -313,7 +407,7 @@ export default function CataloguePage() {
                     )} />
                      <FormField control={productForm.control} name="stock" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Stock</FormLabel>
+                            <FormLabel>Stock (Optional)</FormLabel>
                             <FormControl><Input type="number" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
@@ -321,14 +415,61 @@ export default function CataloguePage() {
                      <FormField control={productForm.control} name="barcode" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Barcode (Optional)</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
+                            <div className="flex gap-2">
+                                <FormControl><Input {...field} /></FormControl>
+                                <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button type="button" variant="outline" size="icon"><QrCode className="h-4 w-4"/></Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Scan Barcode</DialogTitle>
+                                            <DialogDescription>Point your camera at a barcode. This is a placeholder and does not scan barcodes yet.</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="relative">
+                                            <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted" autoPlay muted playsInline />
+                                            {hasCameraPermission === false && (
+                                                <Alert variant="destructive" className="mt-4">
+                                                    <AlertTitle>Camera Access Required</AlertTitle>
+                                                    <AlertDescription>
+                                                        Please allow camera access in your browser settings to use the scanner.
+                                                    </AlertDescription>
+                                                </Alert>
+                                            )}
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                             <FormMessage />
                         </FormItem>
                     )} />
-                     <FormField control={productForm.control} name="imageUrl" render={({ field }) => (
+                     <FormField control={productForm.control} name="image" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Image URL</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
+                            <FormLabel>Product Image (Optional)</FormLabel>
+                            {imagePreview && <Image src={imagePreview} alt="Image preview" width={80} height={80} className="rounded-md object-cover my-2" />}
+                            <FormControl>
+                                <Input type="file" accept="image/*" {...fileRef} onChange={(e) => {
+                                  field.onChange(e.target.files);
+                                  if (e.target.files && e.target.files[0]) {
+                                      const file = e.target.files[0];
+                                      if (file.size > MAX_FILE_SIZE) {
+                                          productForm.setError("image", { type: "manual", message: "Max image size is 2MB." });
+                                          setImagePreview(null);
+                                      } else if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+                                          productForm.setError("image", { type: "manual", message: "Only .jpg, .jpeg, .png and .webp formats are supported." });
+                                          setImagePreview(null);
+                                      } else {
+                                          const reader = new FileReader();
+                                          reader.onload = (loadEvent) => {
+                                              setImagePreview(loadEvent.target?.result as string);
+                                          };
+                                          reader.readAsDataURL(file);
+                                      }
+                                  } else {
+                                      setImagePreview(null);
+                                  }
+                                }} />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -368,3 +509,5 @@ export default function CataloguePage() {
     </div>
   );
 }
+
+    
