@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 // Zod Schema for validation
 const customerSchema = z.object({
   name: z.string().min(2, { message: "Customer name must be at least 2 characters." }),
-  phone: z.string().optional(),
+  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
 });
 
 export default function CustomersPage() {
@@ -231,7 +231,7 @@ export default function CustomersPage() {
                     )} />
                     <FormField control={customerForm.control} name="phone" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Mobile Number (Optional)</FormLabel>
+                            <FormLabel>Mobile Number</FormLabel>
                             <FormControl><Input {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
