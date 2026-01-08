@@ -11,6 +11,14 @@ export class KasiPosDexie extends Dexie {
 
   constructor() {
     super('kasiPosDatabase');
+    this.version(4).stores({
+      products: '++id, name, category, barcode',
+      customers: '++id, name, phone',
+      transactions: '++id, customerId, date',
+      vouchers: '++id, code, isActive',
+      categories: '++id, name',
+      stockAdjustments: '++id, productId, date',
+    });
     this.version(3).stores({
       products: '++id, name, category, barcode',
       customers: '++id, name, email',
@@ -18,6 +26,8 @@ export class KasiPosDexie extends Dexie {
       vouchers: '++id, code, isActive',
       categories: '++id, name',
       stockAdjustments: '++id, productId, date',
+    }).upgrade(tx => {
+      // New version 4 will handle the schema change from email to phone
     });
     this.version(2).stores({
       products: '++id, name, category, barcode',

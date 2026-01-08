@@ -65,4 +65,3 @@ export interface StockAdjustment {
   reason: StockAdjustmentReason;
   note?: string;
 }
-    
