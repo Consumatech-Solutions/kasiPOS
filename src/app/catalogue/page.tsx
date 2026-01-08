@@ -76,6 +76,8 @@ export default function CataloguePage() {
       stock: 0,
       category: '',
       barcode: '',
+      imageUrl: '',
+      imageHint: '',
     },
   });
 
@@ -144,18 +146,18 @@ export default function CataloguePage() {
       productForm.setValue('barcode', product.barcode);
       productForm.setValue('imageUrl', product.imageUrl);
       productForm.setValue('imageHint', product.imageHint);
-      setImagePreview(product.imageUrl);
+      if (product.imageUrl) {
+        setImagePreview(product.imageUrl);
+      }
     } else {
       setEditingProduct(null);
-       const defaultImage = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
       productForm.setValue('name', '');
       productForm.setValue('price', 0);
       productForm.setValue('stock', 0);
       productForm.setValue('category', '');
       productForm.setValue('barcode', '');
-      productForm.setValue('imageUrl', defaultImage.imageUrl);
-      productForm.setValue('imageHint', defaultImage.imageHint);
-      setImagePreview(defaultImage.imageUrl);
+      productForm.setValue('imageUrl', '');
+      productForm.setValue('imageHint', '');
     }
     setProductDialogOpen(true);
   };
@@ -175,6 +177,11 @@ export default function CataloguePage() {
           reader.readAsDataURL(file);
         });
         imageHint = ''; // No hint for custom uploaded images
+      } else if (!imageUrl) {
+        // If no image is uploaded and no existing imageUrl, use a placeholder
+        const defaultImage = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
+        imageUrl = defaultImage.imageUrl;
+        imageHint = defaultImage.imageHint;
       }
       
       const productData: Omit<Product, 'id'> = {
@@ -466,7 +473,7 @@ export default function CataloguePage() {
                                           reader.readAsDataURL(file);
                                       }
                                   } else {
-                                      setImagePreview(null);
+                                      setImagePreview(editingProduct?.imageUrl || null);
                                   }
                                 }} />
                             </FormControl>
@@ -509,5 +516,3 @@ export default function CataloguePage() {
     </div>
   );
 }
-
-    
