@@ -155,7 +155,7 @@ export default function StorePosPage() {
     // For now, we'll just create a toast notification.
     toast({
       title: "Order Placed (Simulation)",
-      description: `Order for ${selectedCustomer?.name} at ${storeName} for R${cartTotal.toFixed(2)} via ${method}.`,
+      description: `Order for ${selectedCustomer?.name} at ${storeName} for R${(cartTotal + 15).toFixed(2)} via ${method}.`,
     });
     setCart(new Map());
     setSelectedCustomerId(undefined);
@@ -168,7 +168,7 @@ export default function StorePosPage() {
 
   return (
     <>
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-gray-50">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-slate-50">
       {/* Product Selection */}
       <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col">
         <div className="relative mb-4">
@@ -283,29 +283,64 @@ export default function StorePosPage() {
       </div>
 
       {/* Cart Section */}
-      <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col h-full">
-        <div className="flex justify-between items-center mb-4 border-b pb-3 shrink-0">
-            <div>
+      <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg flex flex-col h-full">
+        <div className="p-4 border-b">
+            <div className="flex justify-between items-center">
                 <h2 className="font-semibold text-lg">Order for {storeName}</h2>
+                <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                            <User className="mr-2 h-4 w-4"/>
+                            {selectedCustomer ? selectedCustomer.name : 'Add Customer'}
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Select a Customer</DialogTitle>
+                         <div className="relative mt-4">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            <Input 
+                                placeholder="Search by name or phone number..."
+                                className="pl-10"
+                                value={customerSearchTerm}
+                                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                            />
+                        </div>
+                      </DialogHeader>
+                      <ScrollArea className="max-h-[50vh]">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Phone</TableHead>
+                                    <TableHead></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredCustomers?.map(customer => (
+                                    <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
+                                        <TableCell>{customer.name}</TableCell>
+                                        <TableCell>{customer.phone}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button size="sm">Select</Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                      </ScrollArea>
+                    </DialogContent>
+                </Dialog>
             </div>
-            <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                        <User className="mr-2 h-4 w-4"/>
-                        {selectedCustomer ? selectedCustomer.name : 'Add Customer'}
-                    </Button>
-                </DialogTrigger>
-            </Dialog>
         </div>
 
-        <ScrollArea className="flex-grow -mx-4">
-          <div className="px-4">
+        <ScrollArea className="flex-grow">
           {cartItems.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
               <p>Cart is empty</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 p-4">
               {cartItems.map(item => (
                 <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50">
                   <Image src={item.imageUrl || ''} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
@@ -324,11 +359,10 @@ export default function StorePosPage() {
               ))}
             </div>
           )}
-          </div>
         </ScrollArea>
 
         {cartItems.length > 0 && (
-          <div className="mt-auto pt-4 border-t shrink-0">
+          <div className="p-4 mt-auto border-t">
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
@@ -360,7 +394,7 @@ export default function StorePosPage() {
                   MOBILE
               </Button>
             </div>
-             {!selectedCustomerId && <p className="text-center text-sm text-destructive mt-2">Please select a customer to proceed with the order.</p>}
+             {!selectedCustomerId && cartItems.length > 0 && <p className="text-center text-sm text-destructive mt-2">Please select a customer to proceed with the order.</p>}
           </div>
         )}
       </div>
@@ -408,4 +442,3 @@ export default function StorePosPage() {
     </>
   );
 }
-
