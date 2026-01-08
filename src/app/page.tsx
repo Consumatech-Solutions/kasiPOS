@@ -297,37 +297,37 @@ export default function PosPage() {
             </div>
         </div>
 
-        <ScrollArea className="flex-grow -mx-4">
-          <div className="px-4">
-          {cartItems.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              <p>Cart is empty</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {cartItems.map(item => (
-                <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50">
-                  <Image src={item.imageUrl || ''} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
-                  <div className="flex-grow">
-                    <p className="font-medium text-sm">{item.productName}</p>
-                    <p className="text-xs text-gray-500">R {item.unitPrice.toFixed(2)}</p>
+        <div className="overflow-y-auto" style={{ height: '35%' }}>
+          <ScrollArea className="h-full pr-4">
+            {cartItems.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                <p>Cart is empty</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {cartItems.map(item => (
+                  <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50">
+                    <Image src={item.imageUrl || ''} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
+                    <div className="flex-grow">
+                      <p className="font-medium text-sm">{item.productName}</p>
+                      <p className="text-xs text-gray-500">R {item.unitPrice.toFixed(2)}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
+                      <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
+                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
+                    </div>
+                    <p className="font-semibold text-sm w-20 text-right">R{item.totalPrice.toFixed(2)}</p>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
-                    <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
-                    <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
-                  </div>
-                  <p className="font-semibold text-sm w-20 text-right">R{item.totalPrice.toFixed(2)}</p>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              ))}
-            </div>
-          )}
-          </div>
-        </ScrollArea>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
 
         {cartItems.length > 0 && (
-          <div className="mt-auto pt-4 border-t shrink-0">
+          <div className="pt-4 border-t" style={{ height: '65%' }}>
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
