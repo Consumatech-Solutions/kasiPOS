@@ -284,12 +284,13 @@ export default function StorePosPage() {
 
       {/* Cart Section */}
       <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg flex flex-col h-full">
+        {/* Child 1: Header */}
         <div className="p-4 border-b shrink-0">
             <div className="flex justify-between items-center">
                 <h2 className="font-semibold text-lg">Order for {storeName}</h2>
                 <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => setCustomerSearchTerm('')}>
                             <User className="mr-2 h-4 w-4"/>
                             {selectedCustomer ? selectedCustomer.name : 'Add Customer'}
                         </Button>
@@ -334,7 +335,8 @@ export default function StorePosPage() {
             </div>
         </div>
 
-        <div className="flex-grow overflow-y-auto">
+        {/* Child 2: Cart Items */}
+        <div className="overflow-y-auto" style={{ height: '45%' }}>
           <ScrollArea className="h-full">
             {cartItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -363,8 +365,9 @@ export default function StorePosPage() {
           </ScrollArea>
         </div>
 
+        {/* Child 3: Payment Section */}
         {cartItems.length > 0 && (
-          <div className="p-4 mt-auto border-t shrink-0">
+          <div className="p-4 border-t" style={{ height: '55%' }}>
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
