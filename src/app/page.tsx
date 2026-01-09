@@ -19,6 +19,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye } from 'lucide-react';
+import PaymentModal from '@/components/pos/PaymentModal';
 
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
@@ -113,7 +114,7 @@ export default function PosPage() {
   const vat = cartSubtotal * 0.15;
   const cartTotal = cartSubtotal; // Simplified for now
 
-  const handleCheckout = async (method: 'Cash' | 'Card' | 'Mobile Money') => {
+  const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money') => {
     if (cart.size === 0) {
       toast({
         title: "Cart is empty",
@@ -125,7 +126,49 @@ export default function PosPage() {
     setActivePaymentMethod(method);
   };
 
+  const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
+    const newTransaction: Omit<Transaction, 'id'> = {
+      ...transactionDetails,
+      date: new Date(),
+      customerId: selectedCustomerId,
+    };
+    
+    try {
+      await db.transaction('rw', db.transactions, db.products, async () => {
+        // 1. Save transaction
+        await db.transactions.add(newTransaction as Transaction);
+        
+        // 2. Update stock levels
+        for (const item of newTransaction.items) {
+          const product = await db.products.get(item.productId);
+          if (product) {
+            const newStock = product.stock - item.quantity;
+            await db.products.update(item.productId, { stock: newStock });
+          }
+        }
+      });
+
+      toast({
+        title: "Sale Complete!",
+        description: `Transaction #${(await db.transactions.toCollection().last()).id} has been processed.`,
+      });
+
+      // Reset state
+      clearCart();
+      setSelectedCustomerId(undefined);
+      setActivePaymentMethod(null);
+    } catch (error) {
+      console.error("Failed to complete sale:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to complete the sale.",
+      });
+    }
+  };
+
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-gray-50">
       {/* Product Selection */}
       <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col">
@@ -324,6 +367,15 @@ export default function PosPage() {
         )}
       </div>
     </div>
+    <PaymentModal 
+        isOpen={!!activePaymentMethod}
+        onClose={() => setActivePaymentMethod(null)}
+        method={activePaymentMethod}
+        cartTotal={cartTotal}
+        cartItems={cartItems}
+        onCompleteSale={handleCompleteSale}
+    />
+    </>
   );
 }
 
