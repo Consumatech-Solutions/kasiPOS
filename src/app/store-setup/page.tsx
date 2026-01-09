@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Upload, Printer, ScanLine, CreditCard, FileUp, Sparkles, MoveRight } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import type { StoreProfile } from '@/types';
+import { Label } from '@/components/ui/label';
 
 
 const businessInfoSchema = z.object({
