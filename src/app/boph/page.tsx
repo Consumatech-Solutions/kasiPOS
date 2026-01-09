@@ -5,15 +5,27 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import type { Parcel } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardCopy } from 'lucide-react';
+import { ClipboardCopy, Search } from 'lucide-react';
 import { format } from 'date-fns';
+
+const collectionFormSchema = z.object({
+  collectionCode: z.string().min(1, { message: "Collection code is required." }),
+  collectingPersonName: z.string().min(2, { message: "Collector's name is required." }),
+  collectingPersonPhone: z.string().optional(),
+  collectingPersonId: z.string().min(5, { message: "A valid ID/Passport number is required." }),
+});
 
 export default function BophPage() {
   const { toast } = useToast();
@@ -22,10 +34,27 @@ export default function BophPage() {
   const [receiptCode, setReceiptCode] = useState('');
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
+  
+  const [collectionCodeInput, setCollectionCodeInput] = useState('');
+
+  const collectionForm = useForm<z.infer<typeof collectionFormSchema>>({
+    resolver: zodResolver(collectionFormSchema),
+    defaultValues: {
+      collectionCode: '',
+      collectingPersonName: '',
+      collectingPersonPhone: '',
+      collectingPersonId: '',
+    },
+  });
 
   const incomingParcels = useMemo(() => allParcels?.filter(p => p.status === 'Incoming') || [], [allParcels]);
-  const receivedParcels = useMemo(() => allParcels?.filter(p => p.status === 'Received') || [], [allParcels]);
-  const collectedParcels = useMemo(() => allParcels?.filter(p- => p.status === 'Collected') || [], [allParcels]);
+  const receivedParcels = useMemo(() => {
+    const parcels = allParcels?.filter(p => p.status === 'Received') || [];
+    if (!collectionCodeInput) return parcels;
+    return parcels.filter(p => p.collectionCode?.toLowerCase().includes(collectionCodeInput.toLowerCase()));
+  }, [allParcels, collectionCodeInput]);
+  const collectedParcels = useMemo(() => allParcels?.filter(p => p.status === 'Collected') || [], [allParcels]);
 
   // Function to generate a random alphanumeric code
   const generateCode = (length: number, prefix: string = '') => {
@@ -77,6 +106,51 @@ export default function BophPage() {
     }
   };
 
+  const handleOpenCollectModal = (parcel: Parcel) => {
+    setSelectedParcel(parcel);
+    collectionForm.reset({
+      collectionCode: parcel.collectionCode,
+      collectingPersonName: parcel.customerName, // Pre-fill with original customer name
+      collectingPersonPhone: '',
+      collectingPersonId: '',
+    });
+    setIsCollectModalOpen(true);
+  };
+
+  const handleConfirmCollection = async (values: z.infer<typeof collectionFormSchema>) => {
+    if (!selectedParcel || selectedParcel.collectionCode !== values.collectionCode) {
+       toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Collection code does not match the selected parcel.",
+      });
+      return;
+    }
+
+    try {
+      await db.parcels.update(selectedParcel.id!, {
+        status: 'Collected',
+        collectingPersonName: values.collectingPersonName,
+        collectingPersonPhone: values.collectingPersonPhone,
+        collectingPersonId: values.collectingPersonId,
+        dateCollected: new Date(),
+      });
+      toast({
+        title: "Parcel Collected",
+        description: `${selectedParcel.deliveryNumber} has been issued to the customer.`,
+      });
+      setIsCollectModalOpen(false);
+      setSelectedParcel(null);
+    } catch (error) {
+       console.error("Failed to update parcel:", error);
+       toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not complete the collection.",
+      });
+    }
+  };
+
 
   return (
     <div className="p-4">
@@ -122,14 +196,71 @@ export default function BophPage() {
             </TabsContent>
 
             <TabsContent value="received">
-                 <div className="text-center py-16 text-muted-foreground">
-                    <p>Parcel collection functionality will be built here.</p>
+                 <div className="relative my-4 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search by collection code..."
+                        className="pl-10"
+                        value={collectionCodeInput}
+                        onChange={(e) => setCollectionCodeInput(e.target.value)}
+                    />
                 </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Collection #</TableHead>
+                      <TableHead>Delivery #</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Date Received</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {receivedParcels.map(parcel => (
+                      <TableRow key={parcel.id}>
+                        <TableCell className="font-mono">{parcel.collectionCode}</TableCell>
+                        <TableCell className="font-mono">{parcel.deliveryNumber}</TableCell>
+                        <TableCell>{parcel.customerName}</TableCell>
+                        <TableCell>{parcel.dateReceived ? format(parcel.dateReceived, 'PPP') : 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" onClick={() => handleOpenCollectModal(parcel)}>Issue Parcel</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {receivedParcels.length === 0 && (
+                    <div className="text-center py-16 text-muted-foreground">
+                        {collectionCodeInput ? <p>No parcel found with that collection code.</p> : <p>No parcels are currently ready for collection.</p>}
+                    </div>
+                )}
             </TabsContent>
             <TabsContent value="collected">
-                 <div className="text-center py-16 text-muted-foreground">
-                    <p>Collection history will be displayed here.</p>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Delivery #</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Collected By</TableHead>
+                      <TableHead>Date Collected</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {collectedParcels.map(parcel => (
+                      <TableRow key={parcel.id}>
+                        <TableCell className="font-mono">{parcel.deliveryNumber}</TableCell>
+                        <TableCell>{parcel.customerName}</TableCell>
+                        <TableCell>{parcel.collectingPersonName}</TableCell>
+                        <TableCell>{parcel.dateCollected ? format(parcel.dateCollected, 'PPP p') : 'N/A'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {collectedParcels.length === 0 && (
+                    <div className="text-center py-16 text-muted-foreground">
+                        <p>No parcels have been collected yet.</p>
+                    </div>
+                )}
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -157,6 +288,78 @@ export default function BophPage() {
                 <Button variant="secondary" onClick={() => setIsReceiveModalOpen(false)}>Cancel</Button>
                 <Button onClick={handleConfirmReception}>Confirm & Receive</Button>
             </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Collect Parcel Modal */}
+      <Dialog open={isCollectModalOpen} onOpenChange={setIsCollectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Issue Parcel to Customer</DialogTitle>
+            <DialogDescription>
+              Confirm collection code and capture the details of the person collecting the parcel.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...collectionForm}>
+            <form onSubmit={collectionForm.handleSubmit(handleConfirmCollection)} className="space-y-4 pt-4">
+               <FormField
+                control={collectionForm.control}
+                name="collectionCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Collection Code</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly className="font-mono bg-muted" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={collectionForm.control}
+                name="collectingPersonName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Collector's Full Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={collectionForm.control}
+                name="collectingPersonPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Collector's Mobile Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input type="tel" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+               <FormField
+                control={collectionForm.control}
+                name="collectingPersonId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Collector's ID / Passport Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                <Button type="submit">Confirm Collection</Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
