@@ -104,8 +104,11 @@ export default function SettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="zu">isiZulu</SelectItem>
-                    <SelectItem value="xh">isiXhosa</SelectItem>
+                    <SelectItem value="fr">French</SelectItem>
+                    <SelectItem value="sw">Swahili</SelectItem>
+                    <SelectItem value="zu">Zulu</SelectItem>
+                    <SelectItem value="so">Somali</SelectItem>
+                    <SelectItem value="am">Amharic</SelectItem>
                 </SelectContent>
             </Select>
           </div>

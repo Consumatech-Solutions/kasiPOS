@@ -83,7 +83,7 @@ export interface Parcel {
 
 export interface AppSettings {
   theme: 'light' | 'dark';
-  language: 'en' | 'zu' | 'xh';
+  language: 'en' | 'fr' | 'sw' | 'zu' | 'so' | 'am';
   campaigns: boolean;
   marketplace: boolean;
   boph: boolean;
