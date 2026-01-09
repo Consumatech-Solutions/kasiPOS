@@ -30,6 +30,7 @@ export default function PosPage() {
   const [categoryView, setCategoryView] = useState<'carousel' | 'grid'>('carousel');
   const [categorySearch, setCategorySearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [activePaymentMethod, setActivePaymentMethod] = useState<'Cash' | 'Card' | 'Mobile Money' | null>(null);
 
   const { toast } = useToast();
 
@@ -121,47 +122,7 @@ export default function PosPage() {
       });
       return;
     }
-    
-    const newTransaction: Transaction = {
-      customerId: selectedCustomerId,
-      date: new Date(),
-      items: cartItems,
-      total: cartTotal,
-      paymentMethod: method,
-    };
-    
-    try {
-      await db.transaction('rw', db.transactions, db.products, db.customers, async () => {
-        const transactionId = await db.transactions.add(newTransaction);
-        
-        for (const item of newTransaction.items) {
-          await db.products.where({ id: item.productId }).modify(p => {
-            p.stock -= item.quantity;
-          });
-        }
-        
-        if (selectedCustomerId) {
-          await db.customers.where({ id: selectedCustomerId }).modify(c => {
-            c.loyaltyPoints = (c.loyaltyPoints || 0) + Math.floor(cartTotal);
-          });
-        }
-      });
-      
-      toast({
-        title: "Checkout successful",
-        description: `Transaction completed with ${method}. Total: R${cartTotal.toFixed(2)}`,
-      });
-      setCart(new Map());
-      setSelectedCustomerId(undefined);
-
-    } catch (error) {
-      console.error("Failed to checkout:", error);
-      toast({
-        title: "Checkout failed",
-        description: "An error occurred during checkout. Please try again.",
-        variant: 'destructive',
-      });
-    }
+    setActivePaymentMethod(method);
   };
 
   return (
@@ -297,7 +258,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <div className="overflow-y-auto" style={{ height: '35%' }}>
+        <div style={{ height: '35%' }}>
           <ScrollArea className="h-full pr-4">
             {cartItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -365,3 +326,5 @@ export default function PosPage() {
     </div>
   );
 }
+
+    
