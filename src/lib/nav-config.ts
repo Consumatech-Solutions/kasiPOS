@@ -5,7 +5,6 @@ import {
   Users,
   ScrollText,
   Ticket,
-  BarChart,
   Settings,
   BookOpen,
   ShoppingBasket,
@@ -19,6 +18,5 @@ export const navItems = [
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/vouchers', label: 'Campaigns', icon: Ticket },
   { href: '/marketplace', label: 'Marketplace', icon: ShoppingBasket },
-  { href: '/reports', label: 'Reports', icon: BarChart },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
