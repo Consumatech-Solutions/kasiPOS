@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import PwaInstallButton from '@/components/pwa-install-button';
-import { Smartphone, Moon, Sun, Languages, Info } from 'lucide-react';
+import { Moon, Sun, Languages, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -15,7 +14,7 @@ import { Button } from '@/components/ui/button';
 type Feature = 'campaigns' | 'marketplace' | 'boph';
 
 export default function SettingsPage() {
-  const { settings, setSetting, isPwa } = useSettings();
+  const { settings, setSetting } = useSettings();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
 
@@ -110,19 +109,6 @@ export default function SettingsPage() {
                 </SelectContent>
             </Select>
           </div>
-          
-           {!isPwa && (
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Smartphone className="w-5 h-5" />
-                    Install App
-                  </h3>
-                  <p className="text-sm text-muted-foreground">Install KasiPOS for a native-like experience.</p>
-                </div>
-                <PwaInstallButton />
-              </div>
-            )}
 
             <div className="space-y-2 pt-4">
                 <h3 className="text-lg font-semibold">Feature Management</h3>
