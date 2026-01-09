@@ -8,6 +8,7 @@ import {
   Settings,
   BookOpen,
   ShoppingBasket,
+  PackageCheck,
 } from 'lucide-react';
 
 export const navItems = [
@@ -18,5 +19,6 @@ export const navItems = [
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/vouchers', label: 'Campaigns', icon: Ticket },
   { href: '/marketplace', label: 'Marketplace', icon: ShoppingBasket },
+  { href: '/boph', label: 'BOPH', icon: PackageCheck },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

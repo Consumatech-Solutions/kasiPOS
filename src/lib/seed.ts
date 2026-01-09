@@ -2,33 +2,31 @@ import { db } from './db';
 import { PlaceHolderImages } from './placeholder-images';
 
 export async function seedDatabase() {
-    await db.transaction('rw', db.products, db.customers, db.vouchers, db.categories, async () => {
+    await db.transaction('rw', db.products, db.customers, db.vouchers, db.categories, db.parcels, async () => {
 
+        // Check if database is already seeded by checking a single table
         const productCount = await db.products.count();
         if (productCount > 0) {
             console.log('Database already seeded.');
             return;
         }
 
-        // Seed Categories first if they don't exist
-        const categoryCount = await db.categories.count();
-        if (categoryCount === 0) {
-            const initialCategories = [
-                { name: 'Drinks' },
-                { name: 'Snacks' },
-                { name: 'Bakery' },
-                { name: 'Dairy' },
-                { name: 'Confectionery' },
-                { name: 'Groceries' },
-                { name: 'Beverages' },
-                { name: 'Toiletries' },
-                { name: 'Airtime' },
-                { name: 'Cigs' },
-                { name: 'Veg' },
-                { name: 'Cool Drinks' },
-            ];
-            await db.categories.bulkAdd(initialCategories);
-        }
+        // Seed Categories
+        const initialCategories = [
+            { name: 'Drinks' },
+            { name: 'Snacks' },
+            { name: 'Bakery' },
+            { name: 'Dairy' },
+            { name: 'Confectionery' },
+            { name: 'Groceries' },
+            { name: 'Beverages' },
+            { name: 'Toiletries' },
+            { name: 'Airtime' },
+            { name: 'Cigs' },
+            { name: 'Veg' },
+            { name: 'Cool Drinks' },
+        ];
+        await db.categories.bulkAdd(initialCategories);
 
         // Seed Products
         const products = [
@@ -60,6 +58,16 @@ export async function seedDatabase() {
             { code: 'EXPIRED5', type: 'fixed', value: 5, minPurchase: 5, isActive: false },
         ];
         await db.vouchers.bulkAdd(vouchers);
+
+        // Seed Parcels
+        const parcels = [
+            { deliveryNumber: 'PAZ-1001', customerName: 'Thabo Mbeki', status: 'Incoming' },
+            { deliveryNumber: 'PAZ-1002', customerName: 'Cyril Ramaphosa', status: 'Incoming' },
+            { deliveryNumber: 'AMZ-5580', customerName: 'Nelson Mandela', status: 'Received', collectionCode: 'ZM451', receiptCode: 'RC-8912', dateReceived: new Date() },
+            { deliveryNumber: 'TKT-9210', customerName: 'Jacob Zuma', status: 'Collected', collectionCode: 'XF782', receiptCode: 'RC-9988', dateReceived: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), dateCollected: new Date(), collectingPersonName: 'J. Zuma' },
+        ];
+        await db.parcels.bulkAdd(parcels);
+
     }).catch(err => {
         console.error("Failed to seed database:", err);
     });

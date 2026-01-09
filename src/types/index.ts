@@ -64,3 +64,19 @@ export interface StockAdjustment {
   reason: StockAdjustmentReason;
   note?: string;
 }
+
+export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
+
+export interface Parcel {
+    id?: number;
+    deliveryNumber: string;
+    customerName: string;
+    status: ParcelStatus;
+    collectionCode?: string;
+    receiptCode?: string;
+    dateReceived?: Date;
+    dateCollected?: Date;
+    collectingPersonName?: string;
+    collectingPersonPhone?: string;
+    collectingPersonId?: string;
+}
