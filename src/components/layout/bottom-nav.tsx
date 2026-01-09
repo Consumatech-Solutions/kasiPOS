@@ -2,11 +2,24 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { navItems } from '@/lib/nav-config';
+import { navItems as allNavItems } from '@/lib/nav-config';
 import { Button } from '../ui/button';
+import { useSettings } from '../settings-provider';
+import { useMemo } from 'react';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { settings } = useSettings();
+
+  const navItems = useMemo(() => {
+    return allNavItems.filter(item => {
+      if (item.featureFlag && !settings[item.featureFlag]) {
+        return false;
+      }
+      return true;
+    });
+  }, [settings]);
+
 
   return (
     <nav className="sticky bottom-0 left-0 z-10 w-full h-16 bg-card border-t bottom-nav">

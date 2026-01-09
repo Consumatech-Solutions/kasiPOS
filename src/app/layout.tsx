@@ -4,6 +4,7 @@ import './globals.css';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { DbProvider } from '@/components/db-provider';
+import { SettingsProvider } from '@/components/settings-provider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -25,10 +26,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
-        <DbProvider>
-          <AppShell>{children}</AppShell>
-        </DbProvider>
-        <Toaster />
+        <SettingsProvider>
+          <DbProvider>
+            <AppShell>{children}</AppShell>
+          </DbProvider>
+          <Toaster />
+        </SettingsProvider>
       </body>
     </html>
   );

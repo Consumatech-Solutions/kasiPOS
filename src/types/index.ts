@@ -80,3 +80,11 @@ export interface Parcel {
     collectingPersonPhone?: string;
     collectingPersonId?: string;
 }
+
+export interface AppSettings {
+  theme: 'light' | 'dark';
+  language: 'en' | 'zu' | 'xh';
+  campaigns: boolean;
+  marketplace: boolean;
+  boph: boolean;
+}
