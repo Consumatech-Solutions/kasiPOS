@@ -1,21 +1,94 @@
-
 'use client';
 
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/components/settings-provider';
+
+const verifyCodeSchema = z.object({
+  code: z.string().length(6, { message: "Code must be 6 digits." }),
+});
+
+const MOCK_OTP_CODE = '123456';
 
 export default function VerifyCodePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const phone = searchParams.get('phone');
+  const { toast } = useToast();
+  const { setSetting, settings } = useSettings();
+
+  const form = useForm<z.infer<typeof verifyCodeSchema>>({
+    resolver: zodResolver(verifyCodeSchema),
+    defaultValues: {
+      code: '',
+    },
+  });
+
+  const onSubmit = (values: z.infer<typeof verifyCodeSchema>) => {
+    if (values.code === MOCK_OTP_CODE) {
+        toast({
+            title: 'Verification Successful!',
+            description: 'You can now set your password.',
+        });
+        setSetting('isLoggedIn', true); // Tentatively log in
+        
+        // In a real app, you'd check a backend flag. Here, we use the persisted setting.
+        if (settings.hasSetPassword) {
+            router.push('/'); // Should not happen in this flow, but good practice
+        } else {
+            router.push('/set-password');
+        }
+
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Verification Failed',
+            description: 'The code you entered is incorrect.',
+        });
+    }
+  };
+
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle>Verify Your Code</CardTitle>
-          <CardDescription>A 6-digit code was sent to your mobile number.</CardDescription>
+          <CardDescription>
+            A 6-digit code was sent to your mobile number{phone ? ` ending in ...${phone.slice(-4)}` : ''}.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-           <div className="space-y-4">
-                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
-                <div className="h-12 w-full bg-gray-300 rounded animate-pulse" />
-            </div>
+           <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                        control={form.control}
+                        name="code"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Verification Code</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="123456" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <Button type="submit" className="w-full">Verify & Continue</Button>
+                </form>
+            </Form>
+             <p className="mt-4 text-center text-sm text-muted-foreground">
+                Didn't get a code? <Button variant="link" className="p-0" asChild><Link href="/request-access">Resend</Link></Button>
+            </p>
         </CardContent>
       </Card>
     </div>
