@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -12,8 +13,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Store, CircleUserRound, Bell, Wifi } from 'lucide-react';
 import Link from 'next/link';
+import { useSettings } from '../settings-provider';
 
 export default function Header() {
+  const { logout } = useSettings();
   return (
     <header className="sticky top-0 z-20 flex h-20 items-center justify-between gap-4 border-b bg-white dark:bg-card px-4 lg:px-8">
       <div className="flex items-center gap-2">
@@ -55,7 +58,7 @@ export default function Header() {
             <Link href="/settings"><DropdownMenuItem>Profile</DropdownMenuItem></Link>
             <Link href="/settings"><DropdownMenuItem>Settings</DropdownMenuItem></Link>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

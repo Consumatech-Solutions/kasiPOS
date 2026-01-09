@@ -1,3 +1,4 @@
+
 export interface Product {
   id?: number;
   name: string;
@@ -81,10 +82,22 @@ export interface Parcel {
     collectingPersonId?: string;
 }
 
+export interface StoreProfile {
+  name?: string;
+  vatNumber?: string;
+  logoUrl?: string;
+  receiptHeader?: string;
+  receiptFooter?: string;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark';
   language: 'en' | 'fr' | 'sw' | 'zu' | 'so' | 'am';
   campaigns: boolean;
   marketplace: boolean;
   boph: boolean;
+  isLoggedIn: boolean;
+  hasSetPassword?: boolean;
+  isStoreSetupComplete?: boolean;
+  storeProfile?: StoreProfile;
 }
