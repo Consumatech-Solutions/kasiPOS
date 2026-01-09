@@ -127,25 +127,33 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
       case 'Card':
         return (
           <div>
-            <DialogTitle>Card Payment</DialogTitle>
-             <div className="py-8 text-center text-muted-foreground">
-                <p>Total: R{cartTotal.toFixed(2)}</p>
-                <p>Waiting for card machine interaction...</p>
+            <DialogHeader className="text-center mb-6">
+                <DialogTitle className="text-2xl">Card Payment</DialogTitle>
+                <DialogDescription>Total amount to be charged to the card.</DialogDescription>
+            </DialogHeader>
+             <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
+                <p className="text-4xl font-bold text-foreground">R {cartTotal.toFixed(2)}</p>
+                <p className="mt-2">Waiting for card machine interaction...</p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="mt-6">
+                <DialogClose asChild><Button variant="secondary" className="w-full">Cancel</Button></DialogClose>
                 <Button onClick={handlePlaceholderComplete} className="w-full">Simulate Successful Payment</Button>
             </DialogFooter>
           </div>
         );
       case 'Mobile Money':
         return (
-          <div>
-            <DialogTitle>Mobile Money</DialogTitle>
-            <div className="py-8 text-center text-muted-foreground">
-                <p>Total: R{cartTotal.toFixed(2)}</p>
-                <p>Awaiting USSD push to customer's phone...</p>
+            <div>
+            <DialogHeader className="text-center mb-6">
+                <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
+                <DialogDescription>A USSD push will be sent to the customer's phone.</DialogDescription>
+            </DialogHeader>
+             <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
+                <p className="text-4xl font-bold text-foreground">R {cartTotal.toFixed(2)}</p>
+                <p className="mt-2">Awaiting payment confirmation from customer...</p>
             </div>
-             <DialogFooter>
+             <DialogFooter className="mt-6">
+                <DialogClose asChild><Button variant="secondary" className="w-full">Cancel</Button></DialogClose>
                 <Button onClick={handlePlaceholderComplete} className="w-full">Simulate Successful Payment</Button>
             </DialogFooter>
           </div>
