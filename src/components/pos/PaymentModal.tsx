@@ -4,8 +4,13 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Transaction, TransactionItem } from '@/types';
+import { Transaction, TransactionItem, Customer } from '@/types';
 import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Phone } from 'lucide-react';
+
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -14,21 +19,30 @@ interface PaymentModalProps {
   cartTotal: number;
   cartItems: TransactionItem[];
   onCompleteSale: (transaction: Omit<Transaction, 'id' | 'date'>) => void;
+  customer: Customer | null | undefined;
 }
 
-export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartItems, onCompleteSale }: PaymentModalProps) {
+const mobileMoneyOptions = ['MTN MoMo', 'Vodacom VodaPay', 'InstantMoney (Standard Bank)', 'eWallet (FNB)', 'CashSend (ABSA)', 'Imali (Nedbank)'];
+
+export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartItems, onCompleteSale, customer }: PaymentModalProps) {
   const [tendered, setTendered] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
+  const [selectedMobileProvider, setSelectedMobileProvider] = useState('');
 
   const tenderedAmount = parseFloat(tendered) || 0;
   const changeDue = tenderedAmount - cartTotal;
-  const canCompleteSale = tenderedAmount >= cartTotal;
+  const canCompleteCashSale = tenderedAmount >= cartTotal;
+  const canCompleteMobileSale = (customer?.phone || mobileNumber.length > 10) && selectedMobileProvider;
+
 
   useEffect(() => {
     // Reset local state when modal opens or method changes
     if (isOpen) {
       setTendered('');
+      setMobileNumber(customer?.phone || '');
+      setSelectedMobileProvider('');
     }
-  }, [isOpen, method]);
+  }, [isOpen, method, customer]);
   
   const handleKeyPress = (key: string) => {
     if (key === '.' && tendered.includes('.')) return;
@@ -39,7 +53,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   const handleBackspace = () => setTendered(tendered.slice(0, -1));
 
   const handleCompleteCashSale = () => {
-    if (canCompleteSale) {
+    if (canCompleteCashSale) {
       onCompleteSale({
         items: cartItems,
         total: cartTotal,
@@ -50,6 +64,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
 
   const handlePlaceholderComplete = () => {
     if (!method) return;
+     if (method === 'Mobile Money' && !canCompleteMobileSale) return;
     onCompleteSale({
       items: cartItems,
       total: cartTotal,
@@ -119,7 +134,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
               </div>
               <DialogFooter className="mt-4 gap-2">
                   <Button variant="secondary" className="w-full h-14" onClick={handleClear}>Clear</Button>
-                  <Button className="w-full h-14" onClick={handleCompleteCashSale} disabled={!canCompleteSale}>Complete Sale</Button>
+                  <Button className="w-full h-14" onClick={handleCompleteCashSale} disabled={!canCompleteCashSale}>Complete Sale</Button>
               </DialogFooter>
             </div>
           </div>
@@ -144,18 +159,54 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
       case 'Mobile Money':
         return (
             <div>
-            <DialogHeader className="text-center mb-6">
-                <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
-                <DialogDescription>A USSD push will be sent to the customer's phone.</DialogDescription>
-            </DialogHeader>
-             <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
-                <p className="text-4xl font-bold text-foreground">R {cartTotal.toFixed(2)}</p>
-                <p className="mt-2">Awaiting payment confirmation from customer...</p>
-            </div>
-             <DialogFooter className="mt-6">
-                <DialogClose asChild><Button variant="secondary" className="w-full">Cancel</Button></DialogClose>
-                <Button onClick={handlePlaceholderComplete} className="w-full">Simulate Successful Payment</Button>
-            </DialogFooter>
+              <DialogHeader className="mb-6">
+                  <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
+                  <DialogDescription>Select a provider and confirm the mobile number to send the USSD push to.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6">
+                {customer ? (
+                  <Alert>
+                    <Phone className="h-4 w-4" />
+                    <AlertTitle>Confirm Customer</AlertTitle>
+                    <AlertDescription>
+                      The payment request will be sent to <strong>{customer.name}</strong> at <strong>{customer.phone}</strong>.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <div>
+                    <Label htmlFor="mobileNumber">Mobile Number</Label>
+                    <Input 
+                      id="mobileNumber" 
+                      type="tel"
+                      placeholder="Enter mobile number" 
+                      value={mobileNumber}
+                      onChange={(e) => setMobileNumber(e.target.value)}
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <Label>Select Provider</Label>
+                  <RadioGroup 
+                    value={selectedMobileProvider}
+                    onValueChange={setSelectedMobileProvider}
+                    className="grid grid-cols-2 gap-4 mt-2"
+                  >
+                    {mobileMoneyOptions.map(option => (
+                      <div key={option} className="flex items-center space-x-2">
+                        <RadioGroupItem value={option} id={option} />
+                        <Label htmlFor={option} className="font-normal">{option}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+              </div>
+              <DialogFooter className="mt-8">
+                  <DialogClose asChild><Button variant="secondary" className="w-full">Cancel</Button></DialogClose>
+                  <Button onClick={handlePlaceholderComplete} className="w-full" disabled={!canCompleteMobileSale}>
+                    Send Payment Request for R{cartTotal.toFixed(2)}
+                  </Button>
+              </DialogFooter>
           </div>
         );
       default:

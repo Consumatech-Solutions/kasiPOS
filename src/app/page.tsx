@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -61,6 +60,8 @@ export default function PosPage() {
   }, [allCategories, categorySearch]);
   
   const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const selectedCustomer = useLiveQuery(() => selectedCustomerId ? db.customers.get(selectedCustomerId) : Promise.resolve(undefined), [selectedCustomerId]);
+
 
   const selectCategory = (category: string | null) => {
     setActiveCategory(category);
@@ -374,6 +375,7 @@ export default function PosPage() {
         cartTotal={cartTotal}
         cartItems={cartItems}
         onCompleteSale={handleCompleteSale}
+        customer={selectedCustomer}
     />
     </>
   );
