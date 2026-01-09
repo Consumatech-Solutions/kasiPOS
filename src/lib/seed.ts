@@ -55,9 +55,9 @@ export async function seedDatabase() {
 
         // Seed Vouchers
         const vouchers = [
-            { code: 'SAVE10', type: 'percentage', value: 10, minPurchase: 100, isActive: true },
-            { code: 'WINTER25', type: 'fixed', value: 25, minPurchase: 200, isActive: true },
-            { code: 'EXPIRED5', type: 'fixed', value: 5, minPurchase: 50, isActive: false },
+            { code: 'SAVE10', type: 'percentage', value: 10, minPurchase: 5, isActive: true },
+            { code: 'WINTER25', type: 'fixed', value: 25, minPurchase: 5, isActive: true },
+            { code: 'EXPIRED5', type: 'fixed', value: 5, minPurchase: 5, isActive: false },
         ];
         await db.vouchers.bulkAdd(vouchers);
     }).catch(err => {
