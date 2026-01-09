@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
+import VoucherModal from '@/components/pos/VoucherModal';
 
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
@@ -31,6 +32,9 @@ export default function PosPage() {
   const [categorySearch, setCategorySearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [activePaymentMethod, setActivePaymentMethod] = useState<'Cash' | 'Card' | 'Mobile Money' | null>(null);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | undefined>(undefined);
 
   const { toast } = useToast();
 
@@ -108,12 +112,14 @@ export default function PosPage() {
 
   const clearCart = () => {
     setCart(new Map());
+    setAppliedDiscount(0);
+    setAppliedVoucherCode(undefined);
   }
 
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
   const vat = cartSubtotal * 0.15;
-  const cartTotal = cartSubtotal; // Simplified for now
+  const cartTotal = cartSubtotal - appliedDiscount;
 
   const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money') => {
     if (cart.size === 0) {
@@ -127,11 +133,23 @@ export default function PosPage() {
     setActivePaymentMethod(method);
   };
 
+  const handleApplyVoucher = (code: string, amount: number) => {
+    setAppliedVoucherCode(code);
+    setAppliedDiscount(amount);
+    toast({
+        title: "Voucher Applied",
+        description: `Discount of R${amount.toFixed(2)} applied.`,
+    });
+  };
+
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
     const newTransaction: Omit<Transaction, 'id'> = {
       ...transactionDetails,
       date: new Date(),
       customerId: selectedCustomerId,
+      voucherCode: appliedVoucherCode,
+      discountAmount: appliedDiscount,
+      total: cartTotal, // Use the final calculated total
     };
     
     try {
@@ -295,7 +313,7 @@ export default function PosPage() {
                     <User className="mr-2 h-4 w-4"/>
                     Add Customer
                 </Button>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => setIsVoucherModalOpen(true)}>
                     <Ticket className="mr-2 h-4 w-4"/>
                     Redeem Voucher
                 </Button>
@@ -342,9 +360,9 @@ export default function PosPage() {
                   <span>VAT (15%)</span>
                   <span>R {vat.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-gray-500">
+              <div className={`flex justify-between ${appliedDiscount > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
                   <span>Discount Applied</span>
-                  <span>-R 0.00</span>
+                  <span>-R {appliedDiscount.toFixed(2)}</span>
               </div>
             </div>
             
@@ -377,8 +395,12 @@ export default function PosPage() {
         onCompleteSale={handleCompleteSale}
         customer={selectedCustomer}
     />
+    <VoucherModal
+        isOpen={isVoucherModalOpen}
+        onClose={() => setIsVoucherModalOpen(false)}
+        onApplyVoucher={handleApplyVoucher}
+        cartTotal={cartSubtotal}
+    />
     </>
   );
 }
-
-    
