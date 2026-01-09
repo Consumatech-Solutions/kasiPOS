@@ -11,12 +11,9 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initDb = async () => {
       try {
-        const productCount = await db.products.count();
-        if (productCount === 0) {
-          console.log('Database is empty, seeding...');
-          await seedDatabase();
-          console.log('Database seeded successfully.');
-        }
+        // This will now check for products and parcels and seed if necessary.
+        // The seedDatabase function is now idempotent.
+        await seedDatabase();
         setIsDbReady(true);
       } catch (error) {
         console.error('Failed to initialize database:', error);
