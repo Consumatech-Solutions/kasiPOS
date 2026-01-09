@@ -200,9 +200,9 @@ export default function PosPage() {
 
   return (
     <>
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-gray-50">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-muted">
       {/* Product Selection */}
-      <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col">
+      <div className="lg:col-span-1 xl:col-span-3 bg-white dark:bg-card rounded-lg p-4 flex flex-col">
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input 
@@ -315,7 +315,7 @@ export default function PosPage() {
       </div>
 
       {/* Cart Section */}
-      <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg p-4 flex flex-col h-full">
+      <div className="lg:col-span-1 xl:col-span-2 bg-white dark:bg-card rounded-lg p-4 flex flex-col h-full">
         <div className="flex justify-between items-center mb-4 border-b pb-3 shrink-0">
             <div>
                 <h2 className="font-semibold text-lg">Sale #8822</h2>
@@ -341,7 +341,7 @@ export default function PosPage() {
             ) : (
               <div className="space-y-2">
                 {cartItems.map(item => (
-                  <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50">
+                  <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
                     <Image src={item.imageUrl || ''} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
                     <div className="flex-grow">
                       <p className="font-medium text-sm">{item.productName}</p>
@@ -378,7 +378,7 @@ export default function PosPage() {
               </div>
             </div>
             
-            <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
+            <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 dark:bg-muted rounded-lg">
               <span className="text-lg font-bold">Total to Pay</span>
               <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
             </div>
