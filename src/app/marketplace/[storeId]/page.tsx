@@ -19,6 +19,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye } from 'lucide-react';
+import PaymentModal from '@/components/pos/PaymentModal';
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
@@ -46,6 +47,7 @@ export default function StorePosPage() {
   const [productSearch, setProductSearch] = useState('');
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [activePaymentMethod, setActivePaymentMethod] = useState<'Cash' | 'Card' | 'Mobile Money' | null>(null);
   
   const { toast } = useToast();
 
@@ -133,7 +135,7 @@ export default function StorePosPage() {
   const vat = cartSubtotal * 0.15;
   const cartTotal = cartSubtotal; 
 
-  const handleCheckout = async (method: 'Cash' | 'Card' | 'Mobile Money') => {
+  const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money') => {
     if (cart.size === 0) {
       toast({
         title: "Cart is empty",
@@ -150,20 +152,18 @@ export default function StorePosPage() {
       });
       return;
     }
-    
-    // In a real app, this would submit the order to the marketplace API
-    // For now, we'll just create a toast notification.
-    toast({
-      title: "Order Placed (Simulation)",
-      description: `Order for ${selectedCustomer?.name} at ${storeName} for R${(cartTotal + 15).toFixed(2)} via ${method}.`,
-    });
-    setCart(new Map());
-    setSelectedCustomerId(undefined);
+    setActivePaymentMethod(method);
   };
   
   const handleCustomerSelect = (customerId: number) => {
       setSelectedCustomerId(customerId);
       setCustomerDialogOpen(false);
+  }
+
+  // Placeholder for Phase 2
+  const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
+     console.log("Sale to be completed with:", transactionDetails);
+     setActivePaymentMethod(null);
   }
 
   return (
@@ -344,7 +344,7 @@ export default function StorePosPage() {
         </div>
 
         {/* Child 2: Cart Items */}
-        <div className="overflow-y-auto" style={{ height: '35%' }}>
+        <div style={{ height: '35%' }}>
           <ScrollArea className="h-full">
             {cartItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -375,7 +375,7 @@ export default function StorePosPage() {
 
         {/* Child 3: Payment Section */}
         {cartItems.length > 0 && (
-          <div className="p-4 border-t" style={{ height: '65%' }}>
+          <div className="pt-4 p-4 border-t" style={{ height: '65%' }}>
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
@@ -413,6 +413,16 @@ export default function StorePosPage() {
       </div>
     </div>
     
+    <PaymentModal
+        isOpen={!!activePaymentMethod}
+        onClose={() => setActivePaymentMethod(null)}
+        method={activePaymentMethod}
+        cartTotal={cartTotal + 15} // Including service fee in total for marketplace
+        cartItems={cartItems}
+        onCompleteSale={handleCompleteSale}
+        customer={selectedCustomer}
+    />
+
     {/* Customer Selection Dialog */}
     <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
