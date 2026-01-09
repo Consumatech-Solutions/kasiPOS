@@ -121,6 +121,18 @@ export default function PosPage() {
   const vat = cartSubtotal * 0.15;
   const cartTotal = cartSubtotal - appliedDiscount;
 
+  const handleOpenVoucherModal = () => {
+    if (cartSubtotal < 5) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Redeem Voucher',
+        description: 'You need a cart total of at least R5 to redeem a voucher.',
+      });
+      return;
+    }
+    setIsVoucherModalOpen(true);
+  };
+
   const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money') => {
     if (cart.size === 0) {
       toast({
@@ -313,7 +325,7 @@ export default function PosPage() {
                     <User className="mr-2 h-4 w-4"/>
                     Add Customer
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setIsVoucherModalOpen(true)}>
+                <Button variant="ghost" size="sm" onClick={handleOpenVoucherModal}>
                     <Ticket className="mr-2 h-4 w-4"/>
                     Redeem Voucher
                 </Button>
