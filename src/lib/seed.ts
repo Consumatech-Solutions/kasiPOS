@@ -63,8 +63,12 @@ export async function seedDatabase() {
         const parcels = [
             { deliveryNumber: 'PAZ-1001', customerName: 'Thabo Mbeki', status: 'Incoming' },
             { deliveryNumber: 'PAZ-1002', customerName: 'Cyril Ramaphosa', status: 'Incoming' },
-            { deliveryNumber: 'AMZ-5580', customerName: 'Nelson Mandela', status: 'Received', collectionCode: 'ZM451', receiptCode: 'RC-8912', dateReceived: new Date() },
-            { deliveryNumber: 'TKT-9210', customerName: 'Jacob Zuma', status: 'Collected', collectionCode: 'XF782', receiptCode: 'RC-9988', dateReceived: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), dateCollected: new Date(), collectingPersonName: 'J. Zuma' },
+            { deliveryNumber: 'TKT-8831', customerName: 'Fikile Mbalula', status: 'Incoming' },
+            { deliveryNumber: 'AMZ-0331', customerName: 'Trevor Noah', status: 'Incoming' },
+            { deliveryNumber: 'AMZ-5580', customerName: 'Nelson Mandela', status: 'Received', collectionCode: 'ZM451', receiptCode: 'RC-8912', dateReceived: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
+            { deliveryNumber: 'MAK-4112', customerName: 'Elon Musk', status: 'Received', collectionCode: 'TS911', receiptCode: 'RC-0192', dateReceived: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+            { deliveryNumber: 'TKT-9210', customerName: 'Jacob Zuma', status: 'Collected', collectionCode: 'XF782', receiptCode: 'RC-9988', dateReceived: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), collectingPersonName: 'J. Zuma', collectingPersonId: '8001015800080' },
+            { deliveryNumber: 'BAS-1995', customerName: 'Siya Kolisi', status: 'Collected', collectionCode: 'SP991', receiptCode: 'RC-0012', dateReceived: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), collectingPersonName: 'S. Kolisi', collectingPersonId: '9001015800080' },
         ];
         await db.parcels.bulkAdd(parcels);
 
