@@ -3,6 +3,7 @@ export interface Product {
   id?: number;
   name: string;
   price: number;
+  costPrice: number;
   stock: number;
   category: string;
   barcode?: string;
@@ -81,6 +82,28 @@ export interface Parcel {
     collectingPersonPhone?: string;
     collectingPersonId?: string;
 }
+
+export interface PurchaseOrderItem {
+  productId: number;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  groupPrice: number;
+  totalPrice: number;
+}
+
+export interface PurchaseOrder {
+  id?: number;
+  orderCode: string;
+  date: Date;
+  items: PurchaseOrderItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  deliveryMethod: 'delivery' | 'collection';
+  status: 'pending' | 'completed' | 'cancelled';
+}
+
 
 export interface StoreProfile {
   name?: string;

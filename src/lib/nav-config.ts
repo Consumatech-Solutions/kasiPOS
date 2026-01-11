@@ -9,6 +9,7 @@ import {
   BookOpen,
   ShoppingBasket,
   PackageCheck,
+  ShoppingCart,
 } from 'lucide-react';
 import { AppSettings } from '@/types';
 
@@ -25,6 +26,7 @@ export const navItems: NavItem[] = [
   { href: '/inventory', label: 'Inventory', icon: LayoutGrid },
   { href: '/transactions', label: 'Orders', icon: ScrollText },
   { href: '/customers', label: 'Customers', icon: Users },
+  { href: '/buy-stock', label: 'Buy Stock', icon: ShoppingCart },
   { href: '/vouchers', label: 'Campaigns', icon: Ticket, featureFlag: 'campaigns' },
   { href: '/marketplace', label: 'Marketplace', icon: ShoppingBasket, featureFlag: 'marketplace' },
   { href: '/boph', label: 'BOPH', icon: PackageCheck, featureFlag: 'boph' },
