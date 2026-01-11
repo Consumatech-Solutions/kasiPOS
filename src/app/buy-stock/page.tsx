@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 import { db } from '@/lib/db';
-import type { Product } from '@/types';
+import type { Product, PurchaseOrderItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,20 +42,40 @@ export default function BuyStockPage() {
   
   const handleAddToCart = (product: Product) => {
     const quantity = quantities[product.id!] || 0;
-    if (quantity > 0) {
-      // In a real implementation, this would add to a separate purchase order cart state.
-      // For this phase, we just show a toast.
-      toast({
-        title: "Added to Purchase Order",
-        description: `${quantity} x ${product.name} added to your cart.`,
-      });
-    } else {
+    if (quantity <= 0) {
       toast({
         variant: 'destructive',
         title: "No quantity specified",
         description: "Please enter a quantity to add the item to your cart.",
       });
+      return;
     }
+    
+    const newItem: PurchaseOrderItem = {
+      productId: product.id!,
+      productName: product.name,
+      quantity,
+      unitPrice: product.costPrice,
+      groupPrice: getGroupPrice(product.costPrice),
+      totalPrice: quantity * getGroupPrice(product.costPrice),
+    };
+
+    const cart: PurchaseOrderItem[] = JSON.parse(localStorage.getItem('purchaseOrderCart') || '[]');
+    const existingItemIndex = cart.findIndex(item => item.productId === product.id);
+
+    if (existingItemIndex > -1) {
+      cart[existingItemIndex].quantity += quantity;
+      cart[existingItemIndex].totalPrice = cart[existingItemIndex].quantity * cart[existingItemIndex].groupPrice;
+    } else {
+      cart.push(newItem);
+    }
+    
+    localStorage.setItem('purchaseOrderCart', JSON.stringify(cart));
+    
+    toast({
+      title: "Added to Purchase Order",
+      description: `${quantity} x ${product.name} added to your cart.`,
+    });
   };
 
   return (
