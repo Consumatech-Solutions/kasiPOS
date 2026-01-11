@@ -37,6 +37,7 @@ export default function BuyStockPage() {
   };
   
   const getGroupPrice = (costPrice: number) => {
+    if (typeof costPrice !== 'number') return 0;
     return costPrice * 0.9; // Simulate a 10% discount for group buying
   };
   
@@ -51,13 +52,15 @@ export default function BuyStockPage() {
       return;
     }
     
+    const costPrice = product.costPrice || 0;
+    
     const newItem: PurchaseOrderItem = {
       productId: product.id!,
       productName: product.name,
       quantity,
-      unitPrice: product.costPrice,
-      groupPrice: getGroupPrice(product.costPrice),
-      totalPrice: quantity * getGroupPrice(product.costPrice),
+      unitPrice: costPrice,
+      groupPrice: getGroupPrice(costPrice),
+      totalPrice: quantity * getGroupPrice(costPrice),
     };
 
     const cart: PurchaseOrderItem[] = JSON.parse(localStorage.getItem('purchaseOrderCart') || '[]');
@@ -134,7 +137,7 @@ export default function BuyStockPage() {
                                         <Badge variant="destructive">{product.stock} left</Badge>
                                     </TableCell>
                                     <TableCell className="font-semibold text-green-600">
-                                        R{getGroupPrice(product.costPrice).toFixed(2)}
+                                        R{(getGroupPrice(product.costPrice || 0)).toFixed(2)}
                                     </TableCell>
                                     <TableCell>
                                         <Input 
@@ -176,8 +179,8 @@ export default function BuyStockPage() {
                             <TableRow key={product.id}>
                                 <TableCell className="font-medium">{product.name}</TableCell>
                                 <TableCell>{product.stock}</TableCell>
-                                <TableCell>R{product.costPrice.toFixed(2)}</TableCell>
-                                <TableCell className="font-semibold text-green-600">R{getGroupPrice(product.costPrice).toFixed(2)}</TableCell>
+                                <TableCell>R{(product.costPrice || 0).toFixed(2)}</TableCell>
+                                <TableCell className="font-semibold text-green-600">R{(getGroupPrice(product.costPrice || 0)).toFixed(2)}</TableCell>
                                 <TableCell>
                                      <Input 
                                         type="number"
