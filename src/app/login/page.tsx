@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -25,7 +26,7 @@ const MOCK_USER = {
 
 
 export default function LoginPage() {
-    const { setSetting } = useSettings();
+    const { setSetting, settings } = useSettings();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -42,8 +43,13 @@ export default function LoginPage() {
             toast({ title: "Login Successful", description: "Welcome back!" });
             setSetting('isLoggedIn', true);
             setSetting('hasSetPassword', true);
-            setSetting('isStoreSetupComplete', false); // Assume setup needs to be checked
-            router.push('/store-setup');
+            
+            // Check if store setup is complete and redirect accordingly
+            if (settings.isStoreSetupComplete) {
+                router.push('/');
+            } else {
+                router.push('/store-setup');
+            }
         } else {
             toast({
                 variant: 'destructive',

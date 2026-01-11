@@ -22,7 +22,7 @@ const defaultSettings: AppSettings = {
   boph: true,
   isLoggedIn: false,
   hasSetPassword: false,
-  isStoreSetupComplete: false,
+  isStoreSetupComplete: true,
   storeProfile: {},
 };
 
@@ -32,7 +32,10 @@ function getInitialSettings(): AppSettings {
   }
   try {
     const item = window.localStorage.getItem('kasi-pos-settings');
-    return item ? { ...defaultSettings, ...JSON.parse(item) } : defaultSettings;
+    const storedSettings = item ? JSON.parse(item) : {};
+     // We'll give precedence to the default settings for login/setup status
+     // to ensure we can control it from the code for development.
+    return { ...defaultSettings, ...storedSettings, ...{isStoreSetupComplete: defaultSettings.isStoreSetupComplete, isLoggedIn: storedSettings.isLoggedIn || defaultSettings.isLoggedIn } };
   } catch (error) {
     console.error('Error reading settings from localStorage', error);
     return defaultSettings;
@@ -97,7 +100,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     // Reset all settings to default, effectively logging out
-    const newSettings = {...defaultSettings, theme: settings.theme}; // keep theme
+    const newSettings = {...defaultSettings, theme: settings.theme, isLoggedIn: false, isStoreSetupComplete: false}; // keep theme
     setSettings(newSettings); 
     router.push('/login');
   }, [router, settings.theme]);
