@@ -48,7 +48,7 @@ export async function seedDatabase() {
             await db.customers.bulkAdd(customers);
         }
         
-        // Seed Vouchers if they don't exist
+        // Seed Vouchers if they don't exist, or patch if they are incorrect
         const voucherCount = await db.vouchers.count();
         if (voucherCount === 0) {
             console.log('Seeding vouchers...');
@@ -58,6 +58,13 @@ export async function seedDatabase() {
                 { code: 'EXPIRED5', type: 'fixed', value: 5, minPurchase: 5, isActive: false },
             ];
             await db.vouchers.bulkAdd(vouchers);
+        } else {
+            // This is a patch to fix stale data in existing databases.
+            const voucherToPatch = await db.vouchers.where('code').equalsIgnoreCase('SAVE10').first();
+            if (voucherToPatch && voucherToPatch.minPurchase !== 5) {
+                console.log('Patching stale voucher data for SAVE10.');
+                await db.vouchers.update(voucherToPatch.id!, { minPurchase: 5 });
+            }
         }
 
         // Seed Parcels if they don't exist
