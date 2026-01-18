@@ -35,6 +35,8 @@ export default function PosPage() {
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [appliedDiscount, setAppliedDiscount] = useState(0);
   const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | undefined>(undefined);
+  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
   const { toast } = useToast();
 
@@ -65,6 +67,14 @@ export default function PosPage() {
   
   const customers = useLiveQuery(() => db.customers.toArray(), []);
   const selectedCustomer = useLiveQuery(() => selectedCustomerId ? db.customers.get(selectedCustomerId) : Promise.resolve(undefined), [selectedCustomerId]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!customers) return [];
+    return customers.filter(customer =>
+        customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
+        customer.phone?.includes(customerSearchTerm)
+    );
+  }, [customers, customerSearchTerm]);
 
 
   const selectCategory = (category: string | null) => {
@@ -153,6 +163,11 @@ export default function PosPage() {
         description: `Discount of R${amount.toFixed(2)} applied.`,
     });
   };
+
+  const handleCustomerSelect = (customerId: number) => {
+      setSelectedCustomerId(customerId);
+      setCustomerDialogOpen(false);
+  }
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
     const newTransaction: Omit<Transaction, 'id'> = {
@@ -321,10 +336,50 @@ export default function PosPage() {
                 <h2 className="font-semibold text-lg">Sale #8822</h2>
             </div>
             <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm">
-                    <User className="mr-2 h-4 w-4"/>
-                    Add Customer
-                </Button>
+                 <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" onClick={() => setCustomerSearchTerm('')}>
+                            <User className="mr-2 h-4 w-4"/>
+                            {selectedCustomer ? selectedCustomer.name : 'Add Customer'}
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Select a Customer</DialogTitle>
+                            <div className="relative mt-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <Input 
+                                    placeholder="Search by name or phone number..."
+                                    className="pl-10"
+                                    value={customerSearchTerm}
+                                    onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </DialogHeader>
+                        <ScrollArea className="max-h-[50vh]">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Name</TableHead>
+                                        <TableHead>Phone</TableHead>
+                                        <TableHead></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredCustomers?.map(customer => (
+                                        <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
+                                            <TableCell>{customer.name}</TableCell>
+                                            <TableCell>{customer.phone}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button size="sm">Select</Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </DialogContent>
+                </Dialog>
                 <Button variant="ghost" size="sm" onClick={handleOpenVoucherModal}>
                     <Ticket className="mr-2 h-4 w-4"/>
                     Redeem Voucher
