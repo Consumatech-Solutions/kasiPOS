@@ -26,12 +26,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
-        <SettingsProvider>
-          <DbProvider>
+        <DbProvider>
+          <SettingsProvider>
             <AppShell>{children}</AppShell>
-          </DbProvider>
-          <Toaster />
-        </SettingsProvider>
+            <Toaster />
+          </SettingsProvider>
+        </DbProvider>
       </body>
     </html>
   );
