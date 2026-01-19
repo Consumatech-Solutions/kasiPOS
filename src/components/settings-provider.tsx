@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -10,6 +9,7 @@ interface SettingsContextType {
   setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   isPwa: boolean;
   logout: () => void;
+  login: (user: User) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -22,7 +22,6 @@ const defaultSettings: AppSettings = {
   boph: true,
   isLoggedIn: false,
   currentUser: null,
-  hasSetPassword: false,
   isStoreSetupComplete: true,
   storeProfile: {},
 };
@@ -34,9 +33,14 @@ function getInitialSettings(): AppSettings {
   try {
     const item = window.localStorage.getItem('kasi-pos-settings');
     const storedSettings = item ? JSON.parse(item) : {};
-     // We'll give precedence to the default settings for login/setup status
-     // to ensure we can control it from the code for development.
-    return { ...defaultSettings, ...storedSettings, ...{isStoreSetupComplete: defaultSettings.isStoreSetupComplete, isLoggedIn: storedSettings.isLoggedIn || defaultSettings.isLoggedIn } };
+    const currentUser = storedSettings.currentUser || null;
+
+    return { 
+        ...defaultSettings, 
+        ...storedSettings, 
+        currentUser,
+        isLoggedIn: !!currentUser
+    };
   } catch (error) {
     console.error('Error reading settings from localStorage', error);
     return defaultSettings;
@@ -56,12 +60,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Apply theme on initial load and when settings change
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(settings.theme);
-
-    // Save settings to localStorage whenever they change
     try {
       window.localStorage.setItem('kasi-pos-settings', JSON.stringify(settings));
     } catch (error) {
@@ -70,7 +71,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [settings]);
 
   useEffect(() => {
-    // Check if running in PWA mode on initial load
      if (typeof window !== 'undefined') {
         const inPwa = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
         setIsPwa(inPwa);
@@ -79,7 +79,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
    useEffect(() => {
-    if (isInitialLoad) return; // Don't run redirects on the very first render
+    if (isInitialLoad) return;
 
     const isAuthRoute = AUTH_ROUTES.includes(pathname);
     const isSetupRoute = pathname === SETUP_ROUTE;
@@ -99,14 +99,29 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const login = useCallback((user: User) => {
+    setSettings((prev) => ({ 
+        ...prev,
+        currentUser: user,
+        isLoggedIn: true,
+    }));
+  }, []);
+
   const logout = useCallback(() => {
-    // Reset all settings to default, effectively logging out
-    const newSettings = {...defaultSettings, theme: settings.theme, isLoggedIn: false, isStoreSetupComplete: false}; // keep theme
+    const currentSettings = settings;
+    const newSettings = {
+      ...defaultSettings,
+      theme: currentSettings.theme,
+      isStoreSetupComplete: currentSettings.isStoreSetupComplete,
+      storeProfile: currentSettings.storeProfile,
+      isLoggedIn: false, 
+      currentUser: null,
+    };
     setSettings(newSettings); 
     router.push('/login');
-  }, [router, settings.theme]);
+  }, [router, settings]);
 
-  // Render children only if routing rules are met
+
   const canRenderChildren = () => {
     if (isInitialLoad) return false;
     if (!settings.isLoggedIn) return AUTH_ROUTES.includes(pathname);
@@ -115,7 +130,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   };
 
 
-  const value = { settings, setSetting, isPwa, logout };
+  const value = { settings, setSetting, isPwa, logout, login };
 
   return <SettingsContext.Provider value={value}>
     {canRenderChildren() ? children : null}

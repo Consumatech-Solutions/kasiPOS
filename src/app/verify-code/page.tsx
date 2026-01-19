@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
+import { db } from '@/lib/db';
 
 const verifyCodeSchema = z.object({
   code: z.string().length(6, { message: "Code must be 6 digits." }),
@@ -24,7 +25,7 @@ export default function VerifyCodePage() {
   const searchParams = useSearchParams();
   const phone = searchParams.get('phone');
   const { toast } = useToast();
-  const { setSetting, settings } = useSettings();
+  const { login } = useSettings();
 
   const form = useForm<z.infer<typeof verifyCodeSchema>>({
     resolver: zodResolver(verifyCodeSchema),
@@ -33,19 +34,29 @@ export default function VerifyCodePage() {
     },
   });
 
-  const onSubmit = (values: z.infer<typeof verifyCodeSchema>) => {
+  const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
+    if (!phone) {
+        toast({ variant: 'destructive', title: 'Error', description: 'No phone number provided.' });
+        router.push('/request-access');
+        return;
+    }
+
     if (values.code === MOCK_OTP_CODE) {
+        const user = await db.users.where('phone').equals(phone).first();
+        if (!user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
+            router.push('/request-access');
+            return;
+        }
+
         toast({
             title: 'Verification Successful!',
-            description: 'You can now set your password.',
         });
-        setSetting('isLoggedIn', true); // Tentatively log in
         
-        // In a real app, you'd check a backend flag. Here, we use the persisted setting.
-        if (settings.hasSetPassword) {
-            router.push('/'); // Should not happen in this flow, but good practice
+        if (user.password) {
+            login(user);
         } else {
-            router.push('/set-password');
+            router.push(`/set-password?phone=${encodeURIComponent(phone)}`);
         }
 
     } else {

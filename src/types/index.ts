@@ -128,7 +128,6 @@ export interface AppSettings {
   boph: boolean;
   isLoggedIn: boolean;
   currentUser?: User | null;
-  hasSetPassword?: boolean;
   isStoreSetupComplete?: boolean;
   storeProfile?: StoreProfile;
 }

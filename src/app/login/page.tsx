@@ -13,20 +13,15 @@ import { Input } from '@/components/ui/input';
 import { useSettings } from '@/components/settings-provider';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/db';
 
 const loginSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
 
-const MOCK_USER = {
-  phone: '0812345678',
-  password: 'password123',
-};
-
-
 export default function LoginPage() {
-    const { setSetting, settings } = useSettings();
+    const { login } = useSettings();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -38,18 +33,12 @@ export default function LoginPage() {
         },
     });
 
-    const onSubmit = (values: z.infer<typeof loginSchema>) => {
-        if (values.phone === MOCK_USER.phone && values.password === MOCK_USER.password) {
+    const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+        const user = await db.users.where('phone').equals(values.phone).first();
+
+        if (user && user.password && user.password === values.password) {
             toast({ title: "Login Successful", description: "Welcome back!" });
-            setSetting('isLoggedIn', true);
-            setSetting('hasSetPassword', true);
-            
-            // Check if store setup is complete and redirect accordingly
-            if (settings.isStoreSetupComplete) {
-                router.push('/');
-            } else {
-                router.push('/store-setup');
-            }
+            login(user);
         } else {
             toast({
                 variant: 'destructive',

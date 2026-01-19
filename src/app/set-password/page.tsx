@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
+import { db } from '@/lib/db';
 
 const setPasswordSchema = z.object({
     password: z.string().min(8, { message: "Password must be at least 8 characters." }),
@@ -22,8 +23,10 @@ const setPasswordSchema = z.object({
 
 export default function SetPasswordPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const phone = searchParams.get('phone');
     const { toast } = useToast();
-    const { setSetting } = useSettings();
+    const { login } = useSettings();
 
     const form = useForm<z.infer<typeof setPasswordSchema>>({
         resolver: zodResolver(setPasswordSchema),
@@ -33,19 +36,38 @@ export default function SetPasswordPage() {
         },
     });
 
-    const onSubmit = (values: z.infer<typeof setPasswordSchema>) => {
-        // In a real app, you'd save this to the user's profile in the backend.
-        // Here, we just update our mock state.
-        console.log('New password set (mock):', values.password);
-        
-        toast({
-            title: 'Password Set!',
-            description: 'Your password has been successfully created.',
-        });
-        
-        setSetting('hasSetPassword', true);
-        setSetting('isStoreSetupComplete', false); // Ensure they go to setup next
-        router.push('/store-setup');
+    const onSubmit = async (values: z.infer<typeof setPasswordSchema>) => {
+        if (!phone) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No phone number provided.' });
+            router.push('/request-access');
+            return;
+        }
+
+        const user = await db.users.where('phone').equals(phone).first();
+        if (!user) {
+            toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
+            router.push('/request-access');
+            return;
+        }
+
+        try {
+            await db.users.update(user.id!, { password: values.password });
+            toast({
+                title: 'Password Set!',
+                description: 'Your password has been successfully created.',
+            });
+            
+            const updatedUser = { ...user, password: values.password };
+            login(updatedUser);
+
+        } catch (error) {
+            console.error('Failed to set password', error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Failed to set password.',
+            });
+        }
     };
 
   return (

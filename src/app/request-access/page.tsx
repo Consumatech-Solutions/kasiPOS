@@ -11,12 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/db';
 
 const requestAccessSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
 });
 
-const MOCK_ALLOWED_PHONE = '0812345678';
 const MOCK_OTP_CODE = '123456';
 
 export default function RequestAccessPage() {
@@ -30,8 +30,10 @@ export default function RequestAccessPage() {
         },
     });
 
-    const onSubmit = (values: z.infer<typeof requestAccessSchema>) => {
-        if (values.phone === MOCK_ALLOWED_PHONE) {
+    const onSubmit = async (values: z.infer<typeof requestAccessSchema>) => {
+        const user = await db.users.where('phone').equals(values.phone).first();
+
+        if (user) {
             toast({
                 title: 'Code Sent!',
                 description: `A verification code has been sent to ${values.phone}. (It's ${MOCK_OTP_CODE})`,
