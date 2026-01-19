@@ -11,12 +11,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Store, CircleUserRound, Bell, Wifi } from 'lucide-react';
+import { Store, User, Bell, Wifi } from 'lucide-react';
 import Link from 'next/link';
 import { useSettings } from '../settings-provider';
 
 export default function Header() {
-  const { logout } = useSettings();
+  const { settings, logout } = useSettings();
+  const { currentUser } = settings;
+
   return (
     <header className="sticky top-0 z-20 flex h-20 items-center justify-between gap-4 border-b bg-white dark:bg-card px-4 lg:px-8">
       <div className="flex items-center gap-2">
@@ -38,9 +40,9 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar className="h-10 w-10 border">
-                <AvatarImage src="/avatars/01.png" alt="@user" />
+                <AvatarImage src={`https://i.pravatar.cc/40?u=${currentUser?.phone}`} alt={currentUser?.name || ''} />
                 <AvatarFallback>
-                  <CircleUserRound className="h-6 w-6" />
+                  {currentUser?.name ? currentUser.name.charAt(0) : <User className="h-6 w-6" />}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -48,15 +50,17 @@ export default function Header() {
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Shop Owner</p>
+                <p className="text-sm font-medium leading-none">{currentUser?.name}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  owner@kasipos.co.za
+                  {currentUser?.phone}
                 </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <Link href="/settings"><DropdownMenuItem>Profile</DropdownMenuItem></Link>
-            <Link href="/settings"><DropdownMenuItem>Settings</DropdownMenuItem></Link>
+            <Link href="/profile"><DropdownMenuItem>Profile</DropdownMenuItem></Link>
+            {currentUser?.role === 'admin' && (
+                <Link href="/settings"><DropdownMenuItem>Settings</DropdownMenuItem></Link>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
