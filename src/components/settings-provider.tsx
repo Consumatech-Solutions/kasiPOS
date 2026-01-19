@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import type { AppSettings } from '@/types';
+import type { AppSettings, User } from '@/types';
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -21,6 +21,7 @@ const defaultSettings: AppSettings = {
   marketplace: true,
   boph: true,
   isLoggedIn: false,
+  currentUser: null,
   hasSetPassword: false,
   isStoreSetupComplete: true,
   storeProfile: {},

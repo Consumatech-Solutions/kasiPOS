@@ -1,8 +1,9 @@
 import { db } from './db';
 import { PlaceHolderImages } from './placeholder-images';
+import type { User } from '@/types';
 
 export async function seedDatabase() {
-    await db.transaction('rw', db.products, db.customers, db.vouchers, db.categories, db.parcels, async () => {
+    await db.transaction('rw', db.products, db.customers, db.vouchers, db.categories, db.parcels, db.users, async () => {
         
         // Seed Categories if they don't exist
         const categoryCount = await db.categories.count();
@@ -82,6 +83,16 @@ export async function seedDatabase() {
                 { deliveryNumber: 'BAS-1995', customerName: 'Siya Kolisi', status: 'Collected', collectionCode: 'SP991', receiptCode: 'RC-0012', dateReceived: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), collectingPersonName: 'S. Kolisi', collectingPersonId: '9001015800080' },
             ];
             await db.parcels.bulkAdd(parcels);
+        }
+
+        // Seed Users if they don't exist
+        const userCount = await db.users.count();
+        if (userCount === 0) {
+            console.log('Seeding users...');
+            const initialUsers: User[] = [
+                { name: 'Admin User', phone: '0812345678', password: 'password123', role: 'admin' },
+            ];
+            await db.users.bulkAdd(initialUsers);
         }
 
     }).catch(err => {

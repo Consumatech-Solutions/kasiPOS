@@ -104,6 +104,13 @@ export interface PurchaseOrder {
   status: 'pending' | 'completed' | 'cancelled';
 }
 
+export interface User {
+  id?: number;
+  name: string;
+  phone: string;
+  password?: string;
+  role: 'admin' | 'staff';
+}
 
 export interface StoreProfile {
   name?: string;
@@ -120,6 +127,7 @@ export interface AppSettings {
   marketplace: boolean;
   boph: boolean;
   isLoggedIn: boolean;
+  currentUser?: User | null;
   hasSetPassword?: boolean;
   isStoreSetupComplete?: boolean;
   storeProfile?: StoreProfile;
