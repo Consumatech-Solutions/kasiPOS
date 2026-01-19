@@ -16,8 +16,9 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Upload, Printer, ScanLine, CreditCard, FileUp, Sparkles, MoveRight } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import type { StoreProfile } from '@/types';
+import type { Store } from '@/types';
 import { Label } from '@/components/ui/label';
+import { db } from '@/lib/db';
 
 
 const businessInfoSchema = z.object({
@@ -37,15 +38,16 @@ const TOTAL_STEPS = 4;
 export default function StoreSetupPage() {
   const router = useRouter();
   const { settings, setSetting } = useSettings();
+  const { currentStore } = settings;
   const [step, setStep] = useState(1);
 
   const form = useForm<FormData>({
     resolver: zodResolver(step === 1 ? businessInfoSchema : receiptSchema),
     defaultValues: {
-      name: settings.storeProfile?.name || '',
-      vatNumber: settings.storeProfile?.vatNumber || '',
-      receiptHeader: settings.storeProfile?.receiptHeader || 'Thank you for your purchase!',
-      receiptFooter: settings.storeProfile?.receiptFooter || 'Find us on social media @KasiPOS',
+      name: currentStore?.name || '',
+      vatNumber: currentStore?.vatNumber || '',
+      receiptHeader: currentStore?.receiptHeader || 'Thank you for your purchase!',
+      receiptFooter: currentStore?.receiptFooter || 'Find us on social media @KasiPOS',
     },
   });
 
@@ -55,26 +57,32 @@ export default function StoreSetupPage() {
 
 
   const onNext = async () => {
+    if (!currentStore) return;
+
     let isValid = true;
     if (step === 1) {
         isValid = await form.trigger(['name', 'vatNumber']);
+    } else if (step === 2) {
+        isValid = await form.trigger(['receiptHeader', 'receiptFooter']);
     }
     
     if (!isValid) return;
 
-    // Save current step data to context
+    // Save current step data to database and context
     const currentData = form.getValues();
-    const updatedProfile: StoreProfile = {
-        ...settings.storeProfile,
+    const updatedStore: Store = {
+        ...currentStore,
         ...currentData,
     };
-    setSetting('storeProfile', updatedProfile);
+    await db.stores.update(currentStore.id!, currentData);
+    setSetting('currentStore', updatedStore);
 
     if (step < TOTAL_STEPS) {
       setStep(s => s + 1);
     } else {
-      // Final step
-      setSetting('isStoreSetupComplete', true);
+      // Final step: Mark setup as complete
+      await db.stores.update(currentStore.id!, { isSetupComplete: true });
+      setSetting('currentStore', { ...updatedStore, isSetupComplete: true });
       router.push('/');
     }
   };
@@ -175,8 +183,8 @@ export default function StoreSetupPage() {
                     <div className="bg-white p-6 max-w-sm mx-auto shadow-sm font-mono text-xs">
                         <div className="text-center">
                             <Image src="/logo-placeholder.svg" alt="Store Logo" width={80} height={80} className="mx-auto mb-2" />
-                            <h2 className="text-sm font-bold">{settings.storeProfile?.name || 'Your Store Name'}</h2>
-                            <p>VAT#: {settings.storeProfile?.vatNumber || 'N/A'}</p>
+                            <h2 className="text-sm font-bold">{currentStore?.name || 'Your Store Name'}</h2>
+                            <p>VAT#: {currentStore?.vatNumber || 'N/A'}</p>
                             <Separator className="my-2 border-dashed" />
                             <p className="text-center italic">{watchedReceiptHeader}</p>
                             <Separator className="my-2 border-dashed" />

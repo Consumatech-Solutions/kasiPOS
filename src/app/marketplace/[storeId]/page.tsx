@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
+import { useSettings } from '@/components/settings-provider';
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
@@ -38,6 +39,8 @@ export default function StorePosPage() {
   const params = useParams();
   const storeId = params.storeId as string;
   const storeName = storeNames[storeId] || 'Marketplace';
+  const { settings } = useSettings();
+  const { currentStore } = settings;
 
   const [cart, setCart] = useState<Map<number, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
@@ -51,7 +54,10 @@ export default function StorePosPage() {
   
   const { toast } = useToast();
 
-  const allProducts = useLiveQuery(() => db.products.toArray(), []);
+  const allProducts = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.products.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
   
   const products = useMemo(() => {
     if (!allProducts) return [];
@@ -76,7 +82,11 @@ export default function StorePosPage() {
     return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
   }, [allCategories, categorySearch]);
   
-  const allCustomers = useLiveQuery(() => db.customers.toArray(), []);
+  const allCustomers = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.customers.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
+
   const selectedCustomer = useLiveQuery(() => selectedCustomerId ? db.customers.get(selectedCustomerId) : Promise.resolve(undefined), [selectedCustomerId]);
 
   const filteredCustomers = useMemo(() => {

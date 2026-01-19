@@ -20,11 +20,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
+import { useSettings } from '@/components/settings-provider';
 
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
 export default function PosPage() {
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
   const [cart, setCart] = useState<Map<number, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -40,7 +44,10 @@ export default function PosPage() {
 
   const { toast } = useToast();
 
-  const allProducts = useLiveQuery(() => db.products.toArray(), []);
+  const allProducts = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.products.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   const products = useMemo(() => {
     if (!allProducts) return [];
@@ -65,7 +72,11 @@ export default function PosPage() {
     return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
   }, [allCategories, categorySearch]);
   
-  const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const customers = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.customers.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
+
   const selectedCustomer = useLiveQuery(() => selectedCustomerId ? db.customers.get(selectedCustomerId) : Promise.resolve(undefined), [selectedCustomerId]);
 
   const filteredCustomers = useMemo(() => {
@@ -170,6 +181,11 @@ export default function PosPage() {
   }
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
+    if (!currentStore) {
+        toast({ variant: "destructive", title: "Error", description: "No store context found." });
+        return;
+    }
+
     const newTransaction: Omit<Transaction, 'id'> = {
       ...transactionDetails,
       date: new Date(),
@@ -177,6 +193,7 @@ export default function PosPage() {
       voucherCode: appliedVoucherCode,
       discountAmount: appliedDiscount,
       total: cartTotal, // Use the final calculated total
+      storeId: currentStore.id!,
     };
     
     try {

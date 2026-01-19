@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Package } from 'lucide-react';
 import Link from 'next/link';
 import { db } from '@/lib/db';
+import { useSettings } from '@/components/settings-provider';
 import type { PurchaseOrder } from '@/types';
 import { format } from 'date-fns';
 
@@ -19,7 +20,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 
 export default function BuyStockHistoryPage() {
-  const purchaseOrders = useLiveQuery(() => db.purchaseOrders.orderBy('date').reverse().toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
+  const purchaseOrders = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.purchaseOrders.where('storeId').equals(currentStore.id!).orderBy('date').reverse().toArray();
+  }, [currentStore?.id]);
 
   return (
     <div className="p-4">

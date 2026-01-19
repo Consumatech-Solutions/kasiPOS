@@ -32,6 +32,7 @@ const userManagementSchema = z.object({
 
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
+  const { currentUser, currentStore } = settings;
   const { toast } = useToast();
   
   const [modalOpen, setModalOpen] = useState(false);
@@ -41,7 +42,10 @@ export default function SettingsPage() {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const users = useLiveQuery(() => db.users.toArray(), []);
+  const users = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.users.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -91,6 +95,10 @@ export default function SettingsPage() {
   };
 
   const handleUserSubmit = async (values: z.infer<typeof userManagementSchema>) => {
+    if (!currentStore) {
+        toast({ variant: "destructive", title: "Error", description: "No store context found." });
+        return;
+    }
     try {
       if (editingUser) {
         // Update existing user
@@ -103,7 +111,12 @@ export default function SettingsPage() {
           toast({ variant: "destructive", title: "Error", description: "A user with this mobile number already exists." });
           return;
         }
-        const newUser: Omit<User, 'id'> = { name: values.name, phone: values.phone, role: 'staff' };
+        const newUser: Omit<User, 'id'> = { 
+            name: values.name, 
+            phone: values.phone, 
+            role: 'staff',
+            storeId: currentStore.id!,
+        };
         await db.users.add(newUser as User);
         toast({ title: "Success", description: "Staff user added successfully. They will receive an SMS to set up their password." });
       }
@@ -116,7 +129,7 @@ export default function SettingsPage() {
   
   const deleteUser = async (id: number) => {
     try {
-      if (id === settings.currentUser?.id) {
+      if (id === currentUser?.id) {
         toast({ variant: "destructive", title: "Error", description: "You cannot delete your own account." });
         return;
       }
@@ -221,7 +234,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {settings.currentUser?.role === 'admin' && (
+        {currentUser?.role === 'admin' && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
@@ -252,7 +265,7 @@ export default function SettingsPage() {
                         <Button variant="ghost" size="icon" onClick={() => openUserDialog(user)}><Edit className="h-4 w-4" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={user.id === settings.currentUser?.id}>
+                            <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </AlertDialogTrigger>

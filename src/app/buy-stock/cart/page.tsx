@@ -16,12 +16,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 
 import type { PurchaseOrderItem } from '@/types';
 import { db } from '@/lib/db';
+import { useSettings } from '@/components/settings-provider';
 
 const DELIVERY_FEE = 150.00;
 
 export default function BuyStockCartPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { settings } = useSettings();
+  const { currentStore } = settings;
   
   const [cart, setCart] = useState<PurchaseOrderItem[]>([]);
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'collection'>('collection');
@@ -68,6 +71,10 @@ export default function BuyStockCartPage() {
   };
   
   const handleConfirmOrder = async () => {
+    if (!currentStore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No store context found.' });
+      return;
+    }
     if (cart.length === 0) {
       toast({ variant: 'destructive', title: 'Cart is empty', description: 'Please add items to your cart before confirming.' });
       return;
@@ -83,6 +90,7 @@ export default function BuyStockCartPage() {
       total: total,
       deliveryMethod,
       status: 'pending' as 'pending',
+      storeId: currentStore.id!,
     };
     
     try {

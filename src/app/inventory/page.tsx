@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/components/settings-provider';
 import { Search, History, Edit } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -32,9 +33,19 @@ const adjustmentSchema = z.object({
 const reasons: StockAdjustmentReason[] = ['New stock received', 'Shrinkage', 'Damages', 'Expired', 'Other'];
 
 export default function InventoryPage() {
-  const allProducts = useLiveQuery(() => db.products.toArray(), []);
-  const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
   const { toast } = useToast();
+  
+  const allProducts = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.products.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
+
+  const categories = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.categories.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   // Dialog states
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
@@ -93,7 +104,7 @@ export default function InventoryPage() {
   };
 
   const handleAdjustmentSubmit = async (values: z.infer<typeof adjustmentSchema>) => {
-    if (!selectedProduct) return;
+    if (!selectedProduct || !currentStore) return;
 
     const adjustment: Omit<StockAdjustment, 'id'> = {
       productId: selectedProduct.id!,
@@ -103,6 +114,7 @@ export default function InventoryPage() {
       newStock: values.newStock,
       reason: values.reason as StockAdjustmentReason,
       note: values.note,
+      storeId: currentStore.id!,
     };
     
     try {

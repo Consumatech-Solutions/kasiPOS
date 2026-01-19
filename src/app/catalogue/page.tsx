@@ -9,6 +9,7 @@ import * as z from 'zod';
 import { db } from '@/lib/db';
 import type { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/components/settings-provider';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +36,7 @@ const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/web
 const productSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
+  costPrice: z.coerce.number().min(0, { message: "Cost price can't be negative." }),
   stock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }).optional(),
   category: z.string().min(1, { message: "Please select a category." }),
   barcode: z.string().optional(),
@@ -51,6 +53,8 @@ const productSchema = z.object({
 
 export default function CataloguePage() {
   const { toast } = useToast();
+  const { settings } = useSettings();
+  const { currentStore } = settings;
 
   // Dialog states
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -64,8 +68,14 @@ export default function CataloguePage() {
 
 
   // Live queries
-  const products = useLiveQuery(() => db.products.toArray(), []);
-  const categories = useLiveQuery(() => db.categories.toArray(), []);
+  const products = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.products.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
+  const categories = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.categories.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   // Form Hooks
   const productForm = useForm<z.infer<typeof productSchema>>({
@@ -73,6 +83,7 @@ export default function CataloguePage() {
     defaultValues: {
       name: '',
       price: 0,
+      costPrice: 0,
       stock: 0,
       category: '',
       barcode: '',
@@ -141,6 +152,7 @@ export default function CataloguePage() {
       setEditingProduct(product);
       productForm.setValue('name', product.name);
       productForm.setValue('price', product.price);
+      productForm.setValue('costPrice', product.costPrice);
       productForm.setValue('stock', product.stock);
       productForm.setValue('category', product.category);
       productForm.setValue('barcode', product.barcode);
@@ -153,6 +165,7 @@ export default function CataloguePage() {
       setEditingProduct(null);
       productForm.setValue('name', '');
       productForm.setValue('price', 0);
+      productForm.setValue('costPrice', 0);
       productForm.setValue('stock', 0);
       productForm.setValue('category', '');
       productForm.setValue('barcode', '');
@@ -163,6 +176,10 @@ export default function CataloguePage() {
   };
 
   const handleProductSubmit = async (values: z.infer<typeof productSchema>) => {
+    if (!currentStore) {
+        toast({ variant: "destructive", title: "Error", description: "No store context found." });
+        return;
+    }
     try {
       let imageUrl = values.imageUrl;
       let imageHint = values.imageHint;
@@ -184,14 +201,16 @@ export default function CataloguePage() {
         imageHint = defaultImage.imageHint;
       }
       
-      const productData: Omit<Product, 'id'> = {
+      const productData = {
         name: values.name,
         price: values.price,
+        costPrice: values.costPrice,
         stock: values.stock || 0,
         category: values.category,
         barcode: values.barcode,
         imageUrl: imageUrl || '',
         imageHint: imageHint || '',
+        storeId: currentStore.id!,
       };
 
       if (editingProduct) {
@@ -233,12 +252,16 @@ export default function CataloguePage() {
   };
 
   const handleCategorySubmit = async (values: z.infer<typeof categorySchema>) => {
+    if (!currentStore) {
+        toast({ variant: "destructive", title: "Error", description: "No store context found." });
+        return;
+    }
     try {
       if (editingCategory) {
         await db.categories.update(editingCategory.id!, values);
         toast({ title: "Success", description: "Category updated successfully." });
       } else {
-        await db.categories.add(values);
+        await db.categories.add({ ...values, storeId: currentStore.id! });
         toast({ title: "Success", description: "Category added successfully." });
       }
       setCategoryDialogOpen(false);
@@ -287,6 +310,7 @@ export default function CataloguePage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>Cost Price</TableHead>
                   <TableHead>Stock</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -300,6 +324,7 @@ export default function CataloguePage() {
                     <TableCell>{p.name}</TableCell>
                     <TableCell>{p.category}</TableCell>
                     <TableCell>R{p.price.toFixed(2)}</TableCell>
+                    <TableCell>R{p.costPrice.toFixed(2)}</TableCell>
                     <TableCell>{p.stock}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="icon" onClick={() => openProductDialog(p)}><Edit className="h-4 w-4" /></Button>
@@ -408,6 +433,13 @@ export default function CataloguePage() {
                      <FormField control={productForm.control} name="price" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Price</FormLabel>
+                            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={productForm.control} name="costPrice" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Cost Price</FormLabel>
                             <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>

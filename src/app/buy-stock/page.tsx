@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { db } from '@/lib/db';
 import type { Product, PurchaseOrderItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/components/settings-provider';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function BuyStockPage() {
   const { toast } = useToast();
-  const allProducts = useLiveQuery(() => db.products.toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
+  const allProducts = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.products.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   // State to manage quantities for each product
   const [quantities, setQuantities] = useState<Record<number, number>>({});

@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { db } from '@/lib/db';
 import type { Customer, Transaction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/components/settings-provider';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -30,6 +31,8 @@ const customerSchema = z.object({
 
 export default function CustomersPage() {
   const { toast } = useToast();
+  const { settings } = useSettings();
+  const { currentStore } = settings;
 
   // Dialog states
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
@@ -41,14 +44,17 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Live queries
-  const allCustomers = useLiveQuery(() => db.customers.toArray(), []);
+  const allCustomers = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.customers.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
   
   const customerTransactions = useLiveQuery(() => {
-    if (selectedCustomer) {
-      return db.transactions.where('customerId').equals(selectedCustomer.id!).reverse().toArray();
+    if (selectedCustomer && currentStore) {
+      return db.transactions.where('customerId').equals(selectedCustomer.id!).and(t => t.storeId === currentStore.id!).reverse().toArray();
     }
     return [];
-  }, [selectedCustomer]);
+  }, [selectedCustomer, currentStore]);
 
   // Form Hook
   const customerForm = useForm<z.infer<typeof customerSchema>>({
@@ -85,6 +91,10 @@ export default function CustomersPage() {
   };
   
   const handleCustomerSubmit = async (values: z.infer<typeof customerSchema>) => {
+    if (!currentStore) {
+      toast({ variant: "destructive", title: "Error", description: "No store context found." });
+      return;
+    }
     try {
       if (editingCustomer) {
         await db.customers.update(editingCustomer.id!, { 
@@ -93,10 +103,11 @@ export default function CustomersPage() {
          });
         toast({ title: "Success", description: "Customer updated successfully." });
       } else {
-        const newCustomer: Omit<Customer, 'id'> = {
+        const newCustomer = {
             name: values.name,
             phone: values.phone,
             loyaltyPoints: 0,
+            storeId: currentStore.id!,
         };
         await db.customers.add(newCustomer as Customer);
         toast({ title: "Success", description: "Customer added successfully." });

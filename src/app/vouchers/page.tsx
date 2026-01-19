@@ -4,9 +4,16 @@ import { db } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { useSettings } from '@/components/settings-provider';
 
 export default function VouchersPage() {
-  const vouchers = useLiveQuery(() => db.vouchers.toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
+  const vouchers = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.vouchers.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   return (
     <Card>

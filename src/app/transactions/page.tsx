@@ -18,10 +18,21 @@ import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Calendar as CalendarIcon, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSettings } from '@/components/settings-provider';
 
 export default function TransactionsPage() {
-  const allTransactions = useLiveQuery(() => db.transactions.orderBy('date').reverse().toArray(), []);
-  const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
+  const allTransactions = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.transactions.where('storeId').equals(currentStore.id!).orderBy('date').reverse().toArray()
+  }, [currentStore?.id]);
+
+  const customers = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.customers.where('storeId').equals(currentStore.id!).toArray()
+  }, [currentStore?.id]);
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState('');

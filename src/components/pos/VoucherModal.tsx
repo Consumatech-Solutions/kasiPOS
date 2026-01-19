@@ -10,6 +10,7 @@ import { Ticket, XCircle, CheckCircle } from 'lucide-react';
 import type { Voucher } from '@/types';
 import { db } from '@/lib/db';
 import { Separator } from '@/components/ui/separator';
+import { useSettings } from '../settings-provider';
 
 interface VoucherModalProps {
   isOpen: boolean;
@@ -23,14 +24,20 @@ export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTota
   const [foundVoucher, setFoundVoucher] = useState<Voucher | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [amountToApply, setAmountToApply] = useState(0);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
 
   const handleFindVoucher = async () => {
+    if (!currentStore) {
+        setError('No store context found.');
+        return;
+    }
     setError(null);
     setFoundVoucher(null);
 
     const voucher = await db.vouchers
-      .where('code')
-      .equalsIgnoreCase(voucherCode)
+      .where('storeId').equals(currentStore.id!)
+      .and(v => v.code.toLowerCase() === voucherCode.toLowerCase())
       .first();
 
     if (!voucher || !voucher.isActive) {

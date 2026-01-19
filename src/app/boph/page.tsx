@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useSettings } from '@/components/settings-provider';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,7 +30,13 @@ const collectionFormSchema = z.object({
 
 export default function BophPage() {
   const { toast } = useToast();
-  const allParcels = useLiveQuery(() => db.parcels.toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
+  const allParcels = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.parcels.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   const [receiptCode, setReceiptCode] = useState('');
   const [selectedParcel, setSelectedParcel] = useState<Parcel | null>(null);
@@ -79,7 +86,7 @@ export default function BophPage() {
   };
   
   const handleConfirmReception = async () => {
-    if (!selectedParcel) return;
+    if (!selectedParcel || !currentStore) return;
     
     const newCollectionCode = generateCode(5, 'KP-');
 
@@ -118,8 +125,16 @@ export default function BophPage() {
   };
 
   const handleConfirmCollection = async (values: z.infer<typeof collectionFormSchema>) => {
-    if (!selectedParcel || selectedParcel.collectionCode !== values.collectionCode) {
+    if (!selectedParcel || !currentStore) {
        toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No parcel selected.",
+      });
+      return;
+    }
+    if (selectedParcel.collectionCode !== values.collectionCode) {
+      toast({
         variant: "destructive",
         title: "Error",
         description: "Collection code does not match the selected parcel.",

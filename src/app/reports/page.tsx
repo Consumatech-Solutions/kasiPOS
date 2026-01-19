@@ -8,9 +8,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useMemo } from 'react';
 import { format, subDays } from 'date-fns';
+import { useSettings } from '@/components/settings-provider';
 
 export default function ReportsPage() {
-  const transactions = useLiveQuery(() => db.transactions.toArray(), []);
+  const { settings } = useSettings();
+  const { currentStore } = settings;
+
+  const transactions = useLiveQuery(() => {
+    if (!currentStore) return [];
+    return db.transactions.where('storeId').equals(currentStore.id!).toArray();
+  }, [currentStore?.id]);
 
   const salesData = useMemo(() => {
     if (!transactions) return [];
