@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -12,8 +13,14 @@ export default function BottomNav() {
   const { settings } = useSettings();
 
   const navItems = useMemo(() => {
+    const userRole = settings.currentUser?.role;
     return allNavItems.filter(item => {
+      // Hide based on feature flag
       if (item.featureFlag && !settings[item.featureFlag]) {
+        return false;
+      }
+      // Hide based on role
+      if (item.roles && (!userRole || !item.roles.includes(userRole))) {
         return false;
       }
       return true;

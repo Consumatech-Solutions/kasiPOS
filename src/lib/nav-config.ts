@@ -11,13 +11,14 @@ import {
   PackageCheck,
   ShoppingCart,
 } from 'lucide-react';
-import { AppSettings } from '@/types';
+import { AppSettings, User } from '@/types';
 
 type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
   featureFlag?: keyof AppSettings;
+  roles?: User['role'][];
 }
 
 export const navItems: NavItem[] = [
@@ -30,5 +31,5 @@ export const navItems: NavItem[] = [
   { href: '/vouchers', label: 'Campaigns', icon: Ticket, featureFlag: 'campaigns' },
   { href: '/marketplace', label: 'Marketplace', icon: ShoppingBasket, featureFlag: 'marketplace' },
   { href: '/boph', label: 'BOPH', icon: PackageCheck, featureFlag: 'boph' },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ];

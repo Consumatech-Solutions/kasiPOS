@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -89,11 +90,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } else if (settings.isLoggedIn) {
       if (!settings.isStoreSetupComplete && !isSetupRoute) {
         router.push(SETUP_ROUTE);
-      } else if (settings.isStoreSetupComplete && (isAuthRoute || isSetupRoute)) {
-        router.push('/');
+      } else if (settings.isStoreSetupComplete) {
+         if (isAuthRoute || isSetupRoute) {
+          router.push('/');
+          return;
+        }
+
+        // Role-based route protection for staff
+        if (settings.currentUser?.role === 'staff' && pathname.startsWith('/settings')) {
+          router.push('/');
+          return;
+        }
       }
     }
-  }, [settings.isLoggedIn, settings.isStoreSetupComplete, pathname, router, isInitialLoad]);
+  }, [settings.isLoggedIn, settings.isStoreSetupComplete, settings.currentUser, pathname, router, isInitialLoad]);
 
   const setSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
