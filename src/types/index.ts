@@ -1,4 +1,14 @@
 
+export interface Store {
+  id?: number;
+  name: string;
+  vatNumber?: string;
+  logoUrl?: string;
+  receiptHeader?: string;
+  receiptFooter?: string;
+  isSetupComplete: boolean;
+}
+
 export interface Product {
   id?: number;
   name: string;
@@ -10,6 +20,7 @@ export interface Product {
   imageUrl: string;
   imageHint?: string;
   lowStockThreshold?: number;
+  storeId: number;
 }
 
 export interface Customer {
@@ -17,6 +28,7 @@ export interface Customer {
   name: string;
   phone?: string;
   loyaltyPoints: number;
+  storeId: number;
 }
 
 export interface TransactionItem {
@@ -38,6 +50,7 @@ export interface Transaction {
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
   voucherCode?: string;
   discountAmount?: number;
+  storeId: number;
 }
 
 export interface Voucher {
@@ -47,11 +60,13 @@ export interface Voucher {
   value: number;
   minPurchase: number;
   isActive: boolean;
+  storeId: number;
 }
 
 export interface Category {
     id?: number;
     name: string;
+    storeId: number;
 }
 
 export type StockAdjustmentReason = 'New stock received' | 'Shrinkage' | 'Damages' | 'Expired' | 'Other';
@@ -65,6 +80,7 @@ export interface StockAdjustment {
   newStock: number;
   reason: StockAdjustmentReason;
   note?: string;
+  storeId: number;
 }
 
 export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
@@ -81,6 +97,7 @@ export interface Parcel {
     collectingPersonName?: string;
     collectingPersonPhone?: string;
     collectingPersonId?: string;
+    storeId: number;
 }
 
 export interface PurchaseOrderItem {
@@ -102,6 +119,7 @@ export interface PurchaseOrder {
   total: number;
   deliveryMethod: 'delivery' | 'collection';
   status: 'pending' | 'completed' | 'cancelled';
+  storeId: number;
 }
 
 export interface User {
@@ -110,14 +128,7 @@ export interface User {
   phone: string;
   password?: string;
   role: 'admin' | 'staff';
-}
-
-export interface StoreProfile {
-  name?: string;
-  vatNumber?: string;
-  logoUrl?: string;
-  receiptHeader?: string;
-  receiptFooter?: string;
+  storeId: number;
 }
 
 export interface AppSettings {
@@ -127,7 +138,6 @@ export interface AppSettings {
   marketplace: boolean;
   boph: boolean;
   isLoggedIn: boolean;
-  currentUser?: User | null;
-  isStoreSetupComplete?: boolean;
-  storeProfile?: StoreProfile;
+  currentUser: User | null;
+  currentStore: Store | null;
 }
