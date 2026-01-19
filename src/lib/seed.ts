@@ -1,99 +1,109 @@
 import { db } from './db';
 import { PlaceHolderImages } from './placeholder-images';
-import type { User } from '@/types';
 
 export async function seedDatabase() {
-    await db.transaction('rw', db.products, db.customers, db.vouchers, db.categories, db.parcels, db.users, async () => {
+    await db.transaction('rw', db.stores, db.users, db.products, db.customers, db.vouchers, db.categories, db.parcels, async () => {
         
-        // Seed Categories if they don't exist
-        const categoryCount = await db.categories.count();
-        if (categoryCount === 0) {
-            console.log('Seeding categories...');
-            const initialCategories = [
-                { name: 'Drinks' }, { name: 'Snacks' }, { name: 'Bakery' },
-                { name: 'Dairy' }, { name: 'Confectionery' }, { name: 'Groceries' },
-                { name: 'Beverages' }, { name: 'Toiletries' }, { name: 'Airtime' },
-                { name: 'Cigs' }, { name: 'Veg' }, { name: 'Cool Drinks' },
-            ];
-            await db.categories.bulkAdd(initialCategories);
-        }
-
-        // Seed Products if they don't exist
-        const productCount = await db.products.count();
-        if (productCount === 0) {
-            console.log('Seeding products...');
-            const products = [
-                { name: 'Coca-Cola 330ml', price: 12.50, costPrice: 8.50, stock: 150, category: 'Drinks', barcode: '1234567890123', imageUrl: PlaceHolderImages[0].imageUrl, imageHint: PlaceHolderImages[0].imageHint, lowStockThreshold: 20 },
-                { name: 'Lays Chips Classic', price: 18.00, costPrice: 12.00, stock: 80, category: 'Snacks', barcode: '2345678901234', imageUrl: PlaceHolderImages[1].imageUrl, imageHint: PlaceHolderImages[1].imageHint, lowStockThreshold: 15 },
-                { name: 'Albany White Bread', price: 15.00, costPrice: 10.50, stock: 50, category: 'Bakery', barcode: '3456789012345', imageUrl: PlaceHolderImages[2].imageUrl, imageHint: PlaceHolderImages[2].imageHint, lowStockThreshold: 10 },
-                { name: 'Clover Milk 1L', price: 22.00, costPrice: 16.00, stock: 40, category: 'Dairy', barcode: '4567890123456', imageUrl: PlaceHolderImages[3].imageUrl, imageHint: PlaceHolderImages[3].imageHint, lowStockThreshold: 10 },
-                { name: 'Cadbury Dairy Milk', price: 25.00, costPrice: 17.50, stock: 100, category: 'Confectionery', barcode: '5678901234567', imageUrl: PlaceHolderImages[4].imageUrl, imageHint: PlaceHolderImages[4].imageHint, lowStockThreshold: 20 },
-                { name: 'Sunfoil Cooking Oil 2L', price: 75.00, costPrice: 60.00, stock: 30, category: 'Groceries', barcode: '6789012345678', imageUrl: PlaceHolderImages[5].imageUrl, imageHint: PlaceHolderImages[5].imageHint, lowStockThreshold: 5 },
-                { name: 'Selati White Sugar 2.5kg', price: 45.00, costPrice: 35.00, stock: 60, category: 'Groceries', barcode: '7890123456789', imageUrl: PlaceHolderImages[6].imageUrl, imageHint: PlaceHolderImages[6].imageHint, lowStockThreshold: 10 },
-                { name: 'Five Roses Teabags 102s', price: 55.00, costPrice: 42.00, stock: 45, category: 'Beverages', barcode: '8901234567890', imageUrl: PlaceHolderImages[7].imageUrl, imageHint: PlaceHolderImages[7].imageHint, lowStockThreshold: 10 },
-                { name: 'Nescafé Classic Coffee 200g', price: 95.00, costPrice: 78.00, stock: 25, category: 'Beverages', barcode: '9012345678901', imageUrl: PlaceHolderImages[8].imageUrl, imageHint: PlaceHolderImages[8].imageHint, lowStockThreshold: 5 },
-                { name: 'Sunlight Bar Soap', price: 10.00, costPrice: 6.50, stock: 200, category: 'Toiletries', barcode: '0123456789012', imageUrl: PlaceHolderImages[9].imageUrl, imageHint: PlaceHolderImages[9].imageHint, lowStockThreshold: 25 },
-            ];
-            await db.products.bulkAdd(products);
-        }
-
-        // Seed Customers if they don't exist
-        const customerCount = await db.customers.count();
-        if (customerCount === 0) {
-            console.log('Seeding customers...');
-            const customers = [
-                { name: 'John Doe', phone: '0821234567', loyaltyPoints: 150 },
-                { name: 'Jane Smith', phone: '0731234567', loyaltyPoints: 45 },
-                { name: 'Sipho Williams', phone: '0841234567', loyaltyPoints: 320 },
-            ];
-            await db.customers.bulkAdd(customers);
-        }
-        
-        // Seed Vouchers if they don't exist, or patch if they are incorrect
-        const voucherCount = await db.vouchers.count();
-        if (voucherCount === 0) {
-            console.log('Seeding vouchers...');
-            const vouchers = [
-                { code: 'SAVE10', type: 'percentage', value: 10, minPurchase: 5, isActive: true },
-                { code: 'WINTER25', type: 'fixed', value: 25, minPurchase: 5, isActive: true },
-                { code: 'EXPIRED5', type: 'fixed', value: 5, minPurchase: 5, isActive: false },
-            ];
-            await db.vouchers.bulkAdd(vouchers);
-        } else {
-            // This is a patch to fix stale data in existing databases.
+        // Check if seeding or migration has already occurred by looking for stores.
+        const storeCount = await db.stores.count();
+        if (storeCount > 0) {
+            // Data is either migrated or already seeded.
+            // We can apply non-destructive patches here if needed in the future.
             const voucherToPatch = await db.vouchers.where('code').equalsIgnoreCase('SAVE10').first();
             if (voucherToPatch && voucherToPatch.minPurchase !== 5) {
                 console.log('Patching stale voucher data for SAVE10.');
                 await db.vouchers.update(voucherToPatch.id!, { minPurchase: 5 });
             }
+            return; // Exit seeding process
         }
 
-        // Seed Parcels if they don't exist
-        const parcelCount = await db.parcels.count();
-        if (parcelCount === 0) {
-            console.log('Seeding parcels...');
-            const parcels = [
-                { deliveryNumber: 'PAZ-1001', customerName: 'Thabo Mbeki', status: 'Incoming' },
-                { deliveryNumber: 'PAZ-1002', customerName: 'Cyril Ramaphosa', status: 'Incoming' },
-                { deliveryNumber: 'TKT-8831', customerName: 'Fikile Mbalula', status: 'Incoming' },
-                { deliveryNumber: 'AMZ-0331', customerName: 'Trevor Noah', status: 'Incoming' },
-                { deliveryNumber: 'AMZ-5580', customerName: 'Nelson Mandela', status: 'Received', collectionCode: 'ZM451', receiptCode: 'RC-8912', dateReceived: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
-                { deliveryNumber: 'MAK-4112', customerName: 'Elon Musk', status: 'Received', collectionCode: 'TS911', receiptCode: 'RC-0192', dateReceived: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
-                { deliveryNumber: 'TKT-9210', customerName: 'Jacob Zuma', status: 'Collected', collectionCode: 'XF782', receiptCode: 'RC-9988', dateReceived: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), collectingPersonName: 'J. Zuma', collectingPersonId: '8001015800080' },
-                { deliveryNumber: 'BAS-1995', customerName: 'Siya Kolisi', status: 'Collected', collectionCode: 'SP991', receiptCode: 'RC-0012', dateReceived: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), collectingPersonName: 'S. Kolisi', collectingPersonId: '9001015800080' },
-            ];
-            await db.parcels.bulkAdd(parcels);
-        }
+        // If we are here, it's a fresh database.
+        console.log("Performing initial database seed for multi-store setup...");
 
-        // Seed Users if they don't exist
-        const userCount = await db.users.count();
-        if (userCount === 0) {
-            console.log('Seeding users...');
-            const initialUsers: User[] = [
-                { name: 'Admin User', phone: '0812345678', password: 'password123', role: 'admin' },
-            ];
-            await db.users.bulkAdd(initialUsers);
-        }
+        // ----- SCENARIO 1: The user who needs to go through setup -----
+        const incompleteStoreId = await db.stores.add({
+            name: 'My Store', // This will be updated during setup
+            isSetupComplete: false,
+        });
+
+        await db.users.add({
+            name: 'Admin User',
+            phone: '0812345678',
+            password: 'password123',
+            role: 'admin',
+            storeId: incompleteStoreId,
+        });
+        console.log(`Created incomplete store (ID: ${incompleteStoreId}) for user 0812345678.`);
+
+
+        // ----- SCENARIO 2: The user who bypasses setup with a pre-filled store -----
+        const completedStoreId = await db.stores.add({
+            name: 'Kasi General Store',
+            isSetupComplete: true,
+            receiptHeader: 'Thanks for shopping at Kasi General!',
+            receiptFooter: 'Your friendly neighborhood store.',
+            vatNumber: '1234567890'
+        });
+
+        await db.users.add({
+            name: 'Bypass Admin',
+            phone: '0810000000',
+            password: 'password123',
+            role: 'admin',
+            storeId: completedStoreId,
+        });
+        console.log(`Created completed store (ID: ${completedStoreId}) for user 0810000000.`);
+        console.log(`Seeding sample data into store ID: ${completedStoreId}`);
+
+        // ----- SEED SAMPLE DATA INTO THE COMPLETED STORE -----
+        
+        const categories = [
+            { name: 'Drinks' }, { name: 'Snacks' }, { name: 'Bakery' },
+            { name: 'Dairy' }, { name: 'Confectionery' }, { name: 'Groceries' },
+            { name: 'Beverages' }, { name: 'Toiletries' }, { name: 'Airtime' },
+            { name: 'Cigs' }, { name: 'Veg' }, { name: 'Cool Drinks' },
+        ].map(c => ({...c, storeId: completedStoreId}));
+        await db.categories.bulkAdd(categories);
+        
+        const products = [
+            { name: 'Coca-Cola 330ml', price: 12.50, costPrice: 8.50, stock: 150, category: 'Drinks', barcode: '1234567890123', imageUrl: PlaceHolderImages[0].imageUrl, imageHint: PlaceHolderImages[0].imageHint, lowStockThreshold: 20 },
+            { name: 'Lays Chips Classic', price: 18.00, costPrice: 12.00, stock: 80, category: 'Snacks', barcode: '2345678901234', imageUrl: PlaceHolderImages[1].imageUrl, imageHint: PlaceHolderImages[1].imageHint, lowStockThreshold: 15 },
+            { name: 'Albany White Bread', price: 15.00, costPrice: 10.50, stock: 50, category: 'Bakery', barcode: '3456789012345', imageUrl: PlaceHolderImages[2].imageUrl, imageHint: PlaceHolderImages[2].imageHint, lowStockThreshold: 10 },
+            { name: 'Clover Milk 1L', price: 22.00, costPrice: 16.00, stock: 40, category: 'Dairy', barcode: '4567890123456', imageUrl: PlaceHolderImages[3].imageUrl, imageHint: PlaceHolderImages[3].imageHint, lowStockThreshold: 10 },
+            { name: 'Cadbury Dairy Milk', price: 25.00, costPrice: 17.50, stock: 100, category: 'Confectionery', barcode: '5678901234567', imageUrl: PlaceHolderImages[4].imageUrl, imageHint: PlaceHolderImages[4].imageHint, lowStockThreshold: 20 },
+            { name: 'Sunfoil Cooking Oil 2L', price: 75.00, costPrice: 60.00, stock: 30, category: 'Groceries', barcode: '6789012345678', imageUrl: PlaceHolderImages[5].imageUrl, imageHint: PlaceHolderImages[5].imageHint, lowStockThreshold: 5 },
+            { name: 'Selati White Sugar 2.5kg', price: 45.00, costPrice: 35.00, stock: 60, category: 'Groceries', barcode: '7890123456789', imageUrl: PlaceHolderImages[6].imageUrl, imageHint: PlaceHolderImages[6].imageHint, lowStockThreshold: 10 },
+            { name: 'Five Roses Teabags 102s', price: 55.00, costPrice: 42.00, stock: 45, category: 'Beverages', barcode: '8901234567890', imageUrl: PlaceHolderImages[7].imageUrl, imageHint: PlaceHolderImages[7].imageHint, lowStockThreshold: 10 },
+            { name: 'Nescafé Classic Coffee 200g', price: 95.00, costPrice: 78.00, stock: 25, category: 'Beverages', barcode: '9012345678901', imageUrl: PlaceHolderImages[8].imageUrl, imageHint: PlaceHolderImages[8].imageHint, lowStockThreshold: 5 },
+            { name: 'Sunlight Bar Soap', price: 10.00, costPrice: 6.50, stock: 200, category: 'Toiletries', barcode: '0123456789012', imageUrl: PlaceHolderImages[9].imageUrl, imageHint: PlaceHolderImages[9].imageHint, lowStockThreshold: 25 },
+        ].map(p => ({...p, storeId: completedStoreId}));
+        await db.products.bulkAdd(products);
+
+        const customers = [
+            { name: 'John Doe', phone: '0821234567', loyaltyPoints: 150 },
+            { name: 'Jane Smith', phone: '0731234567', loyaltyPoints: 45 },
+            { name: 'Sipho Williams', phone: '0841234567', loyaltyPoints: 320 },
+        ].map(c => ({...c, storeId: completedStoreId}));
+        await db.customers.bulkAdd(customers);
+
+        const vouchers = [
+            { code: 'SAVE10', type: 'percentage', value: 10, minPurchase: 5, isActive: true },
+            { code: 'WINTER25', type: 'fixed', value: 25, minPurchase: 5, isActive: true },
+            { code: 'EXPIRED5', type: 'fixed', value: 5, minPurchase: 5, isActive: false },
+        ].map(v => ({...v, storeId: completedStoreId}));
+        await db.vouchers.bulkAdd(vouchers);
+
+        const parcels = [
+            { deliveryNumber: 'PAZ-1001', customerName: 'Thabo Mbeki', status: 'Incoming' },
+            { deliveryNumber: 'PAZ-1002', customerName: 'Cyril Ramaphosa', status: 'Incoming' },
+            { deliveryNumber: 'TKT-8831', customerName: 'Fikile Mbalula', status: 'Incoming' },
+            { deliveryNumber: 'AMZ-0331', customerName: 'Trevor Noah', status: 'Incoming' },
+            { deliveryNumber: 'AMZ-5580', customerName: 'Nelson Mandela', status: 'Received', collectionCode: 'ZM451', receiptCode: 'RC-8912', dateReceived: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000) },
+            { deliveryNumber: 'MAK-4112', customerName: 'Elon Musk', status: 'Received', collectionCode: 'TS911', receiptCode: 'RC-0192', dateReceived: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+            { deliveryNumber: 'TKT-9210', customerName: 'Jacob Zuma', status: 'Collected', collectionCode: 'XF782', receiptCode: 'RC-9988', dateReceived: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), collectingPersonName: 'J. Zuma', collectingPersonId: '8001015800080' },
+            { deliveryNumber: 'BAS-1995', customerName: 'Siya Kolisi', status: 'Collected', collectionCode: 'SP991', receiptCode: 'RC-0012', dateReceived: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), dateCollected: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), collectingPersonName: 'S. Kolisi', collectingPersonId: '9001015800080' },
+        ].map(p => ({...p, storeId: completedStoreId}));
+        await db.parcels.bulkAdd(parcels);
 
     }).catch(err => {
         console.error("Failed to seed database:", err);
