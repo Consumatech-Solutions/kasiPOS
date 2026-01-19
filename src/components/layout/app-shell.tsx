@@ -1,4 +1,3 @@
-
 'use client';
 
 import Header from './header';
@@ -9,7 +8,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings();
 
   // If the user is not logged in, or the store is not set up, don't render the shell
-  if (!settings.isLoggedIn || !settings.isStoreSetupComplete) {
+  if (!settings.isLoggedIn || !settings.currentStore?.isSetupComplete) {
     return <main className="flex-1">{children}</main>;
   }
   

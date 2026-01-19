@@ -404,7 +404,7 @@ export default function PosPage() {
             </div>
         </div>
 
-        <div style={{ height: '35%' }}>
+        <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
             {cartItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
@@ -434,7 +434,7 @@ export default function PosPage() {
         </div>
 
         {cartItems.length > 0 && (
-          <div className="pt-4 border-t" style={{ height: '65%' }}>
+          <div className="pt-4 border-t shrink-0">
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
