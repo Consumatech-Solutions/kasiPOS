@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { db } from '@/lib/db';
 import type { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { useSettings } from '@/components/settings-provider';
+import { useCategories, useProducts } from '@/hooks/use-catalogue';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,8 +51,6 @@ const productSchema = z.object({
 
 export default function CataloguePage() {
   const { toast } = useToast();
-  const { settings } = useSettings();
-  const { currentStore } = settings;
 
   // Dialog states
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -67,15 +63,9 @@ export default function CataloguePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
 
-  // Live queries
-  const products = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.products.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
-  const categories = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.categories.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  // Hooks pour les données avec synchronisation
+  const { categories, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook } = useCategories();
+  const { products, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook } = useProducts();
 
   // Form Hooks
   const productForm = useForm<z.infer<typeof productSchema>>({
@@ -176,10 +166,6 @@ export default function CataloguePage() {
   };
 
   const handleProductSubmit = async (values: z.infer<typeof productSchema>) => {
-    if (!currentStore) {
-        toast({ variant: "destructive", title: "Error", description: "No store context found." });
-        return;
-    }
     try {
       let imageUrl = values.imageUrl;
       let imageHint = values.imageHint;
@@ -194,12 +180,8 @@ export default function CataloguePage() {
           reader.readAsDataURL(file);
         });
         imageHint = ''; // No hint for custom uploaded images
-      } else if (!imageUrl) {
-        // If no image is uploaded and no existing imageUrl, use a placeholder
-        const defaultImage = PlaceHolderImages[Math.floor(Math.random() * PlaceHolderImages.length)];
-        imageUrl = defaultImage.imageUrl;
-        imageHint = defaultImage.imageHint;
       }
+      // If no image is provided, leave imageUrl empty (don't assign placeholder automatically)
       
       const productData = {
         name: values.name,
@@ -210,32 +192,33 @@ export default function CataloguePage() {
         barcode: values.barcode,
         imageUrl: imageUrl || '',
         imageHint: imageHint || '',
-        storeId: currentStore.id!,
       };
 
-      if (editingProduct) {
-        await db.products.update(editingProduct.id!, productData);
+      if (editingProduct && editingProduct.id) {
+        await updateProduct(editingProduct.id, productData);
         toast({ title: "Success", description: "Product updated successfully." });
       } else {
-        await db.products.add(productData as Product);
+        await createProduct(productData as any);
         toast({ title: "Success", description: "Product added successfully." });
       }
       setProductDialogOpen(false);
       productForm.reset();
     } catch (error) {
       console.error("Failed to save product:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to save product." });
+      const errorMessage = error instanceof Error ? error.message : "Failed to save product.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
     }
   };
 
 
-  const deleteProduct = async (id: number) => {
+  const handleDeleteProduct = async (id: number) => {
     try {
-      await db.products.delete(id);
+      await deleteProductHook(id);
       toast({ title: "Success", description: "Product deleted successfully." });
     } catch (error) {
       console.error("Failed to delete product:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to delete product." });
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete product.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
     }
   };
 
@@ -252,33 +235,32 @@ export default function CataloguePage() {
   };
 
   const handleCategorySubmit = async (values: z.infer<typeof categorySchema>) => {
-    if (!currentStore) {
-        toast({ variant: "destructive", title: "Error", description: "No store context found." });
-        return;
-    }
     try {
-      if (editingCategory) {
-        await db.categories.update(editingCategory.id!, values);
+      if (editingCategory && editingCategory.id) {
+        await updateCategory(editingCategory.id, values);
         toast({ title: "Success", description: "Category updated successfully." });
       } else {
-        await db.categories.add({ ...values, storeId: currentStore.id! });
+        await createCategory(values);
         toast({ title: "Success", description: "Category added successfully." });
       }
       setCategoryDialogOpen(false);
+      categoryForm.reset();
     } catch (error) {
       console.error("Failed to save category:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to save category." });
+      const errorMessage = error instanceof Error ? error.message : "Failed to save category.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
     }
   };
 
-  const deleteCategory = async (id: number) => {
+  const handleDeleteCategory = async (id: number) => {
     try {
-        await db.categories.delete(id);
+        await deleteCategoryHook(id);
         toast({ title: "Success", description: "Category deleted successfully." });
         // Note: You might want to handle products in the deleted category.
     } catch (error) {
         console.error("Failed to delete category:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete category." });
+        const errorMessage = error instanceof Error ? error.message : "Failed to delete category.";
+        toast({ variant: "destructive", title: "Error", description: errorMessage });
     }
   };
 
@@ -316,38 +298,58 @@ export default function CataloguePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products?.map(p => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md object-cover" data-ai-hint={p.imageHint} />
-                    </TableCell>
-                    <TableCell>{p.name}</TableCell>
-                    <TableCell>{p.category}</TableCell>
-                    <TableCell>R{p.price.toFixed(2)}</TableCell>
-                    <TableCell>R{p.costPrice.toFixed(2)}</TableCell>
-                    <TableCell>{p.stock}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => openProductDialog(p)}><Edit className="h-4 w-4" /></Button>
-                      <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                              <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the product.
-                              </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteProduct(p.id!)}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                          </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
+                {productsLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center">Loading products...</TableCell>
                   </TableRow>
-                ))}
+                ) : products && products.length > 0 ? (
+                  products.map(p => {
+                    const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0;
+                    const costPrice = typeof p.costPrice === 'number' ? p.costPrice : parseFloat(String(p.costPrice)) || 0;
+                    return (
+                    <TableRow key={p.id}>
+                      <TableCell>
+                        {p.imageUrl ? (
+                          <Image src={p.imageUrl} alt={p.name} width={40} height={40} className="rounded-md object-cover" data-ai-hint={p.imageHint} />
+                        ) : (
+                          <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                            No img
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>{p.name}</TableCell>
+                      <TableCell>{p.category}</TableCell>
+                      <TableCell>R{price.toFixed(2)}</TableCell>
+                      <TableCell>R{costPrice.toFixed(2)}</TableCell>
+                      <TableCell>{p.stock}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => openProductDialog(p)}><Edit className="h-4 w-4" /></Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the product.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteProduct(p.id!)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">No products yet. Click "Add Product" to create one.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TabsContent>
@@ -367,31 +369,41 @@ export default function CataloguePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories?.map(c => (
-                  <TableRow key={c.id}>
-                    <TableCell>{c.name}</TableCell>
-                    <TableCell className="text-right">
-                       <Button variant="ghost" size="icon" onClick={() => openCategoryDialog(c)}><Edit className="h-4 w-4" /></Button>
-                       <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                              <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the category. Any products in this category will not be deleted but will need to be re-categorized.
-                              </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteCategory(c.id!)}>Delete</AlertDialogAction>
-                              </AlertDialogFooter>
-                          </AlertDialogContent>
-                      </AlertDialog>
-                    </TableCell>
+                {categoriesLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={2} className="text-center">Loading categories...</TableCell>
                   </TableRow>
-                ))}
+                ) : categories && categories.length > 0 ? (
+                  categories.map(c => (
+                    <TableRow key={c.id}>
+                      <TableCell>{c.name}</TableCell>
+                      <TableCell className="text-right">
+                         <Button variant="ghost" size="icon" onClick={() => openCategoryDialog(c)}><Edit className="h-4 w-4" /></Button>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the category. Any products in this category will not be deleted but will need to be re-categorized.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteCategory(c.id!)}>Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={2} className="text-center text-muted-foreground">No categories yet. Click "Add Category" to create one.</TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TabsContent>
@@ -404,6 +416,9 @@ export default function CataloguePage() {
         <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
                 <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
+                <DialogDescription>
+                    {editingProduct ? 'Update the product information below.' : 'Fill in the details to add a new product to your catalogue.'}
+                </DialogDescription>
             </DialogHeader>
             <Form {...productForm}>
                 <form onSubmit={productForm.handleSubmit(handleProductSubmit)} className="space-y-4">
@@ -424,7 +439,7 @@ export default function CataloguePage() {
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {categories?.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                                    {categories?.map((c, index) => <SelectItem key={c.id ?? `category-${index}-${c.name}`} value={c.name}>{c.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -456,28 +471,14 @@ export default function CataloguePage() {
                             <FormLabel>Barcode (Optional)</FormLabel>
                             <div className="flex gap-2">
                                 <FormControl><Input {...field} /></FormControl>
-                                <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button type="button" variant="outline" size="icon"><QrCode className="h-4 w-4"/></Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Scan Barcode</DialogTitle>
-                                            <DialogDescription>Point your camera at a barcode. This is a placeholder and does not scan barcodes yet.</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="relative">
-                                            <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted" autoPlay muted playsInline />
-                                            {hasCameraPermission === false && (
-                                                <Alert variant="destructive" className="mt-4">
-                                                    <AlertTitle>Camera Access Required</AlertTitle>
-                                                    <AlertDescription>
-                                                        Please allow camera access in your browser settings to use the scanner.
-                                                    </AlertDescription>
-                                                </Alert>
-                                            )}
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="icon"
+                                    onClick={() => setScannerDialogOpen(true)}
+                                >
+                                    <QrCode className="h-4 w-4"/>
+                                </Button>
                             </div>
                             <FormMessage />
                         </FormItem>
@@ -526,6 +527,9 @@ export default function CataloguePage() {
         <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
                 <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
+                <DialogDescription>
+                    {editingCategory ? 'Update the category name below.' : 'Enter a name for the new category.'}
+                </DialogDescription>
             </DialogHeader>
             <Form {...categoryForm}>
                 <form onSubmit={categoryForm.handleSubmit(handleCategorySubmit)} className="space-y-4">
@@ -542,6 +546,27 @@ export default function CataloguePage() {
                     </DialogFooter>
                 </form>
             </Form>
+        </DialogContent>
+    </Dialog>
+
+    {/* Barcode Scanner Dialog - Separate from Product Dialog to avoid nesting */}
+    <Dialog open={scannerDialogOpen} onOpenChange={setScannerDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Scan Barcode</DialogTitle>
+                <DialogDescription>Point your camera at a barcode. This is a placeholder and does not scan barcodes yet.</DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+                <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted" autoPlay muted playsInline />
+                {hasCameraPermission === false && (
+                    <Alert variant="destructive" className="mt-4">
+                        <AlertTitle>Camera Access Required</AlertTitle>
+                        <AlertDescription>
+                            Please allow camera access in your browser settings to use the scanner.
+                        </AlertDescription>
+                    </Alert>
+                )}
+            </div>
         </DialogContent>
     </Dialog>
 

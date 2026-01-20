@@ -21,7 +21,7 @@ export class KasiPosDexie extends Dexie {
       customers: '++id, name, phone, storeId',
       transactions: '++id, customerId, date, storeId',
       vouchers: '++id, code, isActive, storeId',
-      categories: '++id, name, storeId',
+      categories: '++id, name',
       stockAdjustments: '++id, productId, date, storeId',
       parcels: '++id, deliveryNumber, collectionCode, status, storeId',
       purchaseOrders: '++id, orderCode, date, storeId',
@@ -105,21 +105,6 @@ export class KasiPosDexie extends Dexie {
       transactions: '++id, customerId, date',
       vouchers: '++id, code, isActive',
       categories: '++id, name',
-    }).upgrade(tx => {
-      // Seed initial categories if the table is new
-      return tx.table('categories').bulkAdd([
-        { name: 'Drinks' },
-        { name: 'Snacks' },
-        { name: 'Bakery' },
-        { name: 'Dairy' },
-        { name: 'Confectionery' },
-        { name: 'Groceries' },
-        { name: 'Beverages' },
-        { name: 'Toiletries' },
-        { name: 'Airtime' },
-        { name: 'Cigs' },
-        { name: 'Veg' },
-      ]);
     });
     this.version(1).stores({
       products: '++id, name, category, barcode',

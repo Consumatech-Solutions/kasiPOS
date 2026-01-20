@@ -14,9 +14,20 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         // This will now check for products and parcels and seed if necessary.
         // The seedDatabase function is now idempotent.
         await seedDatabase();
+        
+        // Remove all mock data immediately on startup
+        try {
+          const { removeAllMockData } = await import('@/lib/utils/catalogue-cleanup');
+          await removeAllMockData();
+        } catch (error) {
+          console.error('Failed to remove mock data:', error);
+          // Continue even if mock data removal fails
+        }
+        
         setIsDbReady(true);
       } catch (error) {
         console.error('Failed to initialize database:', error);
+        setIsDbReady(true); // Still allow app to load even if seeding fails
       }
     };
     initDb();

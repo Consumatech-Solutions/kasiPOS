@@ -20,7 +20,7 @@ export interface Product {
   imageUrl: string;
   imageHint?: string;
   lowStockThreshold?: number;
-  storeId: number;
+  storeId?: number; // Optional - products are now global, not tied to a specific store
 }
 
 export interface Customer {
@@ -66,7 +66,7 @@ export interface Voucher {
 export interface Category {
     id?: number;
     name: string;
-    storeId: number;
+    storeId?: number; // Optional for backward compatibility, but not used for filtering
 }
 
 export type StockAdjustmentReason = 'New stock received' | 'Shrinkage' | 'Damages' | 'Expired' | 'Other';
