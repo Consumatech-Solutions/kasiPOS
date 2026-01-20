@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { authApi } from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,19 +32,21 @@ export default function RequestAccessPage() {
     });
 
     const onSubmit = async (values: z.infer<typeof requestAccessSchema>) => {
-        const user = await db.users.where('phone').equals(values.phone).first();
-
-        if (user) {
+        try {
+            await authApi.requestOtp(values.phone);
+            
             toast({
                 title: 'Code Sent!',
-                description: `A verification code has been sent to ${values.phone}. (It's ${MOCK_OTP_CODE})`,
+                description: `A verification code has been sent to ${values.phone}.`,
             });
             router.push(`/verify-code?phone=${encodeURIComponent(values.phone)}`);
-        } else {
+        } catch (error: any) {
+             console.error('Request OTP error:', error);
+             const message = error.response?.data?.message || 'Failed to send code. Please try again.';
             toast({
                 variant: 'destructive',
                 title: 'Access Denied',
-                description: 'This mobile number is not registered for access.',
+                description: message,
             });
         }
     };
