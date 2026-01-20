@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { authApi } from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,29 +44,39 @@ export default function SetPasswordPage() {
             return;
         }
 
-        const user = await db.users.where('phone').equals(phone).first();
-        if (!user) {
-            toast({ variant: 'destructive', title: 'Error', description: 'User not found.' });
-            router.push('/request-access');
-            return;
+        const tempToken = localStorage.getItem('kasi-pos-temp-token');
+        if (!tempToken) {
+             toast({ variant: 'destructive', title: 'Error', description: 'Session expired. Please request a new code.' });
+             router.push('/request-access');
+             return;
         }
 
         try {
-            await db.users.update(user.id!, { password: values.password });
-            toast({
-                title: 'Password Set!',
-                description: 'Your password has been successfully created.',
-            });
-            
-            const updatedUser = { ...user, password: values.password };
-            login(updatedUser);
+             // Pass tempToken via headers (handled in api.ts interceptor if we set it, 
+             // but here we call setPassword which explicitly accepts it or we rely on interceptor logic.
+             // Our API wrapper `setPassword` takes (password, tempToken) and sets header.
+             const response = await authApi.setPassword(values.password, tempToken);
+             
+             if (response.data && response.data.accessToken) {
+                toast({ title: "All Set!", description: "Your password has been set." });
+                
+                // Clear temp token
+                localStorage.removeItem('kasi-pos-temp-token');
+                
+                // Login user
+                await login({ 
+                    ...response.data.user, 
+                    accessToken: response.data.accessToken 
+                });
+             }
 
-        } catch (error) {
-            console.error('Failed to set password', error);
-            toast({
+        } catch (error: any) {
+            console.error('Set password error:', error);
+            const message = error.response?.data?.message || 'Failed to update password.';
+             toast({
                 variant: 'destructive',
                 title: 'Error',
-                description: 'Failed to set password.',
+                description: message,
             });
         }
     };

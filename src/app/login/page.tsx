@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
+import { authApi } from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,16 +35,26 @@ export default function LoginPage() {
     });
 
     const onSubmit = async (values: z.infer<typeof loginSchema>) => {
-        const user = await db.users.where('phone').equals(values.phone).first();
-
-        if (user && user.password && user.password === values.password) {
-            toast({ title: "Login Successful", description: "Welcome back!" });
-            login(user);
-        } else {
+        try {
+            const response = await authApi.login(values.phone, values.password);
+            
+            if (response.data && response.data.accessToken) {
+                toast({ title: "Login Successful", description: "Welcome back!" });
+                // Pass user and token to settings provider
+                await login({ 
+                    ...response.data.user, 
+                    accessToken: response.data.accessToken 
+                });
+                // Router push is handled inside login() or settings provider effect, but we can do it here too if needed
+                // router.push('/'); 
+            }
+        } catch (error: any) {
+            console.error('Login error:', error);
+            const message = error.response?.data?.message || 'Invalid mobile number or password.';
             toast({
                 variant: 'destructive',
                 title: 'Login Failed',
-                description: 'Invalid mobile number or password.',
+                description: message,
             });
         }
     };

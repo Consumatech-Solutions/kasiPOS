@@ -8,7 +8,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings();
 
   // If the user is not logged in, or the store is not set up, don't render the shell
-  if (!settings.isLoggedIn || !settings.currentStore?.isSetupComplete) {
+  // If the user is not logged in, don't render the shell
+  // We temporarily removed strict store checks until store API is integrated
+  if (!settings.isLoggedIn) {
     return <main className="flex-1">{children}</main>;
   }
   

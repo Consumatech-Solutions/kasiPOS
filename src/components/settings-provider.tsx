@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { AppSettings, User, Store } from '@/types';
-import { db } from '@/lib/db';
+
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -35,9 +35,10 @@ function getInitialSettings(): AppSettings {
     const item = window.localStorage.getItem('kasi-pos-settings');
     const storedSettings = item ? JSON.parse(item) : {};
     // Only persist currentUser from localStorage on initial load
-    const currentUser = storedSettings.currentUser || null;
+    const itemUser = window.localStorage.getItem('user');
+    const currentUser = itemUser ? JSON.parse(itemUser) : null;
     
-    // We only keep theme and currentUser from localStorage, the rest is reset
+    // We only keep theme from settings and currentUser from its own key
     return { 
         ...defaultSettings, 
         theme: storedSettings.theme || 'light', 
@@ -79,6 +80,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
         // Persist only the parts we want to keep after logout
         window.localStorage.setItem('kasi-pos-settings', JSON.stringify({ theme }));
+        window.localStorage.removeItem('token');
     } catch (error) {
         console.error('Error saving settings to localStorage on logout', error);
     }
@@ -90,13 +92,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const bootstrapStore = async () => {
         if (settings.currentUser && !settings.currentStore) {
-            const store = await db.stores.get(settings.currentUser.storeId);
-            if (store) {
-                setSetting('currentStore', store);
-            } else {
-                console.error(`Inconsistent state: User ${settings.currentUser.id} exists but their store ${settings.currentUser.storeId} does not.`);
-                logout();
-            }
+             // Sync store from backend (TODO: Implement getStore API)
+             // For now we just don't load the store locally from DB
         }
     };
     if (isInitialLoad) {
@@ -109,9 +106,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     root.classList.remove('light', 'dark');
     root.classList.add(settings.theme);
     try {
-      // Persist only theme and currentUser to localStorage
-      const { theme, currentUser } = settings;
-      window.localStorage.setItem('kasi-pos-settings', JSON.stringify({ theme, currentUser }));
+      // Persist only theme to localStorage
+      window.localStorage.setItem('kasi-pos-settings', JSON.stringify({ theme: settings.theme }));
+      // Persist user explicitly as requested
+      if (settings.currentUser) {
+          window.localStorage.setItem('user', JSON.stringify(settings.currentUser));
+      } else {
+          window.localStorage.removeItem('user');
+      }
     } catch (error) {
       console.error('Error saving settings to localStorage', error);
     }
@@ -125,58 +127,69 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setIsInitialLoad(false);
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     if (isInitialLoad) return;
     
-    // Wait for store to be hydrated if user is logged in
+    // Check if we are blocking due to missing store?
+    // If db.stores is removed, currentStore is null.
+    // If we return here, we block redirects.
+    // Let's remove this block if we are moving away from local DB store.
+    /* 
     if (settings.isLoggedIn && !settings.currentStore) {
         return; 
     }
+    */
 
     const isAuthRoute = AUTH_ROUTES.includes(pathname);
     const isSetupRoute = pathname === SETUP_ROUTE;
 
     if (!settings.isLoggedIn && !isAuthRoute) {
       router.push('/login');
-    } else if (settings.isLoggedIn && settings.currentStore) {
-      if (!settings.currentStore.isSetupComplete && !isSetupRoute) {
-        router.push(SETUP_ROUTE);
-      } else if (settings.currentStore.isSetupComplete) {
-         if (isAuthRoute || isSetupRoute) {
-          router.push('/');
-          return;
+    } else if (settings.isLoggedIn) {
+        // If we are logged in, we generally want to be in the app.
+        // If store is missing, we might want to fetch it, but effectively we shouldn't stay on login.
+        
+        if (isAuthRoute) {
+             router.push('/');
+             return;
         }
-        // Role-based route protection for staff
-        if (settings.currentUser?.role === 'staff' && pathname.startsWith('/settings')) {
-          router.push('/');
-          return;
+
+        if (settings.currentStore) {
+             if (!settings.currentStore.isSetupComplete && !isSetupRoute) {
+                router.push(SETUP_ROUTE);
+             } else if (settings.currentStore.isSetupComplete && isSetupRoute) {
+                router.push('/');
+             }
+             
+             // Role-based route protection for staff
+             if (settings.currentUser?.role === 'staff' && pathname.startsWith('/settings')) {
+                router.push('/');
+             }
         }
-      }
     }
   }, [settings.isLoggedIn, settings.currentStore, settings.currentUser, pathname, router, isInitialLoad]);
 
-
-  const login = useCallback(async (user: User) => {
-    const store = await db.stores.get(user.storeId);
-    if (store) {
-        setSettings((prev) => ({ 
-            ...prev,
-            currentUser: user,
-            currentStore: store,
-            isLoggedIn: true,
-        }));
-    } else {
-        console.error(`Could not find store with ID ${user.storeId} for user ${user.name}`);
-        logout();
+  const login = useCallback(async (userData: User & { accessToken?: string }) => {
+    if (userData.accessToken) {
+        localStorage.setItem('token', userData.accessToken);
     }
-  }, [logout]);
+    
+    // Explicitly save user as well
+    localStorage.setItem('user', JSON.stringify(userData));
 
+    setSettings((prev) => ({ 
+        ...prev,
+        currentUser: userData,
+        isLoggedIn: true,
+        // currentStore: null // We don't have store details yet
+    }));
+  }, []);
 
   const canRenderChildren = () => {
     if (isInitialLoad) return false;
     if (!settings.isLoggedIn) return AUTH_ROUTES.includes(pathname);
-    if (!settings.currentStore) return false; // Wait until store is loaded
-    if (!settings.currentStore.isSetupComplete) return pathname === SETUP_ROUTE;
+    // if (!settings.currentStore) return false; // Don't block if store is missing for now
+    if (settings.currentStore && !settings.currentStore.isSetupComplete) return pathname === SETUP_ROUTE;
     return !AUTH_ROUTES.includes(pathname) && pathname !== SETUP_ROUTE;
   };
 
