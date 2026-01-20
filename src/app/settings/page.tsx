@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { db } from '@/lib/db';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +11,7 @@ import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users } from 'luc
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
+import { usersApi } from '@/lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
@@ -41,11 +40,26 @@ export default function SettingsPage() {
   // State for user management
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const TABLE_LIMIT = 5;
 
-  const users = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.users.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  const fetchUsers = async () => {
+    const storeId = currentStore?.id || currentUser?.storeId;
+    if (!storeId) return;
+    try {
+        const response = await usersApi.findAll(storeId, page, TABLE_LIMIT);
+        setUsers(response.data.data);
+        setTotalPages(response.data.meta.totalPages);
+    } catch (error) {
+        console.error('Failed to fetch users:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [currentStore?.id, currentUser?.storeId, page]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -95,46 +109,44 @@ export default function SettingsPage() {
   };
 
   const handleUserSubmit = async (values: z.infer<typeof userManagementSchema>) => {
-    if (!currentStore) {
+    const storeId = currentStore?.id || currentUser?.storeId;
+    if (!storeId) {
         toast({ variant: "destructive", title: "Error", description: "No store context found." });
         return;
     }
     try {
       if (editingUser) {
         // Update existing user
-        await db.users.update(editingUser.id!, { name: values.name, phone: values.phone });
+        await usersApi.update(editingUser.id!, { name: values.name, phone: values.phone });
         toast({ title: "Success", description: "User updated successfully." });
       } else {
-        // Add new staff user
-        const existingUser = await db.users.where('phone').equals(values.phone).first();
-        if (existingUser) {
-          toast({ variant: "destructive", title: "Error", description: "A user with this mobile number already exists." });
-          return;
-        }
-        const newUser: Omit<User, 'id'> = { 
+        // Add new staff user via API
+        await usersApi.create({ 
             name: values.name, 
             phone: values.phone, 
             role: 'staff',
-            storeId: currentStore.id!,
-        };
-        await db.users.add(newUser as User);
+            storeId: storeId,
+        });
         toast({ title: "Success", description: "Staff user added successfully. They will receive an SMS to set up their password." });
       }
       setUserDialogOpen(false);
-    } catch (error) {
+      fetchUsers(); // Refresh list
+    } catch (error: any) {
       console.error("Failed to save user:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to save user." });
+      const message = error.response?.data?.message || "Failed to save user.";
+      toast({ variant: "destructive", title: "Error", description: message });
     }
   };
   
-  const deleteUser = async (id: number) => {
+  const deleteUser = async (id: string) => { // ID is uuid string now
     try {
       if (id === currentUser?.id) {
         toast({ variant: "destructive", title: "Error", description: "You cannot delete your own account." });
         return;
       }
-      await db.users.delete(id);
+      await usersApi.remove(id);
       toast({ title: "Success", description: "User deleted successfully." });
+      fetchUsers(); // Refresh list
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to delete user." });
@@ -256,6 +268,13 @@ export default function SettingsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {users?.length === 0 && (
+                      <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              No staff members found. Add one above!
+                          </TableCell>
+                      </TableRow>
+                  )}
                   {users?.map(user => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
@@ -285,6 +304,29 @@ export default function SettingsPage() {
                   ))}
                 </TableBody>
               </Table>
+              
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-end space-x-2 py-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <div className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

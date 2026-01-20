@@ -4,6 +4,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { AppSettings, User, Store } from '@/types';
+import { storesApi, authApi } from '@/lib/api';
 
 
 interface SettingsContextType {
@@ -67,8 +68,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     const theme = settings.theme; // Preserve theme across logout
+    
+    try {
+        await authApi.logout();
+    } catch (error) {
+        // Ignore API errors during logout, we want to clear local state anyway
+        console.error('Logout API call failed', error);
+    }
+
     // Create a new settings object for logout state
     const newSettings = {
         ...defaultSettings,
@@ -81,6 +90,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         // Persist only the parts we want to keep after logout
         window.localStorage.setItem('kasi-pos-settings', JSON.stringify({ theme }));
         window.localStorage.removeItem('token');
+        window.localStorage.removeItem('user'); // Explicitly remove user
     } catch (error) {
         console.error('Error saving settings to localStorage on logout', error);
     }
@@ -88,18 +98,46 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   }, [router, settings.theme]);
 
-  // This effect runs on mount to load the store if a user session exists in localStorage
+
+
+// ...
+
+  // This effect runs on mount to check for updated user data
   useEffect(() => {
-    const bootstrapStore = async () => {
-        if (settings.currentUser && !settings.currentStore) {
-             // Sync store from backend (TODO: Implement getStore API)
-             // For now we just don't load the store locally from DB
+    const bootstrapData = async () => {
+        if (settings.currentUser) {
+             try {
+                // 1. Refresh User Profile to get latest role/storeId
+                const userResponse = await authApi.getProfile();
+                const freshUser = userResponse.data;
+                
+                // Update settings and localStorage with fresh user data
+                setSetting('currentUser', freshUser);
+                localStorage.setItem('user', JSON.stringify(freshUser));
+
+                // 2. Fetch Store if user has a storeId
+                if (freshUser.storeId) {
+                     const storeResponse = await storesApi.getMyStore();
+                     const store = storeResponse.data;
+                     setSetting('currentStore', store);
+                } else if (!settings.currentStore) {
+                     // Fallback check
+                     try {
+                        const storeResponse = await storesApi.getMyStore();
+                        setSetting('currentStore', storeResponse.data);
+                     } catch (e) {
+                         // ignore
+                     }
+                }
+             } catch (error) {
+                 console.error('Failed to bootstrap app data:', error);
+             }
         }
     };
     if (isInitialLoad) {
-        bootstrapStore();
+        bootstrapData();
     }
-  }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting, logout]);
+  }, [isInitialLoad, setSetting]);
 
   useEffect(() => {
     const root = window.document.documentElement;
