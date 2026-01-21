@@ -24,7 +24,8 @@ const MOCK_OTP_CODE = '123456';
 export default function VerifyCodePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const phone = searchParams.get('phone');
+  // Utiliser get() directement sans accéder aux clés pour éviter les warnings Next.js 15
+  const phone = searchParams ? searchParams.get('phone') : null;
   const { toast } = useToast();
   const { login } = useSettings();
 

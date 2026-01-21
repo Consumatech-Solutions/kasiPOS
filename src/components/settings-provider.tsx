@@ -116,11 +116,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 localStorage.setItem('user', JSON.stringify(freshUser));
 
                 // 2. Fetch Store if user has a storeId
-                if (freshUser.storeId) {
-                     const storeResponse = await storesApi.getMyStore();
-                     const store = storeResponse.data;
-                     setSetting('currentStore', store);
-                } else if (!settings.currentStore) {
+                if (freshUser.storeId && storesApi?.getMyStore) {
+                     try {
+                        const storeResponse = await storesApi.getMyStore();
+                        const store = storeResponse.data;
+                        setSetting('currentStore', store);
+                     } catch (error: any) {
+                        // Ignore errors if backend is not available
+                        if (process.env.NODE_ENV === 'development' && error.code !== 'ERR_NETWORK') {
+                            console.warn('Failed to fetch store:', error);
+                        }
+                     }
+                } else if (!settings.currentStore && storesApi?.getMyStore) {
                      // Fallback check
                      try {
                         const storeResponse = await storesApi.getMyStore();
@@ -129,8 +136,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                          // ignore
                      }
                 }
-             } catch (error) {
-                 console.error('Failed to bootstrap app data:', error);
+             } catch (error: any) {
+                 // Ne logger que les erreurs non-réseau en développement
+                 if (process.env.NODE_ENV === 'development') {
+                     if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                         // Erreur réseau attendue si le backend n'est pas démarré
+                         console.warn('Backend non accessible. Mode hors ligne activé.');
+                     } else {
+                         console.error('Failed to bootstrap app data:', error);
+                     }
+                 }
+                 // Continuer avec les données locales en cas d'erreur réseau
              }
         }
     };

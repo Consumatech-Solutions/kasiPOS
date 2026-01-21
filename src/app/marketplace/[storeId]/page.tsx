@@ -36,9 +36,13 @@ const storeNames: Record<string, string> = {
 };
 
 export default function StorePosPage() {
+  // Utiliser useParams() directement - Next.js 15 permet cela dans les Client Components
+  // Éviter d'énumérer les clés pour éviter les warnings React DevTools
   const params = useParams();
-  const storeId = params.storeId as string;
-  const storeName = storeNames[storeId] || 'Marketplace';
+  const storeId = typeof params === 'object' && params !== null && 'storeId' in params 
+    ? String(params.storeId) 
+    : null;
+  const storeName = storeId ? (storeNames[storeId] || 'Marketplace') : 'Marketplace';
   const { settings } = useSettings();
   const { currentStore } = settings;
 
