@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { catalogueApi } from '@/lib/api/catalogue';
 import type { ApiCategory, ApiProduct, CreateCategoryDto, UpdateCategoryDto, CreateProductDto, UpdateProductDto } from '@/types/catalogue';
-import type { PaginationMeta } from '@/types/pagination';
+import type { PaginationMeta, PaginationParams } from '@/types/pagination';
 
 export function useCategories(initialPage: number = 1, initialLimit: number = 10) {
   const [categories, setCategories] = useState<ApiCategory[]>([]);
@@ -109,6 +109,7 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
+  const [filters, setFilters] = useState<Omit<PaginationParams, 'page' | 'limit'>>({});
   const [pagination, setPagination] = useState<PaginationMeta>({
     total: 0,
     page: initialPage,
@@ -116,11 +117,11 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
     totalPages: 1,
   });
 
-  const loadData = useCallback(async (page: number) => {
+  const loadData = useCallback(async (page: number, currentFilters: Omit<PaginationParams, 'page' | 'limit'>) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await catalogueApi.products.getAll({ page, limit: initialLimit });
+      const response = await catalogueApi.products.getAll({ page, limit: initialLimit, ...currentFilters });
 
       if ('data' in response && 'meta' in response) {
         setProducts(response.data);
@@ -143,8 +144,8 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
   }, [initialLimit]);
 
   useEffect(() => {
-    loadData(currentPage);
-  }, [loadData, currentPage]);
+    loadData(currentPage, filters);
+  }, [loadData, currentPage, filters]);
 
   const createProduct = useCallback(async (data: CreateProductDto | { name: string; price: number; costPrice: number; stock?: number; barCode?: string; productImage?: string; category: string }): Promise<ApiProduct> => {
     try {
@@ -175,7 +176,7 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       }
 
       const newProduct = await catalogueApi.products.create(createDto);
-      await loadData(currentPage);
+      await loadData(currentPage, filters);
       return newProduct;
     } catch (err: any) {
       const serverMessage = err?.response?.data?.message;
@@ -183,7 +184,7 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       setError(finalError);
       throw new Error(finalError);
     }
-  }, [loadData, currentPage]);
+  }, [loadData, currentPage, filters]);
 
   const updateProduct = useCallback(async (id: string, data: UpdateProductDto | any): Promise<ApiProduct> => {
     try {
@@ -224,7 +225,7 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       }
 
       const updated = await catalogueApi.products.update(id, updateDto);
-      await loadData(currentPage);
+      await loadData(currentPage, filters);
       return updated;
     } catch (err: any) {
       const serverMessage = err?.response?.data?.message;
@@ -232,20 +233,20 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       setError(finalError);
       throw new Error(finalError);
     }
-  }, [loadData, currentPage]);
+  }, [loadData, currentPage, filters]);
 
   const deleteProduct = useCallback(async (id: string): Promise<void> => {
     try {
       setError(null);
       await catalogueApi.products.delete(id);
-      await loadData(currentPage);
+      await loadData(currentPage, filters);
     } catch (err: any) {
       const serverMessage = err?.response?.data?.message;
       const finalError = serverMessage || (err instanceof Error ? err.message : 'Error deleting product');
       setError(finalError);
       throw new Error(finalError);
     }
-  }, [loadData, currentPage]);
+  }, [loadData, currentPage, filters]);
 
   const loadPage = useCallback((page: number) => {
     setCurrentPage(page);
@@ -259,7 +260,8 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
     createProduct,
     updateProduct,
     deleteProduct,
-    refresh: () => loadData(currentPage),
+    setFilters,
+    refresh: () => loadData(currentPage, filters),
     loadPage,
   };
 }

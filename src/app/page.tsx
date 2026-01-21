@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 
@@ -21,15 +21,14 @@ import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
 import { useSettings } from '@/components/settings-provider';
+import { useCategories, useProducts } from '@/hooks/use-catalogue';
 
-
-const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
 export default function PosPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
 
-  const [cart, setCart] = useState<Map<number, TransactionItem>>(new Map());
+  const [cart, setCart] = useState<Map<string | number, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryView, setCategoryView] = useState<'carousel' | 'grid'>('carousel');
@@ -44,28 +43,30 @@ export default function PosPage() {
 
   const { toast } = useToast();
 
-  const allProducts = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.products.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  // API Hooks
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
+  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 10);
 
-  const products = useMemo(() => {
-    if (!allProducts) return [];
-    let filtered = allProducts;
-    if (activeCategory) {
-      filtered = filtered.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase());
-    }
-    if (productSearch) {
-      filtered = filtered.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.barcode?.includes(productSearch));
-    }
-    return filtered;
-  }, [allProducts, activeCategory, productSearch]);
+  const products = apiProducts;
+
+  // Debounce search and update filters
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setFilters((prev: any) => ({ ...prev, search: productSearch }));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [productSearch, setFilters]);
+
+  // Update category filter
+  useEffect(() => {
+    const categoryId = apiCategories.find(c => c.name === activeCategory)?.id;
+    setFilters((prev: any) => ({ ...prev, categoryId }));
+  }, [activeCategory, apiCategories, setFilters]);
 
   const allCategories = useMemo(() => {
-    if (!allProducts) return [];
-    const categories = new Set(allProducts.map(p => p.category));
-    return Array.from(categories);
-  }, [allProducts]);
+    if (!apiCategories) return [];
+    return apiCategories.map(c => c.name);
+  }, [apiCategories]);
 
   const filteredCategories = useMemo(() => {
     if (!allCategories) return [];
@@ -81,7 +82,7 @@ export default function PosPage() {
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
-    return customers.filter(customer =>
+    return customers.filter((customer: Customer) =>
         customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
         customer.phone?.includes(customerSearchTerm)
     );
@@ -115,7 +116,7 @@ export default function PosPage() {
     });
   };
 
-  const updateQuantity = (productId: number, newQuantity: number) => {
+  const updateQuantity = (productId: string | number, newQuantity: number) => {
     setCart((prevCart) => {
       const newCart = new Map(prevCart);
       const item = newCart.get(productId);
@@ -201,12 +202,14 @@ export default function PosPage() {
         // 1. Save transaction
         await db.transactions.add(newTransaction as Transaction);
         
-        // 2. Update stock levels
+        // 2. Update stock levels (Only for products that exist in IndexedDB)
         for (const item of newTransaction.items) {
-          const product = await db.products.get(item.productId);
-          if (product) {
-            const newStock = product.stock - item.quantity;
-            await db.products.update(item.productId, { stock: newStock });
+          if (typeof item.productId === 'number' || !isNaN(Number(item.productId))) {
+            const product = await db.products.get(Number(item.productId));
+            if (product) {
+              const newStock = (product.stock || 0) - item.quantity;
+              await db.products.update(Number(item.productId), { stock: newStock });
+            }
           }
         }
       });
@@ -261,10 +264,10 @@ export default function PosPage() {
                     All
                   </Button>
               </CarouselItem>
-              {quickAccessCategories.map(cat => (
-                <CarouselItem key={cat} className="basis-auto pl-2">
-                  <Button variant={activeCategory === cat ? 'secondary' : 'outline'} size="sm" onClick={() => selectCategory(activeCategory === cat ? null : cat)}>
-                    {cat}
+              {apiCategories.map(cat => (
+                <CarouselItem key={cat.id} className="basis-auto pl-2">
+                  <Button variant={activeCategory === cat.name ? 'secondary' : 'outline'} size="sm" onClick={() => selectCategory(activeCategory === cat.name ? null : cat.name)}>
+                    {cat.name}
                   </Button>
                 </CarouselItem>
               ))}
@@ -303,7 +306,15 @@ export default function PosPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {products?.map(product => (
+                {productsLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10">Loading products...</TableCell>
+                  </TableRow>
+                ) : products?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No products found.</TableCell>
+                  </TableRow>
+                ) : products?.map((product: any) => (
                     <TableRow key={product.id}>
                     <TableCell>
                         <Dialog>
@@ -318,7 +329,7 @@ export default function PosPage() {
                             </DialogHeader>
                             <div className="flex items-center justify-center">
                             <Image 
-                                src={product.imageUrl} 
+                                src={product.productImage || product.imageUrl || '/placeholder-product.png'} 
                                 alt={product.name} 
                                 width={300} 
                                 height={300} 
@@ -330,8 +341,8 @@ export default function PosPage() {
                         </Dialog>
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.stock}</TableCell>
-                    <TableCell>R{product.price.toFixed(2)}</TableCell>
+                    <TableCell>{product.stock ?? '-'}</TableCell>
+                    <TableCell>R{(typeof product.price === 'number' ? product.price : parseFloat(product.price || 0)).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                         <Button size="sm" onClick={() => addToCart(product)}>
                         <Plus className="h-4 w-4 mr-2" /> Add
@@ -383,7 +394,7 @@ export default function PosPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredCustomers?.map(customer => (
+                                    {filteredCustomers?.map((customer: Customer) => (
                                         <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
                                             <TableCell>{customer.name}</TableCell>
                                             <TableCell>{customer.phone}</TableCell>
@@ -414,7 +425,7 @@ export default function PosPage() {
               <div className="space-y-2">
                 {cartItems.map(item => (
                   <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
-                    <Image src={item.imageUrl || ''} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
+                    <Image src={item.imageUrl || '/placeholder-product.png'} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
                     <div className="flex-grow">
                       <p className="font-medium text-sm">{item.productName}</p>
                       <p className="text-xs text-gray-500">R {item.unitPrice.toFixed(2)}</p>

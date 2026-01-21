@@ -33,7 +33,7 @@ export interface Customer {
 }
 
 export interface TransactionItem {
-  productId: number;
+  productId: string | number;
   productName: string;
   quantity: number;
   unitPrice: number;
