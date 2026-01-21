@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Calendar as CalendarIcon, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from '@/components/settings-provider';
+import { useCustomers } from '@/hooks/use-customers';
 
 export default function TransactionsPage() {
   const { settings } = useSettings();
@@ -29,18 +30,17 @@ export default function TransactionsPage() {
     return db.transactions.where('storeId').equals(currentStore.id!).orderBy('date').reverse().toArray()
   }, [currentStore?.id]);
 
-  const customers = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.customers.where('storeId').equals(currentStore.id!).toArray()
-  }, [currentStore?.id]);
+  // Use API hook for customers
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
+  const customers = allCustomersList || [];
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
 
 
-  const getCustomerName = (customerId: number | undefined) => {
+  const getCustomerName = (customerId: number | string | undefined) => {
     if (!customers || !customerId) return 'N/A';
-    return customers.find(c => c.id === customerId)?.name || 'Unknown';
+    return customers.find(c => c.id === String(customerId) || c.id === customerId)?.name || 'Unknown';
   };
 
   const filteredTransactions = useMemo(() => {

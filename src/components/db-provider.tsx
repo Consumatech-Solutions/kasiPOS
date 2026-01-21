@@ -9,27 +9,27 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
   const [isDbReady, setIsDbReady] = useState(false);
 
   useEffect(() => {
-    // Vérifier que nous sommes côté client
+    // Check that we are on the client side
     if (typeof window === 'undefined') {
       return;
     }
 
     const initDb = async () => {
       try {
-        // Initialiser la base de données
+        // Initialize database (only for products, transactions, etc. - not for customers/stores)
         const db = getDb();
         
-        // Gérer les erreurs de migration Dexie (changement de clé primaire)
+        // Handle Dexie migration errors (primary key changes)
         try {
           await db.open();
         } catch (migrationError: any) {
           if (migrationError.name === 'UpgradeError' && migrationError.message?.includes('primary key')) {
             console.warn('Migration error detected. Resetting database...');
-            // Fermer la base de données
+            // Close the database
             await db.close();
-            // Supprimer la base de données
+            // Delete the database
             await db.delete();
-            // Recréer la base de données
+            // Recreate the database
             await db.open();
           } else {
             throw migrationError;
@@ -38,6 +38,7 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         
         // This will now check for products and parcels and seed if necessary.
         // The seedDatabase function is now idempotent.
+        // Note: Customers and stores are now managed via API only
         await seedDatabase();
         
         setIsDbReady(true);

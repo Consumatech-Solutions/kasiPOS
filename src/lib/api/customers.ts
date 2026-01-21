@@ -4,17 +4,21 @@ import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
 
 export const customersApi = {
   /**
-   * Récupérer tous les clients avec pagination
+   * Get all customers with pagination
    */
   getAll: (params?: PaginationParams) => {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    // Use axios params option - only include params if they are provided
+    const requestParams: Record<string, number> = {};
+    if (params?.page !== undefined) {
+      requestParams.page = params.page;
+    }
+    if (params?.limit !== undefined) {
+      requestParams.limit = params.limit;
+    }
     
-    const queryString = queryParams.toString();
-    return api.get<PaginatedResponse<Customer>>(
-      `/customers${queryString ? `?${queryString}` : ''}`
-    );
+    return api.get<PaginatedResponse<Customer> | Customer[]>('/customers', {
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined
+    });
   },
 
   /**

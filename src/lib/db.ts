@@ -104,26 +104,48 @@ export class KasiPosDexie extends Dexie {
     }).upgrade(async tx => {
       // This migration is for users who have existing data from before multi-tenancy was introduced.
       // We create a default store for all their existing data.
-      const defaultStore = {
-          name: 'My Store',
-          isSetupComplete: true, // Assume existing users have completed setup
-          receiptHeader: 'Thank you for your purchase!',
-          receiptFooter: 'Find us on social media @KasiPOS',
-      };
-      const storeId = await tx.table('stores').add(defaultStore);
+      // Note: Stores and customers are now managed via API only, but we keep this migration for backward compatibility
+      try {
+        const storesTable = tx.table('stores');
+        const existingStores = await storesTable.toArray();
+        
+        let storeId;
+        // Only create default store if none exists
+        if (existingStores.length === 0) {
+          const defaultStore = {
+              name: 'My Store',
+              isSetupComplete: true, // Assume existing users have completed setup
+              receiptHeader: 'Thank you for your purchase!',
+              receiptFooter: 'Find us on social media @KasiPOS',
+          };
+          storeId = await storesTable.add(defaultStore);
+        } else {
+          // Use existing store ID
+          storeId = existingStores[0].id;
+        }
 
-      // Now, associate all existing data with this new default store.
-      const tablesToMigrate = [
-          'products', 'customers', 'transactions', 'vouchers', 
-          'categories', 'stockAdjustments', 'parcels', 'purchaseOrders', 'users'
-      ];
+        // Now, associate all existing data with this new default store.
+        // Note: Customers are now managed via API only, so we skip customer migration
+        const tablesToMigrate = [
+            'products', 'transactions', 'vouchers', 
+            'categories', 'stockAdjustments', 'parcels', 'purchaseOrders', 'users'
+        ];
 
-      for (const tableName of tablesToMigrate) {
-          const table = tx.table(tableName);
-          // Only attempt to modify if the table exists in the transaction
-          if (table) {
-              await table.toCollection().modify({ storeId });
-          }
+        for (const tableName of tablesToMigrate) {
+            const table = tx.table(tableName);
+            // Only attempt to modify if the table exists in the transaction
+            if (table) {
+                try {
+                  await table.toCollection().modify({ storeId });
+                } catch (error) {
+                  // Ignore errors for individual table migrations
+                  console.warn(`Migration skipped for ${tableName}:`, error);
+                }
+            }
+        }
+      } catch (error) {
+        // Ignore errors - stores are now managed via API
+        console.warn('Store migration skipped (stores now managed via API):', error);
       }
     });
     this.version(7).stores({

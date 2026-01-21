@@ -35,21 +35,21 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  // Use the new hook
+  // Use the API hook
   const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage } = useCustomers({
     searchQuery: searchTerm,
   });
 
-  // Get customer transactions
+  // Get customer transactions (still using IndexedDB for transactions)
   const customerTransactions = useLiveQuery(() => {
     if (selectedCustomer && currentStore) {
-      // customerId peut être un number (ancien format) ou string (nouveau format UUID)
-      // On filtre manuellement pour gérer les deux cas
+      // customerId can be a number (old format) or string (new UUID format)
+      // Filter manually to handle both cases
       return db.transactions
         .where('storeId')
         .equals(currentStore.id!)
         .filter(t => {
-          // Comparer avec les deux formats possibles
+          // Compare with both possible formats
           const customerId = selectedCustomer.id;
           return t.customerId === customerId || 
                  t.customerId === Number(customerId) || 
@@ -75,28 +75,28 @@ export default function CustomersPage() {
     try {
       if (editingCustomer) {
         await updateCustomer(editingCustomer.id, data);
-        toast({ title: "Succès", description: "Client modifié avec succès." });
+        toast({ title: "Success", description: "Customer updated successfully." });
       } else {
         await createCustomer(data);
-        toast({ title: "Succès", description: "Client ajouté avec succès." });
+        toast({ title: "Success", description: "Customer added successfully." });
       }
       setCustomerDialogOpen(false);
       setEditingCustomer(null);
     } catch (error) {
       console.error("Failed to save customer:", error);
-      const errorMessage = error instanceof Error ? error.message : "Échec de l'enregistrement du client.";
-      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
+      const errorMessage = error instanceof Error ? error.message : "Failed to save customer.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
     }
   };
 
   const handleDeleteCustomer = async (id: string) => {
     try {
       await deleteCustomer(id);
-      toast({ title: "Succès", description: "Client supprimé avec succès." });
+      toast({ title: "Success", description: "Customer deleted successfully." });
     } catch (error) {
       console.error("Failed to delete customer:", error);
-      const errorMessage = error instanceof Error ? error.message : "Échec de la suppression du client.";
-      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete customer.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
     }
   };
 
@@ -114,7 +114,7 @@ export default function CustomersPage() {
       <div className="p-4">
         <Card>
           <CardContent className="p-6">
-            <div className="text-center">Chargement des clients...</div>
+            <div className="text-center">Loading customers...</div>
           </CardContent>
         </Card>
       </div>
@@ -126,7 +126,7 @@ export default function CustomersPage() {
       <div className="p-4">
         <Card>
           <CardContent className="p-6">
-            <div className="text-red-600">Erreur: {error}</div>
+            <div className="text-red-600">Error: {error}</div>
           </CardContent>
         </Card>
       </div>
@@ -137,22 +137,22 @@ export default function CustomersPage() {
     <div className="p-4">
       <Card>
         <CardHeader>
-          <CardTitle>Clients</CardTitle>
-          <CardDescription>Gérez votre base de données clients et programme de fidélité.</CardDescription>
+          <CardTitle>Customers</CardTitle>
+          <CardDescription>Manage your customer database and loyalty program.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input 
-                placeholder="Rechercher par nom ou contact..."
+                placeholder="Search by name or contact..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Ajouter un client
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
             </Button>
           </div>
 
@@ -160,9 +160,9 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Client</TableHead>
+                  <TableHead>Customer</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>Points de fidélité</TableHead>
+                  <TableHead>Loyalty Points</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -195,15 +195,15 @@ export default function CustomersPage() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Cette action est irréversible. Cela supprimera définitivement le client et ses données.
+                                This action cannot be undone. This will permanently delete the customer and their data.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteCustomer(customer.id)}>
-                                Supprimer
+                                Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -214,7 +214,7 @@ export default function CustomersPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center h-24">
-                      Aucun client trouvé.
+                      No customers found.
                     </TableCell>
                   </TableRow>
                 )}
@@ -238,9 +238,9 @@ export default function CustomersPage() {
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingCustomer ? 'Modifier le client' : 'Ajouter un client'}</DialogTitle>
+            <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
             <DialogDescription>
-              {editingCustomer ? 'Modifiez les informations du client ci-dessous.' : 'Entrez les informations du nouveau client.'}
+              {editingCustomer ? 'Edit the customer information below.' : 'Enter the new customer information.'}
             </DialogDescription>
           </DialogHeader>
           <CustomerForm
@@ -258,15 +258,15 @@ export default function CustomersPage() {
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Historique des achats pour {selectedCustomer?.name}</DialogTitle>
+            <DialogTitle>Purchase History for {selectedCustomer?.name}</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Commande #</TableHead>
+                  <TableHead>Order #</TableHead>
                   <TableHead>Date</TableHead>
-                  <TableHead>Articles</TableHead>
+                  <TableHead>Items</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -282,7 +282,7 @@ export default function CustomersPage() {
               </TableBody>
             </Table>
             {(!customerTransactions || customerTransactions.length === 0) && (
-              <p className="text-center text-muted-foreground py-8">Aucun historique d'achat pour ce client.</p>
+              <p className="text-center text-muted-foreground py-8">No purchase history for this customer.</p>
             )}
           </ScrollArea>
         </DialogContent>

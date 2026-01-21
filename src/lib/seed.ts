@@ -1,7 +1,8 @@
 import { db } from './db';
 
 export async function seedDatabase() {
-    await db.transaction('rw', db.stores, db.users, db.products, db.customers, db.vouchers, db.categories, db.parcels, db.purchaseOrders, async () => {
+    // Note: Stores and Customers are now managed via API only, so we exclude them from IndexedDB transactions
+    await db.transaction('rw', db.users, db.products, db.vouchers, db.categories, db.parcels, db.purchaseOrders, async () => {
         
         // ----- PATCHES for existing data -----
         // This is a good place for non-destructive patches for existing users.
