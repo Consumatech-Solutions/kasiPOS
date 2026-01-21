@@ -1,20 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { catalogueApi } from '@/lib/api/catalogue';
 import { catalogueSyncService } from '@/lib/sync/catalogue-sync';
 import type { Category, Product } from '@/types';
 import type { CreateCategoryDto, UpdateCategoryDto, CreateProductDto, UpdateProductDto } from '@/types/catalogue';
+import type { PaginationMeta } from '@/types/pagination';
 
-export function useCategories() {
+export function useCategories(initialPage: number = 1, initialLimit: number = 10) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const limit = initialLimit;
 
   // Live query for local categories
-  const categories = useLiveQuery(() => {
+  const allCategories = useLiveQuery(() => {
     return db.categories.toArray();
   }, []) || [];
+
+  // Paginate categories client-side
+  const categories = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    const end = start + limit;
+    return allCategories.slice(start, end);
+  }, [allCategories, currentPage, limit]);
+
+  // Calculate pagination meta
+  const pagination: PaginationMeta = useMemo(() => ({
+    total: allCategories.length,
+    page: currentPage,
+    limit,
+    totalPages: Math.ceil(allCategories.length / limit) || 1,
+  }), [allCategories.length, currentPage, limit]);
 
   // Load and sync
   const loadAndSync = useCallback(async (isFirstLoad: boolean = false) => {
@@ -143,8 +161,16 @@ export function useCategories() {
     }
   }, []);
 
+  const loadPage = useCallback((page: number) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Loading categories page ${page}`);
+    }
+    setCurrentPage(page);
+  }, []);
+
   return {
     categories,
+    pagination,
     loading,
     error,
     syncing,
@@ -152,18 +178,63 @@ export function useCategories() {
     updateCategory,
     deleteCategory,
     refresh: loadAndSync,
+    loadPage,
   };
 }
 
-export function useProducts() {
+export function useProducts(initialPage: number = 1, initialLimit: number = 10) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  const limit = initialLimit;
 
   // Live query for local products
-  const products = useLiveQuery(() => {
+  const allProducts = useLiveQuery(() => {
     return db.products.toArray();
   }, []) || [];
+  
+  // Debug: log when products change
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📦 Products updated: ${allProducts.length} products in database`);
+    }
+  }, [allProducts.length]);
+
+  // Sort products by creation date (most recent first) - using id as proxy for creation order
+  const sortedProducts = useMemo(() => {
+    return [...allProducts].sort((a, b) => {
+      // Sort by id descending (higher id = more recent)
+      const aId = a.id || 0;
+      const bId = b.id || 0;
+      return bId - aId;
+    });
+  }, [allProducts]);
+
+  // Paginate products client-side
+  const products = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    const end = start + limit;
+    return sortedProducts.slice(start, end);
+  }, [sortedProducts, currentPage, limit]);
+
+  // Calculate pagination meta
+  const pagination: PaginationMeta = useMemo(() => {
+    const total = Array.isArray(sortedProducts) ? sortedProducts.length : 0;
+    const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
+    
+    // Logs de pagination désactivés pour réduire la pollution de la console
+    // if (process.env.NODE_ENV === 'development') {
+    //   console.log(`📊 Pagination calculated: total=${total}, page=${currentPage}, limit=${limit}, totalPages=${totalPages}`);
+    // }
+    
+    return {
+      total,
+      page: currentPage,
+      limit,
+      totalPages,
+    };
+  }, [sortedProducts, currentPage, limit]);
 
   // Load and sync
   const loadAndSync = useCallback(async () => {
@@ -194,7 +265,8 @@ export function useProducts() {
 
   useEffect(() => {
     loadAndSync();
-  }, [loadAndSync]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const createProduct = useCallback(async (data: CreateProductDto | { name: string; price: number; costPrice: number; stock?: number; barCode?: string; productImage?: string; category: string }): Promise<Product> => {
     try {
@@ -210,19 +282,50 @@ export function useProducts() {
         
         if (navigator.onLine) {
           try {
-            const serverCategories = await catalogueApi.categories.getAll();
+            const response = await catalogueApi.categories.getAll();
+            // Handle different response formats
+            let serverCategories: ApiCategory[] = [];
+            if (Array.isArray(response)) {
+              serverCategories = response;
+            } else if (response && typeof response === 'object') {
+              if (Array.isArray(response.data)) {
+                serverCategories = response.data;
+              } else if (Array.isArray(response.categories)) {
+                serverCategories = response.categories;
+              } else if (Array.isArray(response.items)) {
+                serverCategories = response.items;
+              }
+            }
             const serverCat = serverCategories.find(c => c.name === categoryName);
             if (serverCat) {
               categoryId = serverCat.id;
-            } else if (localCat) {
-              // Catégorie locale mais pas sur le serveur, utiliser le nom comme ID temporaire
-              categoryId = categoryName;
             } else {
-              throw new Error(`Catégorie "${categoryName}" non trouvée`);
+              // Catégorie n'existe pas sur le serveur, essayer de la créer
+              try {
+                const newCategory = await catalogueApi.categories.create({ name: categoryName });
+                categoryId = newCategory.id;
+                // Synchroniser les catégories pour mettre à jour la base locale
+                await catalogueSyncService.syncCategories();
+              } catch (createErr: any) {
+                // Si la création échoue (404, etc.), utiliser la catégorie locale si elle existe
+                if (localCat) {
+                  // Essayer de trouver l'UUID dans les catégories locales qui ont été synchronisées
+                  // Sinon, on utilisera le nom comme fallback et le produit sera créé localement seulement
+                  categoryId = categoryName; // Fallback - sera géré plus tard
+                  console.warn(`Could not create category "${categoryName}" on server, using local fallback`);
+                } else {
+                  throw new Error(`Catégorie "${categoryName}" non trouvée et impossible à créer`);
+                }
+              }
             }
           } catch (err) {
             console.error('Error fetching category:', err);
-            categoryId = categoryName; // Fallback
+            // En cas d'erreur réseau, utiliser la catégorie locale si elle existe
+            if (localCat) {
+              categoryId = categoryName; // Fallback - sera géré plus tard
+            } else {
+              categoryId = categoryName; // Fallback
+            }
           }
         } else {
           categoryId = categoryName; // En mode offline, utiliser le nom
@@ -235,7 +338,20 @@ export function useProducts() {
         const categories = await db.categories.toArray();
         if (navigator.onLine) {
           try {
-            const serverCategories = await catalogueApi.categories.getAll();
+            const response = await catalogueApi.categories.getAll();
+            // Handle different response formats
+            let serverCategories: ApiCategory[] = [];
+            if (Array.isArray(response)) {
+              serverCategories = response;
+            } else if (response && typeof response === 'object') {
+              if (Array.isArray(response.data)) {
+                serverCategories = response.data;
+              } else if (Array.isArray(response.categories)) {
+                serverCategories = response.categories;
+              } else if (Array.isArray(response.items)) {
+                serverCategories = response.items;
+              }
+            }
             const serverCat = serverCategories.find(c => c.id === categoryId);
             categoryName = serverCat?.name || '';
           } catch (err) {
@@ -271,29 +387,80 @@ export function useProducts() {
 
       // Add locally
       const id = await db.products.add(productData as Product);
-
-      // Sync if online
-      if (navigator.onLine) {
-        try {
-          // Créer avec l'UUID de la catégorie
-          const createDto: CreateProductDto = {
-            name: productData.name,
-            categoryId,
-            price: productData.price,
-            costPrice: productData.costPrice,
-            stock: productData.stock,
-            barCode: productData.barcode,
-            productImage: productData.imageUrl || undefined,
-          };
-          await catalogueApi.products.create(createDto);
-          // Re-synchroniser pour obtenir l'ID du serveur
-          await catalogueSyncService.syncProducts();
-        } catch (err) {
-          console.error('Sync error:', err);
-        }
+      const createdProduct = { ...productData, id } as Product;
+      
+      // Vérifier que le produit a bien été créé localement
+      const saved = await db.products.get(id);
+      if (!saved) {
+        throw new Error('Failed to save product to local database');
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Product created locally:', { id, name: saved.name, totalProducts: (await db.products.toArray()).length });
       }
 
-      return { ...productData, id } as Product;
+      // Sync if online (en arrière-plan, ne pas bloquer)
+      if (navigator.onLine) {
+        // Ne pas attendre la synchronisation pour éviter de bloquer l'UI
+        // La synchronisation se fera en arrière-plan
+        (async () => {
+          try {
+            // Vérifier que categoryId est un UUID valide (format UUID v4)
+            // Si ce n'est pas un UUID, ne pas envoyer au backend (sera synchronisé plus tard)
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(categoryId)) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`Category ID "${categoryId}" is not a valid UUID, skipping backend creation. Will sync later.`);
+              }
+              return;
+            }
+
+            // Créer avec l'UUID de la catégorie
+            const createDto: CreateProductDto = {
+              name: productData.name,
+              categoryId,
+              price: typeof productData.price === 'number' ? productData.price : parseFloat(String(productData.price)) || 0,
+              costPrice: typeof productData.costPrice === 'number' ? productData.costPrice : parseFloat(String(productData.costPrice)) || 0,
+              stock: productData.stock !== undefined && productData.stock !== null ? Number(productData.stock) : undefined,
+              barCode: productData.barcode && productData.barcode.trim() !== '' ? productData.barcode : undefined,
+              productImage: productData.imageUrl && productData.imageUrl.trim() !== '' ? productData.imageUrl : undefined,
+            };
+            
+            // Valider que les champs requis sont présents
+            if (!createDto.name || !createDto.categoryId || createDto.price === undefined || createDto.costPrice === undefined) {
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('Missing required fields for product creation, skipping backend sync');
+              }
+              return;
+            }
+
+            await catalogueApi.products.create(createDto);
+            // Re-synchroniser pour obtenir l'ID du serveur (en arrière-plan)
+            await catalogueSyncService.syncProducts();
+          } catch (err: any) {
+            // Si erreur 400, logger les détails pour debug
+            if (err?.response?.status === 400) {
+              console.error('Bad Request (400) - Invalid product data:', {
+                createDto: {
+                  name: productData.name,
+                  categoryId,
+                  price: productData.price,
+                  costPrice: productData.costPrice,
+                  stock: productData.stock,
+                  barCode: productData.barcode,
+                  productImage: productData.imageUrl,
+                },
+                error: err?.response?.data || err.message,
+              });
+            } else if (err?.response?.status !== 404 && err?.code !== 'ERR_NETWORK' && err?.message !== 'Network Error') {
+              console.error('Sync error:', err);
+            }
+            // Ne pas bloquer la création locale même si le backend échoue
+          }
+        })();
+      }
+
+      return createdProduct;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error creating item');
       throw err;
@@ -320,13 +487,31 @@ export function useProducts() {
         
         if (navigator.onLine) {
           try {
-            const serverCategories = await catalogueApi.categories.getAll();
-            const serverCat = serverCategories.find(c => c.id === data.categoryId);
+            const response = await catalogueApi.categories.getAll();
+            // Handle different response formats
+            let serverCategories: any[] = [];
+            if (Array.isArray(response)) {
+              serverCategories = response;
+            } else if (response && typeof response === 'object') {
+              if (Array.isArray(response.data)) {
+                serverCategories = response.data;
+              } else if (Array.isArray(response.categories)) {
+                serverCategories = response.categories;
+              } else if (Array.isArray(response.items)) {
+                serverCategories = response.items;
+              }
+            }
+            const serverCat = serverCategories.find((c: any) => c.id === data.categoryId);
             if (serverCat) {
               categoryName = serverCat.name;
             }
-          } catch (err) {
-            console.error('Error fetching category:', err);
+          } catch (err: any) {
+            // Silently handle network errors - expected when backend is not available
+            if (err?.response?.status !== 404 && err?.code !== 'ERR_NETWORK' && err?.message !== 'Network Error') {
+              if (process.env.NODE_ENV === 'development') {
+                console.error('Error fetching category:', err);
+              }
+            }
           }
         }
         
@@ -341,47 +526,32 @@ export function useProducts() {
         updateData.category = data.category;
       }
 
-      await db.products.update(id, updateData);
+      // Vérifier que le produit existe avant de le mettre à jour
+      const existingProduct = await db.products.get(id);
+      if (!existingProduct) {
+        throw new Error('Produit non trouvé');
+      }
 
-      // Sync if online
-      if (navigator.onLine) {
-        try {
-          const product = await db.products.get(id);
-          if (product) {
-            // Trouver l'UUID de la catégorie
-            const categories = await db.categories.toArray();
-            let categoryId = '';
-            
-            if (navigator.onLine) {
-              try {
-                const serverCategories = await catalogueApi.categories.getAll();
-                const serverCat = serverCategories.find(c => c.name === product.category);
-                if (serverCat) {
-                  categoryId = serverCat.id;
-                }
-              } catch (err) {
-                console.error('Error fetching category:', err);
-              }
-            }
-            
-            if (categoryId) {
-              const updateDto: UpdateProductDto = {
-                name: updateData.name,
-                categoryId: updateData.category ? categoryId : undefined,
-                price: updateData.price,
-                costPrice: updateData.costPrice,
-                stock: updateData.stock,
-                barCode: updateData.barcode,
-                productImage: updateData.imageUrl,
-              };
-              // Note: On ne peut pas mettre à jour directement car on n'a pas l'UUID du produit
-              // On synchronise simplement
-              await catalogueSyncService.syncProducts();
-            }
-          }
-        } catch (err) {
-          console.error('Sync error:', err);
+      const updateCount = await db.products.update(id, updateData);
+      
+      // Si la mise à jour n'a pas affecté de ligne, le produit n'existe peut-être plus
+      if (updateCount === 0) {
+        // Vérifier à nouveau si le produit existe
+        const stillExists = await db.products.get(id);
+        if (!stillExists) {
+          throw new Error('Produit non trouvé');
         }
+      }
+
+      // Sync if online (en arrière-plan, ne pas bloquer)
+      if (navigator.onLine) {
+        // Ne pas attendre la synchronisation pour éviter de bloquer l'UI
+        catalogueSyncService.syncProducts().catch((err) => {
+          // Logger seulement les erreurs inattendues
+          if (err?.response?.status !== 404 && err?.code !== 'ERR_NETWORK' && err?.message !== 'Network Error') {
+            console.error('Sync error:', err);
+          }
+        });
       }
 
       const updated = await db.products.get(id);
@@ -411,8 +581,16 @@ export function useProducts() {
     }
   }, []);
 
+  const loadPage = useCallback((page: number) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Loading products page ${page} (total: ${allProducts.length}, totalPages: ${Math.ceil(allProducts.length / limit) || 1})`);
+    }
+    setCurrentPage(page);
+  }, [allProducts.length, limit]);
+
   return {
     products,
+    pagination,
     loading,
     error,
     syncing,
@@ -420,5 +598,6 @@ export function useProducts() {
     updateProduct,
     deleteProduct,
     refresh: loadAndSync,
+    loadPage,
   };
 }

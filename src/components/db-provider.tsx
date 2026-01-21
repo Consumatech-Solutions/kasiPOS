@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { seedDatabase } from '@/lib/seed';
 import { db } from '@/lib/db';
 import { Skeleton } from './ui/skeleton';
+import { removeAllMockData } from '@/lib/utils/catalogue-cleanup';
 
 export function DbProvider({ children }: { children: React.ReactNode }) {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -17,7 +18,6 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
         
         // Remove all mock data immediately on startup
         try {
-          const { removeAllMockData } = await import('@/lib/utils/catalogue-cleanup');
           await removeAllMockData();
         } catch (error) {
           console.error('Failed to remove mock data:', error);

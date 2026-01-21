@@ -1,6 +1,18 @@
 import Dexie, { type Table } from 'dexie';
 import type { Product, Customer, Transaction, Voucher, Category, StockAdjustment, Parcel, PurchaseOrder, User, Store } from '@/types';
 
+export interface ProductImageRecord {
+  id: string;
+  productId: string; // Toujours stocké comme string pour éviter les problèmes de type avec IndexedDB
+  imageData: Blob;
+  mimeType: string;
+  size: number;
+  synced: boolean;
+  serverUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class KasiPosDexie extends Dexie {
   stores!: Table<Store>;
   products!: Table<Product>;
@@ -12,10 +24,11 @@ export class KasiPosDexie extends Dexie {
   parcels!: Table<Parcel>;
   purchaseOrders!: Table<PurchaseOrder>;
   users!: Table<User>;
+  productImages!: Table<ProductImageRecord>;
 
   constructor() {
     super('kasiPosDatabase');
-    this.version(8).stores({
+    this.version(9).stores({
       stores: '++id, name',
       products: '++id, name, category, barcode, storeId',
       customers: '++id, name, phone, storeId',
@@ -26,6 +39,7 @@ export class KasiPosDexie extends Dexie {
       parcels: '++id, deliveryNumber, collectionCode, status, storeId',
       purchaseOrders: '++id, orderCode, date, storeId',
       users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
     }).upgrade(async tx => {
       // This migration is for users who have existing data from before multi-tenancy was introduced.
       // We create a default store for all their existing data.

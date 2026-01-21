@@ -50,6 +50,17 @@ export default function LoginPage() {
             }
         } catch (error: any) {
             console.error('Login error:', error);
+            
+            // Gérer les erreurs réseau spécifiquement
+            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                toast({
+                    variant: "destructive",
+                    title: "Connection Error",
+                    description: "Unable to connect to the server. Please check if the backend is running on http://localhost:3001",
+                });
+                return;
+            }
+            
             const message = error.response?.data?.message || 'Invalid mobile number or password.';
             toast({
                 variant: 'destructive',
