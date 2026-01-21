@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Product, Category } from '@/types';
+import type { Product } from '@/types';
+import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import { useToast } from '@/hooks/use-toast';
 import { useCategories, useProducts } from '@/hooks/use-catalogue';
-import { db } from '@/lib/db';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,8 +51,8 @@ export default function CataloguePage() {
   // Dialog states
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ApiProduct | Product | null>(null);
+  const [editingCategory, setEditingCategory] = useState<ApiCategory | null>(null);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
 
   // Generate a unique barcode (EAN-13 format: 13 digits)
@@ -87,38 +86,27 @@ export default function CataloguePage() {
     }
     
     const productsWithoutBarcode = products.filter(
-      p => p.id && !processedProductsRef.current.has(p.id) && (!p.barcode || String(p.barcode || '').trim() === '')
+      p => p.id && !processedProductsRef.current.has(p.id) && (!p.barCode || String(p.barCode || '').trim() === '')
     );
     
     if (productsWithoutBarcode.length > 0) {
       isGeneratingRef.current = true;
       
       // Process products one at a time to avoid race conditions
-      const processProduct = async (product: Product) => {
+      const processProduct = async (product: any) => {
         if (!product.id) return;
         
         // Mark as processed immediately to avoid duplicate generation
         processedProductsRef.current.add(product.id);
         
         try {
-          // Vérifier que le produit existe toujours avant de le mettre à jour
-          const existingProduct = await db.products.get(product.id);
-          if (!existingProduct) {
-            // Le produit n'existe plus, ne pas générer de barcode
-            if (process.env.NODE_ENV === 'development') {
-              console.warn(`Product ${product.name} (ID: ${product.id}) no longer exists, skipping barcode generation`);
-            }
-            return;
-          }
-          
-          // Vérifier si le produit a déjà un barcode
-          if (existingProduct.barcode && String(existingProduct.barcode).trim() !== '') {
-            // Le produit a déjà un barcode, ne pas en générer un nouveau
+          // Skip if product already has a barcode (double check state)
+          if (product.barCode && String(product.barCode).trim() !== '') {
             return;
           }
           
           const newBarcode = generateBarcode();
-          await updateProduct(product.id, { barcode: newBarcode });
+          await updateProduct(product.id, { barCode: newBarcode });
         } catch (error: any) {
           // Gérer l'erreur "Produit non trouvé" silencieusement
           if (error?.message === 'Produit non trouvé' || error?.message?.includes('non trouvé')) {
@@ -184,21 +172,33 @@ export default function CataloguePage() {
 
 
   // Handlers for Products
-  const openProductDialog = async (product?: Product) => {
+  const openProductDialog = async (product?: ApiProduct | Product) => {
     productForm.reset();
     if (product) {
       setEditingProduct(product);
-      productForm.setValue('name', product.name);
-      productForm.setValue('price', product.price);
-      productForm.setValue('costPrice', product.costPrice);
-      productForm.setValue('stock', product.stock);
-      productForm.setValue('category', product.category);
-      productForm.setValue('barcode', product.barcode || '');
-      productForm.setValue('imageUrl', product.imageUrl);
-      productForm.setValue('imageHint', product.imageHint);
+      
+      // Safe access to properties that differ between Product and ApiProduct
+      const p = product as any;
+      const name = p.name || '';
+      const price = p.price || 0;
+      const costPrice = p.costPrice || 0;
+      const stock = p.stock || 0;
+      const categoryName = typeof p.category === 'object' ? p.category.name : (p.category || '');
+      const barcodeValue = p.barCode || p.barcode || '';
+      const imageUrl = p.productImage || p.imageUrl || '';
+      const imageHint = p.imageHint || '';
+
+      productForm.setValue('name', name);
+      productForm.setValue('price', price);
+      productForm.setValue('costPrice', costPrice);
+      productForm.setValue('stock', stock);
+      productForm.setValue('category', categoryName);
+      productForm.setValue('barcode', barcodeValue);
+      productForm.setValue('imageUrl', imageUrl);
+      productForm.setValue('imageHint', imageHint);
       
       // Utiliser uniquement l'URL distante
-      setProductImageUrl(product.imageUrl || null);
+      setProductImageUrl(imageUrl || null);
     } else {
       setEditingProduct(null);
       const newBarcode = generateBarcode();
@@ -221,7 +221,7 @@ export default function CataloguePage() {
       const imageUrl = productImageUrl || values.imageUrl || '';
       
       // Generate barcode if not provided
-      const barcode = values.barcode || generateBarcode();
+      const barCode = values.barcode || generateBarcode();
 
       const productData = {
         name: values.name,
@@ -229,34 +229,20 @@ export default function CataloguePage() {
         costPrice: values.costPrice,
         stock: values.stock || 0,
         category: values.category,
-        barcode: barcode,
+        barCode: barCode,
         imageUrl: imageUrl,
         imageHint: values.imageHint || '',
       };
 
       if (editingProduct && editingProduct.id) {
-        await updateProduct(editingProduct.id, productData);
+        await updateProduct(String(editingProduct.id), productData);
         toast({ title: "Success", description: "Product updated successfully." });
       } else {
-        const newProduct = await createProduct(productData as any);
+        await createProduct(productData as any);
         toast({ title: "Success", description: "Product added successfully." });
         
-        // Attendre un peu pour que useLiveQuery détecte le changement
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Calculer la page où se trouve le nouveau produit
-        if (productsPagination && newProduct.id) {
-          const allProducts = await db.products.toArray();
-          const allProductsCount = allProducts.length;
-          const lastPage = Math.ceil(allProductsCount / productsPagination.limit) || 1;
-          
-          // Naviguer vers la dernière page si nécessaire
-          if (lastPage > productsPagination.page) {
-            loadProductsPage(lastPage);
-          } else if (allProductsCount <= productsPagination.limit) {
-            loadProductsPage(1);
-          }
-        }
+        // Refresh products and go to first page or refresh current
+        refreshProducts();
       }
       setProductDialogOpen(false);
       productForm.reset();
@@ -269,9 +255,9 @@ export default function CataloguePage() {
   };
 
 
-  const handleDeleteProduct = async (id: number) => {
+  const handleDeleteProduct = async (id: string | number) => {
     try {
-      await deleteProductHook(id);
+      await deleteProductHook(String(id));
       toast({ title: "Success", description: "Product deleted successfully." });
     } catch (error) {
       console.error("Failed to delete product:", error);
@@ -281,7 +267,7 @@ export default function CataloguePage() {
   };
 
   // Handlers for Categories
-  const openCategoryDialog = (category?: Category) => {
+  const openCategoryDialog = (category?: ApiCategory) => {
     if (category) {
       setEditingCategory(category);
       categoryForm.reset(category);
@@ -295,7 +281,7 @@ export default function CataloguePage() {
   const handleCategorySubmit = async (values: z.infer<typeof categorySchema>) => {
     try {
       if (editingCategory && editingCategory.id) {
-        await updateCategory(editingCategory.id, values);
+        await updateCategory(String(editingCategory.id), values);
         toast({ title: "Success", description: "Category updated successfully." });
       } else {
         await createCategory(values);
@@ -310,9 +296,9 @@ export default function CataloguePage() {
     }
   };
 
-  const handleDeleteCategory = async (id: number) => {
+  const handleDeleteCategory = async (id: string | number) => {
     try {
-        await deleteCategoryHook(id);
+        await deleteCategoryHook(String(id));
         toast({ title: "Success", description: "Category deleted successfully." });
         // Note: You might want to handle products in the deleted category.
     } catch (error) {
@@ -367,34 +353,22 @@ export default function CataloguePage() {
                     const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0;
                     const costPrice = typeof p.costPrice === 'number' ? p.costPrice : parseFloat(String(p.costPrice)) || 0;
                     
-                    const barcodeValue = p.barcode ? String(p.barcode).trim() : '';
+                    const barcodeValue = p.barCode ? String(p.barCode).trim() : '';
                     const hasBarcode = barcodeValue !== '';
-                    
-                    // Debug: log barcode info for first product only (only once)
-                    // Commenté pour réduire la pollution de la console
-                    // if (process.env.NODE_ENV === 'development' && products.indexOf(p) === 0) {
-                    //   console.log('🔍 First product barcode check:', { 
-                    //     name: p.name, 
-                    //     barcode: p.barcode, 
-                    //     barcodeValue,
-                    //     hasBarcode,
-                    //     type: typeof p.barcode 
-                    //   });
-                    // }
                     
                     return (
                     <TableRow key={`product-${p.id}`}>
                       <TableCell>
                         <ProductImage
                           productId={p.id}
-                          imageUrl={p.imageUrl}
+                          imageUrl={p.productImage || (p as any).imageUrl}
                           alt={p.name}
                           width={40}
                           height={40}
                         />
                       </TableCell>
                       <TableCell>{p.name}</TableCell>
-                      <TableCell>{p.category}</TableCell>
+                      <TableCell>{(p.category as any)?.name || (typeof p.category === 'string' ? p.category : 'No Category')}</TableCell>
                       <TableCell className="p-2">
                         {hasBarcode ? (
                           <div className="w-[180px] min-h-[70px] flex flex-col items-center justify-center gap-1 border-2 border-blue-300 rounded p-2 bg-blue-50">
@@ -423,10 +397,10 @@ export default function CataloguePage() {
                               onClick={async () => {
                                 const newBarcode = generateBarcode();
                                 try {
-                                  const updated = await updateProduct(p.id!, { barcode: newBarcode });
+                                  const updated = await updateProduct(p.id!, { barCode: newBarcode });
                                   // Verify the barcode was saved
                                   if (process.env.NODE_ENV === 'development') {
-                                    console.log('Barcode updated:', { productId: p.id, barcode: updated.barcode });
+                                    console.log('Barcode updated:', { productId: p.id, barCode: updated.barCode });
                                   }
                                   toast({ 
                                     title: "Barcode Generated", 

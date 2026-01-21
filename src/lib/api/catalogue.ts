@@ -1,7 +1,7 @@
 import { api } from './core';
-import type { 
-  ApiCategory, 
-  CreateCategoryDto, 
+import type {
+  ApiCategory,
+  CreateCategoryDto,
   UpdateCategoryDto,
   ApiProduct,
   CreateProductDto,
@@ -18,10 +18,10 @@ export const catalogueApi = {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
-      
+
       const url = `${API_BASE_PATH}/categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
-      
+
       // Si la réponse contient meta, c'est une réponse paginée
       if (response.data?.meta) {
         return response.data;
@@ -56,10 +56,12 @@ export const catalogueApi = {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
-      
+      if (params?.search) queryParams.append('search', params.search);
+      if (params?.categoryId) queryParams.append('categoryId', params.categoryId);
+
       const url = `${API_BASE_PATH}/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
-      
+
       // Si la réponse contient meta, c'est une réponse paginée
       if (response.data?.meta) {
         return response.data;

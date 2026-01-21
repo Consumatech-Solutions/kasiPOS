@@ -104,6 +104,7 @@ export class KasiPosDexie extends Dexie {
     }).upgrade(async tx => {
       // This migration is for users who have existing data from before multi-tenancy was introduced.
       // We create a default store for all their existing data.
+
       // Note: Stores and customers are now managed via API only, but we keep this migration for backward compatibility
       try {
         const storesTable = tx.table('stores');
@@ -146,6 +147,7 @@ export class KasiPosDexie extends Dexie {
       } catch (error) {
         // Ignore errors - stores are now managed via API
         console.warn('Store migration skipped (stores now managed via API):', error);
+
       }
     });
     this.version(7).stores({
