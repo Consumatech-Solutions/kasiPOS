@@ -9,7 +9,6 @@ import type { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCategories, useProducts } from '@/hooks/use-catalogue';
 import { db } from '@/lib/db';
-import { imageStorageService } from '@/lib/services/image-storage';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -197,17 +196,8 @@ export default function CataloguePage() {
       productForm.setValue('imageUrl', product.imageUrl);
       productForm.setValue('imageHint', product.imageHint);
       
-      // Charger l'image depuis le stockage local si disponible
-      if (product.id) {
-        try {
-          const localImageUrl = await imageStorageService.getProductImageUrl(product.id);
-          setProductImageUrl(localImageUrl || product.imageUrl || null);
-        } catch {
-          setProductImageUrl(product.imageUrl || null);
-        }
-      } else {
-        setProductImageUrl(product.imageUrl || null);
-      }
+      // Utiliser uniquement l'URL distante
+      setProductImageUrl(product.imageUrl || null);
     } else {
       setEditingProduct(null);
       const newBarcode = generateBarcode();
@@ -247,37 +237,7 @@ export default function CataloguePage() {
         await updateProduct(editingProduct.id, productData);
         toast({ title: "Success", description: "Product updated successfully." });
       } else {
-        // Si l'image est locale (blob://), trouver l'ID temporaire utilisé
-        let tempProductId: string | undefined;
-        if (imageUrl && imageUrl.startsWith('blob:')) {
-          // Chercher l'image avec un productId temporaire récent
-          const allImages = await db.productImages.toArray();
-          const recentTempImage = allImages
-            .filter(img => String(img.productId).startsWith('temp-'))
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-          if (recentTempImage) {
-            tempProductId = String(recentTempImage.productId);
-          }
-        }
-        
         const newProduct = await createProduct(productData as any);
-        
-        // Si l'image était stockée avec un ID temporaire, mettre à jour avec le vrai ID
-        if (tempProductId && newProduct.id) {
-          try {
-            const tempImage = await imageStorageService.getProductImage(tempProductId);
-            if (tempImage) {
-              // Mettre à jour le productId de l'image
-              await db.productImages.update(tempImage.id, {
-                productId: newProduct.id,
-                updatedAt: new Date().toISOString(),
-              });
-            }
-          } catch (err) {
-            // Ignorer les erreurs - l'image pourrait ne pas exister ou avoir déjà été mise à jour
-          }
-        }
-        
         toast({ title: "Success", description: "Product added successfully." });
         
         // Attendre un peu pour que useLiveQuery détecte le changement

@@ -18,15 +18,22 @@ export const filesApi = {
 
   /**
    * Upload une image produit (recommandé pour les produits)
-   * Retourne null si l'upload échoue (l'image reste disponible localement)
+   * Lance une erreur avec un message détaillé si l'upload échoue
    */
-  uploadProductImage: async (file: File): Promise<UploadFileResponse | null> => {
-    const formData = new FormData();
-    // Essayer avec 'file' d'abord, puis 'image' si nécessaire
-    formData.append('file', file);
+  uploadProductImage: async (file: File): Promise<UploadFileResponse> => {
+    // Validation préalable côté client
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error('Type de fichier invalide. Seules les images (JPEG, PNG, GIF, WebP) sont acceptées.');
+    }
 
-    // Debug: vérifier que le fichier est bien dans le FormData (seulement en cas d'erreur)
-    // Logs déplacés dans le catch pour éviter la pollution de la console
+    const maxSizeBytes = 2 * 1024 * 1024; // 2MB
+    if (file.size > maxSizeBytes) {
+      throw new Error(`Fichier trop volumineux. Maximum: 2MB (actuel: ${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
 
     try {
       // Ne pas définir Content-Type manuellement - Axios le fera automatiquement avec la boundary
@@ -35,14 +42,7 @@ export const filesApi = {
     } catch (error: any) {
       const errorStatus = error?.response?.status;
       const errorResponseData = error?.response?.data;
-      const errorMessage = String(errorResponseData?.message || errorResponseData?.error || '').toLowerCase();
-      
-      // Vérifier si c'est une erreur de configuration backend connue (Region missing, etc.)
-      const isBackendConfigError = errorMessage.includes('region is missing') || 
-                                    errorMessage.includes('region') ||
-                                    errorMessage.includes('configuration') ||
-                                    errorMessage.includes('aws') ||
-                                    errorMessage.includes('s3');
+      const errorMessage = String(errorResponseData?.message || errorResponseData?.error || error?.message || 'Erreur inconnue');
       
       // Si c'est une erreur 400, essayer avec différents noms de champs
       if (errorStatus === 400) {
@@ -57,24 +57,35 @@ export const filesApi = {
             // Succès avec ce nom de champ
             return retryResponse.data;
           } catch (retryError: any) {
-            // Continuer avec le prochain nom de champ - silencieux
+            // Continuer avec le prochain nom de champ
             continue;
           }
         }
         
-        // Si tous les retries ont échoué, retourner null silencieusement
-        // L'image est déjà sauvegardée localement
-        return null as any;
+        // Si tous les retries ont échoué, lancer une erreur avec message détaillé
+        throw new Error(`Erreur de validation (400): ${errorMessage}. Vérifiez la configuration du backend.`);
       }
       
-      // Pour les erreurs 404 et network - retourner null silencieusement
+      // Gestion des autres erreurs avec messages spécifiques
+      if (errorStatus === 401) {
+        throw new Error('Non autorisé. Veuillez vous reconnecter.');
+      }
+      
+      if (errorStatus === 413) {
+        throw new Error('Fichier trop volumineux.');
+      }
+      
       if (errorStatus === 404 || error?.code === 'ERR_NETWORK' || error?.message === 'Network Error') {
-        return null as any;
+        throw new Error('Impossible de contacter le serveur. Vérifiez que le backend est démarré et accessible.');
       }
       
-      // Pour les autres erreurs (500, etc.), ne pas logger et retourner null
-      // L'image est sauvegardée localement, donc on ne bloque pas l'utilisateur
-      return null as any;
+      // Pour les autres erreurs serveur
+      if (errorStatus) {
+        throw new Error(`Erreur serveur (${errorStatus}): ${errorMessage}`);
+      }
+      
+      // Erreur de configuration ou autre
+      throw new Error(`Erreur lors de l'upload: ${errorMessage}`);
     }
   },
 

@@ -129,4 +129,28 @@ export class KasiPosDexie extends Dexie {
   }
 }
 
-export const db = new KasiPosDexie();
+// Instance singleton de la base de données
+let dbInstance: KasiPosDexie | null = null;
+
+/**
+ * Obtient l'instance de la base de données.
+ * Ne peut être appelé que côté client (dans le navigateur).
+ * 
+ * @throws {Error} Si appelé côté serveur
+ */
+export function getDb(): KasiPosDexie {
+  // Vérifier que nous sommes côté client
+  if (typeof window === 'undefined') {
+    throw new Error('Database can only be accessed on the client side');
+  }
+
+  if (!dbInstance) {
+    dbInstance = new KasiPosDexie();
+  }
+
+  return dbInstance;
+}
+
+// Export pour compatibilité avec le code existant
+// Utilise getDb() pour éviter les problèmes SSR
+export const db = typeof window !== 'undefined' ? getDb() : (null as any);

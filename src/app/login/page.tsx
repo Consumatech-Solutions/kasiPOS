@@ -49,22 +49,29 @@ export default function LoginPage() {
                 // router.push('/'); 
             }
         } catch (error: any) {
-            console.error('Login error:', error);
-            
             // Gérer les erreurs réseau spécifiquement
             if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                // Ne logger que si nécessaire (mode développement)
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('Backend non accessible. Vérifiez que le serveur backend est démarré sur http://localhost:3001');
+                }
                 toast({
                     variant: "destructive",
-                    title: "Connection Error",
-                    description: "Unable to connect to the server. Please check if the backend is running on http://localhost:3001",
+                    title: "Erreur de connexion",
+                    description: "Impossible de se connecter au serveur. Vérifiez que le backend est démarré.",
                 });
                 return;
             }
             
-            const message = error.response?.data?.message || 'Invalid mobile number or password.';
+            // Logger les autres erreurs uniquement en développement
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Login error:', error);
+            }
+            
+            const message = error.response?.data?.message || 'Numéro de téléphone ou mot de passe invalide.';
             toast({
                 variant: 'destructive',
-                title: 'Login Failed',
+                title: 'Échec de la connexion',
                 description: message,
             });
         }

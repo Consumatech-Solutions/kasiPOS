@@ -6,9 +6,6 @@ import { Button } from '@/components/ui/button';
 import { filesApi } from '@/lib/api/files';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { imageStorageService } from '@/lib/services/image-storage';
-import { imageSyncService } from '@/lib/services/image-sync';
-import { db } from '@/lib/db';
 
 interface ImageUploadProps {
   productId?: string | number;
@@ -32,42 +29,15 @@ export function ImageUpload({
   className,
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [preview, setPreview] = useState<string | null>(currentImageUrl || null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const blobUrlRef = useRef<string | null>(null);
   const { toast } = useToast();
 
-  // Nettoyer l'URL blob quand le composant se démonte
+  // Mettre à jour le preview quand currentImageUrl change
   useEffect(() => {
-    return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-    };
-  }, []);
-
-  // Charger l'image locale si disponible
-  useEffect(() => {
-    const loadImage = async () => {
-      if (productId && !currentImageUrl) {
-        try {
-          const localUrl = await imageStorageService.getProductImageUrl(productId);
-          if (localUrl) {
-            blobUrlRef.current = localUrl;
-            setPreview(localUrl);
-          }
-        } catch (err) {
-          // Pas d'image locale
-        }
-      } else if (currentImageUrl) {
-        setPreview(currentImageUrl);
-      }
-    };
-
-    loadImage();
-  }, [productId, currentImageUrl]);
+    setPreview(currentImageUrl || null);
+  }, [currentImageUrl]);
 
   const validateFile = (file: File): string | null => {
     // Vérifier le type
@@ -111,119 +81,46 @@ export function ImageUpload({
     };
     reader.readAsDataURL(file);
 
-    // Stocker localement d'abord
+    // Uploader directement vers DigitalOcean Spaces
     setUploading(true);
     try {
-      if (!productId) {
-        throw new Error('Product ID is required to store the image');
+      const response = await filesApi.uploadProductImage(file);
+      
+      if (!response || !response.url) {
+        throw new Error('Upload réussi mais aucune URL retournée par le serveur');
       }
 
-      // Révoquer l'ancienne URL blob
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
+      // S'assurer que l'URL utilise https://sfo3.digitaloceanspaces.com
+      let imageUrl = response.url;
+      if (!imageUrl.startsWith('http')) {
+        // Si l'URL retournée est relative, la préfixer avec DigitalOcean Spaces
+        imageUrl = imageUrl.startsWith('/') 
+          ? `https://sfo3.digitaloceanspaces.com${imageUrl}`
+          : `https://sfo3.digitaloceanspaces.com/${imageUrl}`;
       }
 
-      // Stocker dans IndexedDB
-      const blobUrl = await imageStorageService.storeImage(productId, file);
-      blobUrlRef.current = blobUrl;
-      setPreview(blobUrl);
-
-      // Appeler le callback avec l'URL locale
-      onUploadSuccess(blobUrl);
-
-      // Essayer de synchroniser immédiatement si en ligne
-      if (navigator.onLine) {
-        setSyncing(true);
-        try {
-          // Uploader directement le fichier original plutôt que depuis IndexedDB
-          const response = await filesApi.uploadProductImage(file);
-          
-          // Si la réponse est null, c'est que l'upload a échoué mais l'image est locale
-          if (!response || !response.url) {
-            toast({
-              title: 'Image saved locally',
-              description: 'The image will be synchronized when the backend is available.',
-            });
-            setSyncing(false);
-            return;
-          }
-          
-          // Marquer l'image comme synchronisée
-          const images = await db.productImages
-            .where('productId')
-            .equals(String(productId))
-            .toArray();
-          
-          if (images.length > 0) {
-            await imageStorageService.markAsSynced(images[0].id, response.url);
-            setPreview(response.url);
-            onUploadSuccess(response.url);
-            toast({
-              title: 'Image uploaded successfully',
-              description: 'The product image has been uploaded and synchronized.',
-            });
-          } else {
-            toast({
-              title: 'Image saved locally',
-              description: 'The image will be synchronized when online.',
-            });
-          }
-        } catch (syncError: any) {
-          // Ne pas bloquer l'utilisateur si la synchronisation échoue
-          // L'image est déjà stockée localement et sera synchronisée plus tard
-          const errorStatus = syncError?.response?.status;
-          const errorCode = syncError?.code;
-          const errorMessage = syncError?.message || syncError?.toString() || 'Unknown error';
-          const errorResponseData = syncError?.response?.data;
-          
-          // Logger les détails de l'erreur en développement
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ Synchronisation immédiate échouée (image sauvegardée localement):', {
-              status: errorStatus,
-              code: errorCode,
-              message: errorMessage,
-              responseData: errorResponseData,
-              url: syncError?.config?.url,
-              method: syncError?.config?.method,
-            });
-          }
-          
-          // Ignorer les erreurs 404 et network silencieusement
-          if (errorStatus === 404 || errorCode === 'ERR_NETWORK' || errorMessage === 'Network Error') {
-            toast({
-              title: 'Image saved locally',
-              description: 'The image will be synchronized when online.',
-            });
-          } else {
-            // Pour les autres erreurs (400, 500, etc.), afficher un message informatif
-            // mais rassurer l'utilisateur que l'image est sauvegardée localement
-            const backendMessage = errorResponseData?.message || errorResponseData?.error;
-            toast({
-              title: 'Image saved locally',
-              description: backendMessage 
-                ? `Upload failed: ${backendMessage}. The image is saved locally and will be synchronized later.`
-                : 'The image is saved locally and will be synchronized automatically when the backend is available.',
-            });
-          }
-        } finally {
-          setSyncing(false);
-        }
-      } else {
-        toast({
-          title: 'Image saved locally',
-          description: 'The image will be synchronized when online.',
-        });
-      }
+      setPreview(imageUrl);
+      onUploadSuccess(imageUrl);
+      
+      toast({
+        title: 'Image uploadée avec succès',
+        description: 'L\'image du produit a été uploadée.',
+      });
 
       setError(null);
     } catch (err: any) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save image';
+      const errorMessage = err instanceof Error ? err.message : 'Échec de l\'upload de l\'image';
       setError(errorMessage);
       onUploadError?.(errorMessage);
-      setPreview(currentImageUrl || null);
+      
+      // Garder le preview si on avait déjà une image
+      if (!currentImageUrl) {
+        setPreview(null);
+      }
+      
       toast({
         variant: 'destructive',
-        title: 'Upload failed',
+        title: 'Échec de l\'upload',
         description: errorMessage,
       });
     } finally {
@@ -235,24 +132,16 @@ export function ImageUpload({
   };
 
   const handleDelete = async () => {
-    if (!productId) return;
-
     try {
-      // Révoquer l'URL blob
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
-
-      // Supprimer localement
-      await imageStorageService.deleteProductImages(productId);
-
-      // Si on a une URL serveur, la supprimer aussi
+      // Supprimer sur le serveur si on a une URL
       if (currentImageUrl && currentImageUrl.startsWith('http')) {
         try {
           await filesApi.delete(currentImageUrl);
         } catch (err) {
-          console.warn('Erreur lors de la suppression sur le serveur:', err);
+          // Logger seulement en développement
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('Erreur lors de la suppression sur le serveur:', err);
+          }
         }
       }
 
@@ -313,18 +202,13 @@ export function ImageUpload({
           variant="outline"
           size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading || syncing || disabled}
+          disabled={uploading || disabled}
           className="cursor-pointer"
         >
           {uploading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : syncing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Syncing...
+              Uploading...
             </>
           ) : (
             <>
@@ -341,11 +225,6 @@ export function ImageUpload({
 
       <p className="text-xs text-muted-foreground">
         Accepted formats: JPEG, PNG, GIF, WebP (max {maxSizeMB}MB)
-        {!navigator.onLine && (
-          <span className="block text-amber-600 mt-1">
-            ⚠ Offline: Image will be synchronized automatically when connection is restored
-          </span>
-        )}
       </p>
     </div>
   );
