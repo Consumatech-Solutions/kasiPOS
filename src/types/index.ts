@@ -67,6 +67,7 @@ export interface Category {
     id?: number;
     name: string;
     storeId?: number; // Optional for backward compatibility, but not used for filtering
+
 }
 
 export type StockAdjustmentReason = 'New stock received' | 'Shrinkage' | 'Damages' | 'Expired' | 'Other';
@@ -86,18 +87,18 @@ export interface StockAdjustment {
 export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
 
 export interface Parcel {
-    id?: number;
-    deliveryNumber: string;
-    customerName: string;
-    status: ParcelStatus;
-    collectionCode?: string;
-    receiptCode?: string;
-    dateReceived?: Date;
-    dateCollected?: Date;
-    collectingPersonName?: string;
-    collectingPersonPhone?: string;
-    collectingPersonId?: string;
-    storeId: number;
+  id?: number;
+  deliveryNumber: string;
+  customerName: string;
+  status: ParcelStatus;
+  collectionCode?: string;
+  receiptCode?: string;
+  dateReceived?: Date;
+  dateCollected?: Date;
+  collectingPersonName?: string;
+  collectingPersonPhone?: string;
+  collectingPersonId?: string;
+  storeId: number;
 }
 
 export interface PurchaseOrderItem {
@@ -123,7 +124,7 @@ export interface PurchaseOrder {
 }
 
 export interface User {
-  id?: number;
+  id?: string;
   name: string;
   phone: string;
   password?: string;
