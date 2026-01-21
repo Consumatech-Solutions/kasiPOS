@@ -44,25 +44,25 @@ export class KasiPosDexie extends Dexie {
       // This migration is for users who have existing data from before multi-tenancy was introduced.
       // We create a default store for all their existing data.
       const defaultStore = {
-          name: 'My Store',
-          isSetupComplete: true, // Assume existing users have completed setup
-          receiptHeader: 'Thank you for your purchase!',
-          receiptFooter: 'Find us on social media @KasiPOS',
+        name: 'My Store',
+        isSetupComplete: true, // Assume existing users have completed setup
+        receiptHeader: 'Thank you for your purchase!',
+        receiptFooter: 'Find us on social media @KasiPOS',
       };
       const storeId = await tx.table('stores').add(defaultStore);
 
       // Now, associate all existing data with this new default store.
       const tablesToMigrate = [
-          'products', 'customers', 'transactions', 'vouchers', 
-          'categories', 'stockAdjustments', 'parcels', 'purchaseOrders', 'users'
+        'products', 'customers', 'transactions', 'vouchers',
+        'categories', 'stockAdjustments', 'parcels', 'purchaseOrders', 'users'
       ];
 
       for (const tableName of tablesToMigrate) {
-          const table = tx.table(tableName);
-          // Only attempt to modify if the table exists in the transaction
-          if (table) {
-              await table.toCollection().modify({ storeId });
-          }
+        const table = tx.table(tableName);
+        // Only attempt to modify if the table exists in the transaction
+        if (table) {
+          await table.toCollection().modify({ storeId });
+        }
       }
     });
     this.version(7).stores({

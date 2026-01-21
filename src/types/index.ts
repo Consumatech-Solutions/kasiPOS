@@ -17,6 +17,7 @@ export interface Product {
   stock: number;
   category: string;
   barcode?: string;
+  barCode?: string; // Added for backend compatibility
   imageUrl: string;
   imageHint?: string;
   lowStockThreshold?: number;
@@ -32,7 +33,7 @@ export interface Customer {
 }
 
 export interface TransactionItem {
-  productId: number;
+  productId: string | number;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -64,9 +65,9 @@ export interface Voucher {
 }
 
 export interface Category {
-    id?: number;
-    name: string;
-    storeId?: number; // Optional for backward compatibility, but not used for filtering
+  id?: number;
+  name: string;
+  storeId?: number; // Optional for backward compatibility, but not used for filtering
 
 }
 
