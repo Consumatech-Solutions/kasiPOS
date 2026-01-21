@@ -9,4 +9,6 @@ export const authApi = {
         }),
     login: (phone: string, password: string) => api.post('/auth/login', { phone, password }),
     getProfile: () => api.get('/auth/profile'),
+    updateProfile: (data: { name?: string }) => api.patch('/auth/profile', data),
+    logout: () => api.post('/auth/logout'),
 };
