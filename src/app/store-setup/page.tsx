@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 import { useSettings } from '@/components/settings-provider';
+import { useStore } from '@/hooks/use-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -18,7 +19,8 @@ import { Upload, Printer, ScanLine, CreditCard, FileUp, Sparkles, MoveRight } fr
 import { Textarea } from '@/components/ui/textarea';
 import type { Store } from '@/types';
 import { Label } from '@/components/ui/label';
-import { db } from '@/lib/db';
+import { useToast } from '@/hooks/use-toast';
+import { ImageUpload } from '@/components/catalogue/image-upload';
 
 
 const businessInfoSchema = z.object({
@@ -37,9 +39,12 @@ const TOTAL_STEPS = 4;
 
 export default function StoreSetupPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const { settings, setSetting } = useSettings();
   const { currentStore } = settings;
+  const { updateStore, createStore } = useStore();
   const [step, setStep] = useState(1);
+  const [logoUrl, setLogoUrl] = useState<string | null>(currentStore?.logoUrl || null);
 
   const form = useForm<FormData>({
     resolver: zodResolver(step === 1 ? businessInfoSchema : receiptSchema),
@@ -57,8 +62,6 @@ export default function StoreSetupPage() {
 
 
   const onNext = async () => {
-    if (!currentStore) return;
-
     let isValid = true;
     if (step === 1) {
         isValid = await form.trigger(['name', 'vatNumber']);
@@ -68,22 +71,48 @@ export default function StoreSetupPage() {
     
     if (!isValid) return;
 
-    // Save current step data to database and context
-    const currentData = form.getValues();
-    const updatedStore: Store = {
-        ...currentStore,
-        ...currentData,
-    };
-    await db.stores.update(currentStore.id!, currentData);
-    setSetting('currentStore', updatedStore);
+    try {
+      const currentData = form.getValues();
+      
+      if (currentStore && currentStore.id) {
+        // Mettre à jour le magasin existant
+        const updateData: any = {
+          ...currentData,
+          ...(logoUrl !== null && { logoUrl }),
+        };
+        await updateStore(currentStore.id, updateData);
+        
+        // Mettre à jour le contexte
+        const updatedStore = {
+          ...currentStore,
+          ...updateData,
+        };
+        setSetting('currentStore', updatedStore);
+      } else {
+        // Créer un nouveau magasin
+        const createData: any = {
+          ...currentData,
+          ...(logoUrl && { logoUrl }),
+        };
+        const created = await createStore(createData);
+        setSetting('currentStore', created);
+      }
 
-    if (step < TOTAL_STEPS) {
-      setStep(s => s + 1);
-    } else {
-      // Final step: Mark setup as complete
-      await db.stores.update(currentStore.id!, { isSetupComplete: true });
-      setSetting('currentStore', { ...updatedStore, isSetupComplete: true });
-      router.push('/');
+      if (step < TOTAL_STEPS) {
+        setStep(s => s + 1);
+      } else {
+        // Final step: Mark setup as complete
+        if (currentStore && currentStore.id) {
+          await updateStore(currentStore.id, { isSetupComplete: true });
+          setSetting('currentStore', { ...currentStore, isSetupComplete: true });
+        }
+        toast({ title: "Succès", description: "Configuration du magasin terminée !" });
+        router.push('/');
+      }
+    } catch (error) {
+      console.error("Failed to save store:", error);
+      const errorMessage = error instanceof Error ? error.message : "Échec de l'enregistrement.";
+      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
     }
   };
 
@@ -125,22 +154,22 @@ export default function StoreSetupPage() {
                   </FormItem>
                 )}
               />
-              <div>
-                <FormLabel>Store Logo (Optional)</FormLabel>
-                <div className="mt-2 flex justify-center rounded-lg border border-dashed border-input px-6 py-10">
-                    <div className="text-center">
-                        <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <div className="mt-4 flex text-sm leading-6 text-muted-foreground">
-                            <label htmlFor="file-upload" className="relative cursor-pointer rounded-md bg-background font-semibold text-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 hover:text-primary/80">
-                                <span>Upload a file</span>
-                                <input id="file-upload" name="file-upload" type="file" className="sr-only" disabled />
-                            </label>
-                            <p className="pl-1">or drag and drop</p>
-                        </div>
-                        <p className="text-xs leading-5 text-muted-foreground">PNG, JPG up to 2MB</p>
-                    </div>
+              {currentStore && (
+                <div>
+                  <FormLabel>Logo du magasin (Optionnel)</FormLabel>
+                  <div className="mt-2">
+                    <ImageUpload
+                      productId={`store-${currentStore.id}`}
+                      currentImageUrl={logoUrl}
+                      onUploadSuccess={(url) => setLogoUrl(url)}
+                      onUploadError={() => {}}
+                      onDelete={() => setLogoUrl(null)}
+                      maxSizeMB={2}
+                      disabled={false}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </form>
           </Form>
         );

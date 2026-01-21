@@ -13,10 +13,21 @@ export interface ProductImageRecord {
   updatedAt: string;
 }
 
+// Interfaces pour les enregistrements IndexedDB avec synchronisation
+export interface CustomerRecord extends Customer {
+  synced?: boolean;
+  lastSyncedAt?: string;
+}
+
+export interface StoreRecord extends Store {
+  synced?: boolean;
+  lastSyncedAt?: string;
+}
+
 export class KasiPosDexie extends Dexie {
-  stores!: Table<Store>;
+  stores!: Table<StoreRecord>;
   products!: Table<Product>;
-  customers!: Table<Customer>;
+  customers!: Table<CustomerRecord>;
   transactions!: Table<Transaction>;
   vouchers!: Table<Voucher>;
   categories!: Table<Category>;
@@ -28,6 +39,56 @@ export class KasiPosDexie extends Dexie {
 
   constructor() {
     super('kasiPosDatabase');
+    this.version(12).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt, storeId',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+    });
+    this.version(11).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+    });
+    this.version(10).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      // customers supprimé explicitement pour permettre le changement de clé primaire dans la version 11
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+    }).upgrade(async tx => {
+      // Supprimer explicitement la table customers pour permettre le changement de clé primaire
+      // Dexie supprimera automatiquement la table si elle n'est pas dans la définition des stores
+      try {
+        const customersTable = tx.table('customers');
+        await customersTable.clear();
+        console.log('Version 10: Cleared customers table to prepare for primary key change');
+      } catch (error) {
+        // La table pourrait ne pas exister, ce qui est OK
+        console.log('Version 10: Customers table already removed or does not exist');
+      }
+    });
     this.version(9).stores({
       stores: '++id, name',
       products: '++id, name, category, barcode, storeId',

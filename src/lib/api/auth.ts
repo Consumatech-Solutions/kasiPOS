@@ -1,4 +1,5 @@
 import { api } from './core';
+import type { User, UpdateProfileDto } from '@/types';
 
 export const authApi = {
     requestOtp: (phone: string) => api.post('/auth/request-otp', { phone }),
@@ -8,7 +9,7 @@ export const authApi = {
             headers: { Authorization: `Bearer ${tempToken}` }
         }),
     login: (phone: string, password: string) => api.post('/auth/login', { phone, password }),
-    getProfile: () => api.get('/auth/profile'),
-    updateProfile: (data: { name?: string }) => api.patch('/auth/profile', data),
+    getProfile: () => api.get<User>('/auth/profile'),
+    updateProfile: (data: UpdateProfileDto) => api.patch<User>('/auth/profile', data),
     logout: () => api.post('/auth/logout'),
 };

@@ -18,8 +18,6 @@ const requestAccessSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
 });
 
-const MOCK_OTP_CODE = '123456';
-
 export default function RequestAccessPage() {
     const router = useRouter();
     const { toast } = useToast();

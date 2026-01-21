@@ -4,7 +4,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { AppSettings, User, Store } from '@/types';
-import { storesApi, authApi } from '@/lib/api';
+import { storesApi } from '@/lib/api/stores';
+import { authApi } from '@/lib/api/auth';
 
 
 interface SettingsContextType {

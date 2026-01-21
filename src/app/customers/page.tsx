@@ -1,294 +1,292 @@
 'use client';
-import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { format } from 'date-fns';
 
-import { db } from '@/lib/db';
+import { useState, useMemo } from 'react';
+import { format } from 'date-fns';
 import type { Customer, Transaction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
+import { useCustomers } from '@/hooks/use-customers';
+import { CustomerForm } from '@/components/customers/customer-form';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { PlusCircle, Edit, Trash2, Star, History, Search } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-// Zod Schema for validation
-const customerSchema = z.object({
-  name: z.string().min(2, { message: "Customer name must be at least 2 characters." }),
-  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
-});
+import { Pagination } from '@/components/ui/pagination';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 export default function CustomersPage() {
   const { toast } = useToast();
   const { settings } = useSettings();
   const { currentStore } = settings;
-
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Dialog states
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
 
-  // Live queries
-  const allCustomers = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.customers.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
-  
+  // Use the new hook
+  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage } = useCustomers({
+    searchQuery: searchTerm,
+  });
+
+  // Get customer transactions
   const customerTransactions = useLiveQuery(() => {
     if (selectedCustomer && currentStore) {
-      return db.transactions.where('customerId').equals(selectedCustomer.id!).and(t => t.storeId === currentStore.id!).reverse().toArray();
+      // customerId peut être un number (ancien format) ou string (nouveau format UUID)
+      // On filtre manuellement pour gérer les deux cas
+      return db.transactions
+        .where('storeId')
+        .equals(currentStore.id!)
+        .filter(t => {
+          // Comparer avec les deux formats possibles
+          const customerId = selectedCustomer.id;
+          return t.customerId === customerId || 
+                 t.customerId === Number(customerId) || 
+                 String(t.customerId) === String(customerId);
+        })
+        .reverse()
+        .toArray();
     }
     return [];
   }, [selectedCustomer, currentStore]);
-
-  // Form Hook
-  const customerForm = useForm<z.infer<typeof customerSchema>>({
-    resolver: zodResolver(customerSchema),
-    defaultValues: {
-      name: '',
-      phone: '',
-    },
-  });
-
-  const filteredCustomers = useMemo(() => {
-    if (!allCustomers) return [];
-    return allCustomers.filter(customer => {
-      const searchTermLower = searchTerm.toLowerCase();
-      const nameMatch = customer.name.toLowerCase().includes(searchTermLower);
-      const phoneMatch = customer.phone?.includes(searchTermLower);
-      return nameMatch || phoneMatch;
-    });
-  }, [allCustomers, searchTerm]);
 
   // Handlers for Customers
   const openCustomerDialog = (customer?: Customer) => {
     if (customer) {
       setEditingCustomer(customer);
-      customerForm.reset({
-          name: customer.name,
-          phone: customer.phone,
-      });
     } else {
       setEditingCustomer(null);
-      customerForm.reset({ name: '', phone: '' });
     }
     setCustomerDialogOpen(true);
   };
   
-  const handleCustomerSubmit = async (values: z.infer<typeof customerSchema>) => {
-    if (!currentStore) {
-      toast({ variant: "destructive", title: "Error", description: "No store context found." });
-      return;
-    }
+  const handleCustomerSubmit = async (data: any) => {
     try {
       if (editingCustomer) {
-        await db.customers.update(editingCustomer.id!, { 
-            name: values.name,
-            phone: values.phone,
-         });
-        toast({ title: "Success", description: "Customer updated successfully." });
+        await updateCustomer(editingCustomer.id, data);
+        toast({ title: "Succès", description: "Client modifié avec succès." });
       } else {
-        const newCustomer = {
-            name: values.name,
-            phone: values.phone,
-            loyaltyPoints: 0,
-            storeId: currentStore.id!,
-        };
-        await db.customers.add(newCustomer as Customer);
-        toast({ title: "Success", description: "Customer added successfully." });
+        await createCustomer(data);
+        toast({ title: "Succès", description: "Client ajouté avec succès." });
       }
       setCustomerDialogOpen(false);
+      setEditingCustomer(null);
     } catch (error) {
       console.error("Failed to save customer:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to save customer." });
+      const errorMessage = error instanceof Error ? error.message : "Échec de l'enregistrement du client.";
+      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
     }
   };
 
-  const deleteCustomer = async (id: number) => {
+  const handleDeleteCustomer = async (id: string) => {
     try {
-      await db.customers.delete(id);
-      toast({ title: "Success", description: "Customer deleted successfully." });
+      await deleteCustomer(id);
+      toast({ title: "Succès", description: "Client supprimé avec succès." });
     } catch (error) {
       console.error("Failed to delete customer:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to delete customer." });
+      const errorMessage = error instanceof Error ? error.message : "Échec de la suppression du client.";
+      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
     }
   };
 
   const openHistoryDialog = (customer: Customer) => {
     setSelectedCustomer(customer);
     setHistoryDialogOpen(true);
+  };
+
+  const handlePageChange = (page: number) => {
+    loadPage(page);
+  };
+
+  if (loading && customers.length === 0) {
+    return (
+      <div className="p-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">Chargement des clients...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-red-600">Erreur: {error}</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
-    <>
-    <Card>
-      <CardHeader>
-        <CardTitle>Customers</CardTitle>
-        <CardDescription>Manage your customer database and loyalty program.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4 mb-4">
-          <div className="relative flex-grow">
+    <div className="p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Clients</CardTitle>
+          <CardDescription>Gérez votre base de données clients et programme de fidélité.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input 
-                  placeholder="Search by name or phone number..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Rechercher par nom ou contact..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-4 w-4" /> Ajouter un client
+            </Button>
           </div>
-          <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-          </Button>
-        </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Loyalty Points</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredCustomers && filteredCustomers.length > 0 ? (
-              filteredCustomers.map(customer => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={`https://i.pravatar.cc/40?u=${customer.phone}`} />
-                        <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      {customer.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>{customer.phone || 'N/A'}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                      <Star className="w-3 h-3 text-yellow-500 fill-yellow-400" />
-                      {customer.loyaltyPoints.toLocaleString()}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => openHistoryDialog(customer)}>
-                        <History className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => openCustomerDialog(customer)}>
-                        <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
+          <div className="border rounded-md overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Points de fidélité</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {customers && customers.length > 0 ? (
+                  customers.map(customer => (
+                    <TableRow key={customer.id}>
+                      <TableCell className="font-medium">
+                        {customer.name}
+                      </TableCell>
+                      <TableCell>{customer.contact || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-400" />
+                          {customer.loyaltyPoints.toLocaleString()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => openHistoryDialog(customer)}>
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => openCustomerDialog(customer)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
                             <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the customer and their data.
-                            </AlertDialogDescription>
+                              <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Cette action est irréversible. Cela supprimera définitivement le client et ses données.
+                              </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteCustomer(customer.id!)}>Delete</AlertDialogAction>
+                              <AlertDialogCancel>Annuler</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteCustomer(customer.id)}>
+                                Supprimer
+                              </AlertDialogAction>
                             </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center h-24">
-                  No customers found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center h-24">
+                      Aucun client trouvé.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-    {/* Customer Dialog (Add/Edit) */}
-    <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+          {pagination.totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                onPageChange={handlePageChange}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Customer Dialog (Add/Edit) */}
+      <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-                <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
-            </DialogHeader>
-            <Form {...customerForm}>
-                <form onSubmit={customerForm.handleSubmit(handleCustomerSubmit)} className="space-y-4">
-                    <FormField control={customerForm.control} name="name" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                    <FormField control={customerForm.control} name="phone" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Mobile Number</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                    <DialogFooter>
-                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                        <Button type="submit">Save</Button>
-                    </DialogFooter>
-                </form>
-            </Form>
+          <DialogHeader>
+            <DialogTitle>{editingCustomer ? 'Modifier le client' : 'Ajouter un client'}</DialogTitle>
+            <DialogDescription>
+              {editingCustomer ? 'Modifiez les informations du client ci-dessous.' : 'Entrez les informations du nouveau client.'}
+            </DialogDescription>
+          </DialogHeader>
+          <CustomerForm
+            customer={editingCustomer || undefined}
+            onSubmit={handleCustomerSubmit}
+            onCancel={() => {
+              setCustomerDialogOpen(false);
+              setEditingCustomer(null);
+            }}
+          />
         </DialogContent>
-    </Dialog>
+      </Dialog>
     
-    {/* Purchase History Dialog */}
-    <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+      {/* Purchase History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Purchase History for {selectedCustomer?.name}</DialogTitle>
+            <DialogTitle>Historique des achats pour {selectedCustomer?.name}</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <Table>
-                <TableHeader>
+              <TableHeader>
                 <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Commande #</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Articles</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                 </TableRow>
-                </TableHeader>
-                <TableBody>
+              </TableHeader>
+              <TableBody>
                 {customerTransactions?.map(transaction => (
-                    <TableRow key={transaction.id}>
+                  <TableRow key={transaction.id}>
                     <TableCell>#{transaction.id}</TableCell>
                     <TableCell>{format(transaction.date, 'PPP')}</TableCell>
                     <TableCell>{transaction.items.length}</TableCell>
                     <TableCell className="text-right">R{transaction.total.toFixed(2)}</TableCell>
-                    </TableRow>
+                  </TableRow>
                 ))}
-                </TableBody>
+              </TableBody>
             </Table>
             {(!customerTransactions || customerTransactions.length === 0) && (
-                <p className="text-center text-muted-foreground py-8">No purchase history for this customer.</p>
+              <p className="text-center text-muted-foreground py-8">Aucun historique d'achat pour ce client.</p>
             )}
           </ScrollArea>
         </DialogContent>
-    </Dialog>
-    </>
+      </Dialog>
+    </div>
   );
 }

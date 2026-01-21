@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { seedDatabase } from '@/lib/seed';
 import { getDb } from '@/lib/db';
 import { Skeleton } from './ui/skeleton';
-import { removeAllMockData } from '@/lib/utils/catalogue-cleanup';
 
 export function DbProvider({ children }: { children: React.ReactNode }) {
   const [isDbReady, setIsDbReady] = useState(false);
@@ -19,19 +18,27 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
       try {
         // Initialiser la base de données
         const db = getDb();
-        await db.open();
+        
+        // Gérer les erreurs de migration Dexie (changement de clé primaire)
+        try {
+          await db.open();
+        } catch (migrationError: any) {
+          if (migrationError.name === 'UpgradeError' && migrationError.message?.includes('primary key')) {
+            console.warn('Migration error detected. Resetting database...');
+            // Fermer la base de données
+            await db.close();
+            // Supprimer la base de données
+            await db.delete();
+            // Recréer la base de données
+            await db.open();
+          } else {
+            throw migrationError;
+          }
+        }
         
         // This will now check for products and parcels and seed if necessary.
         // The seedDatabase function is now idempotent.
         await seedDatabase();
-        
-        // Remove all mock data immediately on startup
-        try {
-          await removeAllMockData();
-        } catch (error) {
-          console.error('Failed to remove mock data:', error);
-          // Continue even if mock data removal fails
-        }
         
         setIsDbReady(true);
       } catch (error) {

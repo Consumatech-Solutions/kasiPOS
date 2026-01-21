@@ -20,7 +20,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { PlusCircle, Edit, Trash2, RefreshCw } from 'lucide-react';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { BarcodeDisplay } from '@/components/barcode-display';
 import { Pagination } from '@/components/ui/pagination';
 import { ImageUpload } from '@/components/catalogue/image-upload';
@@ -73,6 +72,8 @@ export default function CataloguePage() {
 
   // Hooks pour les données avec synchronisation et pagination
   const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage } = useCategories(1, 10);
+  // Type assertion pour aider TypeScript à inférer les types dans les callbacks
+  const typedCategories: Category[] = categories || [];
   const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts } = useProducts(1, 10);
 
   // Auto-generate barcodes for products that don't have one (only once per product)
@@ -512,8 +513,8 @@ export default function CataloguePage() {
                   <TableRow>
                     <TableCell colSpan={2} className="text-center">Loading categories...</TableCell>
                   </TableRow>
-                ) : categories && categories.length > 0 ? (
-                  categories.map(c => (
+                ) : typedCategories && typedCategories.length > 0 ? (
+                  typedCategories.map((c: Category) => (
                     <TableRow key={c.id}>
                       <TableCell>{c.name}</TableCell>
                       <TableCell className="text-right">
@@ -590,12 +591,12 @@ export default function CataloguePage() {
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                    {categories
-                                      ?.filter((c, index, self) => 
+                                    {typedCategories
+                                      .filter((c: Category, index: number, self: Category[]) => 
                                         // Keep only the first occurrence of each category name
-                                        index === self.findIndex((cat) => cat.name === c.name)
+                                        index === self.findIndex((cat: Category) => cat.name === c.name)
                                       )
-                                      .map((c, index) => (
+                                      .map((c: Category, index: number) => (
                                         <SelectItem 
                                           key={c.id ? String(c.id) : `category-${index}`} 
                                           value={c.name}
