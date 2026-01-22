@@ -15,8 +15,8 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 import type { PurchaseOrderItem } from '@/types';
-import { db } from '@/lib/db';
 import { useSettings } from '@/components/settings-provider';
+import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
 
 const DELIVERY_FEE = 150.00;
 
@@ -43,7 +43,7 @@ export default function BuyStockCartPage() {
     localStorage.setItem('purchaseOrderCart', JSON.stringify(newCart));
   };
   
-  const handleQuantityChange = (productId: number, newQuantity: number) => {
+  const handleQuantityChange = (productId: string, newQuantity: number) => {
     const newCart = cart.map(item => {
       if (item.productId === productId) {
         if (newQuantity <= 0) return null; // Mark for removal
@@ -56,19 +56,13 @@ export default function BuyStockCartPage() {
     updateCart(newCart);
   };
   
-  const handleRemoveItem = (productId: number) => {
+  const handleRemoveItem = (productId: string) => {
     const newCart = cart.filter(item => item.productId !== productId);
     updateCart(newCart);
   };
   
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.totalPrice, 0), [cart]);
   const total = useMemo(() => subtotal + (deliveryMethod === 'delivery' ? DELIVERY_FEE : 0), [subtotal, deliveryMethod]);
-  
-  const generateOrderCode = () => {
-    const prefix = 'PO-';
-    const randomNum = Math.floor(Math.random() * 90000) + 10000;
-    return prefix + randomNum;
-  };
   
   const handleConfirmOrder = async () => {
     if (!currentStore) {
@@ -80,27 +74,24 @@ export default function BuyStockCartPage() {
       return;
     }
     
-    const orderCode = generateOrderCode();
-    const newOrder = {
-      orderCode,
-      date: new Date(),
-      items: cart,
-      subtotal: subtotal,
-      deliveryFee: deliveryMethod === 'delivery' ? DELIVERY_FEE : 0,
-      total: total,
-      deliveryMethod,
-      status: 'pending' as 'pending',
-      storeId: currentStore.id!,
-    };
-    
     try {
-      await db.purchaseOrders.add(newOrder);
-      setConfirmedOrderCode(orderCode);
+      const response = await purchaseOrdersApi.create({
+        items: cart,
+        subtotal: subtotal,
+        deliveryFee: deliveryMethod === 'delivery' ? DELIVERY_FEE : 0,
+        total: total,
+        deliveryMethod,
+      });
+
+      const createdOrder = response.data;
+      setConfirmedOrderCode(createdOrder.orderCode);
       setIsOrderConfirmed(true);
       updateCart([]); // Clear the cart
-    } catch (error) {
+      localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
+    } catch (error: any) {
       console.error('Failed to save purchase order:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not save the purchase order.' });
+      const errorMessage = error?.response?.data?.message || error?.message || 'Could not save the purchase order.';
+      toast({ variant: 'destructive', title: 'Error', description: errorMessage });
     }
   };
   

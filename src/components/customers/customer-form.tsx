@@ -47,7 +47,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false }:
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nom du client *</FormLabel>
+              <FormLabel>Customer Name *</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="Ex: John Doe" disabled={disabled} />
               </FormControl>
@@ -60,7 +60,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false }:
           name="contact"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Contact (téléphone/email) *</FormLabel>
+              <FormLabel>Contact (Phone/Email) *</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="Ex: +1234567890" disabled={disabled} />
               </FormControl>
@@ -73,7 +73,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false }:
           name="loyaltyPoints"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Points de fidélité</FormLabel>
+              <FormLabel>Loyalty Points</FormLabel>
               <FormControl>
                 <Input type="number" min="0" {...field} disabled={disabled} />
               </FormControl>
@@ -83,10 +83,10 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false }:
         />
         <div className="flex gap-2 justify-end">
           <Button type="button" variant="secondary" onClick={onCancel} disabled={disabled}>
-            Annuler
+            Cancel
           </Button>
           <Button type="submit" disabled={disabled}>
-            {customer ? 'Modifier' : 'Créer'}
+            {customer ? 'Update' : 'Create'}
           </Button>
         </div>
       </form>

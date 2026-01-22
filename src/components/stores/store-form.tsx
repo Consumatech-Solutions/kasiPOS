@@ -57,7 +57,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Nom du magasin *</FormLabel>
+              <FormLabel>Store Name *</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="Ex: Mon Magasin" disabled={disabled} />
               </FormControl>
@@ -70,7 +70,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
           name="vatNumber"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Numéro de TVA</FormLabel>
+              <FormLabel>VAT Number</FormLabel>
               <FormControl>
                 <Input {...field} placeholder="Ex: 123456789" disabled={disabled} />
               </FormControl>
@@ -80,7 +80,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
         />
         {store && (
           <FormItem>
-            <FormLabel>Logo du magasin</FormLabel>
+            <FormLabel>Store Logo</FormLabel>
             <ImageUpload
               productId={`store-${store.id}`}
               currentImageUrl={logoUrl}
@@ -97,7 +97,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
           name="receiptHeader"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>En-tête des reçus</FormLabel>
+              <FormLabel>Receipt Header</FormLabel>
               <FormControl>
                 <Textarea {...field} rows={3} placeholder="Ex: Merci de votre visite" disabled={disabled} />
               </FormControl>
@@ -110,7 +110,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
           name="receiptFooter"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Pied de page des reçus</FormLabel>
+              <FormLabel>Receipt Footer</FormLabel>
               <FormControl>
                 <Textarea {...field} rows={3} placeholder="Ex: À bientôt !" disabled={disabled} />
               </FormControl>
@@ -121,11 +121,11 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
         <div className="flex gap-2 justify-end">
           {onCancel && (
             <Button type="button" variant="secondary" onClick={onCancel} disabled={disabled}>
-              Annuler
+              Cancel
             </Button>
           )}
           <Button type="submit" disabled={disabled}>
-            {store ? 'Modifier' : 'Créer'}
+            {store ? 'Update' : 'Create'}
           </Button>
         </div>
       </form>

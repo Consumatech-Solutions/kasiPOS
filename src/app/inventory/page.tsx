@@ -1,13 +1,13 @@
 
 'use client';
-import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { db } from '@/lib/db';
-import type { Product, Category, StockAdjustment, StockAdjustmentReason } from '@/types';
+import type { StockAdjustmentReason } from '@/types';
+import { useProducts, useCategories } from '@/hooks/use-catalogue';
+import { useStockAdjustments } from '@/hooks/use-stock-adjustments';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -37,15 +37,12 @@ export default function InventoryPage() {
   const { currentStore } = settings;
   const { toast } = useToast();
   
-  const allProducts = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.products.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  // Use API hooks for products and categories
+  const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10);
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
 
-  const categories = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.categories.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  const allProducts = apiProducts || [];
+  const categories = apiCategories || [];
 
   // Dialog states
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
@@ -58,15 +55,13 @@ export default function InventoryPage() {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   
   // Threshold editing state
-  const [editingThresholdId, setEditingThresholdId] = useState<number | null>(null);
+  const [editingThresholdId, setEditingThresholdId] = useState<string | null>(null);
   const [thresholdValue, setThresholdValue] = useState(0);
 
-  const stockAdjustments = useLiveQuery(() => {
-    if (selectedProduct) {
-      return db.stockAdjustments.where('productId').equals(selectedProduct.id!).reverse().toArray();
-    }
-    return [];
-  }, [selectedProduct]);
+  // Use API hook for stock adjustments
+  const { adjustments: stockAdjustments, loading: adjustmentsLoading, createAdjustment } = useStockAdjustments({
+    productId: selectedProduct?.id,
+  });
 
   const form = useForm<z.infer<typeof adjustmentSchema>>({
     resolver: zodResolver(adjustmentSchema),
@@ -74,10 +69,11 @@ export default function InventoryPage() {
 
   const filteredProducts = useMemo(() => {
     if (!allProducts) return [];
-    return allProducts.filter(product => {
+    return allProducts.filter((product: any) => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-      const matchesLowStock = !showLowStockOnly || (product.stock <= (product.lowStockThreshold || 0) && (product.lowStockThreshold || 0) > 0);
+      const categoryName = product.category?.name || product.category;
+      const matchesCategory = selectedCategory === 'all' || categoryName === selectedCategory;
+      const matchesLowStock = !showLowStockOnly || ((product.stock ?? 0) <= (product.lowStockThreshold || 0) && (product.lowStockThreshold || 0) > 0);
       return matchesSearch && matchesCategory && matchesLowStock;
     });
   }, [allProducts, searchTerm, selectedCategory, showLowStockOnly]);
@@ -88,68 +84,74 @@ export default function InventoryPage() {
     return 'default';
   };
   
-  const openAdjustmentDialog = (product: Product) => {
+  const openAdjustmentDialog = (product: any) => {
     setSelectedProduct(product);
     form.reset({
-      newStock: product.stock,
+      newStock: product.stock ?? 0,
       reason: 'New stock received',
       note: ''
     });
     setAdjustmentDialogOpen(true);
   };
   
-  const openHistoryDialog = (product: Product) => {
+  const openHistoryDialog = (product: any) => {
     setSelectedProduct(product);
     setHistoryDialogOpen(true);
   };
 
   const handleAdjustmentSubmit = async (values: z.infer<typeof adjustmentSchema>) => {
-    if (!selectedProduct || !currentStore) return;
+    if (!selectedProduct || !selectedProduct.id) return;
 
-    const adjustment: Omit<StockAdjustment, 'id'> = {
-      productId: selectedProduct.id!,
-      productName: selectedProduct.name,
-      date: new Date(),
-      oldStock: selectedProduct.stock,
-      newStock: values.newStock,
-      reason: values.reason as StockAdjustmentReason,
-      note: values.note,
-      storeId: currentStore.id!,
-    };
-    
     try {
-      await db.transaction('rw', db.products, db.stockAdjustments, async () => {
-        await db.stockAdjustments.add(adjustment);
-        await db.products.update(selectedProduct.id!, { stock: values.newStock });
+      await createAdjustment({
+        productId: selectedProduct.id,
+        newStock: values.newStock,
+        reason: values.reason as StockAdjustmentReason,
+        note: values.note,
       });
+
+      // Refresh the products list to show updated stock
+      await refreshProducts();
 
       toast({
         title: "Success",
         description: `Stock for ${selectedProduct.name} updated.`,
       });
       setAdjustmentDialogOpen(false);
-    } catch (error) {
+      setSelectedProduct(null);
+    } catch (error: any) {
       console.error("Failed to adjust stock:", error);
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to adjust stock.";
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to adjust stock.",
+        description: errorMessage,
       });
     }
   };
 
-  const handleThresholdUpdate = async (id: number) => {
+  const handleThresholdUpdate = async (id: string) => {
     if (thresholdValue < 0) {
       toast({ variant: "destructive", title: "Error", description: "Threshold must be zero or more." });
       return;
     }
+    
     try {
-      await db.products.update(id, { lowStockThreshold: thresholdValue });
+      await updateProduct(id, { lowStockThreshold: thresholdValue });
+      
+      // Refresh the products list to show updated threshold
+      await refreshProducts();
+      
       toast({ title: "Success", description: "Low stock trigger updated." });
       setEditingThresholdId(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update threshold:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to update threshold." });
+      const errorMessage = error?.response?.data?.message || error?.message || "Failed to update threshold.";
+      toast({ 
+        variant: "destructive", 
+        title: "Error", 
+        description: errorMessage 
+      });
     }
   };
 
@@ -177,7 +179,7 @@ export default function InventoryPage() {
                   </SelectTrigger>
                   <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      {categories?.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                      {categories?.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                   </SelectContent>
               </Select>
               <div className="flex items-center space-x-2">
@@ -201,26 +203,30 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts && filteredProducts.length > 0 ? (
-                filteredProducts.map(product => (
+              {productsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-10">Loading products...</TableCell>
+                </TableRow>
+              ) : filteredProducts && filteredProducts.length > 0 ? (
+                filteredProducts.map((product: any) => (
                   <TableRow key={product.id}>
                     <TableCell>
                       <Image
-                        src={product.imageUrl}
+                        src={(product as any).productImage || (product as any).imageUrl || '/placeholder-product.png'}
                         alt={product.name}
                         width={40}
                         height={40}
                         className="rounded-md object-cover"
-                        data-ai-hint={product.imageHint}
+                        data-ai-hint={(product as any).imageHint}
                       />
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{product.category}</Badge>
+                      <Badge variant="outline">{(product as any).category?.name || (product as any).category || 'N/A'}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getStockBadgeVariant(product.stock, product.lowStockThreshold)}>
-                          {product.stock}
+                      <Badge variant={getStockBadgeVariant(product.stock ?? 0, (product as any).lowStockThreshold)}>
+                          {product.stock ?? 0}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -239,8 +245,8 @@ export default function InventoryPage() {
                           </>
                         ) : (
                           <>
-                            <span>{product.lowStockThreshold || 0}</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingThresholdId(product.id!); setThresholdValue(product.lowStockThreshold || 0); }}>
+                            <span>{(product as any).lowStockThreshold || 0}</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingThresholdId(product.id!); setThresholdValue((product as any).lowStockThreshold || 0); }}>
                               <Edit className="h-3 w-3"/>
                             </Button>
                           </>
@@ -273,7 +279,7 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>Adjust Stock for {selectedProduct?.name}</DialogTitle>
             <DialogDescription>
-              Current stock: {selectedProduct?.stock}. Enter the new stock level and reason for adjustment.
+              Current stock: {selectedProduct?.stock ?? 0}. Enter the new stock level and reason for adjustment.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -335,11 +341,16 @@ export default function InventoryPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stockAdjustments?.map(adj => {
+              {adjustmentsLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-10">Loading history...</TableCell>
+                </TableRow>
+              ) : stockAdjustments?.map((adj: any) => {
                 const change = adj.newStock - adj.oldStock;
+                const adjDate = adj.createdAt ? new Date(adj.createdAt) : new Date(adj.date || Date.now());
                 return (
                   <TableRow key={adj.id}>
-                    <TableCell>{format(adj.date, 'Pp')}</TableCell>
+                    <TableCell>{format(adjDate, 'Pp')}</TableCell>
                     <TableCell>{adj.reason}</TableCell>
                     <TableCell>{adj.oldStock}</TableCell>
                     <TableCell>{adj.newStock}</TableCell>

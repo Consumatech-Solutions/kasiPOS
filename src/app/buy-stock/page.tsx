@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
-import { db } from '@/lib/db';
-import type { Product, PurchaseOrderItem } from '@/types';
+import type { PurchaseOrderItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
+import { useProducts } from '@/hooks/use-catalogue';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,20 +21,19 @@ export default function BuyStockPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
 
-  const allProducts = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.products.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  // Use API hook for products
+  const { products: apiProducts, loading: productsLoading } = useProducts(1, 10);
+  const allProducts = apiProducts || [];
 
-  // State to manage quantities for each product
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  // State to manage quantities for each product (using string IDs for UUIDs)
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const lowStockItems = useMemo(() => {
     if (!allProducts) return [];
-    return allProducts.filter(p => p.lowStockThreshold && p.stock <= p.lowStockThreshold);
+    return allProducts.filter((p: any) => (p.lowStockThreshold || 0) > 0 && (p.stock ?? 0) <= (p.lowStockThreshold || 0));
   }, [allProducts]);
 
-  const handleQuantityChange = (productId: number, value: string) => {
+  const handleQuantityChange = (productId: string, value: string) => {
     const newQuantity = parseInt(value, 10);
     setQuantities(prev => ({
       ...prev,
@@ -43,13 +41,15 @@ export default function BuyStockPage() {
     }));
   };
   
-  const getGroupPrice = (costPrice: number) => {
-    if (typeof costPrice !== 'number') return 0;
-    return costPrice * 0.9; // Simulate a 10% discount for group buying
+  const getGroupPrice = (costPrice: number | string) => {
+    const numPrice = Number(costPrice) || 0;
+    return numPrice * 0.9; // Simulate a 10% discount for group buying
   };
   
-  const handleAddToCart = (product: Product) => {
-    const quantity = quantities[product.id!] || 0;
+  const handleAddToCart = (product: any) => {
+    if (!product.id) return;
+    
+    const quantity = quantities[product.id] || 0;
     if (quantity <= 0) {
       toast({
         variant: 'destructive',
@@ -59,10 +59,10 @@ export default function BuyStockPage() {
       return;
     }
     
-    const costPrice = product.costPrice || 0;
+    const costPrice = Number(product.costPrice) || 0;
     
     const newItem: PurchaseOrderItem = {
-      productId: product.id!,
+      productId: product.id,
       productName: product.name,
       quantity,
       unitPrice: costPrice,
@@ -137,14 +137,14 @@ export default function BuyStockPage() {
                             </TableRow>
                         </TableHeader>
                          <TableBody>
-                            {lowStockItems.map(product => (
+                            {lowStockItems.map((product: any) => (
                                 <TableRow key={product.id} className="bg-amber-50 hover:bg-amber-100">
                                     <TableCell className="font-medium">{product.name}</TableCell>
                                     <TableCell>
-                                        <Badge variant="destructive">{product.stock} left</Badge>
+                                        <Badge variant="destructive">{product.stock ?? 0} left</Badge>
                                     </TableCell>
                                     <TableCell className="font-semibold text-green-600">
-                                        R{(getGroupPrice(product.costPrice || 0)).toFixed(2)}
+                                        R{(getGroupPrice(Number(product.costPrice) || 0)).toFixed(2)}
                                     </TableCell>
                                     <TableCell>
                                         <Input 
@@ -152,8 +152,8 @@ export default function BuyStockPage() {
                                             min="0"
                                             className="h-9"
                                             placeholder="0"
-                                            value={quantities[product.id!] || ''}
-                                            onChange={(e) => handleQuantityChange(product.id!, e.target.value)}
+                                            value={quantities[product.id] || ''}
+                                            onChange={(e) => handleQuantityChange(product.id, e.target.value)}
                                         />
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -182,20 +182,24 @@ export default function BuyStockPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {allProducts?.map(product => (
+                        {productsLoading ? (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-10">Loading products...</TableCell>
+                            </TableRow>
+                        ) : allProducts?.map((product: any) => (
                             <TableRow key={product.id}>
                                 <TableCell className="font-medium">{product.name}</TableCell>
-                                <TableCell>{product.stock}</TableCell>
-                                <TableCell>R{(product.costPrice || 0).toFixed(2)}</TableCell>
-                                <TableCell className="font-semibold text-green-600">R{(getGroupPrice(product.costPrice || 0)).toFixed(2)}</TableCell>
+                                <TableCell>{product.stock ?? 0}</TableCell>
+                                <TableCell>R{(Number(product.costPrice) || 0).toFixed(2)}</TableCell>
+                                <TableCell className="font-semibold text-green-600">R{(getGroupPrice(Number(product.costPrice) || 0)).toFixed(2)}</TableCell>
                                 <TableCell>
                                      <Input 
                                         type="number"
                                         min="0"
                                         className="h-9"
                                         placeholder="0"
-                                        value={quantities[product.id!] || ''}
-                                        onChange={(e) => handleQuantityChange(product.id!, e.target.value)}
+                                        value={quantities[product.id] || ''}
+                                        onChange={(e) => handleQuantityChange(product.id, e.target.value)}
                                      />
                                 </TableCell>
                                 <TableCell className="text-right">

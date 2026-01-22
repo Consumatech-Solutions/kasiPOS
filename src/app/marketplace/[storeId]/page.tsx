@@ -88,7 +88,7 @@ export default function StorePosPage() {
   }, [allCategories, categorySearch]);
   
   // Use API hook for customers
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
   const allCustomers = allCustomersList || [];
 
   const selectedCustomer = useMemo(() => {
@@ -178,7 +178,7 @@ export default function StorePosPage() {
   }
 
   // Placeholder for Phase 2
-  const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
+  const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
      console.log("Sale to be completed with:", transactionDetails);
      setActivePaymentMethod(null);
   }

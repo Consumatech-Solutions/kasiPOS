@@ -29,7 +29,7 @@ export interface UpdateStoreDto {
 }
 
 export interface Product {
-  id?: number;
+  id?: string; // UUID (backend)
   name: string;
   price: number;
   costPrice: number;
@@ -65,7 +65,7 @@ export interface UpdateCustomerDto {
 }
 
 export interface TransactionItem {
-  productId: string | number;
+  productId: string; // UUID (backend)
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -75,25 +75,33 @@ export interface TransactionItem {
 }
 
 export interface Transaction {
-  id?: number;
-  customerId?: number;
-  date: Date;
+  id?: string; // UUID (backend)
+  customerId?: string | null;
+  date?: Date; // For backward compatibility
+  createdAt?: string; // ISO date string from backend
   items: TransactionItem[];
   total: number;
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
-  voucherCode?: string;
-  discountAmount?: number;
+  voucherCode?: string | null;
+  discountAmount?: number | null;
   storeId: number;
 }
 
 export interface Voucher {
-  id?: number;
+  id?: string; // UUID (backend)
   code: string;
   type: 'percentage' | 'fixed';
   value: number;
   minPurchase: number;
   isActive: boolean;
+  expiresAt?: string | null; // ISO date string
+  maxUses?: number | null;
+  maxUsesPerCustomer?: number | null;
+  currentUses?: number;
+  customerUsages?: Record<string, number> | null;
   storeId: number;
+  createdAt?: string; // ISO date string
+  updatedAt?: string; // ISO date string
 }
 
 export interface Category {
@@ -106,14 +114,15 @@ export interface Category {
 export type StockAdjustmentReason = 'New stock received' | 'Shrinkage' | 'Damages' | 'Expired' | 'Other';
 
 export interface StockAdjustment {
-  id?: number;
-  productId: number;
+  id?: string; // UUID (backend)
+  productId: string;
   productName: string; // denormalized for easier display
-  date: Date;
+  date?: Date; // For backward compatibility
+  createdAt?: string; // ISO date string from backend
   oldStock: number;
   newStock: number;
   reason: StockAdjustmentReason;
-  note?: string;
+  note?: string | null;
   storeId: number;
 }
 
@@ -135,7 +144,7 @@ export interface Parcel {
 }
 
 export interface PurchaseOrderItem {
-  productId: number;
+  productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -144,9 +153,10 @@ export interface PurchaseOrderItem {
 }
 
 export interface PurchaseOrder {
-  id?: number;
+  id?: string; // UUID (backend)
   orderCode: string;
-  date: Date;
+  date?: Date; // For backward compatibility
+  createdAt?: string; // ISO date string from backend
   items: PurchaseOrderItem[];
   subtotal: number;
   deliveryFee: number;
