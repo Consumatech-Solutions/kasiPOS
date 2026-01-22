@@ -21,7 +21,8 @@ import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
 import { useSettings } from '@/components/settings-provider';
-import { useCategories, useProducts } from '@/hooks/use-catalogue';
+import { useCustomers } from '@/hooks/use-customers';
+
 
 
 export default function PosPage() {
@@ -73,18 +74,21 @@ export default function PosPage() {
     return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
   }, [allCategories, categorySearch]);
   
-  const customers = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.customers.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  // Use API hook for customers
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
+  
+  const customers = allCustomersList || [];
 
-  const selectedCustomer = useLiveQuery(() => selectedCustomerId ? db.customers.get(selectedCustomerId) : Promise.resolve(undefined), [selectedCustomerId]);
+  const selectedCustomer = useMemo(() => {
+    if (!selectedCustomerId || !customers) return undefined;
+    return customers.find(c => c.id === String(selectedCustomerId) || c.id === selectedCustomerId);
+  }, [selectedCustomerId, customers]);
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
     return customers.filter((customer: Customer) =>
         customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-        customer.phone?.includes(customerSearchTerm)
+        customer.contact?.includes(customerSearchTerm)
     );
   }, [customers, customerSearchTerm]);
 
@@ -397,7 +401,7 @@ export default function PosPage() {
                                     {filteredCustomers?.map((customer: Customer) => (
                                         <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
                                             <TableCell>{customer.name}</TableCell>
-                                            <TableCell>{customer.phone}</TableCell>
+                                            <TableCell>{customer.contact}</TableCell>
                                             <TableCell className="text-right">
                                                 <Button size="sm">Select</Button>
                                             </TableCell>

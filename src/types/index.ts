@@ -1,12 +1,31 @@
 
 export interface Store {
-  id?: number;
+  id: number;
   name: string;
+  vatNumber: string | null;
+  logoUrl: string | null;
+  receiptHeader: string | null;
+  receiptFooter: string | null;
+  isSetupComplete: boolean;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateStoreDto {
+  name: string;
+  vatNumber?: string;
+  receiptHeader?: string;
+  receiptFooter?: string;
+}
+
+export interface UpdateStoreDto {
+  name?: string;
   vatNumber?: string;
   logoUrl?: string;
   receiptHeader?: string;
   receiptFooter?: string;
-  isSetupComplete: boolean;
+  isSetupComplete?: boolean;
 }
 
 export interface Product {
@@ -25,11 +44,24 @@ export interface Product {
 }
 
 export interface Customer {
-  id?: number;
+  id: string; // UUID
   name: string;
-  phone?: string;
+  contact: string;
   loyaltyPoints: number;
-  storeId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCustomerDto {
+  name: string;
+  contact: string;
+  loyaltyPoints?: number;
+}
+
+export interface UpdateCustomerDto {
+  name?: string;
+  contact?: string;
+  loyaltyPoints?: number;
 }
 
 export interface TransactionItem {
@@ -125,12 +157,18 @@ export interface PurchaseOrder {
 }
 
 export interface User {
-  id?: string;
-  name: string;
+  id: string;
   phone: string;
-  password?: string;
+  name: string;
   role: 'admin' | 'staff';
-  storeId: number;
+  storeId: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateProfileDto {
+  name?: string;
 }
 
 export interface AppSettings {

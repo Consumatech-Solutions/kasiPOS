@@ -4,34 +4,42 @@ import { useEffect, useState } from 'react';
 import { seedDatabase } from '@/lib/seed';
 import { getDb } from '@/lib/db';
 import { Skeleton } from './ui/skeleton';
-import { removeAllMockData } from '@/lib/utils/catalogue-cleanup';
 
 export function DbProvider({ children }: { children: React.ReactNode }) {
   const [isDbReady, setIsDbReady] = useState(false);
 
   useEffect(() => {
-    // Vérifier que nous sommes côté client
+    // Check that we are on the client side
     if (typeof window === 'undefined') {
       return;
     }
 
     const initDb = async () => {
       try {
-        // Initialiser la base de données
+        // Initialize database (only for products, transactions, etc. - not for customers/stores)
         const db = getDb();
-        await db.open();
+        
+        // Handle Dexie migration errors (primary key changes)
+        try {
+          await db.open();
+        } catch (migrationError: any) {
+          if (migrationError.name === 'UpgradeError' && migrationError.message?.includes('primary key')) {
+            console.warn('Migration error detected. Resetting database...');
+            // Close the database
+            await db.close();
+            // Delete the database
+            await db.delete();
+            // Recreate the database
+            await db.open();
+          } else {
+            throw migrationError;
+          }
+        }
         
         // This will now check for products and parcels and seed if necessary.
         // The seedDatabase function is now idempotent.
+        // Note: Customers and stores are now managed via API only
         await seedDatabase();
-        
-        // Remove all mock data immediately on startup
-        try {
-          await removeAllMockData();
-        } catch (error) {
-          console.error('Failed to remove mock data:', error);
-          // Continue even if mock data removal fails
-        }
         
         setIsDbReady(true);
       } catch (error) {

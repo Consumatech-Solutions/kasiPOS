@@ -21,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import { useSettings } from '@/components/settings-provider';
+import { useCustomers } from '@/hooks/use-customers';
 
 const quickAccessCategories = ['Bread', 'Airtime', 'Dairy', 'Cigs', 'Veg', 'Cool Drinks', 'Snacks', 'Groceries', 'Beverages', 'Toiletries'];
 
@@ -86,18 +87,20 @@ export default function StorePosPage() {
     return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
   }, [allCategories, categorySearch]);
   
-  const allCustomers = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.customers.where('storeId').equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  // Use API hook for customers
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
+  const allCustomers = allCustomersList || [];
 
-  const selectedCustomer = useLiveQuery(() => selectedCustomerId ? db.customers.get(selectedCustomerId) : Promise.resolve(undefined), [selectedCustomerId]);
+  const selectedCustomer = useMemo(() => {
+    if (!selectedCustomerId || !allCustomers) return undefined;
+    return allCustomers.find(c => c.id === String(selectedCustomerId) || c.id === selectedCustomerId);
+  }, [selectedCustomerId, allCustomers]);
 
   const filteredCustomers = useMemo(() => {
     if (!allCustomers) return [];
     return allCustomers.filter(customer => 
         customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || 
-        customer.phone?.includes(customerSearchTerm)
+        customer.contact?.includes(customerSearchTerm)
     );
   }, [allCustomers, customerSearchTerm]);
 
@@ -343,7 +346,7 @@ export default function StorePosPage() {
                                 {filteredCustomers?.map(customer => (
                                     <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
                                         <TableCell>{customer.name}</TableCell>
-                                        <TableCell>{customer.phone}</TableCell>
+                                        <TableCell>{customer.contact}</TableCell>
                                         <TableCell className="text-right">
                                             <Button size="sm">Select</Button>
                                         </TableCell>
@@ -465,7 +468,7 @@ export default function StorePosPage() {
                     {filteredCustomers?.map(customer => (
                         <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
                             <TableCell>{customer.name}</TableCell>
-                            <TableCell>{customer.phone}</TableCell>
+                            <TableCell>{customer.contact}</TableCell>
                             <TableCell className="text-right">
                                 <Button size="sm">Select</Button>
                             </TableCell>

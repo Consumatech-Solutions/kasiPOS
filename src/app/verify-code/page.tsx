@@ -19,8 +19,6 @@ const verifyCodeSchema = z.object({
   code: z.string().length(6, { message: "Code must be 6 digits." }),
 });
 
-const MOCK_OTP_CODE = '123456';
-
 export default function VerifyCodePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
