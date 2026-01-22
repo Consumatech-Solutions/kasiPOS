@@ -7,75 +7,75 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Ticket, XCircle, CheckCircle } from 'lucide-react';
-import type { Voucher } from '@/types';
-import { db } from '@/lib/db';
 import { Separator } from '@/components/ui/separator';
-import { useSettings } from '../settings-provider';
+import { useVouchers } from '@/hooks/use-vouchers';
 
 interface VoucherModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyVoucher: (code: string, amount: number) => void;
   cartTotal: number;
+  customerId?: string;
 }
 
-export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTotal }: VoucherModalProps) {
+export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTotal, customerId }: VoucherModalProps) {
   const [voucherCode, setVoucherCode] = useState('');
-  const [foundVoucher, setFoundVoucher] = useState<Voucher | null>(null);
+  const [validatedVoucher, setValidatedVoucher] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [amountToApply, setAmountToApply] = useState(0);
-  const { settings } = useSettings();
-  const { currentStore } = settings;
+  const [validating, setValidating] = useState(false);
+  const { validateVoucher } = useVouchers({ autoLoad: false });
 
   const handleFindVoucher = async () => {
-    if (!currentStore) {
-        setError('No store context found.');
-        return;
+    if (!voucherCode.trim()) {
+      setError('Please enter a voucher code.');
+      return;
     }
+
     setError(null);
-    setFoundVoucher(null);
+    setValidatedVoucher(null);
+    setValidating(true);
 
-    const voucher = await db.vouchers
-      .where('storeId').equals(currentStore.id!)
-      .and(v => v.code.toLowerCase() === voucherCode.toLowerCase())
-      .first();
+    try {
+      const result = await validateVoucher({
+        code: voucherCode,
+        cartTotal,
+        customerId,
+      });
 
-    if (!voucher || !voucher.isActive) {
-      setError('Voucher code is invalid or has expired.');
-      return;
+      if (!result.valid) {
+        setError(result.message || 'Voucher code is invalid.');
+        return;
+      }
+
+      setValidatedVoucher(result.voucher);
+      setAmountToApply(result.discountAmount || 0);
+    } catch (err: any) {
+      setError(err.message || 'Failed to validate voucher.');
+    } finally {
+      setValidating(false);
     }
-    
-    if (cartTotal < voucher.minPurchase) {
-      setError(`A minimum purchase of R${voucher.minPurchase.toFixed(2)} is required for this voucher.`);
-      return;
-    }
-
-    setFoundVoucher(voucher);
-    const potentialValue = voucher.type === 'percentage' 
-      ? (cartTotal * voucher.value) / 100
-      : voucher.value;
-    setAmountToApply(Math.min(potentialValue, cartTotal));
   };
   
   const handleApply = () => {
-    if (!foundVoucher) return;
-    onApplyVoucher(foundVoucher.code, amountToApply);
+    if (!validatedVoucher || amountToApply <= 0) return;
+    onApplyVoucher(validatedVoucher.code, amountToApply);
     handleClose();
   };
 
   const handleClose = () => {
     setVoucherCode('');
-    setFoundVoucher(null);
+    setValidatedVoucher(null);
     setError(null);
     setAmountToApply(0);
     onClose();
   };
 
-  const getVoucherDescription = (voucher: Voucher) => {
+  const getVoucherDescription = (voucher: any) => {
     if (voucher.type === 'percentage') {
-      return `${voucher.value}% off your purchase.`;
+      return `${Number(voucher.value)}% off your purchase.`;
     }
-    return `R${voucher.value.toFixed(2)} off your purchase.`;
+    return `R${Number(voucher.value).toFixed(2)} off your purchase.`;
   };
 
 
@@ -95,7 +95,9 @@ export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTota
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
             />
-            <Button onClick={handleFindVoucher}>Find Voucher</Button>
+            <Button onClick={handleFindVoucher} disabled={validating}>
+              {validating ? 'Validating...' : 'Find Voucher'}
+            </Button>
           </div>
 
           {error && (
@@ -106,13 +108,19 @@ export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTota
             </Alert>
           )}
 
-          {foundVoucher && (
+          {validating && (
+            <div className="text-center py-4 text-muted-foreground">
+              Validating voucher...
+            </div>
+          )}
+
+          {validatedVoucher && (
             <div className="space-y-4">
               <Alert variant="default" className="bg-green-50 border-green-200">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertTitle className="text-green-800">Voucher Found!</AlertTitle>
                 <AlertDescription className="text-green-700">
-                  Code <span className="font-mono font-bold">{foundVoucher.code}</span> gives you {getVoucherDescription(foundVoucher)}
+                  Code <span className="font-mono font-bold">{validatedVoucher.code}</span> gives you {getVoucherDescription(validatedVoucher)}
                 </AlertDescription>
               </Alert>
 
@@ -125,13 +133,16 @@ export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTota
                   <Input 
                     id="amountToApply"
                     type="number"
+                    step="0.01"
+                    min="0"
+                    max={cartTotal}
                     value={amountToApply}
-                    onChange={(e) => setAmountToApply(Number(e.target.value))}
+                    onChange={(e) => setAmountToApply(Math.min(Number(e.target.value) || 0, cartTotal))}
                     className="text-xl h-12 font-bold"
                   />
                 </div>
                  <p className="text-xs text-muted-foreground mt-1">
-                    You can apply up to R{foundVoucher.type === 'fixed' ? foundVoucher.value.toFixed(2) : ((cartTotal * foundVoucher.value) / 100).toFixed(2)}.
+                    Maximum discount: R{amountToApply.toFixed(2)}
                 </p>
               </div>
             </div>
@@ -140,7 +151,7 @@ export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTota
         
         <DialogFooter>
           <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-          <Button onClick={handleApply} disabled={!foundVoucher || amountToApply <= 0 || amountToApply > cartTotal}>Apply Discount</Button>
+          <Button onClick={handleApply} disabled={!validatedVoucher || amountToApply <= 0 || amountToApply > cartTotal}>Apply Discount</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

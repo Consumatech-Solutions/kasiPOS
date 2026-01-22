@@ -1,7 +1,5 @@
 'use client';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
-import { format, startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Accordion,
@@ -11,7 +9,7 @@ import {
 } from "@/components/ui/accordion"
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,48 +18,66 @@ import { Calendar as CalendarIcon, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
+import { useTransactions } from '@/hooks/use-transactions';
 
 export default function TransactionsPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
 
-  const allTransactions = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.transactions.where('storeId').equals(currentStore.id!).orderBy('date').reverse().toArray()
-  }, [currentStore?.id]);
-
-  // Use API hook for customers
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
-  const customers = allCustomersList || [];
-
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Format date for API (YYYY-MM-DD)
+  const dateFilter = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
 
-  const getCustomerName = (customerId: number | string | undefined) => {
+  // Use API hooks
+  const { transactions: allTransactions, loading, error, loadTransactions } = useTransactions({
+    page: 1,
+    limit: 10,
+    date: dateFilter,
+    search: searchTerm || undefined,
+    autoLoad: false, // We'll load manually when filters change
+  });
+
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const customers = allCustomersList || [];
+
+  // Load transactions when filters change
+  useEffect(() => {
+    // Only send search to backend if it looks like a transaction ID (UUID format or partial)
+    // Customer name searches will be handled client-side
+    const isTransactionIdSearch = searchTerm && /^[0-9a-f-]{0,36}$/i.test(searchTerm);
+    loadTransactions({
+      page: 1,
+      limit: 10,
+      date: dateFilter,
+      search: isTransactionIdSearch ? searchTerm : undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilter, searchTerm]); // Remove loadTransactions from deps to prevent infinite loop
+
+  const getCustomerName = (customerId: string | undefined | null) => {
     if (!customers || !customerId) return 'N/A';
-    return customers.find(c => c.id === String(customerId) || c.id === customerId)?.name || 'Unknown';
+    return customers.find(c => c.id === String(customerId))?.name || 'Unknown';
   };
 
-  const filteredTransactions = useMemo(() => {
-    if (!allTransactions) return [];
-
-    return allTransactions.filter(transaction => {
-      const dateMatch = !selectedDate || (
-        transaction.date >= startOfDay(selectedDate) && transaction.date <= endOfDay(selectedDate)
-      );
-
-      const searchTermLower = searchTerm.toLowerCase();
-      const searchMatch = !searchTerm || (
-        String(transaction.id).includes(searchTermLower) ||
-        getCustomerName(transaction.customerId).toLowerCase().includes(searchTermLower)
-      );
-
-      return dateMatch && searchMatch;
-    });
-
-  }, [allTransactions, selectedDate, searchTerm, customers]);
-
+  // Client-side filtering for customer name search
+  const filteredTransactions = allTransactions?.filter((transaction: any) => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    const transactionId = transaction.id?.toLowerCase() || '';
+    const customerName = getCustomerName(transaction.customerId).toLowerCase();
+    
+    // If search looks like transaction ID, backend already filtered it
+    // Otherwise, filter by customer name
+    const isTransactionIdSearch = /^[0-9a-f-]{0,36}$/i.test(searchTerm);
+    if (isTransactionIdSearch) {
+      return transactionId.includes(searchLower);
+    } else {
+      return customerName.includes(searchLower);
+    }
+  }) || [];
 
   const clearFilters = () => {
     setSelectedDate(undefined);
@@ -118,46 +134,62 @@ export default function TransactionsPage() {
 
 
         <ScrollArea className="h-[calc(100vh-18rem)]">
-          <Accordion type="single" collapsible className="w-full">
-            {filteredTransactions && filteredTransactions.length > 0 ? (
-              filteredTransactions.map(transaction => (
-                <AccordionItem value={`item-${transaction.id}`} key={transaction.id}>
-                  <AccordionTrigger>
-                    <div className="flex justify-between w-full pr-4">
-                      <div className="text-left">
-                        <p className="font-medium">Transaction #{transaction.id}</p>
-                        <p className="text-sm text-muted-foreground">{format(new Date(transaction.date), 'PPP p')}</p>
-                      </div>
-                      <div className="text-right">
-                         <p className="font-semibold text-lg">R{transaction.total.toFixed(2)}</p>
-                        <p className="text-sm text-muted-foreground">Customer: {getCustomerName(transaction.customerId)}</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <ul className="space-y-2 pl-2">
-                      {transaction.items.map(item => (
-                        <li key={item.productId} className="flex justify-between items-center text-sm">
-                          <div>
-                            <span className="font-medium">{item.productName}</span>
-                            <span className="text-muted-foreground ml-2">({item.quantity} x R{item.unitPrice.toFixed(2)})</span>
+          {loading ? (
+            <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
+              Loading transactions...
+            </div>
+          ) : error ? (
+            <div className="text-center h-24 flex items-center justify-center text-destructive">
+              {error}
+            </div>
+          ) : (
+            <Accordion type="single" collapsible className="w-full">
+              {filteredTransactions && filteredTransactions.length > 0 ? (
+                filteredTransactions.map((transaction: any) => {
+                  const transactionDate = transaction.createdAt 
+                    ? new Date(transaction.createdAt) 
+                    : (transaction.date ? new Date(transaction.date) : new Date());
+                  
+                  return (
+                    <AccordionItem value={`item-${transaction.id}`} key={transaction.id}>
+                      <AccordionTrigger>
+                        <div className="flex justify-between w-full pr-4">
+                          <div className="text-left">
+                            <p className="font-medium">Transaction #{transaction.id?.substring(0, 8) || 'N/A'}</p>
+                            <p className="text-sm text-muted-foreground">{format(transactionDate, 'PPP p')}</p>
                           </div>
-                          <span className="font-medium">R{item.totalPrice.toFixed(2)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                     <div className="mt-2 text-right">
-                        <Badge variant="secondary">{transaction.paymentMethod}</Badge>
-                     </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))
-            ) : (
-              <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
-                No transactions found for the selected filters.
-              </div>
-            )}
-          </Accordion>
+                          <div className="text-right">
+                            <p className="font-semibold text-lg">R{Number(transaction.total).toFixed(2)}</p>
+                            <p className="text-sm text-muted-foreground">Customer: {getCustomerName(transaction.customerId)}</p>
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <ul className="space-y-2 pl-2">
+                          {transaction.items?.map((item: any) => (
+                            <li key={item.productId} className="flex justify-between items-center text-sm">
+                              <div>
+                                <span className="font-medium">{item.productName}</span>
+                                <span className="text-muted-foreground ml-2">({item.quantity} x R{Number(item.unitPrice).toFixed(2)})</span>
+                              </div>
+                              <span className="font-medium">R{Number(item.totalPrice).toFixed(2)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-2 text-right">
+                          <Badge variant="secondary">{transaction.paymentMethod}</Badge>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })
+              ) : (
+                <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
+                  No transactions found for the selected filters.
+                </div>
+              )}
+            </Accordion>
+          )}
         </ScrollArea>
       </CardContent>
     </Card>

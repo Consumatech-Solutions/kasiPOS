@@ -22,6 +22,8 @@ import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
+import { useCategories, useProducts } from '@/hooks/use-catalogue';
+import { transactionsApi } from '@/lib/api/transactions';
 
 
 
@@ -29,8 +31,8 @@ export default function PosPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
 
-  const [cart, setCart] = useState<Map<string | number, TransactionItem>>(new Map());
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | undefined>();
+  const [cart, setCart] = useState<Map<string, TransactionItem>>(new Map());
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryView, setCategoryView] = useState<'carousel' | 'grid'>('carousel');
   const [categorySearch, setCategorySearch] = useState('');
@@ -75,13 +77,13 @@ export default function PosPage() {
   }, [allCategories, categorySearch]);
   
   // Use API hook for customers
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
   
   const customers = allCustomersList || [];
 
   const selectedCustomer = useMemo(() => {
     if (!selectedCustomerId || !customers) return undefined;
-    return customers.find(c => c.id === String(selectedCustomerId) || c.id === selectedCustomerId);
+    return customers.find((c) => c.id === selectedCustomerId);
   }, [selectedCustomerId, customers]);
 
   const filteredCustomers = useMemo(() => {
@@ -99,20 +101,23 @@ export default function PosPage() {
   };
 
   const addToCart = (product: Product) => {
+    const productId = product.id;
+    if (!productId) return;
+    const unitPrice = typeof product.price === 'number' ? product.price : parseFloat(String(product.price)) || 0;
     setCart((prevCart) => {
       const newCart = new Map(prevCart);
-      const existingItem = newCart.get(product.id!);
+      const existingItem = newCart.get(productId);
       if (existingItem) {
         existingItem.quantity += 1;
         existingItem.totalPrice = existingItem.quantity * existingItem.unitPrice;
       } else {
-        newCart.set(product.id!, {
-          productId: product.id!,
+        newCart.set(productId, {
+          productId: productId,
           productName: product.name,
           quantity: 1,
-          unitPrice: product.price,
-          totalPrice: product.price,
-          imageUrl: product.imageUrl,
+          unitPrice: unitPrice,
+          totalPrice: unitPrice,
+          imageUrl: (product as any).productImage || product.imageUrl,
           stock: product.stock,
         });
       }
@@ -120,7 +125,7 @@ export default function PosPage() {
     });
   };
 
-  const updateQuantity = (productId: string | number, newQuantity: number) => {
+  const updateQuantity = (productId: string, newQuantity: number) => {
     setCart((prevCart) => {
       const newCart = new Map(prevCart);
       const item = newCart.get(productId);
@@ -180,12 +185,12 @@ export default function PosPage() {
     });
   };
 
-  const handleCustomerSelect = (customerId: number) => {
+  const handleCustomerSelect = (customerId: string) => {
       setSelectedCustomerId(customerId);
       setCustomerDialogOpen(false);
   }
 
-  const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date'>) => {
+  const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
     if (!currentStore) {
         toast({ variant: "destructive", title: "Error", description: "No store context found." });
         return;
@@ -202,20 +207,22 @@ export default function PosPage() {
     };
     
     try {
+      // 0. Persist to backend (online required)
+      await transactionsApi.create({
+        storeId: newTransaction.storeId,
+        customerId: newTransaction.customerId,
+        items: newTransaction.items,
+        total: newTransaction.total,
+        paymentMethod: newTransaction.paymentMethod,
+        voucherCode: newTransaction.voucherCode,
+        discountAmount: newTransaction.discountAmount,
+      });
+
       await db.transaction('rw', db.transactions, db.products, async () => {
         // 1. Save transaction
         await db.transactions.add(newTransaction as Transaction);
         
-        // 2. Update stock levels (Only for products that exist in IndexedDB)
-        for (const item of newTransaction.items) {
-          if (typeof item.productId === 'number' || !isNaN(Number(item.productId))) {
-            const product = await db.products.get(Number(item.productId));
-            if (product) {
-              const newStock = (product.stock || 0) - item.quantity;
-              await db.products.update(Number(item.productId), { stock: newStock });
-            }
-          }
-        }
+        // 2. (Optional) Local product stock cache update skipped here because IndexedDB product IDs may differ
       });
 
       toast({
@@ -399,7 +406,13 @@ export default function PosPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {filteredCustomers?.map((customer: Customer) => (
-                                        <TableRow key={customer.id} className="cursor-pointer hover:bg-muted" onClick={() => handleCustomerSelect(customer.id!)}>
+                                        <TableRow
+                                            key={customer.id}
+                                            className="cursor-pointer hover:bg-muted"
+                                            onClick={() => {
+                                                handleCustomerSelect(customer.id);
+                                            }}
+                                        >
                                             <TableCell>{customer.name}</TableCell>
                                             <TableCell>{customer.contact}</TableCell>
                                             <TableCell className="text-right">
@@ -429,17 +442,17 @@ export default function PosPage() {
               <div className="space-y-2">
                 {cartItems.map(item => (
                   <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
-                    <Image src={item.imageUrl || '/placeholder-product.png'} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" />
+                    <Image src={item.imageUrl || '/placeholder-product.png'} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }} />
                     <div className="flex-grow">
                       <p className="font-medium text-sm">{item.productName}</p>
-                      <p className="text-xs text-gray-500">R {item.unitPrice.toFixed(2)}</p>
+                      <p className="text-xs text-gray-500">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
                       <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
                       <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
                     </div>
-                    <p className="font-semibold text-sm w-20 text-right">R{item.totalPrice.toFixed(2)}</p>
+                    <p className="font-semibold text-sm w-20 text-right">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
@@ -497,8 +510,9 @@ export default function PosPage() {
     <VoucherModal
         isOpen={isVoucherModalOpen}
         onClose={() => setIsVoucherModalOpen(false)}
+        customerId={selectedCustomerId}
         onApplyVoucher={handleApplyVoucher}
-        cartTotal={cartSubtotal}
+        cartTotal={cartSubtotal} // Pass subtotal before discount for validation
     />
     </>
   );

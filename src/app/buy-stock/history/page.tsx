@@ -1,14 +1,14 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Package } from 'lucide-react';
 import Link from 'next/link';
-import { db } from '@/lib/db';
 import { useSettings } from '@/components/settings-provider';
 import type { PurchaseOrder } from '@/types';
 import { format } from 'date-fns';
+import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
 
 import {
   Accordion,
@@ -22,11 +22,37 @@ import { Badge } from '@/components/ui/badge';
 export default function BuyStockHistoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const purchaseOrders = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.purchaseOrders.where('storeId').equals(currentStore.id!).orderBy('date').reverse().toArray();
-  }, [currentStore?.id]);
+  useEffect(() => {
+    const loadOrders = async () => {
+      if (!currentStore) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await purchaseOrdersApi.getAll({ page: 1, limit: 10 });
+        const orders = Array.isArray(response.data) ? response.data : response.data.data;
+        // Sort by date descending
+        const sortedOrders = orders.sort((a: any, b: any) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
+          return dateB - dateA;
+        });
+        setPurchaseOrders(sortedOrders);
+      } catch (error) {
+        console.error('Failed to load purchase orders:', error);
+        setPurchaseOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOrders();
+  }, [currentStore]);
 
   return (
     <div className="p-4">
@@ -45,25 +71,31 @@ export default function BuyStockHistoryPage() {
             </div>
         </CardHeader>
         <CardContent>
-          {purchaseOrders && purchaseOrders.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-16 text-muted-foreground">
+              <p>Loading purchase orders...</p>
+            </div>
+          ) : purchaseOrders && purchaseOrders.length > 0 ? (
             <Accordion type="single" collapsible className="w-full">
-              {purchaseOrders.map(order => (
-                <AccordionItem value={`item-${order.id}`} key={order.id}>
-                  <AccordionTrigger>
-                     <div className="flex justify-between w-full pr-4 items-center">
-                      <div className="text-left">
-                        <p className="font-mono font-medium">{order.orderCode}</p>
-                        <p className="text-sm text-muted-foreground">{format(new Date(order.date), 'PPP')}</p>
+              {purchaseOrders.map((order: any) => {
+                const orderDate = order.createdAt ? new Date(order.createdAt) : (order.date ? new Date(order.date) : new Date());
+                return (
+                  <AccordionItem value={`item-${order.id}`} key={order.id}>
+                    <AccordionTrigger>
+                       <div className="flex justify-between w-full pr-4 items-center">
+                        <div className="text-left">
+                          <p className="font-mono font-medium">{order.orderCode}</p>
+                          <p className="text-sm text-muted-foreground">{format(orderDate, 'PPP')}</p>
+                        </div>
+                         <div className="hidden sm:block">
+                            <Badge variant={order.status === 'pending' ? 'secondary' : 'default'} className="capitalize">{order.status}</Badge>
+                         </div>
+                        <div className="text-right">
+                           <p className="font-semibold text-lg">R{Number(order.total || 0).toFixed(2)}</p>
+                          <p className="text-sm text-muted-foreground capitalize">{order.deliveryMethod}</p>
+                        </div>
                       </div>
-                       <div className="hidden sm:block">
-                          <Badge variant={order.status === 'pending' ? 'secondary' : 'default'} className="capitalize">{order.status}</Badge>
-                       </div>
-                      <div className="text-right">
-                         <p className="font-semibold text-lg">R{order.total.toFixed(2)}</p>
-                        <p className="text-sm text-muted-foreground capitalize">{order.deliveryMethod}</p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
+                    </AccordionTrigger>
                   <AccordionContent>
                       <Table>
                         <TableHeader>
@@ -75,12 +107,12 @@ export default function BuyStockHistoryPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {order.items.map(item => (
+                          {order.items.map((item: any) => (
                             <TableRow key={item.productId}>
                               <TableCell>{item.productName}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
-                              <TableCell>R{item.groupPrice.toFixed(2)}</TableCell>
-                              <TableCell className="text-right">R{item.totalPrice.toFixed(2)}</TableCell>
+                              <TableCell>R{Number(item.groupPrice || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">R{Number(item.totalPrice || 0).toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -88,20 +120,21 @@ export default function BuyStockHistoryPage() {
                       <div className="text-right mt-4 space-y-1 text-sm">
                           <div className="flex justify-end gap-4">
                               <span className="text-muted-foreground">Subtotal:</span>
-                              <span>R{order.subtotal.toFixed(2)}</span>
+                              <span>R{Number(order.subtotal || 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-end gap-4">
                               <span className="text-muted-foreground">Delivery Fee:</span>
-                              <span>R{order.deliveryFee.toFixed(2)}</span>
+                              <span>R{Number(order.deliveryFee || 0).toFixed(2)}</span>
                           </div>
                            <div className="flex justify-end gap-4 font-bold text-base border-t pt-2 mt-2">
                               <span className="">Total:</span>
-                              <span>R{order.total.toFixed(2)}</span>
+                              <span>R{Number(order.total || 0).toFixed(2)}</span>
                           </div>
                       </div>
                   </AccordionContent>
-                </AccordionItem>
-              ))}
+                  </AccordionItem>
+                );
+              })}
             </Accordion>
           ) : (
             <div className="text-center py-16 text-muted-foreground">

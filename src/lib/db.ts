@@ -39,6 +39,19 @@ export class KasiPosDexie extends Dexie {
 
   constructor() {
     super('kasiPosDatabase');
+    this.version(13).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt, storeId',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name, storeId',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+    });
     this.version(12).stores({
       stores: '++id, name, ownerId',
       products: '++id, name, category, barcode, storeId',

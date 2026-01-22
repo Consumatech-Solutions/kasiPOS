@@ -18,7 +18,7 @@ interface PaymentModalProps {
   method: 'Cash' | 'Card' | 'Mobile Money' | null;
   cartTotal: number;
   cartItems: TransactionItem[];
-  onCompleteSale: (transaction: Omit<Transaction, 'id' | 'date'>) => void;
+  onCompleteSale: (transaction: Omit<Transaction, 'id' | 'date' | 'storeId'>) => void;
   customer: Customer | null | undefined;
 }
 
@@ -32,14 +32,14 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   const tenderedAmount = parseFloat(tendered) || 0;
   const changeDue = tenderedAmount - cartTotal;
   const canCompleteCashSale = tenderedAmount >= cartTotal;
-  const canCompleteMobileSale = (customer?.phone || mobileNumber.length > 10) && selectedMobileProvider;
+  const canCompleteMobileSale = (customer?.contact || mobileNumber.length > 10) && selectedMobileProvider;
 
 
   useEffect(() => {
     // Reset local state when modal opens or method changes
     if (isOpen) {
       setTendered('');
-      setMobileNumber(customer?.phone || '');
+      setMobileNumber(customer?.contact || '');
       setSelectedMobileProvider('');
     }
   }, [isOpen, method, customer]);
@@ -169,7 +169,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                     <Phone className="h-4 w-4" />
                     <AlertTitle>Confirm Customer</AlertTitle>
                     <AlertDescription>
-                      The payment request will be sent to <strong>{customer.name}</strong> at <strong>{customer.phone}</strong>.
+                      The payment request will be sent to <strong>{customer.name}</strong> at <strong>{customer.contact}</strong>.
                     </AlertDescription>
                   </Alert>
                 ) : (

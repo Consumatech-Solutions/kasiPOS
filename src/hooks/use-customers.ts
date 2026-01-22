@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { customersApi } from '@/lib/api/customers';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
@@ -24,34 +24,26 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter customers by search query
-  const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return customers;
-    }
-
-    const query = searchQuery.toLowerCase();
-    return customers.filter(
-      customer =>
-        customer.name?.toLowerCase().includes(query) ||
-        customer.contact?.toLowerCase().includes(query)
-    );
-  }, [customers, searchQuery]);
-
-  const loadCustomers = useCallback(async (page: number = initialPage, limit: number = initialLimit) => {
+  const loadCustomers = useCallback(async (page: number = initialPage, limit: number = initialLimit, search: string = searchQuery) => {
     try {
       setLoading(true);
       setError(null);
 
+      // Build query parameters
+      const params: { page?: number; limit?: number; search?: string } = {};
+      if (page !== undefined) params.page = page;
+      if (limit !== undefined) params.limit = limit;
+      if (search?.trim()) params.search = search.trim();
+
       let response: { data: Customer[] | PaginatedResponse<Customer> };
       try {
-        // Try with pagination parameters first
-        response = await customersApi.getAll({ page, limit });
+        // Try with pagination and search parameters
+        response = await customersApi.getAll(params);
       } catch (err: any) {
         // If 400 error, try without pagination parameters (API might not support pagination)
         if (err?.response?.status === 400) {
           console.warn('Pagination not supported, trying without pagination params');
-          response = await customersApi.getAll();
+          response = await customersApi.getAll(search?.trim() ? { search: search.trim() } : undefined);
         } else {
           throw err;
         }
@@ -101,19 +93,19 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [initialPage, initialLimit]);
+  }, [initialPage, initialLimit, searchQuery]);
 
   useEffect(() => {
-    loadCustomers();
-  }, [loadCustomers]);
+    loadCustomers(initialPage, initialLimit, searchQuery);
+  }, [searchQuery, initialPage, initialLimit, loadCustomers]);
 
   const createCustomer = useCallback(async (data: CreateCustomerDto) => {
     try {
       const response = await customersApi.create(data);
       const created = response.data;
       
-      // Refresh the list
-      await loadCustomers(pagination.page, pagination.limit);
+      // Refresh the list with current search query
+      await loadCustomers(pagination.page, pagination.limit, searchQuery);
       
       return created;
     } catch (err) {
@@ -121,15 +113,15 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       setError(errorMessage);
       throw err;
     }
-  }, [pagination.page, pagination.limit, loadCustomers]);
+  }, [pagination.page, pagination.limit, searchQuery, loadCustomers]);
 
   const updateCustomer = useCallback(async (id: string, data: UpdateCustomerDto) => {
     try {
       const response = await customersApi.update(id, data);
       const updated = response.data;
       
-      // Refresh the list
-      await loadCustomers(pagination.page, pagination.limit);
+      // Refresh the list with current search query
+      await loadCustomers(pagination.page, pagination.limit, searchQuery);
       
       return updated;
     } catch (err) {
@@ -137,31 +129,31 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       setError(errorMessage);
       throw err;
     }
-  }, [pagination.page, pagination.limit, loadCustomers]);
+  }, [pagination.page, pagination.limit, searchQuery, loadCustomers]);
 
   const deleteCustomer = useCallback(async (id: string) => {
     try {
       await customersApi.delete(id);
       
-      // Refresh the list
-      await loadCustomers(pagination.page, pagination.limit);
+      // Refresh the list with current search query
+      await loadCustomers(pagination.page, pagination.limit, searchQuery);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete customer';
       setError(errorMessage);
       throw err;
     }
-  }, [pagination.page, pagination.limit, loadCustomers]);
+  }, [pagination.page, pagination.limit, searchQuery, loadCustomers]);
 
   return {
-    customers: filteredCustomers,
-    allCustomers: filteredCustomers,
+    customers,
+    allCustomers: customers,
     pagination,
     loading,
     error,
     createCustomer,
     updateCustomer,
     deleteCustomer,
-    refresh: () => loadCustomers(pagination.page, pagination.limit),
-    loadPage: (page: number) => loadCustomers(page, pagination.limit),
+    refresh: () => loadCustomers(pagination.page, pagination.limit, searchQuery),
+    loadPage: (page: number) => loadCustomers(page, pagination.limit, searchQuery),
   };
 }

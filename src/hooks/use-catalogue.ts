@@ -189,12 +189,10 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
   const updateProduct = useCallback(async (id: string, data: UpdateProductDto | any): Promise<ApiProduct> => {
     try {
       setError(null);
-      let updateDto: UpdateProductDto = {};
+      let updateDto: UpdateProductDto = { ...data };
 
-      if ('categoryId' in data) {
-        updateDto = data;
-      } else if ('category' in data && typeof data.category === 'string') {
-        // Resolve category name to ID
+      // If category is provided as a string name, resolve it to categoryId
+      if ('category' in data && typeof data.category === 'string' && !data.categoryId) {
         const categoriesResp = await catalogueApi.categories.getAll();
         const categories = 'data' in categoriesResp ? categoriesResp.data : (categoriesResp as ApiCategory[]);
         const category = categories.find(c => c.name === data.category);
@@ -203,25 +201,18 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
           throw new Error(`Category "${data.category}" not found`);
         }
 
-        updateDto = {
-          name: data.name,
-          price: data.price,
-          costPrice: data.costPrice,
-          stock: data.stock,
-          barCode: data.barCode || data.barcode,
-          productImage: data.productImage || data.imageUrl,
-          categoryId: category.id,
-        };
-      } else {
-        // Partial standard Product
-        updateDto = {
-          name: data.name,
-          price: data.price,
-          costPrice: data.costPrice,
-          stock: data.stock,
-          barCode: data.barCode || data.barcode,
-          productImage: data.productImage || data.imageUrl,
-        };
+        updateDto.categoryId = category.id;
+        delete (updateDto as any).category;
+      }
+
+      // Normalize field names
+      if (data.barcode && !data.barCode) {
+        updateDto.barCode = data.barcode;
+        delete (updateDto as any).barcode;
+      }
+      if (data.imageUrl && !data.productImage) {
+        updateDto.productImage = data.imageUrl;
+        delete (updateDto as any).imageUrl;
       }
 
       const updated = await catalogueApi.products.update(id, updateDto);
