@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Package } from 'lucide-react';
+import { ArrowLeft, Package, MoreVertical, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useSettings } from '@/components/settings-provider';
+import { useToast } from '@/hooks/use-toast';
 import type { PurchaseOrder } from '@/types';
 import { format } from 'date-fns';
 import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
@@ -18,41 +19,107 @@ import {
 } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function BuyStockHistoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const { toast } = useToast();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+
+  const loadOrders = async () => {
+    if (!currentStore) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await purchaseOrdersApi.getAll({ page: 1, limit: 10 });
+      const orders = Array.isArray(response.data) ? response.data : response.data.data;
+      // Sort by date descending
+      const sortedOrders = orders.sort((a: any, b: any) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
+        return dateB - dateA;
+      });
+      setPurchaseOrders(sortedOrders);
+    } catch (error) {
+      console.error('Failed to load purchase orders:', error);
+      setPurchaseOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadOrders = async () => {
-      if (!currentStore) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await purchaseOrdersApi.getAll({ page: 1, limit: 10 });
-        const orders = Array.isArray(response.data) ? response.data : response.data.data;
-        // Sort by date descending
-        const sortedOrders = orders.sort((a: any, b: any) => {
-          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
-          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
-          return dateB - dateA;
-        });
-        setPurchaseOrders(sortedOrders);
-      } catch (error) {
-        console.error('Failed to load purchase orders:', error);
-        setPurchaseOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadOrders();
   }, [currentStore]);
+
+  const handleStatusChange = async (orderId: string, newStatus: 'pending' | 'completed' | 'cancelled') => {
+    if (!orderId) return;
+
+    try {
+      setUpdatingStatus(orderId);
+      await purchaseOrdersApi.updateStatus(orderId, { status: newStatus });
+      
+      // Update local state
+      setPurchaseOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+
+      toast({
+        title: 'Status Updated',
+        description: `Purchase order status changed to ${newStatus}.`,
+      });
+    } catch (error: any) {
+      console.error('Failed to update purchase order status:', error);
+      const errorMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Could not update the purchase order status.';
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'default';
+      case 'cancelled':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return CheckCircle2;
+      case 'cancelled':
+        return XCircle;
+      default:
+        return Clock;
+    }
+  };
 
   return (
     <div className="p-4">
@@ -87,8 +154,69 @@ export default function BuyStockHistoryPage() {
                           <p className="font-mono font-medium">{order.orderCode}</p>
                           <p className="text-sm text-muted-foreground">{format(orderDate, 'PPP')}</p>
                         </div>
-                         <div className="hidden sm:block">
-                            <Badge variant={order.status === 'pending' ? 'secondary' : 'default'} className="capitalize">{order.status}</Badge>
+                         <div className="hidden sm:flex items-center gap-2">
+                            <Badge 
+                              variant={getStatusBadgeVariant(order.status)} 
+                              className="capitalize flex items-center gap-1"
+                            >
+                              {(() => {
+                                const StatusIcon = getStatusIcon(order.status);
+                                return <StatusIcon className="h-3 w-3" />;
+                              })()}
+                              {order.status}
+                            </Badge>
+                            {order.id && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    disabled={updatingStatus === order.id}
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  {order.status !== 'pending' && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusChange(order.id!, 'pending');
+                                      }}
+                                    >
+                                      <Clock className="mr-2 h-4 w-4" />
+                                      Mark as Pending
+                                    </DropdownMenuItem>
+                                  )}
+                                  {order.status !== 'completed' && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusChange(order.id!, 'completed');
+                                      }}
+                                    >
+                                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                                      Mark as Completed
+                                    </DropdownMenuItem>
+                                  )}
+                                  {order.status !== 'cancelled' && (
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusChange(order.id!, 'cancelled');
+                                      }}
+                                      className="text-destructive focus:text-destructive"
+                                    >
+                                      <XCircle className="mr-2 h-4 w-4" />
+                                      Mark as Cancelled
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
                          </div>
                         <div className="text-right">
                            <p className="font-semibold text-lg">R{Number(order.total || 0).toFixed(2)}</p>
@@ -131,6 +259,64 @@ export default function BuyStockHistoryPage() {
                               <span>R{Number(order.total || 0).toFixed(2)}</span>
                           </div>
                       </div>
+                      {order.id && (
+                        <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Status:</span>
+                            <Badge 
+                              variant={getStatusBadgeVariant(order.status)} 
+                              className="capitalize flex items-center gap-1"
+                            >
+                              {(() => {
+                                const StatusIcon = getStatusIcon(order.status);
+                                return <StatusIcon className="h-3 w-3" />;
+                              })()}
+                              {order.status}
+                            </Badge>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={updatingStatus === order.id}
+                              >
+                                <MoreVertical className="mr-2 h-4 w-4" />
+                                Change Status
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {order.status !== 'pending' && (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(order.id!, 'pending')}
+                                >
+                                  <Clock className="mr-2 h-4 w-4" />
+                                  Mark as Pending
+                                </DropdownMenuItem>
+                              )}
+                              {order.status !== 'completed' && (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(order.id!, 'completed')}
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Mark as Completed
+                                </DropdownMenuItem>
+                              )}
+                              {order.status !== 'cancelled' && (
+                                <DropdownMenuItem
+                                  onClick={() => handleStatusChange(order.id!, 'cancelled')}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Mark as Cancelled
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                   </AccordionContent>
                   </AccordionItem>
                 );

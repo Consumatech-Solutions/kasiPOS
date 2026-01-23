@@ -7,7 +7,7 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -29,6 +29,14 @@ const userManagementSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
 });
 
+const passwordSchema = z.object({
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  confirmPassword: z.string().min(6, { message: "Please confirm your password." }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
   const { currentUser, currentStore } = settings;
@@ -39,7 +47,9 @@ export default function SettingsPage() {
   
   // State for user management
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userForPassword, setUserForPassword] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -64,6 +74,11 @@ export default function SettingsPage() {
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
     defaultValues: { name: '', phone: '' },
+  });
+
+  const passwordForm = useForm<z.infer<typeof passwordSchema>>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { password: '', confirmPassword: '' },
   });
 
   const handleToggle = (feature: Feature, checked: boolean) => {
@@ -150,6 +165,28 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Failed to delete user:", error);
       toast({ variant: "destructive", title: "Error", description: "Failed to delete user." });
+    }
+  };
+
+  const openPasswordDialog = (user: User) => {
+    setUserForPassword(user);
+    passwordForm.reset({ password: '', confirmPassword: '' });
+    setPasswordDialogOpen(true);
+  };
+
+  const handlePasswordSubmit = async (values: z.infer<typeof passwordSchema>) => {
+    if (!userForPassword?.id) return;
+    
+    try {
+      await usersApi.update(userForPassword.id, { password: values.password });
+      toast({ title: "Success", description: "Password updated successfully." });
+      setPasswordDialogOpen(false);
+      setUserForPassword(null);
+      passwordForm.reset();
+    } catch (error: any) {
+      console.error("Failed to update password:", error);
+      const message = error.response?.data?.message || "Failed to update password.";
+      toast({ variant: "destructive", title: "Error", description: message });
     }
   };
 
@@ -281,24 +318,31 @@ export default function SettingsPage() {
                       <TableCell>{user.phone}</TableCell>
                       <TableCell><Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">{user.role}</Badge></TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => openUserDialog(user)}><Edit className="h-4 w-4" /></Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>This action cannot be undone. This will permanently delete the user account.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteUser(user.id!)}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openUserDialog(user)} title="Edit user">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(user)} title="Set password">
+                            <Key className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id} title="Delete user">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>This action cannot be undone. This will permanently delete the user account.</AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => deleteUser(user.id!)}>Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -387,6 +431,56 @@ export default function SettingsPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Password Dialog */}
+      {userForPassword && (
+        <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Set Password for {userForPassword.name}</DialogTitle>
+              <DialogDescription>
+                Set a new password for this user. They will be able to use this password to log in.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...passwordForm}>
+              <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-4">
+                <FormField
+                  control={passwordForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>New Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} placeholder="Enter new password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={passwordForm.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} placeholder="Confirm new password" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="secondary">Cancel</Button>
+                  </DialogClose>
+                  <Button type="submit">Set Password</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

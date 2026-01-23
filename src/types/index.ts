@@ -129,18 +129,20 @@ export interface StockAdjustment {
 export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
 
 export interface Parcel {
-  id?: number;
+  id?: string; // UUID (backend)
   deliveryNumber: string;
   customerName: string;
   status: ParcelStatus;
-  collectionCode?: string;
-  receiptCode?: string;
-  dateReceived?: Date;
-  dateCollected?: Date;
-  collectingPersonName?: string;
-  collectingPersonPhone?: string;
-  collectingPersonId?: string;
+  collectionCode?: string | null;
+  receiptCode?: string | null;
+  dateReceived?: Date | string | null;
+  dateCollected?: Date | string | null;
+  collectingPersonName?: string | null;
+  collectingPersonPhone?: string | null;
+  collectingPersonId?: string | null;
   storeId: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PurchaseOrderItem {
