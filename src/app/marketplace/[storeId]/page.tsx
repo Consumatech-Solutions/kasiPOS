@@ -60,6 +60,7 @@ import { useCustomers } from "@/hooks/use-customers";
 import { useProducts, useCategories } from "@/hooks/use-catalogue";
 import { useMarketplaceOrders } from "@/hooks/use-marketplace-orders";
 import { useMarketplaceStores } from "@/hooks/use-marketplace-stores";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 
 const quickAccessCategories = [
   "Bread",
@@ -84,6 +85,7 @@ export default function StorePosPage() {
       : null;
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const { isOnline } = useNetworkStatus();
   const { stores: marketplaceStores } = useMarketplaceStores({
     activeOnly: true,
     autoLoad: true,
@@ -300,7 +302,8 @@ export default function StorePosPage() {
         paymentMethod: transactionDetails.paymentMethod,
       };
 
-      const createdOrder = await createOrder(orderData);
+      const response = await createOrder(orderData);
+      const createdOrder = response.data;
 
       toast({
         title: "Order Created",
@@ -456,14 +459,22 @@ export default function StorePosPage() {
                                 <DialogTitle>{product.name}</DialogTitle>
                               </DialogHeader>
                               <div className="flex items-center justify-center">
-                                <Image
-                                  src={product.productImage || '/placeholder-product.png'}
-                                  alt={product.name}
-                                  width={300}
-                                  height={300}
-                                  className="rounded-md object-cover max-w-full h-auto"
-                                  onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }}
-                                />
+                                {isOnline && product.productImage ? (
+                                  <img
+                                    src={product.productImage || '/placeholder-product.png'}
+                                    alt={product.name}
+                                    width={300}
+                                    height={300}
+                                    className="rounded-md object-cover max-w-full h-auto"
+                                    loading="lazy"
+                                    decoding="async"
+                                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }}
+                                  />
+                                ) : (
+                                  <div className="w-[300px] h-[300px] rounded-md bg-muted flex items-center justify-center text-muted-foreground">
+                                    {isOnline ? 'No image' : 'Offline - Image not available'}
+                                  </div>
+                                )}
                               </div>
                             </DialogContent>
                           </Dialog>

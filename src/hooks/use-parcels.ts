@@ -1,155 +1,249 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { parcelsApi, type GetParcelsParams, type Parcel } from '@/lib/api/parcels';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { parcelsApi, type GetParcelsParams, type Parcel, type CreateParcelDto, type ReceiveParcelDto, type CollectParcelDto } from '@/lib/api/parcels';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
 interface UseParcelsOptions extends GetParcelsParams {
   autoLoad?: boolean;
 }
 
+export const parcelKeys = {
+  all: ['parcels'] as const,
+  lists: () => [...parcelKeys.all, 'list'] as const,
+  list: (filters?: GetParcelsParams) => [...parcelKeys.lists(), filters] as const,
+  details: () => [...parcelKeys.all, 'detail'] as const,
+  detail: (id: string) => [...parcelKeys.details(), id] as const,
+};
+
+function normalizeParcelResponse(response: Parcel[] | PaginatedResponse<Parcel>): { data: Parcel[]; meta: PaginationMeta } {
+  if (Array.isArray(response)) {
+    return {
+      data: response,
+      meta: {
+        total: response.length,
+        page: 1,
+        limit: response.length || 10,
+        totalPages: 1,
+      },
+    };
+  }
+  
+  if ('data' in response && 'meta' in response) {
+    return response;
+  }
+  
+  return {
+    data: [],
+    meta: {
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 0,
+    },
+  };
+}
+
 export function useParcels(options: UseParcelsOptions = {}) {
   const { autoLoad = true, ...params } = options;
+  const queryClient = useQueryClient();
+  
+  const queryKey = parcelKeys.list(params);
 
-  const [parcels, setParcels] = useState<Parcel[]>([]);
-  const [pagination, setPagination] = useState<PaginationMeta>({
-    total: 0,
-    page: params.page || 1,
-    limit: params.limit || 10,
-    totalPages: 0,
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const response = await parcelsApi.getAll(params);
+      return normalizeParcelResponse(response.data);
+    },
+    enabled: true, // Always enabled - we'll control loading via refetch
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Use ref to store latest params to avoid dependency issues
-  const paramsRef = useRef(params);
-  paramsRef.current = params;
+  const createMutation = useMutation({
+    mutationFn: (data: CreateParcelDto) => parcelsApi.create(data),
+    onMutate: async (newParcel) => {
+      await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey);
 
-  const loadParcels = useCallback(async (loadParams?: GetParcelsParams) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Use ref to get latest params
-      const requestParams = { ...paramsRef.current, ...loadParams };
-      const response = await parcelsApi.getAll(requestParams);
-
-      const responseData = response.data;
-      if (Array.isArray(responseData)) {
-        setParcels(responseData);
-        setPagination({
-          total: responseData.length,
-          page: 1,
-          limit: responseData.length,
-          totalPages: 1,
+      if (previousData) {
+        const optimisticParcel: Parcel = {
+          id: `temp-${Date.now()}`,
+          deliveryNumber: newParcel.deliveryNumber,
+          customerName: newParcel.customerName,
+          status: 'Incoming',
+          storeId: newParcel.storeId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: [...previousData.data, optimisticParcel],
+          meta: {
+            ...previousData.meta,
+            total: previousData.meta.total + 1,
+          },
         });
-      } else {
-        setParcels(responseData.data);
-        setPagination(responseData.meta);
       }
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to load parcels';
-      setError(errorMessage);
-      console.error('Error loading parcels:', err);
-      setParcels([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []); // Empty deps - use ref for params
 
-  useEffect(() => {
-    if (autoLoad) {
-      loadParcels();
-    }
-  }, [autoLoad, loadParcels]);
+      return { previousData };
+    },
+    onError: (err, newParcel, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: (response) => {
+      const newParcel = response.data;
+      queryClient.setQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map(p => (p.id && String(p.id).startsWith('temp-')) ? newParcel : p),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: parcelKeys.lists() });
+    },
+  });
 
-  const createParcel = useCallback(async (data: Parameters<typeof parcelsApi.create>[0]) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await parcelsApi.create(data);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to create parcel';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const receiveMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ReceiveParcelDto }) =>
+      parcelsApi.receive(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey);
 
-  const receiveParcel = useCallback(async (id: string, data: Parameters<typeof parcelsApi.receive>[1]) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await parcelsApi.receive(id, data);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to receive parcel';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (previousData) {
+        queryClient.setQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(p =>
+            p.id === id ? { ...p, status: 'Received' as const, receiptCode: data.receiptCode, dateReceived: new Date().toISOString(), updatedAt: new Date().toISOString() } : p
+          ),
+        });
+      }
 
-  const collectParcel = useCallback(async (id: string, data: Parameters<typeof parcelsApi.collect>[1]) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await parcelsApi.collect(id, data);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to collect parcel';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: parcelKeys.lists() });
+    },
+  });
 
-  const updateParcel = useCallback(async (id: string, data: Parameters<typeof parcelsApi.update>[1]) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await parcelsApi.update(id, data);
-      await loadParcels(); // Refresh the list after update
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to update parcel';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [loadParcels]);
+  const collectMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: CollectParcelDto }) =>
+      parcelsApi.collect(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey);
 
-  const deleteParcel = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      await parcelsApi.delete(id);
-      await loadParcels(); // Refresh the list after delete
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to delete parcel';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [loadParcels]);
+      if (previousData) {
+        queryClient.setQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(p =>
+            p.id === id ? { 
+              ...p, 
+              status: 'Collected' as const, 
+              collectingPersonName: data.collectingPersonName,
+              collectingPersonId: data.collectingPersonId,
+              collectingPersonPhone: data.collectingPersonPhone,
+              dateCollected: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            } : p
+          ),
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: parcelKeys.lists() });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Parcel> }) =>
+      parcelsApi.update(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey);
+
+      if (previousData) {
+        queryClient.setQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(p =>
+            p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p
+          ),
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: parcelKeys.lists() });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => parcelsApi.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey);
+
+      if (previousData) {
+        queryClient.setQueryData<{ data: Parcel[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.filter(p => p.id !== id),
+          meta: {
+            ...previousData.meta,
+            total: Math.max(0, previousData.meta.total - 1),
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: parcelKeys.lists() });
+    },
+  });
 
   return {
-    parcels,
-    pagination,
-    loading,
-    error,
-    refresh: loadParcels,
-    loadParcels,
-    createParcel,
-    receiveParcel,
-    collectParcel,
-    updateParcel,
-    deleteParcel,
+    parcels: query.data?.data || [],
+    pagination: query.data?.meta || {
+      total: 0,
+      page: params.page || 1,
+      limit: params.limit || 10,
+      totalPages: 0,
+    },
+    loading: query.isLoading,
+    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    createParcel: createMutation.mutateAsync,
+    receiveParcel: (id: string, data: ReceiveParcelDto) => receiveMutation.mutateAsync({ id, data }),
+    collectParcel: (id: string, data: CollectParcelDto) => collectMutation.mutateAsync({ id, data }),
+    updateParcel: (id: string, data: Partial<Parcel>) => updateMutation.mutateAsync({ id, data }),
+    deleteParcel: deleteMutation.mutateAsync,
+    refresh: () => query.refetch(),
+    loadParcels: (loadParams?: GetParcelsParams) => {
+      queryClient.invalidateQueries({ queryKey: parcelKeys.list({ ...params, ...loadParams }) });
+    },
   };
 }

@@ -30,31 +30,21 @@ export default function TransactionsPage() {
   // Format date for API (YYYY-MM-DD)
   const dateFilter = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
 
-  // Use API hooks
-  const { transactions: allTransactions, loading, error, loadTransactions } = useTransactions({
+  // Only send search to backend if it looks like a transaction ID (UUID format or partial)
+  // Customer name searches will be handled client-side
+  const isTransactionIdSearch = searchTerm && /^[0-9a-f-]{0,36}$/i.test(searchTerm);
+  const backendSearch = isTransactionIdSearch ? searchTerm : undefined;
+
+  // Use API hooks - params in query key will auto-refetch when they change
+  const { transactions: allTransactions, loading, error } = useTransactions({
     page: 1,
     limit: 10,
     date: dateFilter,
-    search: searchTerm || undefined,
-    autoLoad: false, // We'll load manually when filters change
+    search: backendSearch,
   });
 
   const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
   const customers = allCustomersList || [];
-
-  // Load transactions when filters change
-  useEffect(() => {
-    // Only send search to backend if it looks like a transaction ID (UUID format or partial)
-    // Customer name searches will be handled client-side
-    const isTransactionIdSearch = searchTerm && /^[0-9a-f-]{0,36}$/i.test(searchTerm);
-    loadTransactions({
-      page: 1,
-      limit: 10,
-      date: dateFilter,
-      search: isTransactionIdSearch ? searchTerm : undefined,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFilter, searchTerm]); // Remove loadTransactions from deps to prevent infinite loop
 
   const getCustomerName = (customerId: string | undefined | null) => {
     if (!customers || !customerId) return 'N/A';

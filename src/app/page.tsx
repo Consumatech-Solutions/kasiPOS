@@ -24,12 +24,14 @@ import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
 import { useCategories, useProducts } from '@/hooks/use-catalogue';
 import { transactionsApi } from '@/lib/api/transactions';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 
 
 
 export default function PosPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const { isOnline } = useNetworkStatus();
 
   const [cart, setCart] = useState<Map<string, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
@@ -210,12 +212,12 @@ export default function PosPage() {
       // 0. Persist to backend (online required)
       await transactionsApi.create({
         storeId: newTransaction.storeId,
-        customerId: newTransaction.customerId,
+        customerId: newTransaction.customerId ?? undefined,
         items: newTransaction.items,
         total: newTransaction.total,
         paymentMethod: newTransaction.paymentMethod,
-        voucherCode: newTransaction.voucherCode,
-        discountAmount: newTransaction.discountAmount,
+        voucherCode: newTransaction.voucherCode ?? undefined,
+        discountAmount: newTransaction.discountAmount ?? undefined,
       });
 
       await db.transaction('rw', db.transactions, db.products, async () => {
@@ -339,14 +341,25 @@ export default function PosPage() {
                             <DialogTitle>{product.name}</DialogTitle>
                             </DialogHeader>
                             <div className="flex items-center justify-center">
-                            <Image 
+                            {isOnline && (product.productImage || product.imageUrl) ? (
+                              <img 
                                 src={product.productImage || product.imageUrl || '/placeholder-product.png'} 
                                 alt={product.name} 
                                 width={300} 
                                 height={300} 
                                 className="rounded-md object-cover max-w-full h-auto"
                                 data-ai-hint={product.imageHint}
-                            />
+                                loading="lazy"
+                                decoding="async"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-[300px] h-[300px] rounded-md bg-muted flex items-center justify-center text-muted-foreground">
+                                {isOnline ? 'No image' : 'Offline - Image not available'}
+                              </div>
+                            )}
                             </div>
                         </DialogContent>
                         </Dialog>

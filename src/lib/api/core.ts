@@ -1,12 +1,28 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+// Check if we're online
+const isOnline = () => {
+  if (typeof navigator !== 'undefined') {
+    return navigator.onLine;
+  }
+  return true;
+};
+
+// Enhanced error type for offline scenarios
+export interface OfflineError extends Error {
+  isOffline?: boolean;
+  isNetworkError?: boolean;
+  retryable?: boolean;
+}
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30 second timeout
 });
 
 api.interceptors.request.use((config) => {
@@ -14,63 +30,79 @@ api.interceptors.request.use((config) => {
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
-    // Ne pas définir Content-Type pour FormData - Axios le fera automatiquement
+    // Don't set Content-Type for FormData - Axios will handle it automatically
     if (config.data instanceof FormData) {
-        // Supprimer le Content-Type par défaut pour que Axios puisse définir la boundary
-        // Utiliser delete pour supprimer complètement la propriété
+        // Remove Content-Type header so Axios can set the boundary
         if (config.headers && 'Content-Type' in config.headers) {
             delete config.headers['Content-Type'];
         }
-        // FormData détecté - Axios gérera automatiquement le Content-Type avec la boundary
-        // Logs supprimés pour éviter la pollution de la console
     }
     return config;
+}, (error) => {
+    return Promise.reject(error);
 });
 
-// Intercepteur pour gérer les erreurs silencieusement
+// Enhanced response interceptor with offline handling and retry logic
 api.interceptors.response.use(
     (response) => response,
-    (error) => {
-        // Gérer les erreurs réseau (backend non disponible)
-        // Ne logger qu'en développement et seulement pour les endpoints catalogue
-        if ((error.code === 'ERR_NETWORK' || error.message === 'Network Error') &&
-            process.env.NODE_ENV === 'development' &&
-            (error?.config?.url?.includes('/categories') || 
-             error?.config?.url?.includes('/products'))) {
-            // Logger seulement une fois avec un message moins alarmant
-            if (!(window as any).__backendNetworkErrorLogged) {
-                console.warn('⚠️ Backend not available - running in offline mode. Categories and products will be managed locally.', {
-                    backendUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-                });
-                (window as any).__backendNetworkErrorLogged = true;
+    (error: AxiosError) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number };
+        
+        // Check if we're offline
+        if (!isOnline()) {
+            const offlineError: OfflineError = new Error('No internet connection') as OfflineError;
+            offlineError.isOffline = true;
+            offlineError.isNetworkError = true;
+            offlineError.retryable = true;
+            offlineError.name = 'OfflineError';
+            return Promise.reject(offlineError);
+        }
+
+        // Handle network errors (backend unavailable, timeout, etc.)
+        if (
+            error.code === 'ERR_NETWORK' || 
+            error.message === 'Network Error' ||
+            error.code === 'ECONNABORTED' ||
+            error.code === 'ETIMEDOUT'
+        ) {
+            const networkError: OfflineError = new Error('Network request failed. Please check your connection.') as OfflineError;
+            networkError.isNetworkError = true;
+            networkError.retryable = true;
+            networkError.name = 'NetworkError';
+            
+            // Log only once in development for catalogue endpoints
+            if (
+                process.env.NODE_ENV === 'development' &&
+                (error?.config?.url?.includes('/categories') || 
+                 error?.config?.url?.includes('/products'))
+            ) {
+                if (!(window as any).__backendNetworkErrorLogged) {
+                    console.warn('⚠️ Backend not available - running in offline mode. Categories and products will be managed locally.', {
+                        backendUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+                    });
+                    (window as any).__backendNetworkErrorLogged = true;
+                }
             }
+            
+            return Promise.reject(networkError);
         }
         
-        // Ne pas logger les erreurs 404 pour les endpoints catalogue si backend n'est pas disponible
-        if (error?.response?.status === 404 && 
-            (error?.config?.url?.includes('/categories') || 
-             error?.config?.url?.includes('/products'))) {
-            // Ces erreurs sont attendues si le backend n'est pas démarré
-            // On les laisse passer pour que le code puisse les gérer
-        }
-        // Gérer les erreurs 401 (Unauthorized) - token manquant ou invalide
+        // Handle 401 (Unauthorized) - token missing or invalid
         if (error?.response?.status === 401) {
-            // L'erreur sera gérée par le code appelant
-            // On pourrait aussi rediriger vers la page de login ici si nécessaire
+            // Could redirect to login here if needed
+            // For now, let the calling code handle it
         }
-        // Ne pas logger les erreurs 400 pour les uploads de fichiers (erreurs de configuration backend attendues)
+        
+        // Handle 400 (Bad Request) - don't log file upload errors
         if (error?.response?.status === 400) {
             const isFileUploadError = error?.config?.url?.includes('/files');
             
-            // Ne pas logger les erreurs 400 pour les uploads de fichiers
-            // Ces erreurs sont attendues jusqu'à ce que le backend soit configuré
-            // L'image est sauvegardée localement, donc on ne bloque pas l'utilisateur
             if (isFileUploadError) {
-                // Silencieux - rejeter l'erreur sans la logger
+                // Silent - reject without logging
                 return Promise.reject(error);
             }
             
-            // Pour les autres erreurs 400 non liées aux fichiers, logger seulement en développement
+            // Log other 400 errors only in development
             if (process.env.NODE_ENV === 'development') {
                 console.warn('Bad Request (400):', {
                     url: error?.config?.url,
@@ -79,6 +111,53 @@ api.interceptors.response.use(
                 });
             }
         }
+
+        // Handle 404 - expected for some endpoints when backend is not available
+        if (error?.response?.status === 404) {
+            // These errors are expected if backend is not started
+            // Let the calling code handle them
+        }
+
+        // Handle 500+ server errors - these are retryable
+        if (error?.response?.status && error.response.status >= 500) {
+            const serverError: OfflineError = error as any;
+            serverError.retryable = true;
+            serverError.isNetworkError = false;
+            return Promise.reject(serverError);
+        }
+        
         return Promise.reject(error);
     }
 );
+
+// Helper function to check if an error is retryable
+export function isRetryableError(error: any): boolean {
+    if (!error) return false;
+    
+    // Offline errors are retryable
+    if (error.isOffline || error.isNetworkError) {
+        return true;
+    }
+    
+    // Network errors are retryable
+    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        return true;
+    }
+    
+    // Server errors (5xx) are retryable
+    if (error.response?.status >= 500) {
+        return true;
+    }
+    
+    // Timeout errors are retryable
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+        return true;
+    }
+    
+    return false;
+}
+
+// Helper function to check if we're offline
+export function isOfflineError(error: any): boolean {
+    return error?.isOffline === true || (!isOnline() && (error?.code === 'ERR_NETWORK' || error?.message === 'Network Error'));
+}

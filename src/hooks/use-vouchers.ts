@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vouchersApi, type CreateVoucherDto, type UpdateVoucherDto, type GetVouchersParams, type ValidateVoucherDto } from '@/lib/api/vouchers';
 import type { Voucher } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
@@ -9,123 +9,180 @@ interface UseVouchersOptions extends GetVouchersParams {
   autoLoad?: boolean;
 }
 
+export const voucherKeys = {
+  all: ['vouchers'] as const,
+  lists: () => [...voucherKeys.all, 'list'] as const,
+  list: (filters?: GetVouchersParams) => [...voucherKeys.lists(), filters] as const,
+  details: () => [...voucherKeys.all, 'detail'] as const,
+  detail: (id: string) => [...voucherKeys.details(), id] as const,
+};
+
+function normalizeVoucherResponse(response: Voucher[] | PaginatedResponse<Voucher>): { data: Voucher[]; meta: PaginationMeta } {
+  if (Array.isArray(response)) {
+    return {
+      data: response,
+      meta: {
+        total: response.length,
+        page: 1,
+        limit: response.length || 10,
+        totalPages: 1,
+      },
+    };
+  }
+  
+  if ('data' in response && 'meta' in response) {
+    return response;
+  }
+  
+  return {
+    data: [],
+    meta: {
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 0,
+    },
+  };
+}
+
 export function useVouchers(options: UseVouchersOptions = {}) {
   const { autoLoad = true, ...params } = options;
+  const queryClient = useQueryClient();
+  
+  const queryKey = voucherKeys.list(params);
 
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [pagination, setPagination] = useState<PaginationMeta>({
-    total: 0,
-    page: params.page || 1,
-    limit: params.limit || 10,
-    totalPages: 0,
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const response = await vouchersApi.getAll(params);
+      return normalizeVoucherResponse(response.data);
+    },
+    enabled: true, // Always enabled - we'll control loading via refetch
   });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Use ref to store latest params to avoid dependency issues
-  const paramsRef = useRef(params);
-  paramsRef.current = params;
+  const createMutation = useMutation({
+    mutationFn: (data: CreateVoucherDto) => vouchersApi.create(data),
+    onMutate: async (newVoucher) => {
+      await queryClient.cancelQueries({ queryKey: voucherKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey);
 
-  const loadVouchers = useCallback(async (loadParams?: GetVouchersParams) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Use ref to get latest params
-      const requestParams = { ...paramsRef.current, ...loadParams };
-      const response = await vouchersApi.getAll(requestParams);
-
-      const responseData = response.data;
-      if (Array.isArray(responseData)) {
-        setVouchers(responseData);
-        setPagination({
-          total: responseData.length,
-          page: 1,
-          limit: responseData.length,
-          totalPages: 1,
+      if (previousData) {
+        const optimisticVoucher: Voucher = {
+          id: `temp-${Date.now()}`,
+          code: newVoucher.code,
+          discount: newVoucher.discount,
+          discountType: newVoucher.discountType,
+          isActive: newVoucher.isActive ?? true,
+          storeId: newVoucher.storeId || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: [...previousData.data, optimisticVoucher],
+          meta: {
+            ...previousData.meta,
+            total: previousData.meta.total + 1,
+          },
         });
-      } else {
-        setVouchers(responseData.data);
-        setPagination(responseData.meta);
       }
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to load vouchers';
-      setError(errorMessage);
-      console.error('Error loading vouchers:', err);
-      setVouchers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []); // Empty deps - use ref for params
 
-  useEffect(() => {
-    if (autoLoad) {
-      loadVouchers();
-    }
-  }, [autoLoad, loadVouchers]);
+      return { previousData };
+    },
+    onError: (err, newVoucher, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: (response) => {
+      const newVoucher = response.data;
+      queryClient.setQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map(v => v.id?.startsWith('temp-') ? newVoucher : v),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: voucherKeys.lists() });
+    },
+  });
 
-  const createVoucher = useCallback(async (data: CreateVoucherDto): Promise<Voucher> => {
-    try {
-      setError(null);
-      const response = await vouchersApi.create(data);
-      const created = response.data;
-      await loadVouchers();
-      return created;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to create voucher';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }, [loadVouchers]);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateVoucherDto }) =>
+      vouchersApi.update(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: voucherKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey);
 
-  const updateVoucher = useCallback(async (id: string, data: UpdateVoucherDto): Promise<Voucher> => {
-    try {
-      setError(null);
-      const response = await vouchersApi.update(id, data);
-      const updated = response.data;
-      await loadVouchers();
-      return updated;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to update voucher';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }, [loadVouchers]);
+      if (previousData) {
+        queryClient.setQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(v =>
+            v.id === id ? { ...v, ...data, updatedAt: new Date().toISOString() } : v
+          ),
+        });
+      }
 
-  const deleteVoucher = useCallback(async (id: string): Promise<void> => {
-    try {
-      setError(null);
-      await vouchersApi.delete(id);
-      await loadVouchers();
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to delete voucher';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }, [loadVouchers]);
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: voucherKeys.lists() });
+    },
+  });
 
-  const validateVoucher = useCallback(async (data: ValidateVoucherDto) => {
-    try {
-      setError(null);
-      const response = await vouchersApi.validate(data);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to validate voucher';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    }
-  }, []);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => vouchersApi.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: voucherKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey);
+
+      if (previousData) {
+        queryClient.setQueryData<{ data: Voucher[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.filter(v => v.id !== id),
+          meta: {
+            ...previousData.meta,
+            total: Math.max(0, previousData.meta.total - 1),
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: voucherKeys.lists() });
+    },
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: (data: ValidateVoucherDto) => vouchersApi.validate(data),
+  });
 
   return {
-    vouchers,
-    pagination,
-    loading,
-    error,
-    createVoucher,
-    updateVoucher,
-    deleteVoucher,
-    validateVoucher,
-    refresh: loadVouchers,
-    loadVouchers,
+    vouchers: query.data?.data || [],
+    pagination: query.data?.meta || {
+      total: 0,
+      page: params.page || 1,
+      limit: params.limit || 10,
+      totalPages: 0,
+    },
+    loading: query.isLoading,
+    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    createVoucher: createMutation.mutateAsync,
+    updateVoucher: (id: string, data: UpdateVoucherDto) => updateMutation.mutateAsync({ id, data }),
+    deleteVoucher: deleteMutation.mutateAsync,
+    validateVoucher: validateMutation.mutateAsync,
+    refresh: () => query.refetch(),
+    loadVouchers: () => query.refetch(),
   };
 }

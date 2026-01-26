@@ -47,6 +47,7 @@ import {
 import Link from 'next/link';
 import { useSettings } from '../settings-provider';
 import { useNotifications, type Notification, type NotificationType } from '@/hooks/use-notifications';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -116,6 +117,7 @@ export default function Header() {
     markAllAsRead,
     removeNotification,
   } = useNotifications();
+  const { isOnline, wasOffline } = useNetworkStatus();
 
   // Get current page title
   const currentPageTitle = useMemo(() => {
@@ -174,6 +176,26 @@ export default function Header() {
 
       {/* Right Section: Actions */}
       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        {/* Network Status Indicator */}
+        <div className="relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-9 w-9 sm:h-10 sm:w-10 touch-target"
+            title={isOnline ? 'Online' : 'Offline - Working in offline mode'}
+          >
+            <Wifi className={cn(
+              "h-4 w-4 sm:h-5 sm:w-5",
+              isOnline ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            )} />
+          </Button>
+          {wasOffline && (
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 animate-pulse">
+              Back online - Syncing...
+            </div>
+          )}
+        </div>
+        
         {/* Notifications */}
         <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
           <PopoverTrigger asChild>
@@ -255,12 +277,6 @@ export default function Header() {
             </ScrollArea>
           </PopoverContent>
         </Popover>
-
-        {/* Online Status */}
-        <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950 px-2.5 py-1.5 rounded-full border border-green-200 dark:border-green-800">
-          <Wifi className="h-3.5 w-3.5" />
-          <span>Online</span>
-        </div>
 
         {/* User Menu */}
         <DropdownMenu>
