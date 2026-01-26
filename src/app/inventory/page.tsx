@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
-import { Search, History, Edit } from 'lucide-react';
+import { Search, History, Edit, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -59,7 +59,7 @@ export default function InventoryPage() {
   const [thresholdValue, setThresholdValue] = useState(0);
 
   // Use API hook for stock adjustments
-  const { adjustments: stockAdjustments, loading: adjustmentsLoading, createAdjustment } = useStockAdjustments({
+  const { adjustments: stockAdjustments, loading: adjustmentsLoading, createAdjustment, isCreating } = useStockAdjustments({
     productId: selectedProduct?.id,
   });
 
@@ -329,8 +329,11 @@ export default function InventoryPage() {
                 </FormItem>
               )} />
               <DialogFooter className="flex-col sm:flex-row gap-2">
-                <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</Button></DialogClose>
-                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Save Adjustment</Button>
+                <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating}>Cancel</Button></DialogClose>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating}>
+                  {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isCreating ? 'Saving...' : 'Save Adjustment'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

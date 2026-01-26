@@ -56,7 +56,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardCopy, Search, Plus, Edit, Trash2 } from "lucide-react";
+import { ClipboardCopy, Search, Plus, Edit, Trash2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 const collectionFormSchema = z.object({
@@ -95,6 +95,11 @@ export default function BophPage() {
     createParcel,
     updateParcel,
     deleteParcel,
+    isCreating,
+    isReceiving,
+    isCollecting,
+    isUpdating,
+    isDeleting,
   } = useParcels({
     autoLoad: true,
     limit: 10,
@@ -531,10 +536,14 @@ export default function BophPage() {
               variant="secondary"
               className="min-h-[44px] touch-target w-full sm:w-auto"
               onClick={() => setIsReceiveModalOpen(false)}
+              disabled={isReceiving}
             >
               Cancel
             </Button>
-            <Button className="min-h-[44px] touch-target w-full sm:w-auto" onClick={handleConfirmReception}>Confirm & Receive</Button>
+            <Button className="min-h-[44px] touch-target w-full sm:w-auto" onClick={handleConfirmReception} disabled={isReceiving}>
+              {isReceiving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isReceiving ? 'Receiving...' : 'Confirm & Receive'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -612,11 +621,14 @@ export default function BophPage() {
               />
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCollecting}>
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Confirm Collection</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCollecting}>
+                  {isCollecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isCollecting ? 'Collecting...' : 'Confirm Collection'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -704,11 +716,14 @@ export default function BophPage() {
               />
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating}>
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Create Parcel</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating}>
+                  {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isCreating ? 'Creating...' : 'Create Parcel'}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -828,7 +843,7 @@ export default function BophPage() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="min-h-[44px] touch-target w-full sm:w-auto"
+              className="min-h-[44px] touch-target w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={async () => {
                 if (!parcelToDelete) return;
 
@@ -854,9 +869,10 @@ export default function BophPage() {
                   });
                 }
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -7,6 +7,7 @@ import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 const customerSchema = z.object({
   name: z.string().min(2, { message: "Le nom doit contenir au moins 2 caractères." }),
@@ -19,9 +20,10 @@ interface CustomerFormProps {
   onSubmit: (data: CreateCustomerDto | UpdateCustomerDto) => Promise<void>;
   onCancel: () => void;
   disabled?: boolean;
+  isLoading?: boolean;
 }
 
-export function CustomerForm({ customer, onSubmit, onCancel, disabled = false }: CustomerFormProps) {
+export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, isLoading = false }: CustomerFormProps) {
   const form = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
@@ -82,11 +84,12 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false }:
           )}
         />
         <div className="flex gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={disabled}>
+          <Button type="button" variant="secondary" onClick={onCancel} disabled={disabled || isLoading} className="min-h-[44px] touch-target">
             Cancel
           </Button>
-          <Button type="submit" disabled={disabled}>
-            {customer ? 'Update' : 'Create'}
+          <Button type="submit" disabled={disabled || isLoading} className="min-h-[44px] touch-target">
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {customer ? (isLoading ? 'Updating...' : 'Update') : (isLoading ? 'Creating...' : 'Create')}
           </Button>
         </div>
       </form>

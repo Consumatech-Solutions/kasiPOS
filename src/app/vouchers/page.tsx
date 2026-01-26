@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useVouchers } from '@/hooks/use-vouchers';
 import type { Voucher } from '@/types';
@@ -32,7 +32,7 @@ const voucherSchema = z.object({
 
 export default function VouchersPage() {
   const { toast } = useToast();
-  const { vouchers, loading, createVoucher, updateVoucher, deleteVoucher } = useVouchers({ page: 1, limit: 10 });
+  const { vouchers, loading, createVoucher, updateVoucher, deleteVoucher, isCreating, isUpdating, isDeleting } = useVouchers({ page: 1, limit: 10 });
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
   const [filterActive, setFilterActive] = useState<boolean | undefined>(undefined);
@@ -265,9 +265,10 @@ export default function VouchersPage() {
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</AlertDialogCancel>
-                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDelete(voucher.id)}>
-                                    Delete
+                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isDeleting}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDelete(voucher.id)} disabled={isDeleting}>
+                                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -454,11 +455,14 @@ export default function VouchersPage() {
               />
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating || isUpdating}>
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">{editingVoucher ? 'Update' : 'Create'}</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating || isUpdating}>
+                  {(isCreating || isUpdating) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editingVoucher ? (isUpdating ? 'Updating...' : 'Update') : (isCreating ? 'Creating...' : 'Create')}
+                </Button>
               </DialogFooter>
             </form>
           </Form>

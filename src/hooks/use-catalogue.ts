@@ -64,7 +64,6 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
         const optimisticCategory: ApiCategory = {
           id: `temp-${Date.now()}`,
           name: newCategory.name,
-          storeId: newCategory.storeId || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -170,6 +169,9 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
     createCategory: createMutation.mutateAsync,
     updateCategory: (id: string, data: UpdateCategoryDto) => updateMutation.mutateAsync({ id, data }),
     deleteCategory: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     refresh: () => query.refetch(),
     loadPage: (page: number) => {
       // This would need to be handled by changing the query key, but for backward compatibility
@@ -233,11 +235,10 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
           name: 'name' in newProduct ? newProduct.name : '',
           price: 'price' in newProduct ? newProduct.price : 0,
           costPrice: 'costPrice' in newProduct ? newProduct.costPrice : 0,
-          stock: 'stock' in newProduct ? newProduct.stock : 0,
-          barCode: 'barCode' in newProduct ? newProduct.barCode : undefined,
-          productImage: 'productImage' in newProduct ? newProduct.productImage : undefined,
+          stock: ('stock' in newProduct ? newProduct.stock : undefined) ?? null,
+          barCode: ('barCode' in newProduct ? newProduct.barCode : undefined) ?? null,
+          productImage: ('productImage' in newProduct ? newProduct.productImage : undefined) ?? null,
           categoryId: 'categoryId' in newProduct ? newProduct.categoryId : '',
-          storeId: '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -367,6 +368,9 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
     createProduct: createMutation.mutateAsync,
     updateProduct: (id: string, data: UpdateProductDto | any) => updateMutation.mutateAsync({ id, data }),
     deleteProduct: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     setFilters,
     refresh: () => query.refetch(),
     loadPage: setCurrentPage,

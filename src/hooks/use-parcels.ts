@@ -241,6 +241,11 @@ export function useParcels(options: UseParcelsOptions = {}) {
     collectParcel: (id: string, data: CollectParcelDto) => collectMutation.mutateAsync({ id, data }),
     updateParcel: (id: string, data: Partial<Parcel>) => updateMutation.mutateAsync({ id, data }),
     deleteParcel: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isReceiving: receiveMutation.isPending,
+    isCollecting: collectMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     refresh: () => query.refetch(),
     loadParcels: (loadParams?: GetParcelsParams) => {
       queryClient.invalidateQueries({ queryKey: parcelKeys.list({ ...params, ...loadParams }) });

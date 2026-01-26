@@ -121,7 +121,7 @@ export default function StorePosPage() {
     loading: productsLoading,
     setFilters,
   } = useProducts(1, 10);
-  const { createOrder, loading: orderLoading } = useMarketplaceOrders({
+  const { createOrder, loading: orderLoading, isCreating } = useMarketplaceOrders({
     autoLoad: false,
   });
 
@@ -133,13 +133,13 @@ export default function StorePosPage() {
       setFilters((prev: any) => ({ ...prev, search: productSearch }));
     }, 500);
     return () => clearTimeout(timer);
-  }, [productSearch, setFilters]);
+  }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update category filter
   useEffect(() => {
     const categoryId = apiCategories.find((c) => c.name === activeCategory)?.id;
     setFilters((prev: any) => ({ ...prev, categoryId }));
-  }, [activeCategory, apiCategories, setFilters]);
+  }, [activeCategory, apiCategories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allCategories = useMemo(() => {
     if (!apiCategories) return [];
@@ -257,6 +257,8 @@ export default function StorePosPage() {
     setCustomerDialogOpen(false);
   };
 
+  const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+
   const handleCompleteSale = async (
     transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
   ) => {
@@ -278,6 +280,7 @@ export default function StorePosPage() {
       return;
     }
 
+    setIsCompletingOrder(true);
     try {
       const vat = cartSubtotal * 0.15;
       const serviceFee = 15.0;
@@ -325,6 +328,8 @@ export default function StorePosPage() {
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsCompletingOrder(false);
     }
   };
 
@@ -732,6 +737,7 @@ export default function StorePosPage() {
         cartItems={cartItems}
         onCompleteSale={handleCompleteSale}
         customer={selectedCustomer}
+        isLoading={isCompletingOrder || isCreating}
       />
 
       {/* Customer Selection Dialog */}

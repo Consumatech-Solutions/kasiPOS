@@ -88,7 +88,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           id: `temp-${Date.now()}`,
           name: newCustomer.name,
           contact: newCustomer.contact,
-          storeId: newCustomer.storeId || '',
+          loyaltyPoints: newCustomer.loyaltyPoints || 0,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -193,6 +193,9 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     createCustomer: createMutation.mutateAsync,
     updateCustomer: (id: string, data: UpdateCustomerDto) => updateMutation.mutateAsync({ id, data }),
     deleteCustomer: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     refresh: () => query.refetch(),
     loadPage: (page: number) => {
       queryClient.invalidateQueries({ 

@@ -71,7 +71,7 @@ export default function MarketplacePage() {
                       onKeyPress={handleKeyPress}
                       disabled={searchLoading}
                     />
-                    <Button onClick={handleSearch} disabled={searchLoading} className="min-h-[44px] touch-target w-full sm:w-auto whitespace-nowrap px-4 sm:px-6">
+                    <Button onClick={handleSearch} disabled={searchLoading} className="min-h-[44px] touch-target w-full sm:w-auto whitespace-nowrap px-3 sm:px-4">
                         {searchLoading ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />

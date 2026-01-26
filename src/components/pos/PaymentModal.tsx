@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Phone } from 'lucide-react';
+import { Phone, Loader2 } from 'lucide-react';
 
 
 interface PaymentModalProps {
@@ -20,11 +20,12 @@ interface PaymentModalProps {
   cartItems: TransactionItem[];
   onCompleteSale: (transaction: Omit<Transaction, 'id' | 'date' | 'storeId'>) => void;
   customer: Customer | null | undefined;
+  isLoading?: boolean;
 }
 
 const mobileMoneyOptions = ['MTN MoMo', 'Vodacom VodaPay', 'InstantMoney (Standard Bank)', 'eWallet (FNB)', 'CashSend (ABSA)', 'Imali (Nedbank)'];
 
-export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartItems, onCompleteSale, customer }: PaymentModalProps) {
+export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartItems, onCompleteSale, customer, isLoading = false }: PaymentModalProps) {
   const [tendered, setTendered] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [selectedMobileProvider, setSelectedMobileProvider] = useState('');
@@ -133,8 +134,11 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 <Button variant="outline" className="h-12 text-xl" onClick={handleBackspace}>&larr;</Button>
               </div>
               <DialogFooter className="mt-4 gap-2">
-                  <Button variant="secondary" className="w-full h-14" onClick={handleClear}>Clear</Button>
-                  <Button className="w-full h-14" onClick={handleCompleteCashSale} disabled={!canCompleteCashSale}>Complete Sale</Button>
+                  <Button variant="secondary" className="w-full h-14 touch-target" onClick={handleClear} disabled={isLoading}>Clear</Button>
+                  <Button className="w-full h-14 touch-target" onClick={handleCompleteCashSale} disabled={!canCompleteCashSale || isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isLoading ? 'Processing...' : 'Complete Sale'}
+                  </Button>
               </DialogFooter>
             </div>
           </div>
@@ -151,8 +155,11 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 <p className="mt-2">Waiting for card machine interaction...</p>
             </div>
             <DialogFooter className="mt-6">
-                <DialogClose asChild><Button variant="secondary" className="w-full">Cancel</Button></DialogClose>
-                <Button onClick={handlePlaceholderComplete} className="w-full">Simulate Successful Payment</Button>
+                <DialogClose asChild><Button variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
+                <Button onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isLoading ? 'Processing...' : 'Simulate Successful Payment'}
+                </Button>
             </DialogFooter>
           </div>
         );
@@ -202,9 +209,10 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 </div>
               </div>
               <DialogFooter className="mt-8">
-                  <DialogClose asChild><Button variant="secondary" className="w-full">Cancel</Button></DialogClose>
-                  <Button onClick={handlePlaceholderComplete} className="w-full" disabled={!canCompleteMobileSale}>
-                    Send Payment Request for R{cartTotal.toFixed(2)}
+                  <DialogClose asChild><Button variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
+                  <Button onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target" disabled={!canCompleteMobileSale || isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isLoading ? 'Processing...' : `Send Payment Request for R${cartTotal.toFixed(2)}`}
                   </Button>
               </DialogFooter>
           </div>

@@ -138,6 +138,7 @@ export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) 
     error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
     createOrder: createMutation.mutateAsync,
     findByOrderCode,
+    isCreating: createMutation.isPending,
     refresh: () => query.refetch(),
     loadOrders: (loadParams?: GetMarketplaceOrdersParams) => {
       queryClient.invalidateQueries({ queryKey: marketplaceOrderKeys.list({ ...params, ...loadParams }) });

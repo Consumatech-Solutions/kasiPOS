@@ -134,6 +134,7 @@ export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
     loading: query.isLoading,
     error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
     createAdjustment: createMutation.mutateAsync,
+    isCreating: createMutation.isPending,
     refresh: () => query.refetch(),
   };
 }

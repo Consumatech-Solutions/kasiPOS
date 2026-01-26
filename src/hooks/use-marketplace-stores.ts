@@ -123,6 +123,9 @@ export function useMarketplaceStores(options: UseMarketplaceStoresOptions = {}) 
     createStore: createMutation.mutateAsync,
     updateStore: (id: string, data: UpdateMarketplaceStoreDto) => updateMutation.mutateAsync({ id, data }),
     deleteStore: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     refresh: () => query.refetch(),
     loadStores: () => query.refetch(),
   };

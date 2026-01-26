@@ -18,7 +18,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, RefreshCw, Loader2 } from 'lucide-react';
 import { BarcodeDisplay } from '@/components/barcode-display';
 import { Pagination } from '@/components/ui/pagination';
 import { ImageUpload } from '@/components/catalogue/image-upload';
@@ -54,6 +54,8 @@ export default function CataloguePage() {
   const [editingProduct, setEditingProduct] = useState<ApiProduct | Product | null>(null);
   const [editingCategory, setEditingCategory] = useState<ApiCategory | null>(null);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   // Generate a unique barcode (EAN-13 format: 13 digits)
   const generateBarcode = (): string => {
@@ -70,10 +72,10 @@ export default function CataloguePage() {
 
 
   // Hooks pour les données avec synchronisation et pagination
-  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage } = useCategories(1, 10);
+  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
   // Type assertion pour aider TypeScript à inférer les types dans les callbacks
   const typedCategories: Category[] = categories || [];
-  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts } = useProducts(1, 10);
+  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
 
   // Auto-generate barcodes for products that don't have one (only once per product)
   const processedProductsRef = useRef<Set<string | number>>(new Set());
@@ -256,6 +258,7 @@ export default function CataloguePage() {
 
 
   const handleDeleteProduct = async (id: string | number) => {
+    setDeletingProductId(String(id));
     try {
       await deleteProductHook(String(id));
       toast({ title: "Success", description: "Product deleted successfully." });
@@ -263,6 +266,8 @@ export default function CataloguePage() {
       console.error("Failed to delete product:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to delete product.";
       toast({ variant: "destructive", title: "Error", description: errorMessage });
+    } finally {
+      setDeletingProductId(null);
     }
   };
 
@@ -297,6 +302,7 @@ export default function CataloguePage() {
   };
 
   const handleDeleteCategory = async (id: string | number) => {
+    setDeletingCategoryId(String(id));
     try {
         await deleteCategoryHook(String(id));
         toast({ title: "Success", description: "Category deleted successfully." });
@@ -305,6 +311,8 @@ export default function CataloguePage() {
         console.error("Failed to delete category:", error);
         const errorMessage = error instanceof Error ? error.message : "Failed to delete category.";
         toast({ variant: "destructive", title: "Error", description: errorMessage });
+    } finally {
+      setDeletingCategoryId(null);
     }
   };
 
@@ -449,8 +457,11 @@ export default function CataloguePage() {
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteProduct(p.id!)}>Delete</AlertDialogAction>
+                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingProductId === p.id || isDeletingProduct}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteProduct(p.id!)} disabled={deletingProductId === p.id || isDeletingProduct}>
+                                  {(deletingProductId === p.id || isDeletingProduct) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {deletingProductId === p.id || isDeletingProduct ? 'Deleting...' : 'Delete'}
+                                </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -518,8 +529,11 @@ export default function CataloguePage() {
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCategory(c.id!)}>Delete</AlertDialogAction>
+                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCategoryId === c.id || isDeletingCategory}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCategory(c.id!)} disabled={deletingCategoryId === c.id || isDeletingCategory}>
+                                  {(deletingCategoryId === c.id || isDeletingCategory) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {deletingCategoryId === c.id || isDeletingCategory ? 'Deleting...' : 'Delete'}
+                                </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
@@ -683,8 +697,11 @@ export default function CataloguePage() {
               </Form>
             </div>
             <DialogFooter className="flex-shrink-0 pt-4 border-t mt-4 flex-col sm:flex-row gap-2">
-                <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</Button></DialogClose>
-                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" onClick={productForm.handleSubmit(handleProductSubmit)}>Save</Button>
+                <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreatingProduct || isUpdatingProduct}>Cancel</Button></DialogClose>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" onClick={productForm.handleSubmit(handleProductSubmit)} disabled={isCreatingProduct || isUpdatingProduct}>
+                  {(isCreatingProduct || isUpdatingProduct) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isCreatingProduct ? 'Creating...' : isUpdatingProduct ? 'Updating...' : 'Save'}
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
@@ -708,8 +725,11 @@ export default function CataloguePage() {
                         </FormItem>
                     )} />
                     <DialogFooter className="flex-col sm:flex-row gap-2">
-                        <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</Button></DialogClose>
-                        <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Save</Button>
+                        <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreatingCategory || isUpdatingCategory}>Cancel</Button></DialogClose>
+                        <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreatingCategory || isUpdatingCategory}>
+                          {(isCreatingCategory || isUpdatingCategory) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {isCreatingCategory ? 'Creating...' : isUpdatingCategory ? 'Updating...' : 'Save'}
+                        </Button>
                     </DialogFooter>
                 </form>
             </Form>

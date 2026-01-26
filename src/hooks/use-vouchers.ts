@@ -182,6 +182,10 @@ export function useVouchers(options: UseVouchersOptions = {}) {
     updateVoucher: (id: string, data: UpdateVoucherDto) => updateMutation.mutateAsync({ id, data }),
     deleteVoucher: deleteMutation.mutateAsync,
     validateVoucher: validateMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+    isValidating: validateMutation.isPending,
     refresh: () => query.refetch(),
     loadVouchers: () => query.refetch(),
   };

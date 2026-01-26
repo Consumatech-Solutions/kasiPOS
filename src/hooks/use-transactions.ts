@@ -119,6 +119,7 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
     loading: query.isLoading,
     error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
     createTransaction: createMutation.mutateAsync,
+    isCreating: createMutation.isPending,
     refresh: () => query.refetch(),
     loadTransactions: async (loadParams?: GetTransactionsParams) => {
       const newParams = { ...params, ...loadParams };

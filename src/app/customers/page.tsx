@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, Star, History, Search } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Star, History, Search, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Pagination } from '@/components/ui/pagination';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -36,7 +36,7 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Use the API hook
-  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage } = useCustomers({
+  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
     searchQuery: searchTerm,
   });
 
@@ -89,7 +89,10 @@ export default function CustomersPage() {
     }
   };
 
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
+
   const handleDeleteCustomer = async (id: string) => {
+    setDeletingCustomerId(id);
     try {
       await deleteCustomer(id);
       toast({ title: "Success", description: "Customer deleted successfully." });
@@ -97,6 +100,8 @@ export default function CustomersPage() {
       console.error("Failed to delete customer:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to delete customer.";
       toast({ variant: "destructive", title: "Error", description: errorMessage });
+    } finally {
+      setDeletingCustomerId(null);
     }
   };
 
@@ -202,9 +207,10 @@ export default function CustomersPage() {
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCustomer(customer.id)}>
-                                  Delete
+                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCustomerId === customer.id || isDeleting}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCustomer(customer.id)} disabled={deletingCustomerId === customer.id || isDeleting}>
+                                  {(deletingCustomerId === customer.id || isDeleting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {deletingCustomerId === customer.id || isDeleting ? 'Deleting...' : 'Delete'}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -252,6 +258,7 @@ export default function CustomersPage() {
               setCustomerDialogOpen(false);
               setEditingCustomer(null);
             }}
+            isLoading={isCreating || isUpdating}
           />
         </DialogContent>
       </Dialog>

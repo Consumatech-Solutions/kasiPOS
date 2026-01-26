@@ -60,13 +60,13 @@ export default function PosPage() {
         setFilters((prev: any) => ({ ...prev, search: productSearch }));
     }, 500);
     return () => clearTimeout(timer);
-  }, [productSearch, setFilters]);
+  }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update category filter
   useEffect(() => {
     const categoryId = apiCategories.find(c => c.name === activeCategory)?.id;
     setFilters((prev: any) => ({ ...prev, categoryId }));
-  }, [activeCategory, apiCategories, setFilters]);
+  }, [activeCategory, apiCategories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allCategories = useMemo(() => {
     if (!apiCategories) return [];
@@ -192,12 +192,15 @@ export default function PosPage() {
       setCustomerDialogOpen(false);
   }
 
+  const [isCompletingSale, setIsCompletingSale] = useState(false);
+
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
     if (!currentStore) {
         toast({ variant: "destructive", title: "Error", description: "No store context found." });
         return;
     }
 
+    setIsCompletingSale(true);
     const newTransaction: Omit<Transaction, 'id'> = {
       ...transactionDetails,
       date: new Date(),
@@ -243,6 +246,8 @@ export default function PosPage() {
         title: "Error",
         description: "Failed to complete the sale.",
       });
+    } finally {
+      setIsCompletingSale(false);
     }
   };
 
@@ -525,6 +530,7 @@ export default function PosPage() {
         cartItems={cartItems}
         onCompleteSale={handleCompleteSale}
         customer={selectedCustomer}
+        isLoading={isCompletingSale}
     />
     <VoucherModal
         isOpen={isVoucherModalOpen}
