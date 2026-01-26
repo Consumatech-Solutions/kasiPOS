@@ -29,7 +29,7 @@ export default function BottomNav() {
 
 
   return (
-    <nav className="sticky bottom-0 left-0 z-10 w-full h-16 bg-card border-t bottom-nav">
+    <nav className="sticky bottom-0 left-0 z-30 w-full h-16 bg-card border-t bottom-nav">
       <div className="flex h-full w-full justify-center items-center font-medium gap-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;

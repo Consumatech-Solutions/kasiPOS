@@ -263,27 +263,27 @@ export default function BophPage() {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-2 sm:p-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>BOPH - Buy Online, Pickup Here</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-lg sm:text-xl">BOPH - Buy Online, Pickup Here</CardTitle>
+              <CardDescription className="text-sm">
                 Manage incoming and received parcels for customer pickup.
               </CardDescription>
             </div>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Button onClick={() => setIsCreateModalOpen(true)} className="w-full sm:w-auto min-h-[44px] touch-target">
               Add Parcel
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="incoming">
-            <TabsList>
-              <TabsTrigger value="incoming">Incoming Parcels</TabsTrigger>
-              <TabsTrigger value="received">Ready for Collection</TabsTrigger>
-              <TabsTrigger value="collected">Collection History</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="incoming" className="text-xs sm:text-sm">Incoming</TabsTrigger>
+              <TabsTrigger value="received" className="text-xs sm:text-sm">Ready</TabsTrigger>
+              <TabsTrigger value="collected" className="text-xs sm:text-sm">History</TabsTrigger>
             </TabsList>
 
             <TabsContent value="incoming">
@@ -293,61 +293,69 @@ export default function BophPage() {
                 </div>
               ) : (
                 <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Delivery #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {incomingParcels.map((parcel) => (
-                        <TableRow key={parcel.id}>
-                          <TableCell className="font-mono">
-                            {parcel.deliveryNumber}
-                          </TableCell>
-                          <TableCell>{parcel.customerName}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  editParcelForm.reset({
-                                    deliveryNumber: parcel.deliveryNumber,
-                                    customerName: parcel.customerName,
-                                  });
-                                  setSelectedParcel(parcel);
-                                  setIsEditModalOpen(true);
-                                }}
-                              >
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => {
-                                  setParcelToDelete(parcel);
-                                  setIsDeleteDialogOpen(true);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleOpenReceiveModal(parcel)}
-                              >
-                                Receive
-                              </Button>
-                            </div>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Delivery #</TableHead>
+                          <TableHead className="hidden sm:table-cell">Customer</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {incomingParcels.map((parcel) => (
+                          <TableRow key={parcel.id}>
+                            <TableCell className="font-mono">
+                              <div className="flex flex-col">
+                                <span>{parcel.deliveryNumber}</span>
+                                <span className="text-xs text-muted-foreground sm:hidden">{parcel.customerName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">{parcel.customerName}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex flex-col sm:flex-row items-end sm:justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="min-h-[44px] touch-target w-full sm:w-auto"
+                                  onClick={() => {
+                                    editParcelForm.reset({
+                                      deliveryNumber: parcel.deliveryNumber,
+                                      customerName: parcel.customerName,
+                                    });
+                                    setSelectedParcel(parcel);
+                                    setIsEditModalOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4 sm:mr-1" />
+                                  <span className="hidden sm:inline">Edit</span>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="min-h-[44px] touch-target w-full sm:w-auto"
+                                  onClick={() => {
+                                    setParcelToDelete(parcel);
+                                    setIsDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 sm:mr-1" />
+                                  <span className="hidden sm:inline">Delete</span>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="min-h-[44px] touch-target w-full sm:w-auto"
+                                  onClick={() => handleOpenReceiveModal(parcel)}
+                                >
+                                  Receive
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                   {incomingParcels.length === 0 && (
                     <div className="text-center py-16 text-muted-foreground">
                       <p>No parcels are currently expected.</p>
@@ -373,43 +381,55 @@ export default function BophPage() {
                 </div>
               ) : (
                 <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Collection #</TableHead>
-                        <TableHead>Delivery #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Date Received</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {receivedParcels.map((parcel) => (
-                        <TableRow key={parcel.id}>
-                          <TableCell className="font-mono">
-                            {parcel.collectionCode || "N/A"}
-                          </TableCell>
-                          <TableCell className="font-mono">
-                            {parcel.deliveryNumber}
-                          </TableCell>
-                          <TableCell>{parcel.customerName}</TableCell>
-                          <TableCell>
-                            {parcel.dateReceived
-                              ? format(new Date(parcel.dateReceived), "PPP")
-                              : "N/A"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => handleOpenCollectModal(parcel)}
-                            >
-                              Issue Parcel
-                            </Button>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Collection #</TableHead>
+                          <TableHead className="hidden md:table-cell">Delivery #</TableHead>
+                          <TableHead className="hidden sm:table-cell">Customer</TableHead>
+                          <TableHead className="hidden lg:table-cell">Date Received</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {receivedParcels.map((parcel) => (
+                          <TableRow key={parcel.id}>
+                            <TableCell className="font-mono">
+                              <div className="flex flex-col">
+                                <span>{parcel.collectionCode || "N/A"}</span>
+                                <span className="text-xs text-muted-foreground md:hidden">{parcel.deliveryNumber}</span>
+                                <span className="text-xs text-muted-foreground sm:hidden">{parcel.customerName}</span>
+                                <span className="text-xs text-muted-foreground lg:hidden">
+                                  {parcel.dateReceived
+                                    ? format(new Date(parcel.dateReceived), "PPP")
+                                    : "N/A"}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-mono hidden md:table-cell">
+                              {parcel.deliveryNumber}
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">{parcel.customerName}</TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              {parcel.dateReceived
+                                ? format(new Date(parcel.dateReceived), "PPP")
+                                : "N/A"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                className="min-h-[44px] touch-target w-full sm:w-auto"
+                                onClick={() => handleOpenCollectModal(parcel)}
+                              >
+                                Issue Parcel
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                   {receivedParcels.length === 0 && (
                     <div className="text-center py-16 text-muted-foreground">
                       {collectionCodeInput ? (
@@ -429,34 +449,42 @@ export default function BophPage() {
                 </div>
               ) : (
                 <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Delivery #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Collected By</TableHead>
-                        <TableHead>Date Collected</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {collectedParcels.map((parcel) => (
-                        <TableRow key={parcel.id}>
-                          <TableCell className="font-mono">
-                            {parcel.deliveryNumber}
-                          </TableCell>
-                          <TableCell>{parcel.customerName}</TableCell>
-                          <TableCell>
-                            {parcel.collectingPersonName || "N/A"}
-                          </TableCell>
-                          <TableCell>
-                            {parcel.dateCollected
-                              ? format(new Date(parcel.dateCollected), "PPP p")
-                              : "N/A"}
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Delivery #</TableHead>
+                          <TableHead className="hidden sm:table-cell">Customer</TableHead>
+                          <TableHead className="hidden md:table-cell">Collected By</TableHead>
+                          <TableHead>Date Collected</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {collectedParcels.map((parcel) => (
+                          <TableRow key={parcel.id}>
+                            <TableCell className="font-mono">
+                              <div className="flex flex-col">
+                                <span>{parcel.deliveryNumber}</span>
+                                <span className="text-xs text-muted-foreground sm:hidden">{parcel.customerName}</span>
+                                <span className="text-xs text-muted-foreground md:hidden">
+                                  {parcel.collectingPersonName || "N/A"}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">{parcel.customerName}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {parcel.collectingPersonName || "N/A"}
+                            </TableCell>
+                            <TableCell>
+                              {parcel.dateCollected
+                                ? format(new Date(parcel.dateCollected), "PPP p")
+                                : "N/A"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                   {collectedParcels.length === 0 && (
                     <div className="text-center py-16 text-muted-foreground">
                       <p>No parcels have been collected yet.</p>
@@ -471,12 +499,12 @@ export default function BophPage() {
 
       {/* Receive Parcel Modal */}
       <Dialog open={isReceiveModalOpen} onOpenChange={setIsReceiveModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">
               Receive Parcel: {selectedParcel?.deliveryNumber}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm">
               Provide the following code to the courier to confirm the handover.
               Once confirmed, the parcel will be marked as received.
             </DialogDescription>
@@ -498,24 +526,25 @@ export default function BophPage() {
               </Button>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="secondary"
+              className="min-h-[44px] touch-target w-full sm:w-auto"
               onClick={() => setIsReceiveModalOpen(false)}
             >
               Cancel
             </Button>
-            <Button onClick={handleConfirmReception}>Confirm & Receive</Button>
+            <Button className="min-h-[44px] touch-target w-full sm:w-auto" onClick={handleConfirmReception}>Confirm & Receive</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Collect Parcel Modal */}
       <Dialog open={isCollectModalOpen} onOpenChange={setIsCollectModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Issue Parcel to Customer</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Issue Parcel to Customer</DialogTitle>
+            <DialogDescription className="text-sm">
               Confirm collection code and capture the details of the person
               collecting the parcel.
             </DialogDescription>
@@ -581,13 +610,13 @@ export default function BophPage() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit">Confirm Collection</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Confirm Collection</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -596,10 +625,10 @@ export default function BophPage() {
 
       {/* Create Parcel Modal */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Add New Parcel</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Add New Parcel</DialogTitle>
+            <DialogDescription className="text-sm">
               Create a new incoming parcel for customer pickup.
             </DialogDescription>
           </DialogHeader>
@@ -673,13 +702,13 @@ export default function BophPage() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit">Create Parcel</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Create Parcel</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -688,10 +717,10 @@ export default function BophPage() {
 
       {/* Edit Parcel Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Edit Parcel</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Edit Parcel</DialogTitle>
+            <DialogDescription className="text-sm">
               Update the parcel information.
             </DialogDescription>
           </DialogHeader>
@@ -758,13 +787,13 @@ export default function BophPage() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit">Update Parcel</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">Update Parcel</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -773,10 +802,10 @@ export default function BophPage() {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm">
               This action cannot be undone. This will permanently delete the
               parcel{" "}
               <span className="font-mono font-semibold">
@@ -789,8 +818,9 @@ export default function BophPage() {
               .
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel
+              className="min-h-[44px] touch-target w-full sm:w-auto"
               onClick={() => {
                 setParcelToDelete(null);
               }}
@@ -798,6 +828,7 @@ export default function BophPage() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
+              className="min-h-[44px] touch-target w-full sm:w-auto"
               onClick={async () => {
                 if (!parcelToDelete) return;
 

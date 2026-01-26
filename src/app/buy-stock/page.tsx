@@ -89,21 +89,21 @@ export default function BuyStockPage() {
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-2 sm:p-4 space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <CardTitle>Buy Stock</CardTitle>
-                <CardDescription>Order from suppliers to replenish your inventory.</CardDescription>
+                <CardTitle className="text-lg sm:text-xl">Buy Stock</CardTitle>
+                <CardDescription className="text-sm">Order from suppliers to replenish your inventory.</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-                <Button asChild variant="outline">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <Button asChild variant="outline" className="min-h-[44px] touch-target w-full sm:w-auto">
                     <Link href="/buy-stock/history">
                         <History className="mr-2 h-4 w-4" />
                         Order History
                     </Link>
                 </Button>
-                 <Button asChild>
+                 <Button asChild className="min-h-[44px] touch-target w-full sm:w-auto">
                     <Link href="/buy-stock/cart">
                         <ShoppingCart className="mr-2 h-4 w-4" />
                         View Cart
@@ -126,91 +126,107 @@ export default function BuyStockPage() {
                     <p className="text-sm text-muted-foreground mb-4">
                         These items are running low. Consider reordering them now.
                     </p>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Product</TableHead>
-                                <TableHead>Stock</TableHead>
-                                <TableHead>Group Price</TableHead>
-                                <TableHead className="w-[100px]">Quantity</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                         <TableBody>
-                            {lowStockItems.map((product: any) => (
-                                <TableRow key={product.id} className="bg-amber-50 hover:bg-amber-100">
-                                    <TableCell className="font-medium">{product.name}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="destructive">{product.stock ?? 0} left</Badge>
-                                    </TableCell>
-                                    <TableCell className="font-semibold text-green-600">
-                                        R{(getGroupPrice(Number(product.costPrice) || 0)).toFixed(2)}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input 
-                                            type="number" 
-                                            min="0"
-                                            className="h-9"
-                                            placeholder="0"
-                                            value={quantities[product.id] || ''}
-                                            onChange={(e) => handleQuantityChange(product.id, e.target.value)}
-                                        />
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button size="sm" onClick={() => handleAddToCart(product)}>
-                                            <Plus /> Add
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                    <div className="overflow-x-auto">
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead>Product</TableHead>
+                                  <TableHead className="hidden sm:table-cell">Stock</TableHead>
+                                  <TableHead>Group Price</TableHead>
+                                  <TableHead className="w-[100px]">Quantity</TableHead>
+                                  <TableHead className="text-right">Action</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                           <TableBody>
+                              {lowStockItems.map((product: any) => (
+                                  <TableRow key={product.id} className="bg-amber-50 hover:bg-amber-100">
+                                      <TableCell className="font-medium">
+                                        <div className="flex flex-col">
+                                          <span>{product.name}</span>
+                                          <span className="text-xs text-muted-foreground sm:hidden">
+                                            <Badge variant="destructive" className="mt-1 w-fit">{product.stock ?? 0} left</Badge>
+                                          </span>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="hidden sm:table-cell">
+                                          <Badge variant="destructive">{product.stock ?? 0} left</Badge>
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-green-600">
+                                          R{(getGroupPrice(Number(product.costPrice) || 0)).toFixed(2)}
+                                      </TableCell>
+                                      <TableCell>
+                                          <Input 
+                                              type="number" 
+                                              min="0"
+                                              className="h-10 sm:h-9 touch-target"
+                                              placeholder="0"
+                                              value={quantities[product.id] || ''}
+                                              onChange={(e) => handleQuantityChange(product.id, e.target.value)}
+                                          />
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                          <Button size="sm" className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleAddToCart(product)}>
+                                              <Plus /> <span className="hidden sm:inline">Add</span>
+                                          </Button>
+                                      </TableCell>
+                                  </TableRow>
+                              ))}
+                          </TableBody>
+                      </Table>
+                    </div>
                 </div>
             )}
 
             <div>
                 <h3 className="text-lg font-semibold mb-2">Full Supplier Catalogue</h3>
-                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Current Stock</TableHead>
-                            <TableHead>Unit Price</TableHead>
-                            <TableHead>Group Price</TableHead>
-                             <TableHead className="w-[100px]">Quantity</TableHead>
-                            <TableHead className="text-right">Action</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {productsLoading ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center py-10">Loading products...</TableCell>
-                            </TableRow>
-                        ) : allProducts?.map((product: any) => (
-                            <TableRow key={product.id}>
-                                <TableCell className="font-medium">{product.name}</TableCell>
-                                <TableCell>{product.stock ?? 0}</TableCell>
-                                <TableCell>R{(Number(product.costPrice) || 0).toFixed(2)}</TableCell>
-                                <TableCell className="font-semibold text-green-600">R{(getGroupPrice(Number(product.costPrice) || 0)).toFixed(2)}</TableCell>
-                                <TableCell>
-                                     <Input 
-                                        type="number"
-                                        min="0"
-                                        className="h-9"
-                                        placeholder="0"
-                                        value={quantities[product.id] || ''}
-                                        onChange={(e) => handleQuantityChange(product.id, e.target.value)}
-                                     />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Button size="sm" onClick={() => handleAddToCart(product)}>
-                                        <Plus /> Add
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                 <div className="overflow-x-auto">
+                   <Table>
+                      <TableHeader>
+                          <TableRow>
+                              <TableHead>Product</TableHead>
+                              <TableHead className="hidden sm:table-cell">Current Stock</TableHead>
+                              <TableHead className="hidden md:table-cell">Unit Price</TableHead>
+                              <TableHead>Group Price</TableHead>
+                               <TableHead className="w-[100px]">Quantity</TableHead>
+                              <TableHead className="text-right">Action</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {productsLoading ? (
+                              <TableRow>
+                                  <TableCell colSpan={6} className="text-center py-10">Loading products...</TableCell>
+                              </TableRow>
+                          ) : allProducts?.map((product: any) => (
+                              <TableRow key={product.id}>
+                                  <TableCell className="font-medium">
+                                    <div className="flex flex-col">
+                                      <span>{product.name}</span>
+                                      <span className="text-xs text-muted-foreground sm:hidden">Stock: {product.stock ?? 0}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="hidden sm:table-cell">{product.stock ?? 0}</TableCell>
+                                  <TableCell className="hidden md:table-cell">R{(Number(product.costPrice) || 0).toFixed(2)}</TableCell>
+                                  <TableCell className="font-semibold text-green-600">R{(getGroupPrice(Number(product.costPrice) || 0)).toFixed(2)}</TableCell>
+                                  <TableCell>
+                                       <Input 
+                                          type="number"
+                                          min="0"
+                                          className="h-10 sm:h-9 touch-target"
+                                          placeholder="0"
+                                          value={quantities[product.id] || ''}
+                                          onChange={(e) => handleQuantityChange(product.id, e.target.value)}
+                                       />
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                      <Button size="sm" className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleAddToCart(product)}>
+                                          <Plus /> <span className="hidden sm:inline">Add</span>
+                                      </Button>
+                                  </TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+                 </div>
             </div>
 
         </CardContent>

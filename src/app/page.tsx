@@ -246,9 +246,9 @@ export default function PosPage() {
 
   return (
     <>
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-muted">
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-4 h-full p-2 sm:p-4 bg-muted">
       {/* Product Selection */}
-      <div className="lg:col-span-1 xl:col-span-3 bg-white dark:bg-card rounded-lg p-4 flex flex-col">
+      <div className="lg:col-span-1 xl:col-span-3 bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col">
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input 
@@ -262,7 +262,7 @@ export default function PosPage() {
 
         <div className="flex justify-between items-center mb-2">
             <p className="text-xs font-semibold text-gray-500 uppercase">Categories</p>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCategoryView(prev => prev === 'carousel' ? 'grid' : 'carousel')}>
+            <Button variant="ghost" size="icon" className="h-10 w-10 touch-target" onClick={() => setCategoryView(prev => prev === 'carousel' ? 'grid' : 'carousel')}>
                 {categoryView === 'carousel' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
             </Button>
         </div>
@@ -309,9 +309,9 @@ export default function PosPage() {
             <Table>
                 <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[50px]">View</TableHead>
+                    <TableHead className="w-[50px] hidden sm:table-cell">View</TableHead>
                     <TableHead>Product</TableHead>
-                    <TableHead>Stock</TableHead>
+                    <TableHead className="hidden md:table-cell">Stock</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -327,14 +327,14 @@ export default function PosPage() {
                   </TableRow>
                 ) : products?.map((product: any) => (
                     <TableRow key={product.id}>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                         <Dialog>
                         <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="touch-target">
                             <Eye className="h-4 w-4" />
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
+                        <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
                             <DialogHeader>
                             <DialogTitle>{product.name}</DialogTitle>
                             </DialogHeader>
@@ -344,19 +344,24 @@ export default function PosPage() {
                                 alt={product.name} 
                                 width={300} 
                                 height={300} 
-                                className="rounded-md object-cover"
+                                className="rounded-md object-cover max-w-full h-auto"
                                 data-ai-hint={product.imageHint}
                             />
                             </div>
                         </DialogContent>
                         </Dialog>
                     </TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.stock ?? '-'}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{product.name}</span>
+                        <span className="text-xs text-muted-foreground md:hidden">Stock: {product.stock ?? '-'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">{product.stock ?? '-'}</TableCell>
                     <TableCell>R{(typeof product.price === 'number' ? product.price : parseFloat(product.price || 0)).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
-                        <Button size="sm" onClick={() => addToCart(product)}>
-                        <Plus className="h-4 w-4 mr-2" /> Add
+                        <Button size="sm" className="min-h-[44px] touch-target" onClick={() => addToCart(product)}>
+                        <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Add</span>
                         </Button>
                     </TableCell>
                     </TableRow>
@@ -369,20 +374,20 @@ export default function PosPage() {
       </div>
 
       {/* Cart Section */}
-      <div className="lg:col-span-1 xl:col-span-2 bg-white dark:bg-card rounded-lg p-4 flex flex-col h-full">
-        <div className="flex justify-between items-center mb-4 border-b pb-3 shrink-0">
+      <div className="lg:col-span-1 xl:col-span-2 bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col h-full lg:sticky lg:top-16">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 border-b pb-3 shrink-0">
             <div>
-                <h2 className="font-semibold text-lg">Sale #8822</h2>
+                <h2 className="font-semibold text-base sm:text-lg">Sale #8822</h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
                  <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" onClick={() => setCustomerSearchTerm('')}>
-                            <User className="mr-2 h-4 w-4"/>
-                            {selectedCustomer ? selectedCustomer.name : 'Add Customer'}
+                        <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={() => setCustomerSearchTerm('')}>
+                            <User className="mr-1 sm:mr-2 h-4 w-4"/>
+                            <span className="truncate max-w-[120px] sm:max-w-none">{selectedCustomer ? selectedCustomer.name : 'Add Customer'}</span>
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-2xl">
+                    <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
                         <DialogHeader>
                             <DialogTitle>Select a Customer</DialogTitle>
                             <div className="relative mt-4">
@@ -425,9 +430,10 @@ export default function PosPage() {
                         </ScrollArea>
                     </DialogContent>
                 </Dialog>
-                <Button variant="ghost" size="sm" onClick={handleOpenVoucherModal}>
-                    <Ticket className="mr-2 h-4 w-4"/>
-                    Redeem Voucher
+                <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={handleOpenVoucherModal}>
+                    <Ticket className="mr-1 sm:mr-2 h-4 w-4"/>
+                    <span className="hidden sm:inline">Redeem Voucher</span>
+                    <span className="sm:hidden">Voucher</span>
                 </Button>
             </div>
         </div>
@@ -441,19 +447,19 @@ export default function PosPage() {
             ) : (
               <div className="space-y-2">
                 {cartItems.map(item => (
-                  <div key={item.productId} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
-                    <Image src={item.imageUrl || '/placeholder-product.png'} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }} />
-                    <div className="flex-grow">
-                      <p className="font-medium text-sm">{item.productName}</p>
+                  <div key={item.productId} className="flex items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
+                    <Image src={item.imageUrl || '/placeholder-product.png'} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }} />
+                    <div className="flex-grow min-w-0">
+                      <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
                       <p className="text-xs text-gray-500">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
-                      <span className="font-bold text-sm w-4 text-center">{item.quantity}</span>
-                      <Button variant="outline" size="icon" className="h-7 w-7 rounded-full" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
+                      <span className="font-bold text-sm w-6 sm:w-4 text-center">{item.quantity}</span>
+                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
                     </div>
-                    <p className="font-semibold text-sm w-20 text-right">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-gray-400 hover:text-red-500" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
+                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-right">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
               </div>
@@ -483,14 +489,14 @@ export default function PosPage() {
               <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              <Button size="lg" className="h-14 text-base bg-green-500 hover:bg-green-600 text-white" onClick={() => handleCheckout('Cash')}>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <Button size="lg" className="h-12 sm:h-14 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white touch-target" onClick={() => handleCheckout('Cash')}>
                   CASH
               </Button>
-              <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Card')}>
+              <Button size="lg" variant="outline" className="h-12 sm:h-14 text-sm sm:text-base touch-target" onClick={() => handleCheckout('Card')}>
                   CARD
               </Button>
-              <Button size="lg" variant="outline" className="h-14 text-base" onClick={() => handleCheckout('Mobile Money')}>
+              <Button size="lg" variant="outline" className="h-12 sm:h-14 text-sm sm:text-base touch-target" onClick={() => handleCheckout('Mobile Money')}>
                   MOBILE
               </Button>
             </div>

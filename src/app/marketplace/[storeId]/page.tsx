@@ -327,9 +327,9 @@ export default function StorePosPage() {
 
   return (
     <>
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4 h-full p-4 bg-slate-50">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-4 h-full p-2 sm:p-4 bg-slate-50">
         {/* Product Selection */}
-        <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-4 flex flex-col">
+        <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-2 sm:p-4 flex flex-col">
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
@@ -356,7 +356,7 @@ export default function StorePosPage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-10 w-10 touch-target"
               onClick={() =>
                 setCategoryView((prev) =>
                   prev === "carousel" ? "grid" : "carousel",
@@ -434,9 +434,9 @@ export default function StorePosPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px]">View</TableHead>
+                      <TableHead className="w-[50px] hidden sm:table-cell">View</TableHead>
                       <TableHead>Product</TableHead>
-                      <TableHead>Stock</TableHead>
+                      <TableHead className="hidden md:table-cell">Stock</TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
@@ -444,14 +444,14 @@ export default function StorePosPage() {
                   <TableBody>
                     {products?.map((product) => (
                       <TableRow key={product.id}>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" className="touch-target">
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px]">
+                            <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
                               <DialogHeader>
                                 <DialogTitle>{product.name}</DialogTitle>
                               </DialogHeader>
@@ -461,7 +461,7 @@ export default function StorePosPage() {
                                   alt={product.name}
                                   width={300}
                                   height={300}
-                                  className="rounded-md object-cover"
+                                  className="rounded-md object-cover max-w-full h-auto"
                                   onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }}
                                 />
                               </div>
@@ -469,9 +469,12 @@ export default function StorePosPage() {
                           </Dialog>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {product.name}
+                          <div className="flex flex-col">
+                            <span>{product.name}</span>
+                            <span className="text-xs text-muted-foreground md:hidden">Stock: {product.stock}</span>
+                          </div>
                         </TableCell>
-                        <TableCell>{product.stock}</TableCell>
+                        <TableCell className="hidden md:table-cell">{product.stock}</TableCell>
                         <TableCell>
                           R
                           {(typeof product.price === "number"
@@ -480,8 +483,8 @@ export default function StorePosPage() {
                           ).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => addToCart(product)}>
-                            <Plus className="h-4 w-4 mr-2" /> Add
+                          <Button size="sm" className="min-h-[44px] touch-target" onClick={() => addToCart(product)}>
+                            <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Add</span>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -494,15 +497,15 @@ export default function StorePosPage() {
         </div>
 
         {/* Cart Section */}
-        <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg flex flex-col h-full">
+        <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg flex flex-col h-full lg:sticky lg:top-16">
           {/* Child 1: Header */}
-          <div className="p-4 border-b shrink-0">
-            <div className="flex justify-between items-center">
+          <div className="p-2 sm:p-4 border-b shrink-0">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-10 w-10 touch-target"
                   asChild
                 >
                   <Link href="/marketplace">
@@ -510,7 +513,7 @@ export default function StorePosPage() {
                     <span className="sr-only">Back to Marketplace</span>
                   </Link>
                 </Button>
-                <h2 className="font-semibold text-lg">Order for {storeName}</h2>
+                <h2 className="font-semibold text-base sm:text-lg">Order for {storeName}</h2>
               </div>
               <Dialog
                 open={customerDialogOpen}
@@ -520,13 +523,14 @@ export default function StorePosPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="min-h-[44px] touch-target text-xs sm:text-sm"
                     onClick={() => setCustomerSearchTerm("")}
                   >
-                    <User className="mr-2 h-4 w-4" />
-                    {selectedCustomer ? selectedCustomer.name : "Add Customer"}
+                    <User className="mr-1 sm:mr-2 h-4 w-4" />
+                    <span className="truncate max-w-[120px] sm:max-w-none">{selectedCustomer ? selectedCustomer.name : "Add Customer"}</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
                   <DialogHeader>
                     <DialogTitle>Select a Customer</DialogTitle>
                     <div className="relative mt-4">
@@ -582,45 +586,45 @@ export default function StorePosPage() {
                   {cartItems.map((item) => (
                     <div
                       key={item.productId}
-                      className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50"
+                      className="flex items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50"
                     >
                       <Image
                         src={item.imageUrl || "/placeholder-product.png"}
                         alt={item.productName}
                         width={40}
                         height={40}
-                        className="rounded-md bg-gray-200 object-cover"
+                        className="rounded-md bg-gray-200 object-cover flex-shrink-0"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
                             "/placeholder-product.png";
                         }}
                       />
-                      <div className="flex-grow">
-                        <p className="font-medium text-sm">
+                      <div className="flex-grow min-w-0">
+                        <p className="font-medium text-xs sm:text-sm truncate">
                           {item.productName}
                         </p>
                         <p className="text-xs text-gray-500">
                           R {(Number(item.unitPrice) || 0).toFixed(2)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-7 w-7 rounded-full"
+                          className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target"
                           onClick={() =>
                             updateQuantity(item.productId, item.quantity - 1)
                           }
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
-                        <span className="font-bold text-sm w-4 text-center">
+                        <span className="font-bold text-sm w-6 sm:w-4 text-center">
                           {item.quantity}
                         </span>
                         <Button
                           variant="outline"
                           size="icon"
-                          className="h-7 w-7 rounded-full"
+                          className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target"
                           onClick={() =>
                             updateQuantity(item.productId, item.quantity + 1)
                           }
@@ -628,13 +632,13 @@ export default function StorePosPage() {
                           <Plus className="h-3 w-3" />
                         </Button>
                       </div>
-                      <p className="font-semibold text-sm w-20 text-right">
+                      <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-right">
                         R{item.totalPrice.toFixed(2)}
                       </p>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-gray-400 hover:text-red-500"
+                        className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target"
                         onClick={() => updateQuantity(item.productId, 0)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -671,10 +675,10 @@ export default function StorePosPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 <Button
                   size="lg"
-                  className="h-14 text-base bg-green-500 hover:bg-green-600 text-white"
+                  className="h-12 sm:h-14 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white touch-target"
                   onClick={() => handleCheckout("Cash")}
                   disabled={!selectedCustomerId}
                 >
@@ -683,7 +687,7 @@ export default function StorePosPage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="h-14 text-base"
+                  className="h-12 sm:h-14 text-sm sm:text-base touch-target"
                   onClick={() => handleCheckout("Card")}
                   disabled={!selectedCustomerId}
                 >
@@ -692,7 +696,7 @@ export default function StorePosPage() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="h-14 text-base"
+                  className="h-12 sm:h-14 text-sm sm:text-base touch-target"
                   onClick={() => handleCheckout("Mobile Money")}
                   disabled={!selectedCustomerId}
                 >
@@ -721,9 +725,9 @@ export default function StorePosPage() {
 
       {/* Customer Selection Dialog */}
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Select a Customer</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Select a Customer</DialogTitle>
             <div className="relative mt-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input

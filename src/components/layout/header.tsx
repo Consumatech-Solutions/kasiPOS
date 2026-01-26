@@ -142,14 +142,14 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b bg-white dark:bg-card px-4 lg:px-6 shadow-sm">
+    <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm">
       {/* Left Section: Logo and Page Title */}
-      <div className="flex items-center gap-4 flex-1 min-w-0">
-        <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-          <div className="bg-green-500 p-2 rounded-md">
-            <Store className="h-5 w-5 text-white" />
+      <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+        <Link href="/" className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
+            <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
           </div>
-          <span className="text-lg font-bold hidden sm:inline">kasiPOS</span>
+          <span className="text-base sm:text-lg font-bold hidden sm:inline">kasiPOS</span>
         </Link>
         
         <div className="hidden md:flex items-center gap-2 text-muted-foreground">
@@ -173,12 +173,12 @@ export default function Header() {
       </div>
 
       {/* Right Section: Actions */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
         {/* Notifications */}
         <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 touch-target">
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
               {unreadCount > 0 && (
                 <Badge 
                   className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 hover:bg-red-600"
@@ -189,7 +189,7 @@ export default function Header() {
               )}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-0" align="end">
+          <PopoverContent className="w-[90vw] sm:w-80 p-0" align="end">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-sm">Notifications</h3>
@@ -265,8 +265,8 @@ export default function Header() {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-              <Avatar className="h-9 w-9 border-2 border-border">
+            <Button variant="ghost" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full touch-target">
+              <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-border">
                 <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                   {currentUser?.name 
                     ? currentUser.name
@@ -281,7 +281,7 @@ export default function Header() {
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuContent className="w-56 sm:w-56 p-2" align="end" sideOffset={8} alignOffset={-4} collisionPadding={8}>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{currentUser?.name || 'User'}</p>
@@ -297,21 +297,21 @@ export default function Header() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <Link href="/profile">
-              <DropdownMenuItem>
+              <DropdownMenuItem className="min-h-[44px] touch-target">
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
             </Link>
             {currentUser?.role === 'admin' && (
               <Link href="/settings">
-                <DropdownMenuItem>
+                <DropdownMenuItem className="min-h-[44px] touch-target">
                   <Store className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
               </Link>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive min-h-[44px] touch-target">
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>

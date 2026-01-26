@@ -87,11 +87,11 @@ export default function TransactionsPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Transaction History</CardTitle>
-        <CardDescription>View and filter your past sales transactions.</CardDescription>
+        <CardTitle className="text-lg sm:text-xl">Transaction History</CardTitle>
+        <CardDescription className="text-sm">View and filter your past sales transactions.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -126,7 +126,7 @@ export default function TransactionsPage() {
             </div>
 
             {(selectedDate || searchTerm) && (
-              <Button variant="ghost" onClick={clearFilters}>
+              <Button variant="ghost" onClick={clearFilters} className="min-h-[44px] touch-target w-full sm:w-auto">
                 <X className="mr-2 h-4 w-4" /> Clear Filters
               </Button>
             )}

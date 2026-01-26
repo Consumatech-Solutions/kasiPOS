@@ -144,21 +144,22 @@ export default function VouchersPage() {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle>Voucher Management</CardTitle>
-            <CardDescription>Create and manage your discount vouchers.</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Voucher Management</CardTitle>
+            <CardDescription className="text-sm">Create and manage your discount vouchers.</CardDescription>
           </div>
-          <Button onClick={() => openVoucherDialog()}>
+          <Button onClick={() => openVoucherDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
             <PlusCircle className="mr-2 h-4 w-4" />
             Create Voucher
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-4">
             <Button
               variant={filterActive === undefined ? 'default' : 'outline'}
               size="sm"
+              className="min-h-[44px] touch-target"
               onClick={() => setFilterActive(undefined)}
             >
               All
@@ -166,6 +167,7 @@ export default function VouchersPage() {
             <Button
               variant={filterActive === true ? 'default' : 'outline'}
               size="sm"
+              className="min-h-[44px] touch-target"
               onClick={() => setFilterActive(true)}
             >
               Active
@@ -173,6 +175,7 @@ export default function VouchersPage() {
             <Button
               variant={filterActive === false ? 'default' : 'outline'}
               size="sm"
+              className="min-h-[44px] touch-target"
               onClick={() => setFilterActive(false)}
             >
               Inactive
@@ -182,19 +185,20 @@ export default function VouchersPage() {
           {loading ? (
             <div className="text-center py-10 text-muted-foreground">Loading vouchers...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Min. Purchase</TableHead>
-                  <TableHead>Expiration</TableHead>
-                  <TableHead>Usage</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead className="hidden md:table-cell">Type</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead className="hidden lg:table-cell">Min. Purchase</TableHead>
+                    <TableHead className="hidden md:table-cell">Expiration</TableHead>
+                    <TableHead className="hidden lg:table-cell">Usage</TableHead>
+                    <TableHead className="hidden sm:table-cell text-right">Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {filteredVouchers && filteredVouchers.length > 0 ? (
                   filteredVouchers.map((voucher: any) => {
@@ -203,20 +207,30 @@ export default function VouchersPage() {
                     const minPurchase = Number(voucher.minPurchase);
                     return (
                       <TableRow key={voucher.id}>
-                        <TableCell className="font-mono font-medium">{voucher.code}</TableCell>
-                        <TableCell className="capitalize">{voucher.type}</TableCell>
+                        <TableCell className="font-mono font-medium">
+                          <div className="flex flex-col">
+                            <span>{voucher.code}</span>
+                            <span className="text-xs text-muted-foreground md:hidden capitalize">{voucher.type}</span>
+                            <span className="text-xs text-muted-foreground sm:hidden">
+                              <Badge variant={voucher.isActive ? 'default' : 'secondary'} className="mt-1 w-fit">
+                                {voucher.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell capitalize">{voucher.type}</TableCell>
                         <TableCell>
                           {voucher.type === 'percentage' ? `${value}%` : `R${value.toFixed(2)}`}
                         </TableCell>
-                        <TableCell>R{minPurchase.toFixed(2)}</TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">R{minPurchase.toFixed(2)}</TableCell>
+                        <TableCell className="hidden md:table-cell">
                           {expirationStatus ? (
                             <Badge variant={expirationStatus.variant}>{expirationStatus.text}</Badge>
                           ) : (
                             <span className="text-muted-foreground">No expiration</span>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           {voucher.maxUses !== null ? (
                             <span className="text-sm">
                               {voucher.currentUses || 0} / {voucher.maxUses}
@@ -227,36 +241,38 @@ export default function VouchersPage() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="hidden sm:table-cell text-right">
                           <Badge variant={voucher.isActive ? 'default' : 'secondary'}>
                             {voucher.isActive ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => openVoucherDialog(voucher)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the voucher.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(voucher.id)}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
+                            <Button variant="ghost" size="icon" className="touch-target" onClick={() => openVoucherDialog(voucher)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="touch-target">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-sm">
+                                    This action cannot be undone. This will permanently delete the voucher.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto">Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDelete(voucher.id)}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -270,16 +286,17 @@ export default function VouchersPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Create/Edit Voucher Dialog */}
       <Dialog open={voucherDialogOpen} onOpenChange={setVoucherDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingVoucher ? 'Edit Voucher' : 'Create Voucher'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">{editingVoucher ? 'Edit Voucher' : 'Create Voucher'}</DialogTitle>
+            <DialogDescription className="text-sm">
               {editingVoucher
                 ? 'Update voucher details. Code cannot be changed after creation.'
                 : 'Create a new discount voucher for your store.'}
@@ -435,13 +452,13 @@ export default function VouchersPage() {
                   </FormItem>
                 )}
               />
-              <DialogFooter>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild>
-                  <Button type="button" variant="secondary">
+                  <Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto">
                     Cancel
                   </Button>
                 </DialogClose>
-                <Button type="submit">{editingVoucher ? 'Update' : 'Create'}</Button>
+                <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto">{editingVoucher ? 'Update' : 'Create'}</Button>
               </DialogFooter>
             </form>
           </Form>
