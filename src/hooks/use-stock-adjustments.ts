@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { stockAdjustmentsApi, type CreateStockAdjustmentDto } from '@/lib/api/stock-adjustments';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { stockAdjustmentsApi, type CreateStockAdjustmentDto, type GetStockAdjustmentsParams } from '@/lib/api/stock-adjustments';
 import type { StockAdjustment } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
@@ -11,90 +11,130 @@ interface UseStockAdjustmentsOptions {
   initialLimit?: number;
 }
 
+export const stockAdjustmentKeys = {
+  all: ['stockAdjustments'] as const,
+  lists: () => [...stockAdjustmentKeys.all, 'list'] as const,
+  list: (filters?: GetStockAdjustmentsParams) => [...stockAdjustmentKeys.lists(), filters] as const,
+  byProduct: (productId: string) => [...stockAdjustmentKeys.all, 'product', productId] as const,
+  details: () => [...stockAdjustmentKeys.all, 'detail'] as const,
+  detail: (id: string) => [...stockAdjustmentKeys.details(), id] as const,
+};
+
+function normalizeStockAdjustmentResponse(response: StockAdjustment[] | PaginatedResponse<StockAdjustment>): { data: StockAdjustment[]; meta: PaginationMeta } {
+  if (Array.isArray(response)) {
+    return {
+      data: response,
+      meta: {
+        total: response.length,
+        page: 1,
+        limit: response.length || 10,
+        totalPages: 1,
+      },
+    };
+  }
+  
+  if ('data' in response && 'meta' in response) {
+    return response;
+  }
+  
+  return {
+    data: [],
+    meta: {
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 0,
+    },
+  };
+}
+
 export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
   const { productId, initialPage = 1, initialLimit = 10 } = options;
+  const queryClient = useQueryClient();
 
-  const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
-  const [pagination, setPagination] = useState<PaginationMeta>({
-    total: 0,
-    page: initialPage,
-    limit: initialLimit,
-    totalPages: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryKey = productId 
+    ? stockAdjustmentKeys.byProduct(productId)
+    : stockAdjustmentKeys.list({ page: initialPage, limit: initialLimit, productId });
 
-  const loadAdjustments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
       let response: { data: StockAdjustment[] | PaginatedResponse<StockAdjustment> };
       
       if (productId) {
-        // Get adjustments for specific product
         response = await stockAdjustmentsApi.getByProduct(productId);
-        setAdjustments(Array.isArray(response.data) ? response.data : []);
-        setPagination({
-          total: Array.isArray(response.data) ? response.data.length : 0,
-          page: 1,
-          limit: initialLimit,
-          totalPages: 1,
-        });
+        return normalizeStockAdjustmentResponse(Array.isArray(response.data) ? response.data : []);
       } else {
-        // Get all adjustments with pagination
-        const params: any = { page: initialPage, limit: initialLimit };
+        const params: GetStockAdjustmentsParams = { page: initialPage, limit: initialLimit };
         response = await stockAdjustmentsApi.getAll(params);
-
-        const responseData = response.data;
-        if (Array.isArray(responseData)) {
-          setAdjustments(responseData);
-          setPagination({
-            total: responseData.length,
-            page: 1,
-            limit: responseData.length,
-            totalPages: 1,
-          });
-        } else {
-          setAdjustments(responseData.data);
-          setPagination(responseData.meta);
-        }
+        return normalizeStockAdjustmentResponse(response.data);
       }
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.error || err?.message || 'Failed to load stock adjustments';
-      setError(errorMessage);
-      console.error('Error loading stock adjustments:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [productId, initialPage, initialLimit]);
+    },
+  });
 
-  useEffect(() => {
-    loadAdjustments();
-  }, [loadAdjustments]);
+  const createMutation = useMutation({
+    mutationFn: (data: CreateStockAdjustmentDto) => stockAdjustmentsApi.create(data),
+    onMutate: async (newAdjustment) => {
+      await queryClient.cancelQueries({ queryKey: stockAdjustmentKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: StockAdjustment[]; meta: PaginationMeta }>(queryKey);
 
-  const createAdjustment = useCallback(async (data: CreateStockAdjustmentDto) => {
-    try {
-      const response = await stockAdjustmentsApi.create(data);
-      const created = response.data;
+      if (previousData) {
+        const optimisticAdjustment: StockAdjustment = {
+          id: `temp-${Date.now()}`,
+          productId: newAdjustment.productId,
+          productName: '', // Will be filled by backend
+          oldStock: 0, // Will be filled by backend
+          newStock: newAdjustment.newStock,
+          reason: newAdjustment.reason,
+          note: newAdjustment.note || null,
+          storeId: 0, // Will be filled by backend
+          createdAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<{ data: StockAdjustment[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: [optimisticAdjustment, ...previousData.data],
+          meta: {
+            ...previousData.meta,
+            total: previousData.meta.total + 1,
+          },
+        });
+      }
 
-      // Refresh the list
-      await loadAdjustments();
-
-      return created;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create stock adjustment';
-      setError(errorMessage);
-      throw err;
-    }
-  }, [loadAdjustments]);
+      return { previousData };
+    },
+    onError: (err, newAdjustment, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: (response) => {
+      const newAdjustment = response.data;
+      queryClient.setQueryData<{ data: StockAdjustment[]; meta: PaginationMeta }>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map(adj => (adj.id && String(adj.id).startsWith('temp-')) ? newAdjustment : adj),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: stockAdjustmentKeys.lists() });
+      if (productId) {
+        queryClient.invalidateQueries({ queryKey: stockAdjustmentKeys.byProduct(productId) });
+      }
+    },
+  });
 
   return {
-    adjustments,
-    pagination,
-    loading,
-    error,
-    createAdjustment,
-    refresh: loadAdjustments,
+    adjustments: query.data?.data || [],
+    pagination: query.data?.meta || {
+      total: 0,
+      page: initialPage,
+      limit: initialLimit,
+      totalPages: 0,
+    },
+    loading: query.isLoading,
+    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    createAdjustment: createMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    refresh: () => query.refetch(),
   };
 }

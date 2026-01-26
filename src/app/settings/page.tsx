@@ -7,7 +7,7 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -21,6 +21,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 
 type Feature = 'campaigns' | 'marketplace' | 'boph';
 
@@ -41,6 +42,8 @@ export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
   const { currentUser, currentStore } = settings;
   const { toast } = useToast();
+  const { isOnline } = useNetworkStatus();
+  const [isUpdating, setIsUpdating] = useState(false);
   
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
@@ -192,6 +195,63 @@ export default function SettingsPage() {
 
   const featureDetails = getFeatureDetails(selectedFeature);
 
+  const handleUpdateApp = async () => {
+    if (!isOnline) {
+      toast({
+        variant: "destructive",
+        title: "Offline",
+        description: "Please connect to the internet to update the app.",
+      });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Clear all caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+
+      // Clear service worker cache
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' });
+      }
+
+      // Unregister service worker
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.unregister()));
+      }
+
+      // Clear IndexedDB query cache
+      try {
+        const { del } = await import('idb-keyval');
+        await del('REACT_QUERY_OFFLINE_CACHE');
+      } catch (e) {
+        console.warn('Failed to clear query cache:', e);
+      }
+
+      toast({
+        title: "Cache Cleared",
+        description: "Reloading the app with the latest version...",
+      });
+
+      // Reload after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error: any) {
+      console.error('Failed to update app:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update the app. Please try again.",
+      });
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <>
       <div className="space-y-6">
@@ -238,6 +298,46 @@ export default function SettingsPage() {
                       <SelectItem value="am">Amharic</SelectItem>
                   </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <Label htmlFor="update-app" className="font-semibold flex items-center gap-2">
+                  <RefreshCw className="w-5 h-5" />
+                  Update App
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Clear cache and reload the app to get the latest version.
+                </p>
+              </div>
+              <Button
+                id="update-app"
+                onClick={handleUpdateApp}
+                disabled={!isOnline || isUpdating}
+                variant="outline"
+                className="min-h-[44px] touch-target"
+              >
+                {isUpdating ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    {isOnline ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Update
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="mr-2 h-4 w-4" />
+                        Offline
+                      </>
+                    )}
+                  </>
+                )}
+              </Button>
             </div>
 
               <div className="space-y-2 pt-4">

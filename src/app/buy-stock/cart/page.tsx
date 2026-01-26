@@ -64,6 +64,8 @@ export default function BuyStockCartPage() {
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.totalPrice, 0), [cart]);
   const total = useMemo(() => subtotal + (deliveryMethod === 'delivery' ? DELIVERY_FEE : 0), [subtotal, deliveryMethod]);
   
+  const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
+
   const handleConfirmOrder = async () => {
     if (!currentStore) {
       toast({ variant: 'destructive', title: 'Error', description: 'No store context found.' });
@@ -74,6 +76,7 @@ export default function BuyStockCartPage() {
       return;
     }
     
+    setIsConfirmingOrder(true);
     try {
       const response = await purchaseOrdersApi.create({
         items: cart,
@@ -92,6 +95,8 @@ export default function BuyStockCartPage() {
       console.error('Failed to save purchase order:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Could not save the purchase order.';
       toast({ variant: 'destructive', title: 'Error', description: errorMessage });
+    } finally {
+      setIsConfirmingOrder(false);
     }
   };
   
@@ -145,14 +150,15 @@ export default function BuyStockCartPage() {
                                         <TableCell>R{item.groupPrice.toFixed(2)}</TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
+                                                <Button variant="outline" size="icon" className="h-7 w-7 touch-target" onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
                                                 <Input
                                                     type="number"
                                                     value={item.quantity}
                                                     onChange={(e) => handleQuantityChange(item.productId, parseInt(e.target.value, 10) || 0)}
-                                                    className="h-8 w-14 text-center"
+                                                    className="h-8 w-24 sm:w-28 text-center min-w-[80px]"
+                                                    min="0"
                                                 />
-                                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
+                                                <Button variant="outline" size="icon" className="h-7 w-7 touch-target" onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">R{item.totalPrice.toFixed(2)}</TableCell>
@@ -203,7 +209,10 @@ export default function BuyStockCartPage() {
                                         <span>R{total.toFixed(2)}</span>
                                     </div>
                                 </div>
-                                <Button className="w-full" size="lg" onClick={handleConfirmOrder}>Confirm Order</Button>
+                                <Button className="w-full min-h-[44px] touch-target" size="lg" onClick={handleConfirmOrder} disabled={isConfirmingOrder}>
+                                  {isConfirmingOrder && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {isConfirmingOrder ? 'Processing...' : 'Confirm Order'}
+                                </Button>
                             </CardContent>
                         </Card>
                     </div>

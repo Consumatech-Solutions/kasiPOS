@@ -52,40 +52,48 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-2 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Marketplace</CardTitle>
-          <CardDescription>Place orders from third-party stores for your customers.</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Marketplace</CardTitle>
+          <CardDescription className="text-sm">Place orders from third-party stores for your customers.</CardDescription>
         </CardHeader>
         <CardContent>
             <div className="max-w-md space-y-2">
                 <label htmlFor="order-code" className="text-sm font-medium">Have an Order Code?</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                     <Input 
                       id="order-code" 
                       placeholder="Enter order code..." 
+                      className="touch-target"
                       value={orderCode}
                       onChange={(e) => setOrderCode(e.target.value)}
                       onKeyPress={handleKeyPress}
                       disabled={searchLoading}
                     />
-                    <Button onClick={handleSearch} disabled={searchLoading}>
+                    <Button onClick={handleSearch} disabled={searchLoading} className="min-h-[44px] touch-target w-full sm:w-auto whitespace-nowrap px-3 sm:px-4">
                         {searchLoading ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
+                            <span className="hidden sm:inline">Find Order</span>
+                            <span className="sm:hidden">Find</span>
+                          </>
                         ) : (
-                          <Search className="mr-2 h-4 w-4" />
+                          <>
+                            <Search className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="hidden sm:inline">Find Order</span>
+                            <span className="sm:hidden">Find</span>
+                          </>
                         )}
-                        Find Order
                     </Button>
                 </div>
             </div>
         </CardContent>
       </Card>
       
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold tracking-tight">Available Stores</h2>
-        <Button variant="outline" asChild>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Available Stores</h2>
+        <Button variant="outline" asChild className="min-h-[44px] touch-target w-full sm:w-auto">
           <Link href="/marketplace/orders">
             View Orders
           </Link>
@@ -120,16 +128,16 @@ export default function MarketplacePage() {
       </div>
 
       <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>Order Details</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Order Details</DialogTitle>
+            <DialogDescription className="text-sm">
               Order Code: {foundOrder?.orderCode}
             </DialogDescription>
           </DialogHeader>
           {foundOrder && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Marketplace Store</p>
                   <p className="text-sm">{marketplaces.find(m => m.code === foundOrder.marketplaceStoreId)?.name || foundOrder.marketplaceStoreId}</p>

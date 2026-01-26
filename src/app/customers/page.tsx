@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, Star, History, Search } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, Star, History, Search, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Pagination } from '@/components/ui/pagination';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -36,7 +36,7 @@ export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Use the API hook
-  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage } = useCustomers({
+  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
     searchQuery: searchTerm,
   });
 
@@ -89,7 +89,10 @@ export default function CustomersPage() {
     }
   };
 
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
+
   const handleDeleteCustomer = async (id: string) => {
+    setDeletingCustomerId(id);
     try {
       await deleteCustomer(id);
       toast({ title: "Success", description: "Customer deleted successfully." });
@@ -97,6 +100,8 @@ export default function CustomersPage() {
       console.error("Failed to delete customer:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to delete customer.";
       toast({ variant: "destructive", title: "Error", description: errorMessage });
+    } finally {
+      setDeletingCustomerId(null);
     }
   };
 
@@ -134,14 +139,14 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-2 sm:p-4">
       <Card>
         <CardHeader>
-          <CardTitle>Customers</CardTitle>
-          <CardDescription>Manage your customer database and loyalty program.</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Customers</CardTitle>
+          <CardDescription className="text-sm">Manage your customer database and loyalty program.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
             <div className="relative flex-grow">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input 
@@ -151,7 +156,7 @@ export default function CustomersPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto">
+            <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
               <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
             </Button>
           </div>
@@ -181,33 +186,36 @@ export default function CustomersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => openHistoryDialog(customer)}>
-                          <History className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openCustomerDialog(customer)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the customer and their data.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteCustomer(customer.id)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
+                          <Button variant="ghost" size="icon" className="touch-target" onClick={() => openHistoryDialog(customer)}>
+                            <History className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="touch-target" onClick={() => openCustomerDialog(customer)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="touch-target">
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-sm">
+                                  This action cannot be undone. This will permanently delete the customer and their data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCustomerId === customer.id || isDeleting}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCustomer(customer.id)} disabled={deletingCustomerId === customer.id || isDeleting}>
+                                  {(deletingCustomerId === customer.id || isDeleting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  {deletingCustomerId === customer.id || isDeleting ? 'Deleting...' : 'Delete'}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -236,10 +244,10 @@ export default function CustomersPage() {
 
       {/* Customer Dialog (Add/Edit) */}
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>{editingCustomer ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">{editingCustomer ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
+            <DialogDescription className="text-sm">
               {editingCustomer ? 'Edit the customer information below.' : 'Enter the new customer information.'}
             </DialogDescription>
           </DialogHeader>
@@ -250,15 +258,16 @@ export default function CustomersPage() {
               setCustomerDialogOpen(false);
               setEditingCustomer(null);
             }}
+            isLoading={isCreating || isUpdating}
           />
         </DialogContent>
       </Dialog>
     
       {/* Purchase History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Purchase History for {selectedCustomer?.name}</DialogTitle>
+            <DialogTitle className="text-lg sm:text-xl">Purchase History for {selectedCustomer?.name}</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <Table>

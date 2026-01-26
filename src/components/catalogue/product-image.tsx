@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 
 interface ProductImageProps {
   productId: string | number | undefined;
@@ -21,8 +22,16 @@ export function ProductImage({
 }: ProductImageProps) {
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { isOnline } = useNetworkStatus();
 
   useEffect(() => {
+    // Don't load images when offline
+    if (!isOnline) {
+      setDisplayUrl(null);
+      setIsLoading(false);
+      return;
+    }
+
     // Utiliser uniquement l'URL fournie (doit être une URL distante)
     if (imageUrl) {
       // S'assurer que l'URL utilise https://sfo3.digitaloceanspaces.com si elle est relative
@@ -37,33 +46,46 @@ export function ProductImage({
       setDisplayUrl(null);
     }
     setIsLoading(false);
-  }, [imageUrl]);
+  }, [imageUrl, isOnline]);
 
   if (isLoading) {
     return (
-      <div className={`w-10 h-10 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground ${className}`}>
+      <div className={`w-10 h-10 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground ${className}`} style={{ width: `${width}px`, height: `${height}px` }}>
         <div className="animate-pulse">...</div>
+      </div>
+    );
+  }
+
+  // Show placeholder when offline or no image URL
+  // Never render img tag when offline to prevent any network requests
+  if (!isOnline) {
+    return (
+      <div className={`w-10 h-10 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground ${className}`} style={{ width: `${width}px`, height: `${height}px` }}>
+        Offline
       </div>
     );
   }
 
   if (!displayUrl) {
     return (
-      <div className={`w-10 h-10 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground ${className}`}>
+      <div className={`w-10 h-10 rounded-md bg-muted flex items-center justify-center text-xs text-muted-foreground ${className}`} style={{ width: `${width}px`, height: `${height}px` }}>
         No img
       </div>
     );
   }
 
-  // Utiliser une balise img native pour les URLs distantes
+  // Only render img tag when online and we have a URL
+  // Use loading="lazy" to prevent eager loading
   return (
     <img
-      src={displayUrl || undefined}
+      src={displayUrl}
       alt={alt}
       width={width}
       height={height}
       className={`rounded-md object-cover ${className}`}
       style={{ width: `${width}px`, height: `${height}px` }}
+      loading="lazy"
+      decoding="async"
       onError={(e) => {
         // En cas d'erreur de chargement, afficher le placeholder
         setDisplayUrl(null);

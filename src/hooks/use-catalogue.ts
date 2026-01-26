@@ -1,155 +1,203 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogueApi } from '@/lib/api/catalogue';
 import type { ApiCategory, ApiProduct, CreateCategoryDto, UpdateCategoryDto, CreateProductDto, UpdateProductDto } from '@/types/catalogue';
 import type { PaginationMeta, PaginationParams } from '@/types/pagination';
 
-export function useCategories(initialPage: number = 1, initialLimit: number = 10) {
-  const [categories, setCategories] = useState<ApiCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(initialPage);
-  const [pagination, setPagination] = useState<PaginationMeta>({
-    total: 0,
-    page: initialPage,
-    limit: initialLimit,
-    totalPages: 1,
-  });
+// Query keys
+export const categoryKeys = {
+  all: ['categories'] as const,
+  lists: () => [...categoryKeys.all, 'list'] as const,
+  list: (filters: PaginationParams) => [...categoryKeys.lists(), filters] as const,
+  details: () => [...categoryKeys.all, 'detail'] as const,
+  detail: (id: string) => [...categoryKeys.details(), id] as const,
+};
 
-  const loadData = useCallback(async (page: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await catalogueApi.categories.getAll({ page, limit: initialLimit });
+export const productKeys = {
+  all: ['products'] as const,
+  lists: () => [...productKeys.all, 'list'] as const,
+  list: (filters: PaginationParams) => [...productKeys.lists(), filters] as const,
+  details: () => [...productKeys.all, 'detail'] as const,
+  detail: (id: string) => [...productKeys.details(), id] as const,
+};
 
-      if ('data' in response && 'meta' in response) {
-        setCategories(response.data);
-        setPagination(response.meta);
-      } else {
-        const data = response as ApiCategory[];
-        setCategories(data);
-        setPagination({
-          total: data.length,
-          page,
-          limit: initialLimit,
-          totalPages: Math.ceil(data.length / initialLimit) || 1,
-        });
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || 'Error loading categories');
-    } finally {
-      setLoading(false);
-    }
-  }, [initialLimit]);
-
-  useEffect(() => {
-    loadData(currentPage);
-  }, [loadData, currentPage]);
-
-  const createCategory = useCallback(async (data: CreateCategoryDto): Promise<ApiCategory> => {
-    try {
-      setError(null);
-      const newCategory = await catalogueApi.categories.create(data);
-      await loadData(currentPage);
-      return newCategory;
-    } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
-      const finalError = serverMessage || (err instanceof Error ? err.message : 'Error creating category');
-      setError(finalError);
-      throw new Error(finalError);
-    }
-  }, [loadData, currentPage]);
-
-  const updateCategory = useCallback(async (id: string, data: UpdateCategoryDto): Promise<ApiCategory> => {
-    try {
-      setError(null);
-      const updated = await catalogueApi.categories.update(id, data);
-      await loadData(currentPage);
-      return updated;
-    } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
-      const finalError = serverMessage || (err instanceof Error ? err.message : 'Error updating category');
-      setError(finalError);
-      throw new Error(finalError);
-    }
-  }, [loadData, currentPage]);
-
-  const deleteCategory = useCallback(async (id: string): Promise<void> => {
-    try {
-      setError(null);
-      await catalogueApi.categories.delete(id);
-      await loadData(currentPage);
-    } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
-      const finalError = serverMessage || (err instanceof Error ? err.message : 'Error deleting category');
-      setError(finalError);
-      throw new Error(finalError);
-    }
-  }, [loadData, currentPage]);
-
-  const loadPage = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
-
+// Helper to normalize API response
+function normalizeResponse<T>(response: T[] | { data: T[]; meta: PaginationMeta }): { data: T[]; meta: PaginationMeta } {
+  if ('data' in response && 'meta' in response) {
+    return response;
+  }
+  const data = response as T[];
   return {
-    categories,
-    pagination,
-    loading,
-    error,
-    createCategory,
-    updateCategory,
-    deleteCategory,
-    refresh: () => loadData(currentPage),
-    loadPage,
+    data,
+    meta: {
+      total: data.length,
+      page: 1,
+      limit: data.length || 10,
+      totalPages: 1,
+    },
   };
 }
 
+export function useCategories(initialPage: number = 1, initialLimit: number = 10) {
+  const queryClient = useQueryClient();
+  const queryKey = categoryKeys.list({ page: initialPage, limit: initialLimit });
 
-export function useProducts(initialPage: number = 1, initialLimit: number = 10) {
-  const [products, setProducts] = useState<ApiProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(initialPage);
-  const [filters, setFilters] = useState<Omit<PaginationParams, 'page' | 'limit'>>({});
-  const [pagination, setPagination] = useState<PaginationMeta>({
-    total: 0,
-    page: initialPage,
-    limit: initialLimit,
-    totalPages: 1,
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const response = await catalogueApi.categories.getAll({ page: initialPage, limit: initialLimit });
+      return normalizeResponse(response);
+    },
   });
 
-  const loadData = useCallback(async (page: number, currentFilters: Omit<PaginationParams, 'page' | 'limit'>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await catalogueApi.products.getAll({ page, limit: initialLimit, ...currentFilters });
+  const createMutation = useMutation({
+    mutationFn: (data: CreateCategoryDto) => catalogueApi.categories.create(data),
+    onMutate: async (newCategory) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
 
-      if ('data' in response && 'meta' in response) {
-        setProducts(response.data);
-        setPagination(response.meta);
-      } else {
-        const data = response as ApiProduct[];
-        setProducts(data);
-        setPagination({
-          total: data.length,
-          page,
-          limit: initialLimit,
-          totalPages: Math.ceil(data.length / initialLimit) || 1,
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey);
+
+      // Optimistically update
+      if (previousData) {
+        const optimisticCategory: ApiCategory = {
+          id: `temp-${Date.now()}`,
+          name: newCategory.name,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: [...previousData.data, optimisticCategory],
+          meta: {
+            ...previousData.meta,
+            total: previousData.meta.total + 1,
+          },
         });
       }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || err.message || 'Error loading products');
-    } finally {
-      setLoading(false);
-    }
-  }, [initialLimit]);
 
-  useEffect(() => {
-    loadData(currentPage, filters);
-  }, [loadData, currentPage, filters]);
+      return { previousData };
+    },
+    onError: (err, newCategory, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: (newCategory) => {
+      // Replace optimistic update with real data
+      queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map(cat => cat.id?.startsWith('temp-') ? newCategory : cat),
+        };
+      });
+      // Invalidate to refetch
+      queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+    },
+  });
 
-  const createProduct = useCallback(async (data: CreateProductDto | { name: string; price: number; costPrice: number; stock?: number; barCode?: string; productImage?: string; category: string }): Promise<ApiProduct> => {
-    try {
-      setError(null);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateCategoryDto }) =>
+      catalogueApi.categories.update(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey);
+
+      if (previousData) {
+        queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(cat =>
+            cat.id === id ? { ...cat, ...data, updatedAt: new Date().toISOString() } : cat
+          ),
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => catalogueApi.categories.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey);
+
+      if (previousData) {
+        queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.filter(cat => cat.id !== id),
+          meta: {
+            ...previousData.meta,
+            total: Math.max(0, previousData.meta.total - 1),
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+    },
+  });
+
+  return {
+    categories: query.data?.data || [],
+    pagination: query.data?.meta || {
+      total: 0,
+      page: initialPage,
+      limit: initialLimit,
+      totalPages: 1,
+    },
+    loading: query.isLoading,
+    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    createCategory: createMutation.mutateAsync,
+    updateCategory: (id: string, data: UpdateCategoryDto) => updateMutation.mutateAsync({ id, data }),
+    deleteCategory: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+    refresh: () => query.refetch(),
+    loadPage: (page: number) => {
+      // This would need to be handled by changing the query key, but for backward compatibility
+      // we'll just refetch with the new page
+      queryClient.invalidateQueries({ queryKey: categoryKeys.list({ page, limit: initialLimit }) });
+    },
+  };
+}
+
+export function useProducts(initialPage: number = 1, initialLimit: number = 10) {
+  const queryClient = useQueryClient();
+  const [filters, setFilters] = useState<Omit<PaginationParams, 'page' | 'limit'>>({});
+  const [currentPage, setCurrentPage] = useState(initialPage);
+  
+  const queryKey = productKeys.list({ page: currentPage, limit: initialLimit, ...filters });
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const response = await catalogueApi.products.getAll({ page: currentPage, limit: initialLimit, ...filters });
+      return normalizeResponse(response);
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateProductDto | { name: string; price: number; costPrice: number; stock?: number; barCode?: string; productImage?: string; category: string }) => {
       let createDto: CreateProductDto;
 
       if ('categoryId' in data) {
@@ -175,20 +223,56 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
         };
       }
 
-      const newProduct = await catalogueApi.products.create(createDto);
-      await loadData(currentPage, filters);
-      return newProduct;
-    } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
-      const finalError = serverMessage || (err instanceof Error ? err.message : 'Error creating product');
-      setError(finalError);
-      throw new Error(finalError);
-    }
-  }, [loadData, currentPage, filters]);
+      return catalogueApi.products.create(createDto);
+    },
+    onMutate: async (newProduct) => {
+      await queryClient.cancelQueries({ queryKey: productKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey);
 
-  const updateProduct = useCallback(async (id: string, data: UpdateProductDto | any): Promise<ApiProduct> => {
-    try {
-      setError(null);
+      if (previousData) {
+        const optimisticProduct: ApiProduct = {
+          id: `temp-${Date.now()}`,
+          name: 'name' in newProduct ? newProduct.name : '',
+          price: 'price' in newProduct ? newProduct.price : 0,
+          costPrice: 'costPrice' in newProduct ? newProduct.costPrice : 0,
+          stock: ('stock' in newProduct ? newProduct.stock : undefined) ?? null,
+          barCode: ('barCode' in newProduct ? newProduct.barCode : undefined) ?? null,
+          productImage: ('productImage' in newProduct ? newProduct.productImage : undefined) ?? null,
+          categoryId: 'categoryId' in newProduct ? newProduct.categoryId : '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: [...previousData.data, optimisticProduct],
+          meta: {
+            ...previousData.meta,
+            total: previousData.meta.total + 1,
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, newProduct, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: (newProduct) => {
+      queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map(prod => prod.id?.startsWith('temp-') ? newProduct : prod),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateProductDto | any }) => {
       let updateDto: UpdateProductDto = { ...data };
 
       // If category is provided as a string name, resolve it to categoryId
@@ -215,44 +299,80 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
         delete (updateDto as any).imageUrl;
       }
 
-      const updated = await catalogueApi.products.update(id, updateDto);
-      await loadData(currentPage, filters);
-      return updated;
-    } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
-      const finalError = serverMessage || (err instanceof Error ? err.message : 'Error updating product');
-      setError(finalError);
-      throw new Error(finalError);
-    }
-  }, [loadData, currentPage, filters]);
+      return catalogueApi.products.update(id, updateDto);
+    },
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: productKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey);
 
-  const deleteProduct = useCallback(async (id: string): Promise<void> => {
-    try {
-      setError(null);
-      await catalogueApi.products.delete(id);
-      await loadData(currentPage, filters);
-    } catch (err: any) {
-      const serverMessage = err?.response?.data?.message;
-      const finalError = serverMessage || (err instanceof Error ? err.message : 'Error deleting product');
-      setError(finalError);
-      throw new Error(finalError);
-    }
-  }, [loadData, currentPage, filters]);
+      if (previousData) {
+        queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.map(prod =>
+            prod.id === id ? { ...prod, ...data, updatedAt: new Date().toISOString() } : prod
+          ),
+        });
+      }
 
-  const loadPage = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => catalogueApi.products.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: productKeys.lists() });
+      const previousData = queryClient.getQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey);
+
+      if (previousData) {
+        queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, {
+          ...previousData,
+          data: previousData.data.filter(prod => prod.id !== id),
+          meta: {
+            ...previousData.meta,
+            total: Math.max(0, previousData.meta.total - 1),
+          },
+        });
+      }
+
+      return { previousData };
+    },
+    onError: (err, id, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    },
+  });
 
   return {
-    products,
-    pagination,
-    loading,
-    error,
-    createProduct,
-    updateProduct,
-    deleteProduct,
+    products: query.data?.data || [],
+    pagination: query.data?.meta || {
+      total: 0,
+      page: currentPage,
+      limit: initialLimit,
+      totalPages: 1,
+    },
+    loading: query.isLoading,
+    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    createProduct: createMutation.mutateAsync,
+    updateProduct: (id: string, data: UpdateProductDto | any) => updateMutation.mutateAsync({ id, data }),
+    deleteProduct: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     setFilters,
-    refresh: () => loadData(currentPage, filters),
-    loadPage,
+    refresh: () => query.refetch(),
+    loadPage: setCurrentPage,
   };
 }

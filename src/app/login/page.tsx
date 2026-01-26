@@ -79,11 +79,11 @@ export default function LoginPage() {
 
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted">
+    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Welcome Back!</CardTitle>
-          <CardDescription>Enter your details to sign in to your store</CardDescription>
+          <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
+          <CardDescription className="text-sm">Enter your details to sign in to your store</CardDescription>
         </CardHeader>
         <CardContent>
             <Form {...form}>
@@ -95,7 +95,7 @@ export default function LoginPage() {
                             <FormItem>
                                 <FormLabel>Mobile Number</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="e.g., 0812345678" {...field} />
+                                    <Input placeholder="e.g., 0812345678" className="touch-target" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -108,17 +108,17 @@ export default function LoginPage() {
                             <FormItem>
                                 <FormLabel>Password</FormLabel>
                                 <FormControl>
-                                    <Input type="password" {...field} />
+                                    <Input type="password" className="touch-target" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
                         )}
                     />
-                    <Button type="submit" className="w-full">Sign In</Button>
+                    <Button type="submit" className="w-full min-h-[44px] touch-target">Sign In</Button>
                 </form>
             </Form>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-                First time here? <Button variant="link" className="p-0" asChild><Link href="/request-access">Request Access</Link></Button>
+                First time here? <Button variant="link" className="p-0 min-h-[44px] touch-target" asChild><Link href="/request-access">Request Access</Link></Button>
             </p>
         </CardContent>
       </Card>
