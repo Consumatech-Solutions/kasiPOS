@@ -15,8 +15,8 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             networkMode: 'offlineFirst', // Try cache first, then network
-            staleTime: 5 * 60 * 1000, // 5 minutes
-            gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+            staleTime: 30 * 60 * 1000, // 30 minutes - longer to support offline use
+            gcTime: 24 * 60 * 60 * 1000, // 24 hours - keep data in memory longer for offline
             retry: (failureCount, error: any) => {
               // Don't retry on 4xx errors
               if (error?.response?.status >= 400 && error?.response?.status < 500) {

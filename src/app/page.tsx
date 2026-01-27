@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 
@@ -22,9 +22,11 @@ import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
-import { useCategories, useProducts } from '@/hooks/use-catalogue';
+import { useCategories, useProducts, productKeys } from '@/hooks/use-catalogue';
 import { transactionsApi } from '@/lib/api/transactions';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
+import { mutationQueue } from '@/lib/mutation-queue';
 
 
 
@@ -32,6 +34,7 @@ export default function PosPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
+  const queryClient = useQueryClient();
 
   const [cart, setCart] = useState<Map<string, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
@@ -54,6 +57,15 @@ export default function PosPage() {
 
   const products = apiProducts;
 
+  // Memoize categoryId lookup to prevent infinite loops
+  const categoryId = useMemo(() => {
+    if (!activeCategory || !apiCategories) return undefined;
+    return apiCategories.find(c => c.name === activeCategory)?.id;
+  }, [activeCategory, apiCategories]);
+
+  // Track previous categoryId to prevent unnecessary updates
+  const prevCategoryIdRef = useRef<string | undefined>(undefined);
+
   // Debounce search and update filters
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -62,11 +74,13 @@ export default function PosPage() {
     return () => clearTimeout(timer);
   }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update category filter
+  // Update category filter only when categoryId actually changes
   useEffect(() => {
-    const categoryId = apiCategories.find(c => c.name === activeCategory)?.id;
-    setFilters((prev: any) => ({ ...prev, categoryId }));
-  }, [activeCategory, apiCategories]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (categoryId !== prevCategoryIdRef.current) {
+      prevCategoryIdRef.current = categoryId;
+      setFilters((prev: any) => ({ ...prev, categoryId }));
+    }
+  }, [categoryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allCategories = useMemo(() => {
     if (!apiCategories) return [];
@@ -211,43 +225,119 @@ export default function PosPage() {
       storeId: currentStore.id!,
     };
     
-    try {
-      // 0. Persist to backend (online required)
-      await transactionsApi.create({
-        storeId: newTransaction.storeId,
-        customerId: newTransaction.customerId ?? undefined,
-        items: newTransaction.items,
-        total: newTransaction.total,
-        paymentMethod: newTransaction.paymentMethod,
-        voucherCode: newTransaction.voucherCode ?? undefined,
-        discountAmount: newTransaction.discountAmount ?? undefined,
-      });
+    if (isOnline) {
+      // ONLINE: Use API - backend will update stock
+      try {
+        await transactionsApi.create({
+          storeId: newTransaction.storeId,
+          customerId: newTransaction.customerId ?? undefined,
+          items: newTransaction.items,
+          total: newTransaction.total,
+          paymentMethod: newTransaction.paymentMethod,
+          voucherCode: newTransaction.voucherCode ?? undefined,
+          discountAmount: newTransaction.discountAmount ?? undefined,
+        });
 
-      await db.transaction('rw', db.transactions, db.products, async () => {
-        // 1. Save transaction
+        // Save to local DB for history
         await db.transactions.add(newTransaction as Transaction);
+
+        // Refresh products from API to get updated stock
+        queryClient.invalidateQueries({ queryKey: productKeys.lists(), refetchType: 'all' });
+
+        toast({
+          title: "Sale Complete!",
+          description: `Transaction has been processed successfully.`,
+        });
+
+        // Reset state
+        clearCart();
+        setSelectedCustomerId(undefined);
+        setActivePaymentMethod(null);
+      } catch (error) {
+        console.error("Failed to complete sale:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to complete the sale. Please try again.",
+        });
+      } finally {
+        setIsCompletingSale(false);
+      }
+    } else {
+      // OFFLINE: Optimistically update and queue for later sync
+      try {
+        // 1. Optimistic cache update FIRST (synchronous, immediate UI feedback)
+        const productQueryKeys = queryClient.getQueryCache().getAll().map(query => query.queryKey);
+        const productQueries = productQueryKeys.filter(key => 
+          Array.isArray(key) && key[0] === 'products'
+        );
+
+        // Update stock optimistically for all product queries
+        productQueries.forEach(queryKey => {
+          queryClient.setQueryData<{ data: any[]; meta: any }>(queryKey, (old) => {
+            if (!old || !old.data) return old;
+            return {
+              ...old,
+              data: old.data.map(product => {
+                const cartItem = newTransaction.items.find(item => item.productId === product.id);
+                if (cartItem) {
+                  const currentStock = product.stock ?? 0;
+                  const newStock = Math.max(0, currentStock - cartItem.quantity);
+                  return { ...product, stock: newStock };
+                }
+                return product;
+              }),
+            };
+          });
+        });
+
+        // 2. Save transaction to local IndexedDB
+        await db.transactions.add(newTransaction as Transaction);
+
+        // 3. Queue the transaction for sync when back online
+        mutationQueue.add({
+          mutationKey: ['transactions', 'create'],
+          mutationFn: () => transactionsApi.create({
+            storeId: newTransaction.storeId,
+            customerId: newTransaction.customerId ?? undefined,
+            items: newTransaction.items,
+            total: newTransaction.total,
+            paymentMethod: newTransaction.paymentMethod,
+            voucherCode: newTransaction.voucherCode ?? undefined,
+            discountAmount: newTransaction.discountAmount ?? undefined,
+          }),
+          variables: newTransaction,
+        });
+
+        // 4. Show success and clear cart
+        toast({
+          title: "Offline Sale Complete!",
+          description: "Sale saved locally. Will sync when back online.",
+        });
+
+        clearCart();
+        setSelectedCustomerId(undefined);
+        setActivePaymentMethod(null);
+      } catch (error) {
+        console.error("Failed to complete offline sale:", error);
         
-        // 2. (Optional) Local product stock cache update skipped here because IndexedDB product IDs may differ
-      });
+        // Rollback optimistic updates on error
+        const productQueryKeys = queryClient.getQueryCache().getAll().map(query => query.queryKey);
+        const productQueries = productQueryKeys.filter(key => 
+          Array.isArray(key) && key[0] === 'products'
+        );
+        productQueries.forEach(queryKey => {
+          queryClient.invalidateQueries({ queryKey });
+        });
 
-      toast({
-        title: "Sale Complete!",
-        description: `Transaction #${(await db.transactions.toCollection().last()).id} has been processed.`,
-      });
-
-      // Reset state
-      clearCart();
-      setSelectedCustomerId(undefined);
-      setActivePaymentMethod(null);
-    } catch (error) {
-      console.error("Failed to complete sale:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to complete the sale.",
-      });
-    } finally {
-      setIsCompletingSale(false);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to save the sale locally. Please try again.",
+        });
+      } finally {
+        setIsCompletingSale(false);
+      }
     }
   };
 

@@ -194,6 +194,8 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       const response = await catalogueApi.products.getAll({ page: currentPage, limit: initialLimit, ...filters });
       return normalizeResponse(response);
     },
+    staleTime: 0, // Always consider data stale to refetch on navigation
+    refetchOnMount: 'always', // Always refetch when component mounts
   });
 
   const createMutation = useMutation({

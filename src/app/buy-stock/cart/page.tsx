@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -38,35 +38,41 @@ export default function BuyStockCartPage() {
     }
   }, []);
 
-  const updateCart = (newCart: PurchaseOrderItem[]) => {
+  const updateCart = useCallback((newCart: PurchaseOrderItem[]) => {
     setCart(newCart);
     localStorage.setItem('purchaseOrderCart', JSON.stringify(newCart));
-  };
+  }, []);
   
-  const handleQuantityChange = (productId: string, newQuantity: number) => {
-    const newCart = cart.map(item => {
-      if (item.productId === productId) {
-        if (newQuantity <= 0) return null; // Mark for removal
-        const updatedItem = { ...item, quantity: newQuantity };
-        updatedItem.totalPrice = updatedItem.quantity * updatedItem.groupPrice;
-        return updatedItem;
-      }
-      return item;
-    }).filter(Boolean) as PurchaseOrderItem[];
-    updateCart(newCart);
-  };
+  const handleQuantityChange = useCallback((productId: string, newQuantity: number) => {
+    setCart(prevCart => {
+      const newCart = prevCart.map(item => {
+        if (item.productId === productId) {
+          if (newQuantity <= 0) return null; // Mark for removal
+          const updatedItem = { ...item, quantity: newQuantity };
+          updatedItem.totalPrice = updatedItem.quantity * updatedItem.groupPrice;
+          return updatedItem;
+        }
+        return item;
+      }).filter(Boolean) as PurchaseOrderItem[];
+      localStorage.setItem('purchaseOrderCart', JSON.stringify(newCart));
+      return newCart;
+    });
+  }, []);
   
-  const handleRemoveItem = (productId: string) => {
-    const newCart = cart.filter(item => item.productId !== productId);
-    updateCart(newCart);
-  };
+  const handleRemoveItem = useCallback((productId: string) => {
+    setCart(prevCart => {
+      const newCart = prevCart.filter(item => item.productId !== productId);
+      localStorage.setItem('purchaseOrderCart', JSON.stringify(newCart));
+      return newCart;
+    });
+  }, []);
   
   const subtotal = useMemo(() => cart.reduce((acc, item) => acc + item.totalPrice, 0), [cart]);
   const total = useMemo(() => subtotal + (deliveryMethod === 'delivery' ? DELIVERY_FEE : 0), [subtotal, deliveryMethod]);
   
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
 
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = useCallback(async () => {
     if (!currentStore) {
       toast({ variant: 'destructive', title: 'Error', description: 'No store context found.' });
       return;
@@ -89,7 +95,7 @@ export default function BuyStockCartPage() {
       const createdOrder = response.data;
       setConfirmedOrderCode(createdOrder.orderCode);
       setIsOrderConfirmed(true);
-      updateCart([]); // Clear the cart
+      setCart([]); // Clear the cart
       localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
     } catch (error: any) {
       console.error('Failed to save purchase order:', error);
@@ -98,12 +104,12 @@ export default function BuyStockCartPage() {
     } finally {
       setIsConfirmingOrder(false);
     }
-  };
+  }, [cart, subtotal, total, deliveryMethod, currentStore, toast]);
   
-  const closeConfirmationDialog = () => {
+  const closeConfirmationDialog = useCallback(() => {
     setIsOrderConfirmed(false);
     router.push('/buy-stock/history');
-  }
+  }, [router]);
 
   return (
     <>
