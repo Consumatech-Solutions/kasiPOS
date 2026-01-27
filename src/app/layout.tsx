@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SettingsProvider } from '@/components/settings-provider';
 import { ClientDbProvider } from '@/components/client-db-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { DataPreloader } from '@/components/providers/data-preloader';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
         <QueryProvider>
+          <DataPreloader />
           <ClientDbProvider>
             <SettingsProvider>
               <AppShell>{children}</AppShell>
