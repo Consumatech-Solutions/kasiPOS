@@ -61,6 +61,7 @@ import { useProducts, useCategories } from "@/hooks/use-catalogue";
 import { useMarketplaceOrders } from "@/hooks/use-marketplace-orders";
 import { useMarketplaceStores } from "@/hooks/use-marketplace-stores";
 import { useNetworkStatus } from "@/hooks/use-network-status";
+import { getProductInitials } from "@/lib/utils/product-initials";
 
 const quickAccessCategories = [
   "Bread",
@@ -199,7 +200,7 @@ export default function StorePosPage() {
           quantity: 1,
           unitPrice: unitPrice,
           totalPrice: unitPrice,
-          imageUrl: product.productImage || '/placeholder-product.png',
+          imageUrl: product.productImage || undefined,
           stock: product.stock !== null ? product.stock : undefined,
         });
       }
@@ -466,20 +467,31 @@ export default function StorePosPage() {
                               <div className="flex items-center justify-center">
                                 {isOnline && product.productImage ? (
                                   <img
-                                    src={product.productImage || '/placeholder-product.png'}
+                                    src={product.productImage}
                                     alt={product.name}
                                     width={300}
                                     height={300}
                                     className="rounded-md object-cover max-w-full h-auto"
                                     loading="lazy"
                                     decoding="async"
-                                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }}
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const initialsDiv = target.nextElementSibling as HTMLElement;
+                                      if (initialsDiv) {
+                                        initialsDiv.style.display = 'flex';
+                                      }
+                                    }}
                                   />
-                                ) : (
-                                  <div className="w-[300px] h-[300px] rounded-md bg-muted flex items-center justify-center text-muted-foreground">
-                                    {isOnline ? 'No image' : 'Offline - Image not available'}
-                                  </div>
-                                )}
+                                ) : null}
+                                <div 
+                                  className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${isOnline && product.productImage ? 'hidden' : ''}`}
+                                  style={{ display: isOnline && product.productImage ? 'none' : 'flex' }}
+                                >
+                                  <span className="text-6xl font-bold text-primary">
+                                    {getProductInitials(product.name)}
+                                  </span>
+                                </div>
                               </div>
                             </DialogContent>
                           </Dialog>
@@ -604,17 +616,32 @@ export default function StorePosPage() {
                       key={item.productId}
                       className="flex items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50"
                     >
-                      <Image
-                        src={item.imageUrl || "/placeholder-product.png"}
-                        alt={item.productName}
-                        width={40}
-                        height={40}
-                        className="rounded-md bg-gray-200 object-cover flex-shrink-0"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "/placeholder-product.png";
-                        }}
-                      />
+                      {item.imageUrl ? (
+                        <div className="relative w-10 h-10 flex-shrink-0">
+                          <Image
+                            src={item.imageUrl}
+                            alt={item.productName}
+                            width={40}
+                            height={40}
+                            className="rounded-md bg-gray-200 object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const initialsDiv = target.nextElementSibling as HTMLElement;
+                              if (initialsDiv) {
+                                initialsDiv.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                            {getProductInitials(item.productName)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
+                          {getProductInitials(item.productName)}
+                        </div>
+                      )}
                       <div className="flex-grow min-w-0">
                         <p className="font-medium text-xs sm:text-sm truncate">
                           {item.productName}

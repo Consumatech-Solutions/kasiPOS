@@ -17,6 +17,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 import type { PurchaseOrderItem } from '@/types';
 import { useSettings } from '@/components/settings-provider';
 import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { mutationQueue } from '@/lib/mutation-queue';
 
 const DELIVERY_FEE = 150.00;
 
@@ -25,6 +27,7 @@ export default function BuyStockCartPage() {
   const { toast } = useToast();
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const { isOnline } = useNetworkStatus();
   
   const [cart, setCart] = useState<PurchaseOrderItem[]>([]);
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'collection'>('collection');
@@ -83,28 +86,69 @@ export default function BuyStockCartPage() {
     }
     
     setIsConfirmingOrder(true);
-    try {
-      const response = await purchaseOrdersApi.create({
-        items: cart,
-        subtotal: subtotal,
-        deliveryFee: deliveryMethod === 'delivery' ? DELIVERY_FEE : 0,
-        total: total,
-        deliveryMethod,
-      });
+    
+    if (isOnline) {
+      // ONLINE: Use API directly
+      try {
+        const response = await purchaseOrdersApi.create({
+          items: cart,
+          subtotal: subtotal,
+          deliveryFee: deliveryMethod === 'delivery' ? DELIVERY_FEE : 0,
+          total: total,
+          deliveryMethod,
+        });
 
-      const createdOrder = response.data;
-      setConfirmedOrderCode(createdOrder.orderCode);
-      setIsOrderConfirmed(true);
-      setCart([]); // Clear the cart
-      localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
-    } catch (error: any) {
-      console.error('Failed to save purchase order:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Could not save the purchase order.';
-      toast({ variant: 'destructive', title: 'Error', description: errorMessage });
-    } finally {
-      setIsConfirmingOrder(false);
+        const createdOrder = response.data;
+        setConfirmedOrderCode(createdOrder.orderCode);
+        setIsOrderConfirmed(true);
+        setCart([]); // Clear the cart
+        localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
+      } catch (error: any) {
+        console.error('Failed to save purchase order:', error);
+        const errorMessage = error?.response?.data?.message || error?.message || 'Could not save the purchase order.';
+        toast({ variant: 'destructive', title: 'Error', description: errorMessage });
+      } finally {
+        setIsConfirmingOrder(false);
+      }
+    } else {
+      // OFFLINE: Queue for sync and show success immediately
+      try {
+        // Generate a temporary order code for offline
+        const tempOrderCode = `PO-${Date.now()}`;
+        
+        // Queue the mutation for sync
+        mutationQueue.add({
+          mutationKey: ['purchaseOrders', 'create'],
+          mutationFn: () => purchaseOrdersApi.create({
+            items: cart,
+            subtotal: subtotal,
+            deliveryFee: deliveryMethod === 'delivery' ? DELIVERY_FEE : 0,
+            total: total,
+            deliveryMethod,
+          }),
+          variables: { cart, subtotal, total, deliveryMethod },
+        });
+
+        // Clear loading state immediately
+        setIsConfirmingOrder(false);
+
+        // Show success with temp code
+        setConfirmedOrderCode(tempOrderCode);
+        setIsOrderConfirmed(true);
+        setCart([]); // Clear the cart
+        localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
+        
+        toast({
+          title: "Order Queued!",
+          description: "Order saved locally. Will sync when back online.",
+        });
+      } catch (error: any) {
+        console.error('Failed to queue purchase order:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to save order locally.' });
+        setIsConfirmingOrder(false);
+      }
     }
-  }, [cart, subtotal, total, deliveryMethod, currentStore, toast]);
+  }, [cart, subtotal, total, deliveryMethod, currentStore, toast, isOnline]);
   
   const closeConfirmationDialog = useCallback(() => {
     setIsOrderConfirmed(false);

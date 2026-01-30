@@ -1,13 +1,29 @@
 import { QueryClient } from '@tanstack/react-query';
 
-interface QueuedMutation {
+export interface QueuedMutation {
   id: string;
   mutationKey: string[];
   mutationFn: () => Promise<any>;
   variables: any;
   timestamp: number;
   retries: number;
+  status?: 'pending' | 'syncing' | 'completed' | 'failed';
 }
+
+export type SyncStatus = 'idle' | 'syncing' | 'preloading';
+
+export interface SyncStatusData {
+  status: SyncStatus;
+  pendingCount: number;
+  currentMutation: QueuedMutation | null;
+  queue: QueuedMutation[];
+  preloadProgress?: {
+    completed: number;
+    total: number;
+  };
+}
+
+type StatusChangeCallback = (status: SyncStatusData) => void;
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
@@ -18,12 +34,67 @@ class MutationQueue {
   private processing = false;
   private queryClient: QueryClient | null = null;
   private onlineHandler: (() => void) | null = null;
+  private statusChangeCallbacks: StatusChangeCallback[] = [];
+  private currentStatus: SyncStatus = 'idle';
+  private currentMutation: QueuedMutation | null = null;
+  private preloadProgress: { completed: number; total: number } | undefined = undefined;
 
   constructor() {
     // Restore queue from localStorage on initialization
     this.restoreQueue();
     // Setup online listener
     this.setupOnlineListener();
+  }
+
+  private notifyStatusChange() {
+    const statusData: SyncStatusData = {
+      status: this.currentStatus,
+      pendingCount: this.queue.length,
+      currentMutation: this.currentMutation,
+      queue: [...this.queue],
+      preloadProgress: this.preloadProgress,
+    };
+    this.statusChangeCallbacks.forEach(callback => callback(statusData));
+  }
+
+  subscribe(callback: StatusChangeCallback): () => void {
+    this.statusChangeCallbacks.push(callback);
+    // Immediately call with current status
+    callback(this.getStatus());
+    // Return unsubscribe function
+    return () => {
+      const index = this.statusChangeCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.statusChangeCallbacks.splice(index, 1);
+      }
+    };
+  }
+
+  setPreloadProgress(completed: number, total: number) {
+    this.preloadProgress = { completed, total };
+    if (completed < total) {
+      this.currentStatus = 'preloading';
+    } else {
+      this.preloadProgress = undefined;
+      if (this.queue.length === 0) {
+        this.currentStatus = 'idle';
+      }
+    }
+    this.notifyStatusChange();
+  }
+
+  getStatus(): SyncStatusData {
+    return {
+      status: this.currentStatus,
+      pendingCount: this.queue.length,
+      currentMutation: this.currentMutation,
+      queue: [...this.queue],
+      preloadProgress: this.preloadProgress,
+    };
+  }
+
+  getCurrentMutation(): QueuedMutation | null {
+    return this.currentMutation;
   }
 
   private setupOnlineListener() {
@@ -78,16 +149,23 @@ class MutationQueue {
     }
   }
 
-  add(mutation: Omit<QueuedMutation, 'id' | 'timestamp' | 'retries'>) {
+  add(mutation: Omit<QueuedMutation, 'id' | 'timestamp' | 'retries' | 'status'>) {
     const queuedMutation: QueuedMutation = {
       ...mutation,
       id: `mutation-${Date.now()}-${Math.random()}`,
       timestamp: Date.now(),
       retries: 0,
+      status: 'pending',
     };
 
     this.queue.push(queuedMutation);
     this.persistQueue();
+    
+    // Update status if not preloading
+    if (this.currentStatus !== 'preloading') {
+      this.currentStatus = 'idle';
+    }
+    this.notifyStatusChange();
     
     // Only process if online
     if (typeof window !== 'undefined' && navigator.onLine) {
@@ -109,21 +187,31 @@ class MutationQueue {
     }
 
     this.processing = true;
+    this.currentStatus = 'syncing';
     console.log(`[MutationQueue] Processing ${this.queue.length} queued mutations`);
+    this.notifyStatusChange();
 
     while (this.queue.length > 0) {
       // Re-check online status before each mutation
       if (typeof window !== 'undefined' && !navigator.onLine) {
         console.log('[MutationQueue] Went offline during processing - pausing');
+        this.currentStatus = 'idle';
+        this.currentMutation = null;
+        this.notifyStatusChange();
         break;
       }
 
       const mutation = this.queue[0];
+      this.currentMutation = mutation;
+      mutation.status = 'syncing';
+      this.notifyStatusChange();
 
       try {
         await mutation.mutationFn();
         // Success - remove from queue
+        mutation.status = 'completed';
         this.queue.shift();
+        this.currentMutation = null;
         this.persistQueue();
         console.log(`[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join('/')}`);
         
@@ -134,6 +222,8 @@ class MutationQueue {
             refetchType: 'all',
           });
         }
+        
+        this.notifyStatusChange();
       } catch (error: any) {
         // Check if it's a network error
         const isNetworkError = !navigator.onLine || 
@@ -142,30 +232,42 @@ class MutationQueue {
         
         if (isNetworkError) {
           console.log('[MutationQueue] Network error - will retry when online');
+          mutation.status = 'pending';
+          this.currentMutation = null;
+          this.currentStatus = 'idle';
+          this.notifyStatusChange();
           break;
         }
         
         // Check if we should retry
         if (mutation.retries < MAX_RETRIES) {
           mutation.retries++;
+          mutation.status = 'pending';
           console.log(`[MutationQueue] Retrying mutation (attempt ${mutation.retries}/${MAX_RETRIES})`);
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * mutation.retries));
           // Try again (mutation stays at front of queue)
         } else {
           // Max retries reached - remove from queue
+          mutation.status = 'failed';
           console.error('[MutationQueue] Mutation failed after max retries:', mutation.mutationKey, error);
           this.queue.shift();
+          this.currentMutation = null;
           this.persistQueue();
+          this.notifyStatusChange();
         }
       }
     }
 
     this.processing = false;
+    this.currentStatus = this.queue.length > 0 ? 'idle' : 'idle';
+    this.currentMutation = null;
     
     if (this.queue.length === 0) {
       console.log('[MutationQueue] All mutations synced successfully');
     }
+    
+    this.notifyStatusChange();
   }
 
   getQueue() {
