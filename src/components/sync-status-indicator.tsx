@@ -1,22 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSyncStatus } from '@/hooks/use-sync-status';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sync, CheckCircle2, Loader2, Download } from 'lucide-react';
+import { CheckCircle2, Loader2, Download, FolderSync } from 'lucide-react';
 import { SyncStatusModal } from './sync-status-modal';
 
 export function SyncStatusIndicator() {
-  const { status, pendingCount, isSyncing, isPreloading, preloadProgress } = useSyncStatus();
+  // ALL HOOKS MUST BE CALLED FIRST - in the same order every render
+  // Hook 1: useSyncStatus (contains useState and useEffect internally)
+  const syncStatus = useSyncStatus();
+  
+  // Hook 2: useState
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Don't show if idle and no pending mutations
-  if (status === 'idle' && pendingCount === 0 && !isPreloading) {
-    return null;
-  }
-
-  const getIcon = () => {
+  
+  // Hook 3: useMemo for icon
+  const icon = useMemo(() => {
+    const isPreloading = syncStatus?.isPreloading ?? false;
+    const isSyncing = syncStatus?.isSyncing ?? false;
+    const pendingCount = syncStatus?.pendingCount ?? 0;
+    
     if (isPreloading) {
       return <Download className="h-4 w-4 animate-pulse" />;
     }
@@ -24,12 +28,17 @@ export function SyncStatusIndicator() {
       return <Loader2 className="h-4 w-4 animate-spin" />;
     }
     if (pendingCount > 0) {
-      return <Sync className="h-4 w-4" />;
+      return <FolderSync className="h-4 w-4" />;
     }
     return <CheckCircle2 className="h-4 w-4" />;
-  };
-
-  const getColor = () => {
+  }, [syncStatus?.isPreloading, syncStatus?.isSyncing, syncStatus?.pendingCount]);
+  
+  // Hook 4: useMemo for colorClass
+  const colorClass = useMemo(() => {
+    const isPreloading = syncStatus?.isPreloading ?? false;
+    const isSyncing = syncStatus?.isSyncing ?? false;
+    const pendingCount = syncStatus?.pendingCount ?? 0;
+    
     if (isPreloading || isSyncing) {
       return 'bg-blue-500 hover:bg-blue-600';
     }
@@ -37,34 +46,50 @@ export function SyncStatusIndicator() {
       return 'bg-orange-500 hover:bg-orange-600';
     }
     return 'bg-green-500 hover:bg-green-600';
-  };
+  }, [syncStatus?.isPreloading, syncStatus?.isSyncing, syncStatus?.pendingCount]);
+
+  // Extract values with defaults to handle undefined case (after all hooks)
+  const status = syncStatus?.status ?? 'idle';
+  const pendingCount = syncStatus?.pendingCount ?? 0;
+  const isPreloading = syncStatus?.isPreloading ?? false;
+  const preloadProgress = syncStatus?.preloadProgress;
+
+  // NOW we can do conditional returns AFTER all hooks are called
+  // Don't show if idle and no pending mutations
+  if (status === 'idle' && pendingCount === 0 && !isPreloading) {
+    return null;
+  }
 
   return (
     <>
-      <Button
-        onClick={() => setIsModalOpen(true)}
-        className={`fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg ${getColor()} text-white p-0`}
-        size="icon"
-      >
-        {getIcon()}
-        {pendingCount > 0 && (
-          <Badge 
-            variant="destructive" 
-            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-          >
-            {pendingCount > 9 ? '9+' : pendingCount}
-          </Badge>
-        )}
-        {isPreloading && preloadProgress && (
-          <Badge 
-            variant="secondary" 
-            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-          >
-            {preloadProgress.completed}/{preloadProgress.total}
-          </Badge>
-        )}
-      </Button>
-      <SyncStatusModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          className={`h-12 w-12 rounded-full shadow-lg ${colorClass} text-white p-0 relative`}
+          size="icon"
+        >
+          {icon}
+          {pendingCount > 0 && (
+            <Badge 
+              variant="destructive" 
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {pendingCount > 9 ? '9+' : pendingCount}
+            </Badge>
+          )}
+          {isPreloading && preloadProgress && (
+            <Badge 
+              variant="secondary" 
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {preloadProgress.completed}/{preloadProgress.total}
+            </Badge>
+          )}
+        </Button>
+      </div>
+      {isModalOpen && (
+        <SyncStatusModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      )}
     </>
   );
 }

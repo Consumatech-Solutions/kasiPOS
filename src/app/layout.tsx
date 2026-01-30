@@ -34,9 +34,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
         <QueryProvider>
-          <DataPreloader />
           <ClientDbProvider>
             <SettingsProvider>
+              <DataPreloader />
               <AppShell>{children}</AppShell>
               <Toaster />
               <SyncStatusIndicator />

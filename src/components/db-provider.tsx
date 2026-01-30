@@ -55,8 +55,21 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
     if ('serviceWorker' in navigator) {
       const registerSW = async () => {
         try {
+          // First, unregister any existing service workers to clear old workbox caches
+          const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of existingRegistrations) {
+            // Only unregister if it's not our current service worker
+            const swUrl = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL;
+            if (swUrl && !swUrl.includes('/sw.js')) {
+              console.log('[Service Worker] Unregistering old service worker:', swUrl);
+              await registration.unregister();
+            }
+          }
+
+          // Register our service worker
           const registration = await navigator.serviceWorker.register('/sw.js', {
             scope: '/',
+            updateViaCache: 'none', // Always check for updates
           });
           
           console.log('[Service Worker] Registered:', registration);
