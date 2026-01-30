@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { AppSettings, User, Store } from '@/types';
 import { storesApi } from '@/lib/api/stores';
 import { authApi } from '@/lib/api/auth';
-import { fetchAndSaveStore, loadStoreFromIndexedDB } from '@/lib/store-persistence';
 
 
 interface SettingsContextType {
@@ -65,6 +64,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [isPwa, setIsPwa] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  const setSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
   // Load store from IndexedDB on initial load if not in localStorage
   useEffect(() => {
     const loadStoreFromIndexedDB = async () => {
@@ -88,13 +94,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       loadStoreFromIndexedDB();
     }
   }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
-
-  const router = useRouter();
-  const pathname = usePathname();
-  
-  const setSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-  }, []);
 
   const logout = useCallback(async () => {
     const theme = settings.theme; // Preserve theme across logout
@@ -146,6 +145,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 // 2. Fetch Store if user has a storeId and save permanently
                 if (freshUser.storeId && storesApi?.getMyStore) {
                      try {
+                        const { fetchAndSaveStore } = await import('@/lib/store-persistence');
                         const store = await fetchAndSaveStore(setSetting);
                         if (store) {
                             setSetting('currentStore', store);
@@ -154,6 +154,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                         // If network fails, try loading from IndexedDB
                         if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
                             console.log('[SettingsProvider] Network error - loading store from IndexedDB');
+                            const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
                             const cachedStore = await loadStoreFromIndexedDB(freshUser.storeId);
                             if (cachedStore) {
                                 setSetting('currentStore', cachedStore);
@@ -165,12 +166,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 } else if (!settings.currentStore && storesApi?.getMyStore) {
                      // Fallback check - try to fetch store
                      try {
+                        const { fetchAndSaveStore } = await import('@/lib/store-persistence');
                         const store = await fetchAndSaveStore(setSetting);
                         if (store) {
                             setSetting('currentStore', store);
                         }
                      } catch (e) {
                          // Try loading from IndexedDB as last resort
+                         const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
                          const cachedStore = await loadStoreFromIndexedDB();
                          if (cachedStore) {
                              setSetting('currentStore', cachedStore);
@@ -178,6 +181,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                      }
                 } else if (!settings.currentStore) {
                     // If no storeId and no store in settings, try loading from IndexedDB
+                    const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
                     const cachedStore = await loadStoreFromIndexedDB();
                     if (cachedStore) {
                         setSetting('currentStore', cachedStore);
@@ -287,11 +291,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     // Fetch and save store immediately after login
     try {
+        const { fetchAndSaveStore } = await import('@/lib/store-persistence');
         const store = await fetchAndSaveStore(setSetting);
         if (store) {
             setSetting('currentStore', store);
         } else {
             // If fetch fails, try loading from IndexedDB
+            const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
             const cachedStore = await loadStoreFromIndexedDB(userData.storeId);
             if (cachedStore) {
                 setSetting('currentStore', cachedStore);
@@ -301,6 +307,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         // If network fails, try loading from IndexedDB
         if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
             console.log('[SettingsProvider] Network error during login - loading store from IndexedDB');
+            const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
             const cachedStore = await loadStoreFromIndexedDB(userData.storeId);
             if (cachedStore) {
                 setSetting('currentStore', cachedStore);
