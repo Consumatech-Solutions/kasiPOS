@@ -1,7 +1,7 @@
 'use client';
 
 import type { Store } from '@/types';
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import type { StoreRecord } from '@/lib/db';
 
 /**
@@ -36,6 +36,7 @@ export async function saveStorePermanently(
     // 2. Save to IndexedDB for permanent offline storage
     if (typeof window !== 'undefined') {
       try {
+        const db = getDb();
         const storeRecord: StoreRecord = {
           ...store,
           synced: true,
@@ -66,6 +67,7 @@ export async function loadStoreFromIndexedDB(storeId?: number): Promise<Store | 
   }
 
   try {
+    const db = getDb();
     if (storeId) {
       // Load specific store by ID
       const store = await db.stores.get(storeId);
