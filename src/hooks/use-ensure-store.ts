@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useSettings } from '@/components/settings-provider';
 import { storesApi } from '@/lib/api/stores';
 import { useToast } from '@/hooks/use-toast';
+import { saveStorePermanently, loadStoreFromIndexedDB } from '@/lib/store-persistence';
 import type { Store } from '@/types';
 
 export function useEnsureStore() {
@@ -17,8 +18,14 @@ export function useEnsureStore() {
       return settings.currentStore;
     }
 
-    // If we're offline, return null (can't fetch)
+    // If we're offline, try loading from IndexedDB
     if (typeof window !== 'undefined' && !navigator.onLine) {
+      console.log('[useEnsureStore] Offline - attempting to load store from IndexedDB');
+      const cachedStore = await loadStoreFromIndexedDB(settings.currentUser?.storeId);
+      if (cachedStore) {
+        setSetting('currentStore', cachedStore);
+        return cachedStore;
+      }
       toast({
         variant: 'destructive',
         title: 'Offline',
@@ -31,11 +38,29 @@ export function useEnsureStore() {
     try {
       const response = await storesApi.getMyStore();
       const store = response.data;
-      setSetting('currentStore', store);
+      
+      // Save store permanently to both localStorage and IndexedDB
+      await saveStorePermanently(store, setSetting);
+      
       setIsLoading(false);
       return store;
     } catch (error: any) {
       setIsLoading(false);
+      
+      // If network error, try loading from IndexedDB
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        console.log('[useEnsureStore] Network error - attempting to load store from IndexedDB');
+        const cachedStore = await loadStoreFromIndexedDB(settings.currentUser?.storeId);
+        if (cachedStore) {
+          setSetting('currentStore', cachedStore);
+          toast({
+            title: 'Using Cached Store',
+            description: 'Loaded store from offline cache.',
+          });
+          return cachedStore;
+        }
+      }
+      
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to fetch store.';
       toast({
         variant: 'destructive',

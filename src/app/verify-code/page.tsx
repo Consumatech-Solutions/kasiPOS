@@ -59,17 +59,12 @@ const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
                 localStorage.setItem('kasi-pos-temp-token', tempToken);
             }
 
+            // Note: verifyOtp returns tempToken, not a full accessToken
+            // Store will be fetched after login or set-password completes
+            // However, if backend ever returns accessToken here, we should fetch store immediately
             if (hasPassword && user) {
-                // If user has password, we can auto-login if the backend returned a full token, 
-                // but verifyOtp returns tempToken. So we generally expect users to login properly 
-                // OR if verifyOtp returns a full token for existing users (backend specific).
-                // Backend `verifyOtp` returns { tempToken, hasPassword, user }.
-                // It does NOT return a full accessToken. So we must redirect to login or set-password.
+                // If user has password, redirect to login (store will be fetched there)
                 if (hasPassword) {
-                     // The user has a password but just verified OTP (maybe forgot password flow? or just logging in via OTP?)
-                     // Backend logic for login is phone+password.
-                     // If we want to support OTP login, we'd need an exchange endpoint.
-                     // For now, let's redirect to login.
                      router.push('/login');
                 } else {
                      router.push(`/set-password?phone=${encodeURIComponent(phone)}`);
