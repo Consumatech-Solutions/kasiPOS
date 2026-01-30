@@ -1,3 +1,19 @@
+// Error handler for workbox-related errors (if any cached service workers try to use workbox)
+self.addEventListener('error', (event) => {
+  if (event.error && event.error.message && event.error.message.includes('_ref')) {
+    console.warn('[Service Worker] Suppressed workbox error:', event.error.message);
+    event.preventDefault();
+  }
+});
+
+// Unhandled promise rejection handler
+self.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && event.reason.message && event.reason.message.includes('_ref')) {
+    console.warn('[Service Worker] Suppressed workbox promise rejection:', event.reason.message);
+    event.preventDefault();
+  }
+});
+
 const CACHE_VERSION = 'kasipos-v3';
 const CACHE_NAME = `kasipos-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'kasipos-runtime-cache';
@@ -27,7 +43,26 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[Service Worker] Precaching assets');
-        return cache.addAll(PRECACHE_ASSETS.map(url => new Request(url, { cache: 'reload' })));
+        // Cache assets individually to handle missing files gracefully
+        // This prevents one missing asset from failing the entire precache
+        return Promise.allSettled(
+          PRECACHE_ASSETS.map(url => {
+            return fetch(new Request(url, { cache: 'reload' }))
+              .then((response) => {
+                if (response.ok) {
+                  return cache.put(url, response);
+                } else {
+                  console.warn(`[Service Worker] Failed to cache ${url}: ${response.status}`);
+                  return Promise.resolve();
+                }
+              })
+              .catch((error) => {
+                console.warn(`[Service Worker] Could not cache ${url}:`, error);
+                // Don't fail the entire install if one asset fails
+                return Promise.resolve();
+              });
+          })
+        );
       })
       .then(() => {
         console.log('[Service Worker] Assets precached');
@@ -36,6 +71,8 @@ self.addEventListener('install', (event) => {
       })
       .catch((error) => {
         console.error('[Service Worker] Precaching failed:', error);
+        // Still activate even if precaching had issues
+        return self.skipWaiting();
       })
   );
 });
@@ -138,11 +175,66 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets (JS, CSS, images), use cache-first strategy
-  if (
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/) ||
-    url.pathname.startsWith('/_next/static/')
-  ) {
+  // Handle Next.js static assets
+  // Only intercept if we have a cached version to avoid breaking offline behavior
+  // Next.js handles these assets with its own caching, so we only help when offline
+  if (url.pathname.startsWith('/_next/static/')) {
+    // Use a promise to check cache first before deciding to intercept
+    const cacheCheck = caches.open(CACHE_NAME).then(async (cache) => {
+      // Try to match without query parameters (for better cache matching)
+      const cacheKey = new Request(url.pathname, { method: 'GET' });
+      let cachedResponse = await cache.match(cacheKey);
+      
+      // If no match without query, try with the full request (including query)
+      if (!cachedResponse) {
+        cachedResponse = await cache.match(request);
+      }
+      
+      return { cache, cachedResponse, cacheKey };
+    });
+    
+    // Only intercept if we have a cached version
+    event.respondWith(
+      cacheCheck.then(async ({ cache, cachedResponse, cacheKey }) => {
+        if (cachedResponse) {
+          // We have cache - use stale-while-revalidate
+          // Try to update cache in background
+          fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.ok) {
+              // Cache with pathname only (ignore query params) for better matching
+              cache.put(cacheKey, networkResponse.clone()).catch(() => {});
+            }
+          }).catch(() => {});
+          
+          return cachedResponse;
+        }
+        
+        // No cache - try network, but if it fails, don't return empty response
+        // Instead, let the fetch fail naturally so Next.js can handle it
+        try {
+          const networkResponse = await fetch(request);
+          if (networkResponse && networkResponse.ok) {
+            // Cache successful responses for offline use
+            const responseClone = networkResponse.clone();
+            cache.put(cacheKey, responseClone).catch(() => {});
+          }
+          return networkResponse;
+        } catch (error) {
+          // Network failed - rethrow to let browser/Next.js handle
+          // This prevents us from returning empty responses
+          throw error;
+        }
+      }).catch(() => {
+        // If cache check or fetch fails, fall back to normal fetch
+        // This allows Next.js to handle the request normally
+        return fetch(request);
+      })
+    );
+    return;
+  }
+
+  // For other static assets (JS, CSS, images), use cache-first strategy
+  if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE_NAME);
@@ -160,8 +252,12 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         } catch (error) {
-          // Network failed - return cached version if available, or error
-          return cachedResponse || new Response('Asset not available offline', {
+          // Network failed - return cached version if available
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // No cache - return network error (browser will handle)
+          return new Response('Asset not available offline', {
             status: 503,
             statusText: 'Service Unavailable',
           });

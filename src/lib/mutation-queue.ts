@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { offlineDetector, isOffline, checkOfflineStatus } from '@/lib/offline-detector';
 
 export interface QueuedMutation {
   id: string;
@@ -99,11 +100,16 @@ class MutationQueue {
 
   private setupOnlineListener() {
     if (typeof window !== 'undefined') {
-      this.onlineHandler = () => {
-        console.log('[MutationQueue] Network online - processing queued mutations');
-        this.processQueue();
-      };
-      window.addEventListener('online', this.onlineHandler);
+      // Use enhanced offline detector instead of native online event
+      const unsubscribe = offlineDetector.subscribe((isOffline) => {
+        if (!isOffline) {
+          console.log('[MutationQueue] Network online - processing queued mutations');
+          this.processQueue();
+        }
+      });
+      
+      // Store unsubscribe function for cleanup
+      this.onlineHandler = unsubscribe;
     }
   }
 
@@ -143,9 +149,13 @@ class MutationQueue {
 
   setQueryClient(queryClient: QueryClient) {
     this.queryClient = queryClient;
-    // Try to process queue when client is set (might be online now)
-    if (typeof window !== 'undefined' && navigator.onLine) {
-      this.processQueue();
+    // Try to process queue when client is set (check if online using enhanced detector)
+    if (typeof window !== 'undefined') {
+      checkOfflineStatus().then((isOffline) => {
+        if (!isOffline) {
+          this.processQueue();
+        }
+      });
     }
   }
 
@@ -167,9 +177,15 @@ class MutationQueue {
     }
     this.notifyStatusChange();
     
-    // Only process if online
-    if (typeof window !== 'undefined' && navigator.onLine) {
-      this.processQueue();
+    // Only process if online (using enhanced offline detection)
+    if (typeof window !== 'undefined') {
+      checkOfflineStatus().then((isOffline) => {
+        if (!isOffline) {
+          this.processQueue();
+        } else {
+          console.log('[MutationQueue] Offline - mutation queued for later sync');
+        }
+      });
     } else {
       console.log('[MutationQueue] Offline - mutation queued for later sync');
     }
@@ -180,10 +196,13 @@ class MutationQueue {
       return;
     }
 
-    // Check if we're online before processing
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-      console.log('[MutationQueue] Still offline - skipping queue processing');
-      return;
+    // Check if we're online before processing (using enhanced offline detection)
+    if (typeof window !== 'undefined') {
+      const isOfflineStatus = await checkOfflineStatus();
+      if (isOfflineStatus) {
+        console.log('[MutationQueue] Still offline - skipping queue processing');
+        return;
+      }
     }
 
     this.processing = true;
@@ -192,13 +211,20 @@ class MutationQueue {
     this.notifyStatusChange();
 
     while (this.queue.length > 0) {
-      // Re-check online status before each mutation
-      if (typeof window !== 'undefined' && !navigator.onLine) {
-        console.log('[MutationQueue] Went offline during processing - pausing');
-        this.currentStatus = 'idle';
-        this.currentMutation = null;
-        this.notifyStatusChange();
-        break;
+      // Re-check online status before each mutation (using enhanced offline detection)
+      if (typeof window !== 'undefined') {
+        const isOfflineStatus = isOffline(); // Use cached value for quick check
+        if (isOfflineStatus) {
+          // Verify with fresh check
+          const verifiedOffline = await checkOfflineStatus(true);
+          if (verifiedOffline) {
+            console.log('[MutationQueue] Went offline during processing - pausing');
+            this.currentStatus = 'idle';
+            this.currentMutation = null;
+            this.notifyStatusChange();
+            break;
+          }
+        }
       }
 
       const mutation = this.queue[0];
@@ -225,10 +251,13 @@ class MutationQueue {
         
         this.notifyStatusChange();
       } catch (error: any) {
-        // Check if it's a network error
-        const isNetworkError = !navigator.onLine || 
+        // Check if it's a network error (using enhanced offline detection)
+        const isOfflineStatus = isOffline();
+        const isNetworkError = isOfflineStatus ||
           error?.code === 'ECONNABORTED' || 
-          error?.message?.includes('Network Error');
+          error?.message?.includes('Network Error') ||
+          error?.isOffline ||
+          error?.isNetworkError;
         
         if (isNetworkError) {
           console.log('[MutationQueue] Network error - will retry when online');
@@ -285,7 +314,10 @@ class MutationQueue {
 
   destroy() {
     if (typeof window !== 'undefined' && this.onlineHandler) {
-      window.removeEventListener('online', this.onlineHandler);
+      // onlineHandler is now an unsubscribe function from offlineDetector
+      if (typeof this.onlineHandler === 'function') {
+        this.onlineHandler();
+      }
     }
   }
 }
