@@ -28,12 +28,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
 import { getProductInitials } from '@/lib/utils/product-initials';
+import { useEnsureStore } from '@/hooks/use-ensure-store';
 
 
 
 export default function PosPage() {
   const { settings } = useSettings();
-  const { currentStore } = settings;
+  const { currentStore: settingsStore } = settings;
+  const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
 
@@ -210,9 +212,10 @@ export default function PosPage() {
   const [isCompletingSale, setIsCompletingSale] = useState(false);
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
+    // Ensure store exists, fetch if missing
+    const currentStore = await ensureStore();
     if (!currentStore) {
-        toast({ variant: "destructive", title: "Error", description: "No store context found." });
-        return;
+        return; // Error already shown by ensureStore
     }
 
     setIsCompletingSale(true);
