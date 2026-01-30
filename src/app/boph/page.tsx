@@ -8,6 +8,7 @@ import * as z from "zod";
 import { useSettings } from "@/components/settings-provider";
 import { useParcels } from "@/hooks/use-parcels";
 import type { Parcel } from "@/lib/api/parcels";
+import { useEnsureStore } from "@/hooks/use-ensure-store";
 
 import {
   Card,
@@ -84,7 +85,8 @@ const createParcelFormSchema = z.object({
 export default function BophPage() {
   const { toast } = useToast();
   const { settings } = useSettings();
-  const { currentStore } = settings;
+  const { currentStore: settingsStore } = settings;
+  const { ensureStore } = useEnsureStore();
 
   const {
     parcels: allParcels,
@@ -183,7 +185,10 @@ export default function BophPage() {
   };
 
   const handleConfirmReception = async () => {
-    if (!selectedParcel || !currentStore || !selectedParcel.id) return;
+    if (!selectedParcel || !selectedParcel.id) return;
+    
+    const currentStore = await ensureStore();
+    if (!currentStore) return; // Error already shown by ensureStore
 
     try {
       await receiveParcel(selectedParcel.id, { receiptCode });
@@ -222,7 +227,7 @@ export default function BophPage() {
   const handleConfirmCollection = async (
     values: z.infer<typeof collectionFormSchema>,
   ) => {
-    if (!selectedParcel || !currentStore || !selectedParcel.id) {
+    if (!selectedParcel || !selectedParcel.id) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -647,13 +652,9 @@ export default function BophPage() {
           <Form {...createParcelForm}>
             <form
               onSubmit={createParcelForm.handleSubmit(async (values) => {
+                const currentStore = await ensureStore();
                 if (!currentStore) {
-                  toast({
-                    variant: "destructive",
-                    title: "Error",
-                    description: "No store context found.",
-                  });
-                  return;
+                  return; // Error already shown by ensureStore
                 }
 
                 try {

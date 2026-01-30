@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { useNetworkStatus } from '@/hooks/use-network-status';
+import { useEnsureStore } from '@/hooks/use-ensure-store';
 
 type Feature = 'campaigns' | 'marketplace' | 'boph';
 
@@ -40,7 +41,8 @@ const passwordSchema = z.object({
 
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
-  const { currentUser, currentStore } = settings;
+  const { currentUser, currentStore: settingsStore } = settings;
+  const { ensureStore } = useEnsureStore();
   const { toast } = useToast();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -59,7 +61,7 @@ export default function SettingsPage() {
   const TABLE_LIMIT = 5;
 
   const fetchUsers = async () => {
-    const storeId = currentStore?.id || currentUser?.storeId;
+    const storeId = settingsStore?.id || currentUser?.storeId;
     if (!storeId) return;
     try {
         const response = await usersApi.findAll(storeId, page, TABLE_LIMIT);
@@ -72,7 +74,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchUsers();
-  }, [currentStore?.id, currentUser?.storeId, page]);
+  }, [settingsStore?.id, currentUser?.storeId, page]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -127,11 +129,11 @@ export default function SettingsPage() {
   };
 
   const handleUserSubmit = async (values: z.infer<typeof userManagementSchema>) => {
-    const storeId = currentStore?.id || currentUser?.storeId;
-    if (!storeId) {
-        toast({ variant: "destructive", title: "Error", description: "No store context found." });
-        return;
+    const currentStore = await ensureStore();
+    if (!currentStore) {
+        return; // Error already shown by ensureStore
     }
+    const storeId = currentStore.id || currentUser?.storeId;
     try {
       if (editingUser) {
         // Update existing user

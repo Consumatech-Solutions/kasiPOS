@@ -30,21 +30,23 @@ export default function BottomNav() {
 
   return (
     <nav className="sticky bottom-0 left-0 z-30 w-full h-16 bg-card border-t bottom-nav">
-      <div className="flex h-full w-full justify-center items-center font-medium gap-2">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Button key={item.label} variant={isActive ? 'secondary' : 'ghost'} asChild className="flex-col h-full px-4 text-xs">
-              <Link
-                href={item.href}
-              >
-                <Icon className="w-5 h-5 mb-1" />
-                <span>{item.label}</span>
-              </Link>
-            </Button>
-          );
-        })}
+      <div className="flex h-full w-full items-center font-medium gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide scroll-smooth">
+        <div className="flex h-full items-center gap-2 min-w-fit px-2">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Button key={item.label} variant={isActive ? 'secondary' : 'ghost'} asChild className="flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0">
+                <Link
+                  href={item.href}
+                >
+                  <Icon className="w-5 h-5 mb-1" />
+                  <span>{item.label}</span>
+                </Link>
+              </Button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

@@ -19,6 +19,7 @@ import { useSettings } from '@/components/settings-provider';
 import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { useEnsureStore } from '@/hooks/use-ensure-store';
 
 const DELIVERY_FEE = 150.00;
 
@@ -26,7 +27,7 @@ export default function BuyStockCartPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { settings } = useSettings();
-  const { currentStore } = settings;
+  const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   
   const [cart, setCart] = useState<PurchaseOrderItem[]>([]);
@@ -76,9 +77,9 @@ export default function BuyStockCartPage() {
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
 
   const handleConfirmOrder = useCallback(async () => {
+    const currentStore = await ensureStore();
     if (!currentStore) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No store context found.' });
-      return;
+      return; // Error already shown by ensureStore
     }
     if (cart.length === 0) {
       toast({ variant: 'destructive', title: 'Cart is empty', description: 'Please add items to your cart before confirming.' });
@@ -148,7 +149,7 @@ export default function BuyStockCartPage() {
         setIsConfirmingOrder(false);
       }
     }
-  }, [cart, subtotal, total, deliveryMethod, currentStore, toast, isOnline]);
+  }, [cart, subtotal, total, deliveryMethod, ensureStore, toast, isOnline]);
   
   const closeConfirmationDialog = useCallback(() => {
     setIsOrderConfirmed(false);
