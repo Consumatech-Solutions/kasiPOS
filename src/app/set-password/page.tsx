@@ -64,7 +64,7 @@ export default function SetPasswordPage() {
                 // Clear temp token
                 localStorage.removeItem('kasi-pos-temp-token');
                 
-                // Login user
+                // Login user - this will automatically fetch and save store via SettingsProvider
                 await login({ 
                     ...response.data.user, 
                     accessToken: response.data.accessToken 

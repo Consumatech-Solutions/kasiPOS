@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { AppSettings, User, Store } from '@/types';
 import { storesApi } from '@/lib/api/stores';
 import { authApi } from '@/lib/api/auth';
+import { fetchAndSaveStore, loadStoreFromIndexedDB } from '@/lib/store-persistence';
 
 
 interface SettingsContextType {
@@ -41,10 +42,12 @@ function getInitialSettings(): AppSettings {
     const currentUser = itemUser ? JSON.parse(itemUser) : null;
     
     // We only keep theme from settings and currentUser from its own key
+    // Store will be loaded from IndexedDB in useEffect if not in localStorage
     return { 
         ...defaultSettings, 
         theme: storedSettings.theme || 'light', 
         currentUser,
+        currentStore: storedSettings.currentStore || null,
         isLoggedIn: !!currentUser
     };
   } catch (error) {
@@ -61,6 +64,30 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(getInitialSettings);
   const [isPwa, setIsPwa] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Load store from IndexedDB on initial load if not in localStorage
+  useEffect(() => {
+    const loadStoreFromIndexedDB = async () => {
+      if (settings.currentStore || !settings.currentUser) {
+        return; // Already have store or no user
+      }
+
+      try {
+        const { loadStoreFromIndexedDB: loadStore } = await import('@/lib/store-persistence');
+        const cachedStore = await loadStore(settings.currentUser.storeId);
+        if (cachedStore) {
+          console.log('[SettingsProvider] Restored store from IndexedDB on initial load');
+          setSetting('currentStore', cachedStore);
+        }
+      } catch (error) {
+        console.warn('[SettingsProvider] Failed to load store from IndexedDB:', error);
+      }
+    };
+
+    if (isInitialLoad && settings.currentUser && !settings.currentStore) {
+      loadStoreFromIndexedDB();
+    }
+  }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -116,26 +143,45 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 setSetting('currentUser', freshUser);
                 localStorage.setItem('user', JSON.stringify(freshUser));
 
-                // 2. Fetch Store if user has a storeId
+                // 2. Fetch Store if user has a storeId and save permanently
                 if (freshUser.storeId && storesApi?.getMyStore) {
                      try {
-                        const storeResponse = await storesApi.getMyStore();
-                        const store = storeResponse.data;
-                        setSetting('currentStore', store);
+                        const store = await fetchAndSaveStore(setSetting);
+                        if (store) {
+                            setSetting('currentStore', store);
+                        }
                      } catch (error: any) {
-                        // Ignore errors if backend is not available
-                        if (process.env.NODE_ENV === 'development' && error.code !== 'ERR_NETWORK') {
+                        // If network fails, try loading from IndexedDB
+                        if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                            console.log('[SettingsProvider] Network error - loading store from IndexedDB');
+                            const cachedStore = await loadStoreFromIndexedDB(freshUser.storeId);
+                            if (cachedStore) {
+                                setSetting('currentStore', cachedStore);
+                            }
+                        } else if (process.env.NODE_ENV === 'development') {
                             console.warn('Failed to fetch store:', error);
                         }
                      }
                 } else if (!settings.currentStore && storesApi?.getMyStore) {
-                     // Fallback check
+                     // Fallback check - try to fetch store
                      try {
-                        const storeResponse = await storesApi.getMyStore();
-                        setSetting('currentStore', storeResponse.data);
+                        const store = await fetchAndSaveStore(setSetting);
+                        if (store) {
+                            setSetting('currentStore', store);
+                        }
                      } catch (e) {
-                         // ignore
+                         // Try loading from IndexedDB as last resort
+                         const cachedStore = await loadStoreFromIndexedDB();
+                         if (cachedStore) {
+                             setSetting('currentStore', cachedStore);
+                         }
                      }
+                } else if (!settings.currentStore) {
+                    // If no storeId and no store in settings, try loading from IndexedDB
+                    const cachedStore = await loadStoreFromIndexedDB();
+                    if (cachedStore) {
+                        setSetting('currentStore', cachedStore);
+                    }
                 }
              } catch (error: any) {
                  // Ne logger que les erreurs non-réseau en développement
@@ -238,7 +284,32 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         isLoggedIn: true,
         // currentStore: null // We don't have store details yet
     }));
-  }, []);
+
+    // Fetch and save store immediately after login
+    try {
+        const store = await fetchAndSaveStore(setSetting);
+        if (store) {
+            setSetting('currentStore', store);
+        } else {
+            // If fetch fails, try loading from IndexedDB
+            const cachedStore = await loadStoreFromIndexedDB(userData.storeId);
+            if (cachedStore) {
+                setSetting('currentStore', cachedStore);
+            }
+        }
+    } catch (error: any) {
+        // If network fails, try loading from IndexedDB
+        if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+            console.log('[SettingsProvider] Network error during login - loading store from IndexedDB');
+            const cachedStore = await loadStoreFromIndexedDB(userData.storeId);
+            if (cachedStore) {
+                setSetting('currentStore', cachedStore);
+            }
+        } else {
+            console.warn('[SettingsProvider] Failed to fetch store after login:', error);
+        }
+    }
+  }, [setSetting]);
 
   const canRenderChildren = () => {
     if (isInitialLoad) return false;
