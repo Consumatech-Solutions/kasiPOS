@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { catalogueApi } from '@/lib/api/catalogue';
 import { customersApi } from '@/lib/api/customers';
 import { vouchersApi } from '@/lib/api/vouchers';
+import { mutationQueue } from '@/lib/mutation-queue';
+import { useToast } from '@/hooks/use-toast';
 
 // Define query keys locally to avoid circular imports from hooks
 const productKeys = {
@@ -45,6 +47,7 @@ const voucherKeys = {
  */
 export function DataPreloader() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   useEffect(() => {
     // Only prefetch when online to avoid errors
@@ -53,6 +56,28 @@ export function DataPreloader() {
     }
 
     console.log('[DataPreloader] Prefetching essential data for offline use...');
+    
+    // Set preloading status
+    const totalItems = 4; // products, categories, customers, vouchers
+    let completed = 0;
+    mutationQueue.setPreloadProgress(completed, totalItems);
+
+    const updateProgress = () => {
+      completed++;
+      mutationQueue.setPreloadProgress(completed, totalItems);
+      
+      // When all complete, show toast and reset status
+      if (completed >= totalItems) {
+        setTimeout(() => {
+          mutationQueue.setPreloadProgress(totalItems, totalItems);
+          toast({
+            title: "Offline Mode Ready!",
+            description: "All data has been downloaded. You can now work offline",
+            duration: 5000,
+          });
+        }, 500);
+      }
+    };
 
     // Prefetch products (first 100 for POS)
     queryClient.prefetchQuery({
@@ -70,7 +95,7 @@ export function DataPreloader() {
         };
       },
       staleTime: 30 * 60 * 1000, // 30 minutes
-    });
+    }).then(() => updateProgress()).catch(() => updateProgress());
 
     // Prefetch categories
     queryClient.prefetchQuery({
@@ -88,7 +113,7 @@ export function DataPreloader() {
         };
       },
       staleTime: 30 * 60 * 1000,
-    });
+    }).then(() => updateProgress()).catch(() => updateProgress());
 
     // Prefetch recent customers
     queryClient.prefetchQuery({
@@ -107,7 +132,7 @@ export function DataPreloader() {
         };
       },
       staleTime: 30 * 60 * 1000,
-    });
+    }).then(() => updateProgress()).catch(() => updateProgress());
 
     // Prefetch active vouchers/campaigns
     queryClient.prefetchQuery({
@@ -126,8 +151,8 @@ export function DataPreloader() {
         };
       },
       staleTime: 30 * 60 * 1000,
-    });
-  }, [queryClient]);
+    }).then(() => updateProgress()).catch(() => updateProgress());
+  }, [queryClient, toast]);
 
   // This component renders nothing - it only prefetches data
   return null;

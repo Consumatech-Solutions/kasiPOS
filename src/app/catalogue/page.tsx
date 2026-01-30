@@ -8,6 +8,9 @@ import type { Product } from '@/types';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import { useToast } from '@/hooks/use-toast';
 import { useCategories, useProducts } from '@/hooks/use-catalogue';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { mutationQueue } from '@/lib/mutation-queue';
+import { catalogueApi } from '@/lib/api/catalogue';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +50,7 @@ const productSchema = z.object({
 
 export default function CataloguePage() {
   const { toast } = useToast();
+  const { isOnline } = useNetworkStatus();
 
   // Dialog states
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -237,14 +241,47 @@ export default function CataloguePage() {
       };
 
       if (editingProduct && editingProduct.id) {
-        await updateProduct(String(editingProduct.id), productData);
-        toast({ title: "Success", description: "Product updated successfully." });
+        if (isOnline) {
+          await updateProduct(String(editingProduct.id), productData);
+          toast({ title: "Success", description: "Product updated successfully." });
+        } else {
+          // Offline: queue mutation (optimistic update already done by hook)
+          mutationQueue.add({
+            mutationKey: ['products', 'update'],
+            mutationFn: () => catalogueApi.products.update(String(editingProduct.id), productData),
+            variables: { id: editingProduct.id, data: productData },
+          });
+          toast({ title: "Success", description: "Product update queued. Will sync when online." });
+        }
       } else {
-        await createProduct(productData as any);
-        toast({ title: "Success", description: "Product added successfully." });
-        
-        // Refresh products and go to first page or refresh current
-        refreshProducts();
+        if (isOnline) {
+          await createProduct(productData as any);
+          toast({ title: "Success", description: "Product added successfully." });
+          refreshProducts();
+        } else {
+          // Offline: queue mutation (optimistic update already done by hook)
+          mutationQueue.add({
+            mutationKey: ['products', 'create'],
+            mutationFn: async () => {
+              // Resolve category name to ID
+              const categoriesResp = await catalogueApi.categories.getAll();
+              const categories = 'data' in categoriesResp ? categoriesResp.data : (categoriesResp as any[]);
+              const category = categories.find((c: any) => c.name === productData.category);
+              if (!category) throw new Error(`Category "${productData.category}" not found`);
+              return catalogueApi.products.create({
+                name: productData.name,
+                price: productData.price,
+                costPrice: productData.costPrice,
+                stock: productData.stock,
+                barCode: productData.barCode,
+                productImage: productData.imageUrl,
+                categoryId: category.id,
+              });
+            },
+            variables: productData,
+          });
+          toast({ title: "Success", description: "Product queued. Will sync when online." });
+        }
       }
       setProductDialogOpen(false);
       productForm.reset();
@@ -260,8 +297,18 @@ export default function CataloguePage() {
   const handleDeleteProduct = async (id: string | number) => {
     setDeletingProductId(String(id));
     try {
-      await deleteProductHook(String(id));
-      toast({ title: "Success", description: "Product deleted successfully." });
+      if (isOnline) {
+        await deleteProductHook(String(id));
+        toast({ title: "Success", description: "Product deleted successfully." });
+      } else {
+        // Offline: queue mutation (optimistic update already done by hook)
+        mutationQueue.add({
+          mutationKey: ['products', 'delete'],
+          mutationFn: () => catalogueApi.products.delete(String(id)),
+          variables: { id },
+        });
+        toast({ title: "Success", description: "Product deletion queued. Will sync when online." });
+      }
     } catch (error) {
       console.error("Failed to delete product:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to delete product.";
@@ -286,11 +333,31 @@ export default function CataloguePage() {
   const handleCategorySubmit = async (values: z.infer<typeof categorySchema>) => {
     try {
       if (editingCategory && editingCategory.id) {
-        await updateCategory(String(editingCategory.id), values);
-        toast({ title: "Success", description: "Category updated successfully." });
+        if (isOnline) {
+          await updateCategory(String(editingCategory.id), values);
+          toast({ title: "Success", description: "Category updated successfully." });
+        } else {
+          // Offline: queue mutation (optimistic update already done by hook)
+          mutationQueue.add({
+            mutationKey: ['categories', 'update'],
+            mutationFn: () => catalogueApi.categories.update(String(editingCategory.id), values),
+            variables: { id: editingCategory.id, data: values },
+          });
+          toast({ title: "Success", description: "Category update queued. Will sync when online." });
+        }
       } else {
-        await createCategory(values);
-        toast({ title: "Success", description: "Category added successfully." });
+        if (isOnline) {
+          await createCategory(values);
+          toast({ title: "Success", description: "Category added successfully." });
+        } else {
+          // Offline: queue mutation (optimistic update already done by hook)
+          mutationQueue.add({
+            mutationKey: ['categories', 'create'],
+            mutationFn: () => catalogueApi.categories.create(values),
+            variables: values,
+          });
+          toast({ title: "Success", description: "Category queued. Will sync when online." });
+        }
       }
       setCategoryDialogOpen(false);
       categoryForm.reset();
@@ -304,13 +371,23 @@ export default function CataloguePage() {
   const handleDeleteCategory = async (id: string | number) => {
     setDeletingCategoryId(String(id));
     try {
+      if (isOnline) {
         await deleteCategoryHook(String(id));
         toast({ title: "Success", description: "Category deleted successfully." });
-        // Note: You might want to handle products in the deleted category.
+      } else {
+        // Offline: queue mutation (optimistic update already done by hook)
+        mutationQueue.add({
+          mutationKey: ['categories', 'delete'],
+          mutationFn: () => catalogueApi.categories.delete(String(id)),
+          variables: { id },
+        });
+        toast({ title: "Success", description: "Category deletion queued. Will sync when online." });
+      }
+      // Note: You might want to handle products in the deleted category.
     } catch (error) {
-        console.error("Failed to delete category:", error);
-        const errorMessage = error instanceof Error ? error.message : "Failed to delete category.";
-        toast({ variant: "destructive", title: "Error", description: errorMessage });
+      console.error("Failed to delete category:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete category.";
+      toast({ variant: "destructive", title: "Error", description: errorMessage });
     } finally {
       setDeletingCategoryId(null);
     }

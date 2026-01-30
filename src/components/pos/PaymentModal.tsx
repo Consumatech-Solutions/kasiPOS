@@ -97,7 +97,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 </div>
               </div>
               <Separator className="my-6" />
-              <div className="space-y-4 text-2xl">
+              <div className="space-y-4 text-lg">
                  <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Tendered:</span>
                   <span className="font-bold text-primary">R {tenderedAmount.toFixed(2)}</span>
@@ -135,7 +135,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
               </div>
               <DialogFooter className="mt-4 gap-2">
                   <Button variant="secondary" className="w-full h-14 touch-target" onClick={handleClear} disabled={isLoading}>Clear</Button>
-                  <Button className="w-full h-14 touch-target" onClick={handleCompleteCashSale} disabled={!canCompleteCashSale || isLoading}>
+                  <Button className="w-full h-14 touch-target px-4" onClick={handleCompleteCashSale} disabled={!canCompleteCashSale || isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isLoading ? 'Processing...' : 'Complete Sale'}
                   </Button>
@@ -210,7 +210,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
               </div>
               <DialogFooter className="mt-8">
                   <DialogClose asChild><Button variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
-                  <Button onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target" disabled={!canCompleteMobileSale || isLoading}>
+                  <Button onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target px-4" disabled={!canCompleteMobileSale || isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {isLoading ? 'Processing...' : `Send Payment Request for R${cartTotal.toFixed(2)}`}
                   </Button>
@@ -224,7 +224,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         {renderContent()}
       </DialogContent>
     </Dialog>

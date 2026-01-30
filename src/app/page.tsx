@@ -27,6 +27,7 @@ import { transactionsApi } from '@/lib/api/transactions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { getProductInitials } from '@/lib/utils/product-initials';
 
 
 
@@ -309,7 +310,10 @@ export default function PosPage() {
           variables: newTransaction,
         });
 
-        // 4. Show success and clear cart
+        // 4. Clear loading state immediately after successful local save
+        setIsCompletingSale(false);
+
+        // 5. Show success and clear cart
         toast({
           title: "Offline Sale Complete!",
           description: "Sale saved locally. Will sync when back online.",
@@ -335,7 +339,6 @@ export default function PosPage() {
           title: "Error",
           description: "Failed to save the sale locally. Please try again.",
         });
-      } finally {
         setIsCompletingSale(false);
       }
     }
@@ -438,7 +441,7 @@ export default function PosPage() {
                             <div className="flex items-center justify-center">
                             {isOnline && (product.productImage || product.imageUrl) ? (
                               <img 
-                                src={product.productImage || product.imageUrl || '/placeholder-product.png'} 
+                                src={product.productImage || product.imageUrl} 
                                 alt={product.name} 
                                 width={300} 
                                 height={300} 
@@ -447,14 +450,23 @@ export default function PosPage() {
                                 loading="lazy"
                                 decoding="async"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '/placeholder-product.png';
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const initialsDiv = target.nextElementSibling as HTMLElement;
+                                  if (initialsDiv) {
+                                    initialsDiv.style.display = 'flex';
+                                  }
                                 }}
                               />
-                            ) : (
-                              <div className="w-[300px] h-[300px] rounded-md bg-muted flex items-center justify-center text-muted-foreground">
-                                {isOnline ? 'No image' : 'Offline - Image not available'}
-                              </div>
-                            )}
+                            ) : null}
+                            <div 
+                              className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${isOnline && (product.productImage || product.imageUrl) ? 'hidden' : ''}`}
+                              style={{ display: isOnline && (product.productImage || product.imageUrl) ? 'none' : 'flex' }}
+                            >
+                              <span className="text-6xl font-bold text-primary">
+                                {getProductInitials(product.name)}
+                              </span>
+                            </div>
                             </div>
                         </DialogContent>
                         </Dialog>
@@ -556,7 +568,32 @@ export default function PosPage() {
               <div className="space-y-2">
                 {cartItems.map(item => (
                   <div key={item.productId} className="flex items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
-                    <Image src={item.imageUrl || '/placeholder-product.png'} alt={item.productName} width={40} height={40} className="rounded-md bg-gray-200 object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-product.png'; }} />
+                    {item.imageUrl ? (
+                      <div className="relative w-10 h-10 flex-shrink-0">
+                        <Image 
+                          src={item.imageUrl} 
+                          alt={item.productName} 
+                          width={40} 
+                          height={40} 
+                          className="rounded-md bg-gray-200 object-cover" 
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const initialsDiv = target.nextElementSibling as HTMLElement;
+                            if (initialsDiv) {
+                              initialsDiv.style.display = 'flex';
+                            }
+                          }} 
+                        />
+                        <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                          {getProductInitials(item.productName)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
+                        {getProductInitials(item.productName)}
+                      </div>
+                    )}
                     <div className="flex-grow min-w-0">
                       <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
                       <p className="text-xs text-gray-500">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>

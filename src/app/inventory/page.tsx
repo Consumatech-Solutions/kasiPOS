@@ -5,9 +5,14 @@ import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { StockAdjustmentReason } from '@/types';
+import type { StockAdjustmentReason, Product } from '@/types';
+import type { ApiProduct } from '@/types/catalogue';
 import { useProducts, useCategories } from '@/hooks/use-catalogue';
 import { useStockAdjustments } from '@/hooks/use-stock-adjustments';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { mutationQueue } from '@/lib/mutation-queue';
+import { stockAdjustmentsApi } from '@/lib/api/stock-adjustments';
+import { catalogueApi } from '@/lib/api/catalogue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +28,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { getProductInitials } from '@/lib/utils/product-initials';
 
 const adjustmentSchema = z.object({
   newStock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }),
@@ -36,6 +42,7 @@ export default function InventoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { toast } = useToast();
+  const { isOnline } = useNetworkStatus();
   
   // Use API hooks for products and categories
   const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10);
@@ -47,7 +54,7 @@ export default function InventoryPage() {
   // Dialog states
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ApiProduct | Product | null>(null);
 
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,20 +110,47 @@ export default function InventoryPage() {
     if (!selectedProduct || !selectedProduct.id) return;
 
     try {
-      await createAdjustment({
-        productId: selectedProduct.id,
-        newStock: values.newStock,
-        reason: values.reason as StockAdjustmentReason,
-        note: values.note,
-      });
+      if (isOnline) {
+        await createAdjustment({
+          productId: selectedProduct.id,
+          newStock: values.newStock,
+          reason: values.reason as StockAdjustmentReason,
+          note: values.note,
+        });
 
-      // Refresh the products list to show updated stock
-      await refreshProducts();
+        // Refresh the products list to show updated stock
+        await refreshProducts();
 
-      toast({
-        title: "Success",
-        description: `Stock for ${selectedProduct.name} updated.`,
-      });
+        toast({
+          title: "Success",
+          description: `Stock for ${selectedProduct.name} updated.`,
+        });
+      } else {
+        // Offline: optimistically update stock in cache
+        const productQueryKeys = apiProducts.map((p: any) => ['products', 'list', { page: 1, limit: 10 }]);
+        // Update stock optimistically
+        // Note: The hook already does optimistic updates, but we queue the mutation
+        mutationQueue.add({
+          mutationKey: ['stockAdjustments', 'create'],
+          mutationFn: () => stockAdjustmentsApi.create({
+            productId: selectedProduct.id!,
+            newStock: values.newStock,
+            reason: values.reason as StockAdjustmentReason,
+            note: values.note,
+          }),
+          variables: {
+            productId: selectedProduct.id!,
+            newStock: values.newStock,
+            reason: values.reason,
+            note: values.note,
+          },
+        });
+
+        toast({
+          title: "Success",
+          description: `Stock adjustment queued. Will sync when online.`,
+        });
+      }
       setAdjustmentDialogOpen(false);
       setSelectedProduct(null);
     } catch (error: any) {
@@ -137,12 +171,22 @@ export default function InventoryPage() {
     }
     
     try {
-      await updateProduct(id, { lowStockThreshold: thresholdValue });
-      
-      // Refresh the products list to show updated threshold
-      await refreshProducts();
-      
-      toast({ title: "Success", description: "Low stock trigger updated." });
+      if (isOnline) {
+        await updateProduct(id, { lowStockThreshold: thresholdValue });
+        
+        // Refresh the products list to show updated threshold
+        await refreshProducts();
+        
+        toast({ title: "Success", description: "Low stock trigger updated." });
+      } else {
+        // Offline: queue mutation (optimistic update already done by hook)
+        mutationQueue.add({
+          mutationKey: ['products', 'update'],
+          mutationFn: () => catalogueApi.products.update(id, { lowStockThreshold: thresholdValue } as any),
+          variables: { id, data: { lowStockThreshold: thresholdValue } },
+        });
+        toast({ title: "Success", description: "Threshold update queued. Will sync when online." });
+      }
       setEditingThresholdId(null);
     } catch (error: any) {
       console.error("Failed to update threshold:", error);
@@ -212,14 +256,33 @@ export default function InventoryPage() {
                 filteredProducts.map((product: any) => (
                   <TableRow key={product.id}>
                     <TableCell className="hidden sm:table-cell">
-                      <Image
-                        src={(product as any).productImage || (product as any).imageUrl || '/placeholder-product.png'}
-                        alt={product.name}
-                        width={40}
-                        height={40}
-                        className="rounded-md object-cover"
-                        data-ai-hint={(product as any).imageHint}
-                      />
+                      {(product as any).productImage || (product as any).imageUrl ? (
+                        <div className="relative w-10 h-10">
+                          <Image
+                            src={(product as any).productImage || (product as any).imageUrl}
+                            alt={product.name}
+                            width={40}
+                            height={40}
+                            className="rounded-md object-cover"
+                            data-ai-hint={(product as any).imageHint}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const initialsDiv = target.nextElementSibling as HTMLElement;
+                              if (initialsDiv) {
+                                initialsDiv.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                            {getProductInitials(product.name)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                          {getProductInitials(product.name)}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">

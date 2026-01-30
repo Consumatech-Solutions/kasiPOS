@@ -7,6 +7,7 @@ import { SettingsProvider } from '@/components/settings-provider';
 import { ClientDbProvider } from '@/components/client-db-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { DataPreloader } from '@/components/providers/data-preloader';
+import { SyncStatusIndicator } from '@/components/sync-status-indicator';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -38,6 +39,7 @@ export default function RootLayout({
             <SettingsProvider>
               <AppShell>{children}</AppShell>
               <Toaster />
+              <SyncStatusIndicator />
             </SettingsProvider>
           </ClientDbProvider>
         </QueryProvider>

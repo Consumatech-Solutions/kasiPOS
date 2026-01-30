@@ -6,6 +6,9 @@ import type { Customer, Transaction } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { mutationQueue } from '@/lib/mutation-queue';
+import { customersApi } from '@/lib/api/customers';
 import { CustomerForm } from '@/components/customers/customer-form';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +28,7 @@ export default function CustomersPage() {
   const { toast } = useToast();
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const { isOnline } = useNetworkStatus();
   
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -74,11 +78,31 @@ export default function CustomersPage() {
   const handleCustomerSubmit = async (data: any) => {
     try {
       if (editingCustomer) {
-        await updateCustomer(editingCustomer.id, data);
-        toast({ title: "Success", description: "Customer updated successfully." });
+        if (isOnline) {
+          await updateCustomer(editingCustomer.id, data);
+          toast({ title: "Success", description: "Customer updated successfully." });
+        } else {
+          // Offline: queue mutation (optimistic update already done by hook)
+          mutationQueue.add({
+            mutationKey: ['customers', 'update'],
+            mutationFn: () => customersApi.update(editingCustomer.id, data),
+            variables: { id: editingCustomer.id, data },
+          });
+          toast({ title: "Success", description: "Customer update queued. Will sync when online." });
+        }
       } else {
-        await createCustomer(data);
-        toast({ title: "Success", description: "Customer added successfully." });
+        if (isOnline) {
+          await createCustomer(data);
+          toast({ title: "Success", description: "Customer added successfully." });
+        } else {
+          // Offline: queue mutation (optimistic update already done by hook)
+          mutationQueue.add({
+            mutationKey: ['customers', 'create'],
+            mutationFn: () => customersApi.create(data),
+            variables: data,
+          });
+          toast({ title: "Success", description: "Customer queued. Will sync when online." });
+        }
       }
       setCustomerDialogOpen(false);
       setEditingCustomer(null);
@@ -94,8 +118,18 @@ export default function CustomersPage() {
   const handleDeleteCustomer = async (id: string) => {
     setDeletingCustomerId(id);
     try {
-      await deleteCustomer(id);
-      toast({ title: "Success", description: "Customer deleted successfully." });
+      if (isOnline) {
+        await deleteCustomer(id);
+        toast({ title: "Success", description: "Customer deleted successfully." });
+      } else {
+        // Offline: queue mutation (optimistic update already done by hook)
+        mutationQueue.add({
+          mutationKey: ['customers', 'delete'],
+          mutationFn: () => customersApi.delete(id),
+          variables: { id },
+        });
+        toast({ title: "Success", description: "Customer deletion queued. Will sync when online." });
+      }
     } catch (error) {
       console.error("Failed to delete customer:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to delete customer.";
