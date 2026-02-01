@@ -3,22 +3,22 @@ import type { Store, CreateStoreDto, UpdateStoreDto } from '@/types';
 
 export const storesApi = {
   /**
-   * Récupérer le magasin de l'utilisateur actuel
+   * Get current user's store
    */
   getMyStore: () => api.get<Store>('/stores/my-store'),
 
   /**
-   * Récupérer un magasin par ID
+   * Get store by ID
    */
   getById: (id: number) => api.get<Store>(`/stores/${id}`),
 
   /**
-   * Créer un nouveau magasin
+   * Create a new store
    */
   create: (data: CreateStoreDto) => api.post<Store>('/stores', data),
 
   /**
-   * Mettre à jour un magasin
+   * Update a store
    */
   update: (id: number, data: UpdateStoreDto) => api.patch<Store>(`/stores/${id}`, data),
 };

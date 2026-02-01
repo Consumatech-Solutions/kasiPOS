@@ -41,9 +41,9 @@ export function ProductImage({
       return;
     }
 
-    // Utiliser uniquement l'URL fournie (doit être une URL distante)
-    if (imageUrl) {
-      // S'assurer que l'URL utilise https://sfo3.digitaloceanspaces.com si elle est relative
+    // Use only the provided URL (must be a remote URL). Never use blob: URLs - they are invalid after refresh/navigation.
+    if (imageUrl && !imageUrl.startsWith('blob:')) {
+      // Ensure URL uses https://sfo3.digitaloceanspaces.com if relative
       let url = imageUrl;
       if (!url.startsWith('http')) {
         url = url.startsWith('/') 

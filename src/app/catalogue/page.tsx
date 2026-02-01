@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { Product } from '@/types';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { useCategories, useProducts } from '@/hooks/use-catalogue';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
@@ -21,7 +21,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, RefreshCw, Loader2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { BarcodeDisplay } from '@/components/barcode-display';
 import { Pagination } from '@/components/ui/pagination';
 import { ImageUpload } from '@/components/catalogue/image-upload';
@@ -49,7 +55,6 @@ const productSchema = z.object({
 
 
 export default function CataloguePage() {
-  const { toast } = useToast();
   const { isOnline } = useNetworkStatus();
 
   // Dialog states
@@ -60,6 +65,7 @@ export default function CataloguePage() {
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  const [activeCatalogueTab, setActiveCatalogueTab] = useState<string>('products');
 
   // Generate a unique barcode (EAN-13 format: 13 digits)
   const generateBarcode = (): string => {
@@ -75,9 +81,9 @@ export default function CataloguePage() {
   };
 
 
-  // Hooks pour les données avec synchronisation et pagination
+  // Hooks for data with sync and pagination
   const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
-  // Type assertion pour aider TypeScript à inférer les types dans les callbacks
+  // Type assertion for callbacks
   const typedCategories: Category[] = categories || [];
   const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
 
@@ -114,9 +120,8 @@ export default function CataloguePage() {
           const newBarcode = generateBarcode();
           await updateProduct(product.id, { barCode: newBarcode });
         } catch (error: any) {
-          // Gérer l'erreur "Produit non trouvé" silencieusement
-          if (error?.message === 'Produit non trouvé' || error?.message?.includes('non trouvé')) {
-            // Le produit a été supprimé entre-temps, c'est normal
+          // Handle "Product not found" silently
+          if (error?.message === 'Product not found' || error?.message?.includes('not found')) {
             return;
           }
           
@@ -128,7 +133,7 @@ export default function CataloguePage() {
             }
           }
           // Remove from processed set on error so it can be retried (only for unexpected errors)
-          if (error?.response?.status !== 404 && error?.code !== 'ERR_NETWORK' && error?.message !== 'Network Error' && error?.message !== 'Produit non trouvé') {
+          if (error?.response?.status !== 404 && error?.code !== 'ERR_NETWORK' && error?.message !== 'Network Error' && error?.message !== 'Product not found') {
             processedProductsRef.current.delete(product.id);
           }
         }
@@ -170,10 +175,7 @@ export default function CataloguePage() {
   const handleGenerateBarcode = () => {
     const newBarcode = generateBarcode();
     productForm.setValue('barcode', newBarcode);
-    toast({
-      title: 'Barcode Generated',
-      description: `New barcode "${newBarcode}" has been generated.`,
-    });
+    feedback.success('Barcode Generated', `New barcode "${newBarcode}" has been generated.`);
   };
 
 
@@ -243,7 +245,7 @@ export default function CataloguePage() {
       if (editingProduct && editingProduct.id) {
         if (isOnline) {
           await updateProduct(String(editingProduct.id), productData);
-          toast({ title: "Success", description: "Product updated successfully." });
+          feedback.success('Product updated', 'Product updated successfully.');
         } else {
           // Offline: queue mutation (optimistic update already done by hook)
           mutationQueue.add({
@@ -251,12 +253,12 @@ export default function CataloguePage() {
             mutationFn: () => catalogueApi.products.update(String(editingProduct.id), productData),
             variables: { id: editingProduct.id, data: productData },
           });
-          toast({ title: "Success", description: "Product update queued. Will sync when online." });
+          feedback.success('Queued', 'Product update queued. Will sync when online.');
         }
       } else {
         if (isOnline) {
           await createProduct(productData as any);
-          toast({ title: "Success", description: "Product added successfully." });
+          feedback.success('Product added', 'Product added successfully.');
           refreshProducts();
         } else {
           // Offline: queue mutation (optimistic update already done by hook)
@@ -280,7 +282,7 @@ export default function CataloguePage() {
             },
             variables: productData,
           });
-          toast({ title: "Success", description: "Product queued. Will sync when online." });
+          feedback.success('Queued', 'Product queued. Will sync when online.');
         }
       }
       setProductDialogOpen(false);
@@ -288,8 +290,7 @@ export default function CataloguePage() {
       setProductImageUrl(null);
     } catch (error) {
       console.error("Failed to save product:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to save product.";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      feedback.fromError(error, 'Failed to save product', 'Check your connection and try again.');
     }
   };
 
@@ -299,7 +300,7 @@ export default function CataloguePage() {
     try {
       if (isOnline) {
         await deleteProductHook(String(id));
-        toast({ title: "Success", description: "Product deleted successfully." });
+        feedback.success('Product deleted', 'Product deleted successfully.');
       } else {
         // Offline: queue mutation (optimistic update already done by hook)
         mutationQueue.add({
@@ -307,12 +308,11 @@ export default function CataloguePage() {
           mutationFn: () => catalogueApi.products.delete(String(id)),
           variables: { id },
         });
-        toast({ title: "Success", description: "Product deletion queued. Will sync when online." });
+        feedback.success('Queued', 'Product deletion queued. Will sync when online.');
       }
     } catch (error) {
       console.error("Failed to delete product:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete product.";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      feedback.fromError(error, 'Failed to delete product', 'Try again or check your connection.');
     } finally {
       setDeletingProductId(null);
     }
@@ -335,7 +335,7 @@ export default function CataloguePage() {
       if (editingCategory && editingCategory.id) {
         if (isOnline) {
           await updateCategory(String(editingCategory.id), values);
-          toast({ title: "Success", description: "Category updated successfully." });
+          feedback.success('Category updated', 'Category updated successfully.');
         } else {
           // Offline: queue mutation (optimistic update already done by hook)
           mutationQueue.add({
@@ -343,12 +343,12 @@ export default function CataloguePage() {
             mutationFn: () => catalogueApi.categories.update(String(editingCategory.id), values),
             variables: { id: editingCategory.id, data: values },
           });
-          toast({ title: "Success", description: "Category update queued. Will sync when online." });
+          feedback.success('Queued', 'Category update queued. Will sync when online.');
         }
       } else {
         if (isOnline) {
           await createCategory(values);
-          toast({ title: "Success", description: "Category added successfully." });
+          feedback.success('Category added', 'Category added successfully.');
         } else {
           // Offline: queue mutation (optimistic update already done by hook)
           mutationQueue.add({
@@ -356,15 +356,14 @@ export default function CataloguePage() {
             mutationFn: () => catalogueApi.categories.create(values),
             variables: values,
           });
-          toast({ title: "Success", description: "Category queued. Will sync when online." });
+          feedback.success('Queued', 'Category queued. Will sync when online.');
         }
       }
       setCategoryDialogOpen(false);
       categoryForm.reset();
     } catch (error) {
       console.error("Failed to save category:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to save category.";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      feedback.fromError(error, 'Failed to save category', 'Check your connection and try again.');
     }
   };
 
@@ -373,7 +372,7 @@ export default function CataloguePage() {
     try {
       if (isOnline) {
         await deleteCategoryHook(String(id));
-        toast({ title: "Success", description: "Category deleted successfully." });
+        feedback.success('Category deleted', 'Category deleted successfully.');
       } else {
         // Offline: queue mutation (optimistic update already done by hook)
         mutationQueue.add({
@@ -381,13 +380,12 @@ export default function CataloguePage() {
           mutationFn: () => catalogueApi.categories.delete(String(id)),
           variables: { id },
         });
-        toast({ title: "Success", description: "Category deletion queued. Will sync when online." });
+        feedback.success('Queued', 'Category deletion queued. Will sync when online.');
       }
       // Note: You might want to handle products in the deleted category.
     } catch (error) {
       console.error("Failed to delete category:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete category.";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      feedback.fromError(error, 'Failed to delete category', 'Try again or check your connection.');
     } finally {
       setDeletingCategoryId(null);
     }
@@ -396,36 +394,47 @@ export default function CataloguePage() {
   return (
     <div className="p-2 sm:p-4 overflow-y-auto h-full">
       <Card>
-        <CardHeader className="sticky top-0 z-10 bg-card border-b">
-          <CardTitle className="text-lg sm:text-xl">Catalogue Management</CardTitle>
-          <CardDescription className="text-sm">Manage your products and categories.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="products">
-            <TabsList>
-              <TabsTrigger value="products">Products</TabsTrigger>
-              <TabsTrigger value="categories">Categories</TabsTrigger>
-            </TabsList>
-            
-            {/* Products Tab */}
-            <TabsContent value="products" className="flex flex-col">
-              <div className="flex justify-end mb-4">
-                <Button onClick={() => openProductDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                </Button>
+        <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg sm:text-xl">Catalogue Management</CardTitle>
+            <CardDescription className="text-sm">Manage your products and categories.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Tabs value={activeCatalogueTab} onValueChange={setActiveCatalogueTab}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
+                <TabsList>
+                  <TabsTrigger value="products">Products</TabsTrigger>
+                  <TabsTrigger value="categories">Categories</TabsTrigger>
+                </TabsList>
+                {activeCatalogueTab === 'products' ? (
+                  <Button onClick={() => openProductDialog()} className="w-full sm:w-auto min-h-[44px] touch-target order-first sm:order-none">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                  </Button>
+                ) : (
+                  <Button onClick={() => openCategoryDialog()} className="w-full sm:w-auto min-h-[44px] touch-target order-first sm:order-none">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Category
+                  </Button>
+                )}
               </div>
-              <div className="border rounded-md overflow-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
+            </Tabs>
+          </CardContent>
+        </div>
+        <CardContent className="relative z-0">
+          <Tabs value={activeCatalogueTab} onValueChange={setActiveCatalogueTab}>
+            {/* Products Tab */}
+            <TabsContent value="products" className="flex flex-col mt-0">
+              <div className="border rounded-md overflow-auto overscroll-contain relative z-0" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                <Table noScrollWrapper>
+                  <TableHeader>
                     <TableRow>
-                      <TableHead className="hidden sm:table-cell">Image</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="hidden md:table-cell">Category</TableHead>
-                      <TableHead className="hidden lg:table-cell">Barcode</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead className="hidden md:table-cell">Cost Price</TableHead>
-                      <TableHead className="hidden sm:table-cell">Stock</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Image</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Name</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Category</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden lg:table-cell">Barcode</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Price</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Cost Price</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Stock</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                 <TableBody>
@@ -497,17 +506,10 @@ export default function CataloguePage() {
                                   if (process.env.NODE_ENV === 'development') {
                                     console.log('Barcode updated:', { productId: p.id, barCode: updated.barCode });
                                   }
-                                  toast({ 
-                                    title: "Barcode Generated", 
-                                    description: `Barcode "${newBarcode}" has been generated for ${p.name}.` 
-                                  });
+                                  feedback.success('Barcode Generated', `Barcode "${newBarcode}" has been generated for ${p.name}.`);
                                 } catch (error) {
                                   console.error('Error generating barcode:', error);
-                                  toast({ 
-                                    variant: "destructive",
-                                    title: "Error", 
-                                    description: "Failed to generate barcode." 
-                                  });
+                                  feedback.fromError(error, 'Failed to generate barcode', 'Try again or edit the product.');
                                 }
                               }}
                             >
@@ -520,29 +522,42 @@ export default function CataloguePage() {
                       <TableCell className="hidden md:table-cell">R{costPrice.toFixed(2)}</TableCell>
                       <TableCell className="hidden sm:table-cell">{p.stock}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2">
-                          <Button variant="ghost" size="icon" className="touch-target" onClick={() => openProductDialog(p)}><Edit className="h-4 w-4" /></Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="touch-target"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="touch-target h-9 w-9" aria-label="Actions">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[10rem]">
+                            <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer" onClick={() => openProductDialog(p)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
                                 <AlertDialogHeader>
-                                <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-sm">
+                                  <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-sm">
                                     This action cannot be undone. This will permanently delete the product.
-                                </AlertDialogDescription>
+                                  </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingProductId === p.id || isDeletingProduct}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteProduct(p.id!)} disabled={deletingProductId === p.id || isDeletingProduct}>
-                                  {(deletingProductId === p.id || isDeletingProduct) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  {deletingProductId === p.id || isDeletingProduct ? 'Deleting...' : 'Delete'}
-                                </AlertDialogAction>
+                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingProductId === p.id || isDeletingProduct}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteProduct(p.id!)} disabled={deletingProductId === p.id || isDeletingProduct}>
+                                    {(deletingProductId === p.id || isDeletingProduct) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {deletingProductId === p.id || isDeletingProduct ? 'Deleting...' : 'Delete'}
+                                  </AlertDialogAction>
                                 </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                        </div>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                     );
@@ -568,18 +583,13 @@ export default function CataloguePage() {
             </TabsContent>
 
             {/* Categories Tab */}
-            <TabsContent value="categories" className="flex flex-col">
-              <div className="flex justify-end mb-4">
-                <Button onClick={() => openCategoryDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Category
-                </Button>
-              </div>
-              <div className="border rounded-md overflow-auto" style={{ maxHeight: '500px' }}>
-                <Table>
-                    <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead>Category Name</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+            <TabsContent value="categories" className="flex flex-col mt-0">
+              <div className="border rounded-md overflow-y-auto overflow-x-auto overscroll-contain relative z-0" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+                <Table noScrollWrapper>
+                    <TableHeader>
+                  <TableRow className="border-b bg-card">
+                    <TableHead className="sticky top-0 z-20 h-12 bg-card font-medium shadow-[0_1px_0_0_hsl(var(--border))]">Category Name</TableHead>
+                    <TableHead className="sticky top-0 z-20 h-12 bg-card font-medium text-right shadow-[0_1px_0_0_hsl(var(--border))]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -592,29 +602,42 @@ export default function CataloguePage() {
                     <TableRow key={c.id}>
                       <TableCell>{c.name}</TableCell>
                       <TableCell className="text-right">
-                         <div className="flex items-center justify-end gap-1 sm:gap-2">
-                           <Button variant="ghost" size="icon" className="touch-target" onClick={() => openCategoryDialog(c)}><Edit className="h-4 w-4" /></Button>
-                           <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="touch-target"><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="touch-target h-9 w-9" aria-label="Actions">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="min-w-[10rem]">
+                            <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer" onClick={() => openCategoryDialog(c)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
                                 <AlertDialogHeader>
-                                <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-sm">
+                                  <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-sm">
                                     This action cannot be undone. This will permanently delete the category. Any products in this category will not be deleted but will need to be re-categorized.
-                                </AlertDialogDescription>
+                                  </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCategoryId === c.id || isDeletingCategory}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCategory(c.id!)} disabled={deletingCategoryId === c.id || isDeletingCategory}>
-                                  {(deletingCategoryId === c.id || isDeletingCategory) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  {deletingCategoryId === c.id || isDeletingCategory ? 'Deleting...' : 'Delete'}
-                                </AlertDialogAction>
+                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCategoryId === c.id || isDeletingCategory}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCategory(c.id!)} disabled={deletingCategoryId === c.id || isDeletingCategory}>
+                                    {(deletingCategoryId === c.id || isDeletingCategory) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {deletingCategoryId === c.id || isDeletingCategory ? 'Deleting...' : 'Delete'}
+                                  </AlertDialogAction>
                                 </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                         </div>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -753,11 +776,7 @@ export default function CataloguePage() {
                                         field.onChange(url);
                                     }}
                                     onUploadError={(error) => {
-                                        toast({
-                                            variant: 'destructive',
-                                            title: 'Upload failed',
-                                            description: error,
-                                        });
+                                        feedback.error('Upload failed', error, 'Check file size (max 2MB) and format, then try again.');
                                     }}
                                     onDelete={() => {
                                         setProductImageUrl(null);

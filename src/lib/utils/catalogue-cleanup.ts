@@ -1,6 +1,6 @@
 import { db } from '../db';
 
-// Liste des catégories mockées à supprimer
+// Mock categories to remove
 const MOCK_CATEGORIES = [
   'Drinks',
   'Snacks',
@@ -16,7 +16,7 @@ const MOCK_CATEGORIES = [
   'Cool Drinks',
 ];
 
-// Liste des produits mockés à supprimer
+// Mock products to remove
 const MOCK_PRODUCTS = [
   'Coca-Cola 330ml',
   'Lays Chips Classic',
@@ -31,21 +31,21 @@ const MOCK_PRODUCTS = [
 ];
 
 /**
- * Supprime les catégories mockées de la base de données locale
+ * Remove mock categories from local database
  */
 export async function removeMockCategories(): Promise<number> {
   try {
     const allCategories = await db.categories.toArray();
     const mockCategoryIds: number[] = [];
 
-    // Trouver les IDs des catégories mockées
+    // Find IDs of mock categories
     for (const category of allCategories) {
       if (category.id && MOCK_CATEGORIES.includes(category.name)) {
         mockCategoryIds.push(category.id);
       }
     }
 
-    // Supprimer les catégories mockées
+    // Delete mock categories
     if (mockCategoryIds.length > 0) {
       await db.categories.bulkDelete(mockCategoryIds);
       console.log(`Removed ${mockCategoryIds.length} mock categories`);
@@ -59,21 +59,21 @@ export async function removeMockCategories(): Promise<number> {
 }
 
 /**
- * Supprime les produits mockés de la base de données locale
+ * Remove mock products from local database
  */
 export async function removeMockProducts(): Promise<number> {
   try {
     const allProducts = await db.products.toArray();
     const mockProductIds: number[] = [];
 
-    // Trouver les IDs des produits mockés
+    // Find IDs of mock products
     for (const product of allProducts) {
       if (product.id && MOCK_PRODUCTS.includes(product.name)) {
         mockProductIds.push(product.id);
       }
     }
 
-    // Supprimer les produits mockés
+    // Delete mock products
     if (mockProductIds.length > 0) {
       await db.products.bulkDelete(mockProductIds);
       console.log(`Removed ${mockProductIds.length} mock products`);
@@ -87,7 +87,7 @@ export async function removeMockProducts(): Promise<number> {
 }
 
 /**
- * Supprime toutes les données mockées (catégories et produits)
+ * Remove all mock data (categories and products)
  */
 export async function removeAllMockData(): Promise<{ categories: number; products: number }> {
   try {

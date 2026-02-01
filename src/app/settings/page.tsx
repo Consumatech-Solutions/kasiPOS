@@ -7,7 +7,7 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { Badge } from '@/components/ui/badge';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
@@ -42,8 +42,8 @@ const passwordSchema = z.object({
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
   const { currentUser, currentStore: settingsStore } = settings;
+  const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin';
   const { ensureStore } = useEnsureStore();
-  const { toast } = useToast();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
   
@@ -53,12 +53,31 @@ export default function SettingsPage() {
   // State for user management
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [duplicatePhonePopupOpen, setDuplicatePhonePopupOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userForPassword, setUserForPassword] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const TABLE_LIMIT = 5;
+
+  /** Detect if the error indicates the phone number is already registered (duplicate). */
+  const isDuplicatePhoneError = (error: unknown): boolean => {
+    const err = error as { response?: { status?: number; data?: { message?: string; error?: string } | string }; message?: string };
+    const status = err?.response?.status;
+    const data = err?.response?.data;
+    const msg = (
+      (typeof data === 'object' && data?.message) ||
+      (typeof data === 'object' && data?.error) ||
+      (typeof data === 'string' ? data : '') ||
+      ''
+    ).toLowerCase();
+    if (status === 409) return true;
+    if (status === 400 && (msg.includes('phone') || msg.includes('duplicate') || msg.includes('already') || msg.includes('exist'))) return true;
+    // 500 on create user: backend often returns 500 for duplicate phone (e.g. unique constraint)
+    if (status === 500) return true;
+    return false;
+  };
 
   const fetchUsers = async () => {
     const storeId = settingsStore?.id || currentUser?.storeId;
@@ -88,6 +107,7 @@ export default function SettingsPage() {
 
   const handleToggle = (feature: Feature, checked: boolean) => {
     if (checked) {
+      setUserDialogOpen(false);
       setSelectedFeature(feature);
       setModalOpen(true);
     } else {
@@ -118,6 +138,8 @@ export default function SettingsPage() {
   }
 
   const openUserDialog = (user?: User) => {
+    setModalOpen(false);
+    setSelectedFeature(null);
     if (user) {
       setEditingUser(user);
       userForm.reset({ name: user.name, phone: user.phone });
@@ -138,38 +160,48 @@ export default function SettingsPage() {
       if (editingUser) {
         // Update existing user
         await usersApi.update(editingUser.id!, { name: values.name, phone: values.phone });
-        toast({ title: "Success", description: "User updated successfully." });
+        feedback.success('User updated', 'User updated successfully.');
       } else {
         // Add new staff user via API
-        await usersApi.create({ 
-            name: values.name, 
-            phone: values.phone, 
+        await usersApi.create({
+            name: values.name,
+            phone: values.phone,
             role: 'staff',
             storeId: storeId,
         });
-        toast({ title: "Success", description: "Staff user added successfully. They will receive an SMS to set up their password." });
+        feedback.success('Staff user added', 'They will receive an SMS to set up their password.');
       }
       setUserDialogOpen(false);
       fetchUsers(); // Refresh list
     } catch (error: any) {
       console.error("Failed to save user:", error);
-      const message = error.response?.data?.message || "Failed to save user.";
-      toast({ variant: "destructive", title: "Error", description: message });
+      if (!editingUser) {
+        setUserDialogOpen(false);
+        setDuplicatePhonePopupOpen(true);
+        return;
+      }
+      feedback.fromError(error, 'Failed to save user', 'Check your connection and try again.');
     }
   };
-  
+
+  const closeDuplicatePhonePopup = () => {
+    setDuplicatePhonePopupOpen(false);
+    // Reopen Add Staff form after popup closes so user can try again without clicking the button
+    setTimeout(() => setUserDialogOpen(true), 0);
+  };
+
   const deleteUser = async (id: string) => { // ID is uuid string now
     try {
       if (id === currentUser?.id) {
-        toast({ variant: "destructive", title: "Error", description: "You cannot delete your own account." });
+        feedback.error('Cannot delete', 'You cannot delete your own account.', 'Ask another admin to remove you.');
         return;
       }
       await usersApi.remove(id);
-      toast({ title: "Success", description: "User deleted successfully." });
+      feedback.success('User deleted', 'User deleted successfully.');
       fetchUsers(); // Refresh list
     } catch (error) {
       console.error("Failed to delete user:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to delete user." });
+      feedback.fromError(error, 'Failed to delete user', 'Check your connection and try again.');
     }
   };
 
@@ -184,14 +216,13 @@ export default function SettingsPage() {
     
     try {
       await usersApi.update(userForPassword.id, { password: values.password });
-      toast({ title: "Success", description: "Password updated successfully." });
+      feedback.success('Password updated', 'Password updated successfully.');
       setPasswordDialogOpen(false);
       setUserForPassword(null);
       passwordForm.reset();
     } catch (error: any) {
       console.error("Failed to update password:", error);
-      const message = error.response?.data?.message || "Failed to update password.";
-      toast({ variant: "destructive", title: "Error", description: message });
+      feedback.fromError(error, 'Failed to update password', 'Ensure the password meets requirements and try again.');
     }
   };
 
@@ -199,11 +230,7 @@ export default function SettingsPage() {
 
   const handleUpdateApp = async () => {
     if (!isOnline) {
-      toast({
-        variant: "destructive",
-        title: "Offline",
-        description: "Please connect to the internet to update the app.",
-      });
+      feedback.error('Offline', 'Please connect to the internet to update the app.', 'Connect to Wi‑Fi or mobile data and try again.');
       return;
     }
 
@@ -234,10 +261,7 @@ export default function SettingsPage() {
         console.warn('Failed to clear query cache:', e);
       }
 
-      toast({
-        title: "Cache Cleared",
-        description: "Reloading the app with the latest version...",
-      });
+      feedback.success('Cache cleared', 'Reloading the app with the latest version...');
 
       // Reload after a short delay
       setTimeout(() => {
@@ -245,11 +269,7 @@ export default function SettingsPage() {
       }, 1000);
     } catch (error: any) {
       console.error('Failed to update app:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update the app. Please try again.",
-      });
+      feedback.fromError(error, 'Failed to update the app', 'Check your connection and try again.');
       setIsUpdating(false);
     }
   };
@@ -382,10 +402,30 @@ export default function SettingsPage() {
                   onCheckedChange={(checked) => handleToggle('boph', checked)}
                   />
               </div>
+
+              {(isAdmin || currentUser != null) && (
+                <>
+                  <div id="checkout-display-admin" className="space-y-2 pt-4 scroll-mt-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2"><Receipt className="w-5 h-5" /> Checkout display {isAdmin ? '(Admin)' : ''}</h3>
+                    <p className="text-sm text-muted-foreground">Prices are VAT-inclusive. VAT display shows VAT portion included in totals.</p>
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <Label htmlFor="show-vat-toggle" className="font-semibold">Show VAT in checkout summary</Label>
+                      <p className="text-sm text-muted-foreground">When ON, the checkout shows the VAT portion included in the total. When OFF, the VAT line is hidden.</p>
+                    </div>
+                    <Switch
+                      id="show-vat-toggle"
+                      checked={settings.showVatInCheckout !== false}
+                      onCheckedChange={(checked) => setSetting('showVatInCheckout', checked)}
+                    />
+                  </div>
+                </>
+              )}
           </CardContent>
         </Card>
 
-        {currentUser?.role === 'admin' && (
+        {isAdmin && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
@@ -393,7 +433,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex justify-end mb-4">
-                <Button onClick={() => openUserDialog()}>
+                <Button type="button" onClick={(e) => { e.stopPropagation(); openUserDialog(); }}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Staff
                 </Button>
               </div>
@@ -478,7 +518,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <AlertDialog open={modalOpen} onOpenChange={setModalOpen}>
+      <AlertDialog open={modalOpen && selectedFeature != null} onOpenChange={(open) => { if (!open) handleCancel(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -583,6 +623,21 @@ export default function SettingsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Duplicate phone number popup */}
+      <AlertDialog open={duplicatePhonePopupOpen} onOpenChange={setDuplicatePhonePopupOpen}>
+        <AlertDialogContent className="z-[100]" aria-describedby="duplicate-phone-description">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Number already registered</AlertDialogTitle>
+            <AlertDialogDescription id="duplicate-phone-description">
+              This phone number is already registered for a staff member. Please use a different number.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={closeDuplicatePhonePopup}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
 const customerSchema = z.object({
-  name: z.string().min(2, { message: "Le nom doit contenir au moins 2 caractères." }),
-  contact: z.string().min(1, { message: "Le contact est requis." }),
-  loyaltyPoints: z.coerce.number().int().min(0, { message: "Les points de fidélité ne peuvent pas être négatifs." }).optional(),
+  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  contact: z.string().min(1, { message: "Contact is required." }),
+  loyaltyPoints: z.coerce.number().int().min(0, { message: "Loyalty points cannot be negative." }).optional(),
 });
 
 interface CustomerFormProps {

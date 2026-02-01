@@ -22,7 +22,7 @@ const verifyCodeSchema = z.object({
 export default function VerifyCodePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Utiliser get() directement sans accéder aux clés pour éviter les warnings Next.js 15
+  // Use get() directly to avoid Next.js 15 searchParams key access warnings
   const phone = searchParams ? searchParams.get('phone') : null;
   const { toast } = useToast();
   const { login } = useSettings();

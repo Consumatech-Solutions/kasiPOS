@@ -25,14 +25,14 @@ export const customersApi = {
   },
 
   /**
-   * Récupérer un client par ID
+   * Get customer by ID
    */
   getById: (id: string) => {
     return api.get<Customer>(`/customers/${id}`);
   },
 
   /**
-   * Créer un nouveau client
+   * Create a new customer
    */
   create: (data: CreateCustomerDto) => {
     return api.post<Customer>('/customers', data);
@@ -46,7 +46,7 @@ export const customersApi = {
   },
 
   /**
-   * Supprimer un client
+   * Delete a customer
    */
   delete: (id: string) => {
     return api.delete(`/customers/${id}`);

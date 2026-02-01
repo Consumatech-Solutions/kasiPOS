@@ -2,20 +2,32 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto -mx-4 sm:mx-0">
-    <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  /** When true, table is rendered without the scroll wrapper so a parent with overflow-auto can be the scroll container and sticky thead works. */
+  noScrollWrapper?: boolean;
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, noScrollWrapper, ...props }, ref) => {
+    const tableEl = (
       <table
         ref={ref}
-        className={cn("w-full caption-bottom text-sm", className)}
+        className={cn("w-full caption-bottom text-sm", noScrollWrapper ? "min-w-full align-middle" : "", className)}
         {...props}
       />
-    </div>
-  </div>
-))
+    );
+    if (noScrollWrapper) {
+      return tableEl;
+    }
+    return (
+      <div className="relative w-full overflow-auto -mx-4 sm:mx-0">
+        <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+          {tableEl}
+        </div>
+      </div>
+    );
+  }
+);
 Table.displayName = "Table"
 
 const TableHeader = React.forwardRef<

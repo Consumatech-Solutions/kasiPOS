@@ -110,6 +110,7 @@ export default function Header() {
   const { currentUser, currentStore } = settings;
   const pathname = usePathname();
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const {
     notifications,
     unreadCount,
@@ -144,13 +145,23 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm">
+    <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
       {/* Left Section: Logo and Page Title */}
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
         <Link href="/" className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-          <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
-            <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-          </div>
+          {!logoError ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/logo.png"
+              alt="kasiPOS"
+              className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
+              <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+            </div>
+          )}
           <span className="text-base sm:text-lg font-bold hidden sm:inline">kasiPOS</span>
         </Link>
         

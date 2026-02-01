@@ -115,7 +115,6 @@ async function verifyServiceWorkerCache(maxRetries: number = 5, retryDelay: numb
   const REQUIRED_ASSETS = [
     '/',
     '/manifest.json',
-    '/favicon.ico',
   ];
   const OPTIONAL_ASSETS = [
     '/offline', // Offline fallback page (if exists)

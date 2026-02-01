@@ -2,14 +2,12 @@
 
 import dynamic from 'next/dynamic';
 
-// Charger DbProvider dynamiquement (côté client uniquement)
-// Cela évite les problèmes de ChunkLoadError avec Dexie/IndexedDB côté serveur
-const DbProvider = dynamic(
-  () => import('@/components/db-provider').then((mod) => mod.DbProvider),
-  {
-    ssr: false, // Désactiver le rendu côté serveur
-  }
-);
+// Load DbProvider dynamically (client-only) to avoid ChunkLoadError with Dexie/IndexedDB on server.
+// Use default export so RSC client and webpack chunk share the same module contract (avoids factory undefined).
+const DbProvider = dynamic(() => import('@/components/db-provider'), {
+  ssr: false,
+  loading: () => null,
+});
 
 export function ClientDbProvider({ children }: { children: React.ReactNode }) {
   return <DbProvider>{children}</DbProvider>;

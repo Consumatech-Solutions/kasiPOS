@@ -142,46 +142,49 @@ export default function VouchersPage() {
   };
 
   return (
-    <>
+    <div className="p-2 sm:p-4 overflow-y-auto h-full">
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg sm:text-xl">Voucher Management</CardTitle>
-            <CardDescription className="text-sm">Create and manage your discount vouchers.</CardDescription>
-          </div>
-          <Button onClick={() => openVoucherDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create Voucher
-          </Button>
-        </CardHeader>
+        <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
+          <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="text-lg sm:text-xl">Voucher Management</CardTitle>
+              <CardDescription className="text-sm">Create and manage your discount vouchers.</CardDescription>
+            </div>
+            <Button onClick={() => openVoucherDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create Voucher
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2 pb-4">
+              <Button
+                variant={filterActive === undefined ? 'default' : 'outline'}
+                size="sm"
+                className="min-h-[44px] touch-target"
+                onClick={() => setFilterActive(undefined)}
+              >
+                All
+              </Button>
+              <Button
+                variant={filterActive === true ? 'default' : 'outline'}
+                size="sm"
+                className="min-h-[44px] touch-target"
+                onClick={() => setFilterActive(true)}
+              >
+                Active
+              </Button>
+              <Button
+                variant={filterActive === false ? 'default' : 'outline'}
+                size="sm"
+                className="min-h-[44px] touch-target"
+                onClick={() => setFilterActive(false)}
+              >
+                Inactive
+              </Button>
+            </div>
+          </CardContent>
+        </div>
         <CardContent>
-          <div className="flex flex-wrap gap-2 mb-4">
-            <Button
-              variant={filterActive === undefined ? 'default' : 'outline'}
-              size="sm"
-              className="min-h-[44px] touch-target"
-              onClick={() => setFilterActive(undefined)}
-            >
-              All
-            </Button>
-            <Button
-              variant={filterActive === true ? 'default' : 'outline'}
-              size="sm"
-              className="min-h-[44px] touch-target"
-              onClick={() => setFilterActive(true)}
-            >
-              Active
-            </Button>
-            <Button
-              variant={filterActive === false ? 'default' : 'outline'}
-              size="sm"
-              className="min-h-[44px] touch-target"
-              onClick={() => setFilterActive(false)}
-            >
-              Inactive
-            </Button>
-          </div>
-
           {loading ? (
             <div className="text-center py-10 text-muted-foreground">Loading vouchers...</div>
           ) : (
@@ -468,6 +471,6 @@ export default function VouchersPage() {
           </Form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

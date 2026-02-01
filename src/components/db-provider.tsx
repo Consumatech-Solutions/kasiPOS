@@ -5,7 +5,7 @@ import { seedDatabase } from '@/lib/seed';
 import { getDb } from '@/lib/db';
 import { Skeleton } from './ui/skeleton';
 
-export function DbProvider({ children }: { children: React.ReactNode }) {
+function DbProvider({ children }: { children: React.ReactNode }) {
   const [isDbReady, setIsDbReady] = useState(false);
 
   useEffect(() => {
@@ -118,3 +118,6 @@ export function DbProvider({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+export { DbProvider };
+export default DbProvider;

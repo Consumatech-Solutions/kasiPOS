@@ -14,14 +14,14 @@ export interface LocalImage {
 
 class ImageStorageService {
   /**
-   * Générer un ID unique pour l'image
+   * Generate a unique ID for the image
    */
   private generateImageId(): string {
     return `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
-   * Stocker une image localement dans IndexedDB
+   * Store an image locally in IndexedDB
    */
   async storeImage(productId: string | number, file: File): Promise<string> {
     const imageId = this.generateImageId();
@@ -38,7 +38,7 @@ class ImageStorageService {
       updatedAt: new Date().toISOString(),
     };
 
-    // Supprimer l'ancienne image du produit s'il y en a une
+    // Remove existing product image if any
     try {
       const existingImages = await db.productImages
         .where('productId')
@@ -52,16 +52,16 @@ class ImageStorageService {
       console.error('Error deleting existing images:', err);
     }
 
-    // Ajouter la nouvelle image
+    // Add the new image
     await db.productImages.add(imageRecord);
 
-    // Retourner une URL blob pour affichage immédiat
+    // Return blob URL for immediate display
     return URL.createObjectURL(imageBlob);
   }
 
   /**
-   * Obtenir l'URL d'une image locale (blob://) ou serveur
-   * Note: Les URLs blob créées ici doivent être révoquées par le composant qui les utilise
+   * Get URL of a local (blob://) or server image
+   * Note: Blob URLs created here must be revoked by the component that uses them
    */
   async getProductImageUrl(productId: string | number): Promise<string | null> {
     try {
@@ -76,13 +76,13 @@ class ImageStorageService {
 
       const image = images[0];
 
-      // Si synchronisé, retourner l'URL serveur
+      // If synced, return server URL
       if (image.synced && image.serverUrl) {
         return image.serverUrl;
       }
 
-      // Sinon, créer une nouvelle URL blob depuis les données de l'image
-      // Le composant qui utilise cette URL doit la révoquer avec URL.revokeObjectURL()
+      // Otherwise create a new blob URL from image data
+      // Component using this URL must revoke it with URL.revokeObjectURL()
       try {
         return URL.createObjectURL(image.imageData);
       } catch (blobError) {
@@ -96,7 +96,7 @@ class ImageStorageService {
   }
 
   /**
-   * Obtenir l'image complète d'un produit
+   * Get full product image record
    */
   async getProductImage(productId: string | number): Promise<ProductImageRecord | null> {
     try {
@@ -113,7 +113,7 @@ class ImageStorageService {
   }
 
   /**
-   * Marquer une image comme synchronisée avec l'URL serveur
+   * Mark an image as synced with server URL
    */
   async markAsSynced(imageId: string, serverUrl: string): Promise<void> {
     await db.productImages.update(imageId, {
@@ -124,24 +124,23 @@ class ImageStorageService {
   }
 
   /**
-   * Obtenir toutes les images non synchronisées
+   * Get all unsynced images
    */
   async getUnsyncedImages(): Promise<ProductImageRecord[]> {
-    // Récupérer toutes les images et filtrer celles qui ne sont pas synchronisées
-    // car Dexie ne peut pas utiliser .where() directement sur un booléen
+    // Fetch all images and filter unsynced (Dexie cannot use .where() on boolean)
     const allImages = await db.productImages.toArray();
     return allImages.filter(img => !img.synced);
   }
 
   /**
-   * Supprimer une image locale
+   * Delete a local image
    */
   async deleteImage(imageId: string): Promise<void> {
     await db.productImages.delete(imageId);
   }
 
   /**
-   * Supprimer toutes les images d'un produit
+   * Delete all images for a product
    */
   async deleteProductImages(productId: string | number): Promise<void> {
     try {
@@ -159,14 +158,14 @@ class ImageStorageService {
   }
 
   /**
-   * Convertir un Blob en File pour l'upload
+   * Convert Blob to File for upload
    */
   blobToFile(blob: Blob, fileName: string, mimeType: string): File {
     return new File([blob], fileName, { type: mimeType });
   }
 
   /**
-   * Obtenir l'extension de fichier depuis le type MIME
+   * Get file extension from MIME type
    */
   getFileExtension(mimeType: string): string {
     const extensions: Record<string, string> = {

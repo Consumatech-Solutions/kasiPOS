@@ -7,12 +7,12 @@ class ImageSyncService {
   }
 
   /**
-   * Synchroniser toutes les images non synchronisées
+   * Sync all unsynced images
    */
   async syncUnsyncedImages(): Promise<void> {
     if (!this.isOnline()) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('Offline: Synchronisation des images reportée');
+        console.log('Offline: Image sync postponed');
       }
       return;
     }
@@ -24,12 +24,12 @@ class ImageSyncService {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log(`Synchronisation de ${unsyncedImages.length} image(s)...`);
+      console.log(`Syncing ${unsyncedImages.length} image(s)...`);
     }
 
     for (const image of unsyncedImages) {
       try {
-        // Convertir le Blob en File
+        // Convert Blob to File
         const fileName = `product-${image.productId}-${image.id}.${imageStorageService.getFileExtension(image.mimeType)}`;
         const file = imageStorageService.blobToFile(
           image.imageData,
@@ -37,27 +37,27 @@ class ImageSyncService {
           image.mimeType
         );
 
-        // Upload vers le serveur
+        // Upload to server
         const response = await filesApi.uploadProductImage(file);
 
-        // Marquer comme synchronisé
+        // Mark as synced
         await imageStorageService.markAsSynced(image.id, response.url);
 
         if (process.env.NODE_ENV === 'development') {
-          console.log(`✓ Image ${image.id} synchronisée: ${response.url}`);
+          console.log(`✓ Image ${image.id} synced: ${response.url}`);
         }
       } catch (error: any) {
-        // Ignorer les erreurs 404 et network pour ne pas spammer la console
+        // Ignore 404 and network errors to avoid console spam
         if (error?.response?.status !== 404 && error?.code !== 'ERR_NETWORK' && error?.message !== 'Network Error') {
-          console.error(`✗ Erreur lors de la synchronisation de l'image ${image.id}:`, error);
+          console.error(`✗ Error syncing image ${image.id}:`, error);
         }
-        // Continuer avec les autres images même en cas d'erreur
+        // Continue with other images on error
       }
     }
   }
 
   /**
-   * Synchroniser l'image d'un produit spécifique
+   * Sync a specific product image
    */
   async syncProductImage(productId: string | number): Promise<string | null> {
     if (!this.isOnline()) {
@@ -83,16 +83,15 @@ class ImageSyncService {
 
       return response.url;
     } catch (error: any) {
-      // Ne pas throw l'erreur pour ne pas bloquer l'utilisateur
-      // L'image reste disponible localement et sera réessayée plus tard
+      // Do not throw so user is not blocked; image stays available locally and will retry later
       const errorStatus = error?.response?.status;
       const errorCode = error?.code;
       const errorMessage = error?.message;
       
-      // Logger seulement les erreurs non-404 et non-network
+      // Log only non-404 and non-network errors
       if (errorStatus !== 404 && errorCode !== 'ERR_NETWORK' && errorMessage !== 'Network Error') {
         if (process.env.NODE_ENV === 'development') {
-          console.error(`Erreur lors de la synchronisation de l'image du produit ${productId}:`, {
+          console.error(`Error syncing product image ${productId}:`, {
             status: errorStatus,
             code: errorCode,
             message: errorMessage,
@@ -101,7 +100,7 @@ class ImageSyncService {
         }
       }
       
-      // Retourner null au lieu de throw pour ne pas bloquer
+      // Return null instead of throwing so caller is not blocked
       return null;
     }
   }
@@ -109,16 +108,16 @@ class ImageSyncService {
 
 export const imageSyncService = new ImageSyncService();
 
-// Écouter les changements de connexion
+// Listen for connection changes
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('Connexion rétablie: Synchronisation des images...');
+      console.log('Connection restored: Syncing images...');
     }
     imageSyncService.syncUnsyncedImages();
   });
 
-  // Synchroniser toutes les 5 minutes si en ligne
+  // Sync every 5 minutes when online
   setInterval(() => {
     if (navigator.onLine) {
       imageSyncService.syncUnsyncedImages();

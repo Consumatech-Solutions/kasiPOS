@@ -23,7 +23,6 @@ const API_CACHE = 'kasipos-api-cache';
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.json',
-  '/favicon.ico',
   '/offline', // Offline fallback page (if exists)
 ];
 
@@ -172,6 +171,12 @@ self.addEventListener('fetch', (event) => {
         }
       })()
     );
+    return;
+  }
+
+  // In development, never intercept _next requests to avoid ChunkLoadError (double path, cache issues)
+  const isDev = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  if (isDev && url.pathname.startsWith('/_next/')) {
     return;
   }
 
