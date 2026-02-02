@@ -13,6 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useSettings } from '@/components/settings-provider';
 import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
 
@@ -38,7 +39,7 @@ export default function LoginPage() {
             const response = await authApi.login(values.phone, values.password);
             
             if (response.data && response.data.accessToken) {
-                toast({ title: "Login Successful", description: "Welcome back!" });
+                feedback.success('Login successful', 'Welcome back!');
                 // Pass user and token to settings provider
                 await login({ 
                     ...response.data.user, 
@@ -47,22 +48,24 @@ export default function LoginPage() {
                 // Router push is handled inside login() or settings provider effect, but we can do it here too if needed
                 // router.push('/'); 
             }
-        } catch (error: any) {
-            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        } catch (error: unknown) {
+            const err = error as { code?: string; message?: string; response?: { status?: number; data?: { message?: string } } };
+            if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
                 if (process.env.NODE_ENV === 'development') {
                     console.warn('Backend not reachable. Ensure backend is running on http://localhost:3001');
                 }
-                feedback.error('Connection error', 'Cannot reach server.', 'Ensure the backend is running and try again.');
+                feedback.error('Connection error', 'Cannot reach server.', 'Ensure the backend is running and try again.', { code: ERROR_CODES.LOGIN });
                 return;
             }
 
-            // 401 = backend rejected credentials (wrong phone/password or account not found)
-            const status = error.response?.status;
-            const message = error.response?.data?.message || (status === 401 ? 'Invalid phone number or password.' : 'Login failed. Please try again.');
-            if (process.env.NODE_ENV === 'development' && status !== 401) {
-                console.error('Login error:', error);
-            }
-            feedback.error('Login failed', message, status === 401 ? 'Check your phone number and password.' : 'Try again or request access if you don\'t have an account.');
+            const status = err?.response?.status;
+            const message = err?.response?.data?.message || (status === 401 ? 'Invalid phone number or password.' : 'Login failed. Please try again.');
+            feedback.error(
+                'Login failed',
+                message,
+                status === 401 ? 'Check your phone number and password.' : 'Try again or request access if you don\'t have an account.',
+                { code: ERROR_CODES.LOGIN }
+            );
         }
     };
 

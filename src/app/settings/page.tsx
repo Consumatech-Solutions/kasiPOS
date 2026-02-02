@@ -407,12 +407,12 @@ export default function SettingsPage() {
                 <>
                   <div id="checkout-display-admin" className="space-y-2 pt-4 scroll-mt-4">
                     <h3 className="text-lg font-semibold flex items-center gap-2"><Receipt className="w-5 h-5" /> Checkout display {isAdmin ? '(Admin)' : ''}</h3>
-                    <p className="text-sm text-muted-foreground">Prices are VAT-inclusive. VAT display shows VAT portion included in totals.</p>
+                    <p className="text-sm text-muted-foreground">When ON, VAT is added to the total (Total = Subtotal + VAT). When OFF, VAT is included in the total (no addition).</p>
                   </div>
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <Label htmlFor="show-vat-toggle" className="font-semibold">Show VAT in checkout summary</Label>
-                      <p className="text-sm text-muted-foreground">When ON, the checkout shows the VAT portion included in the total. When OFF, the VAT line is hidden.</p>
+                      <p className="text-sm text-muted-foreground">When ON, VAT is added on top (Total = Subtotal + VAT). When OFF, VAT is included in prices and the VAT line is hidden.</p>
                     </div>
                     <Switch
                       id="show-vat-toggle"

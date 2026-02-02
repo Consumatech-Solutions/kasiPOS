@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { useSettings } from '@/components/settings-provider';
 import { db } from '@/lib/db';
 
@@ -24,7 +25,6 @@ export default function VerifyCodePage() {
   const searchParams = useSearchParams();
   // Use get() directly to avoid Next.js 15 searchParams key access warnings
   const phone = searchParams ? searchParams.get('phone') : null;
-  const { toast } = useToast();
   const { login } = useSettings();
 
   const form = useForm<z.infer<typeof verifyCodeSchema>>({
@@ -36,7 +36,7 @@ export default function VerifyCodePage() {
 
 const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
     if (!phone) {
-        toast({ variant: 'destructive', title: 'Error', description: 'No phone number provided.' });
+        feedback.error('Verification failed', 'No phone number was provided.', 'Go back to Request Access and enter your mobile number.', { code: ERROR_CODES.VERIFY });
         router.push('/request-access');
         return;
     }
@@ -45,9 +45,7 @@ const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
         const response = await authApi.verifyOtp(phone, values.code);
         
         if (response.data) {
-            toast({
-                title: 'Verification Successful!',
-            });
+            feedback.success('Verification successful', 'You can now continue to sign in or set your password.');
             
             const { tempToken, hasPassword, user } = response.data;
 
@@ -73,14 +71,13 @@ const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
                  router.push(`/set-password?phone=${encodeURIComponent(phone)}`);
             }
         }
-    } catch (error: any) {
-        console.error('Verify OTP error:', error);
-        const message = error.response?.data?.message || 'The code you entered is incorrect.';
-        toast({
-            variant: 'destructive',
-            title: 'Verification Failed',
-            description: message,
-        });
+    } catch (error: unknown) {
+        feedback.fromError(
+            error,
+            'Verification failed',
+            'Check the code and try again, or request a new code from Request Access.',
+            ERROR_CODES.VERIFY
+        );
     }
   };
 

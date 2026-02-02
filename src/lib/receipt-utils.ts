@@ -49,14 +49,23 @@ export function validateReceiptContent(data: ReceiptData): string[] {
 
   const itemsSubtotal = data.items.reduce((sum, item) => sum + (item.totalPrice ?? item.unitPrice * item.quantity), 0);
   const roundedItemsSubtotal = Math.round(itemsSubtotal * 100) / 100;
-  const roundedSubtotal = Math.round(data.subtotal * 100) / 100;
-  if (Math.abs(roundedItemsSubtotal - roundedSubtotal) > 0.02) {
-    errors.push(`Items total ${roundedItemsSubtotal} does not match subtotal ${roundedSubtotal}`);
+  // When showVat: subtotal is ex-VAT, items total = subtotal + discount (cart before discount)
+  const expectedItemsTotal = data.showVat
+    ? Math.round((data.subtotal + data.discountAmount) * 100) / 100
+    : Math.round(data.subtotal * 100) / 100;
+  if (Math.abs(roundedItemsSubtotal - expectedItemsTotal) > 0.02) {
+    errors.push(`Items total ${roundedItemsSubtotal} does not match ${data.showVat ? 'subtotal + discount' : 'subtotal'} (${expectedItemsTotal})`);
   }
 
-  const expectedTotal = data.subtotal - data.discountAmount;
+  const expectedTotal = data.showVat
+    ? data.subtotal + data.vatAmount
+    : data.subtotal - data.discountAmount;
   if (Math.abs(data.total - expectedTotal) > 0.02) {
-    errors.push(`Total ${data.total} does not match subtotal - discount (${expectedTotal})`);
+    errors.push(
+      data.showVat
+        ? `Total ${data.total} does not match subtotal + VAT (${expectedTotal})`
+        : `Total ${data.total} does not match subtotal - discount (${expectedTotal})`
+    );
   }
 
   if (data.showVat) {

@@ -46,6 +46,24 @@ describe('Receipt generation and content accuracy', () => {
     expect(Math.abs(data.vatAmount - expectedVat)).toBeLessThan(0.02);
   });
 
+  it('when showVat is true, total equals subtotal + VAT (VAT added on top) and validation passes', () => {
+    const subtotal = 98; // ex-VAT
+    const total = subtotal * 1.15; // VAT added
+    const data = buildReceiptData({
+      storeName: 'Test Store',
+      saleId: 'TXN-VAT',
+      items: sampleItems,
+      subtotal,
+      discountAmount: 0,
+      total,
+      paymentMethod: 'Cash',
+      showVat: true,
+    });
+    expect(data.subtotal + data.vatAmount).toBeCloseTo(data.total, 2);
+    const errors = validateReceiptContent(data);
+    expect(errors).toHaveLength(0);
+  });
+
   it('omits VAT amount when showVat is false', () => {
     const data = buildReceiptData({
       storeName: 'Test Store',

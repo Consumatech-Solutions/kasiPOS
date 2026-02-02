@@ -30,14 +30,13 @@ interface CartContextValue {
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cart, setCartState] = useState<CartMap>(() => {
-    if (typeof window === 'undefined') return new Map();
-    if (cartMemoryCache && cartMemoryCache.size > 0) return new Map(cartMemoryCache);
-    return loadCartFromSessionStorage();
-  });
+  // Always start with empty cart so server and client render the same (avoids hydration mismatch in production).
+  // Cart is restored from storage only in useLayoutEffect (client-only).
+  const [cart, setCartState] = useState<CartMap>(() => new Map());
   const [hydrated, setHydrated] = useState(false);
 
   useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
     if (cartMemoryCache && cartMemoryCache.size > 0) {
       setCartState(new Map(cartMemoryCache));
     } else {
