@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { TransactionItem } from '@/types';
 import { Printer, Download, Mail, MessageCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 
 export interface ReceiptData {
   storeName: string;
@@ -52,7 +52,6 @@ function formatReceiptDate(d: Date): string {
 
 export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
 
   const buildPrintHtml = (d: ReceiptData): string => {
     const rows = d.items
@@ -71,7 +70,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         ? `<div class="row"><span>Discount</span><span>-R ${d.discountAmount.toFixed(2)}</span></div>`
         : '';
     const vatRow = d.showVat
-      ? `<div class="row"><span>VAT (15%) included</span><span>R ${d.vatAmount.toFixed(2)}</span></div>`
+      ? `<div class="row"><span>VAT (15%)</span><span>R ${d.vatAmount.toFixed(2)}</span></div>`
       : '';
     const voucherRow = d.voucherCode
       ? `<div class="row meta"><span>Voucher</span><span>${escapeHtml(d.voucherCode)}</span></div>`
@@ -103,11 +102,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
     if (!data) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast({
-        variant: 'destructive',
-        title: 'Print blocked',
-        description: 'Please allow pop-ups to print the receipt.',
-      });
+      feedback.error('Print blocked', 'Your browser blocked the print window.', 'Allow pop-ups for this site and try again.');
       return;
     }
     const doc = printWindow.document;
@@ -141,25 +136,16 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   };
 
   const handleDownloadPdf = () => {
-    toast({
-      title: 'Print or Save as PDF',
-      description: 'Use the print dialog and choose "Save as PDF" as the destination.',
-    });
+    feedback.success('Save as PDF', 'Use the print dialog and choose "Save as PDF" as the destination.');
     handlePrint();
   };
 
   const handleEmailReceipt = () => {
-    toast({
-      title: 'Coming soon',
-      description: 'Email receipt delivery will be available in a future update.',
-    });
+    feedback.success('Coming soon', 'Email receipt delivery will be available in a future update.');
   };
 
   const handleSmsReceipt = () => {
-    toast({
-      title: 'Coming soon',
-      description: 'SMS receipt delivery will be available in a future update.',
-    });
+    feedback.success('Coming soon', 'SMS receipt delivery will be available in a future update.');
   };
 
   const VAT_RATE = 15;
@@ -227,7 +213,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             )}
             {data.showVat && (
               <div className="flex justify-between gap-4 text-muted-foreground">
-                <span className="shrink-0">VAT (15%) included</span>
+                <span className="shrink-0">VAT (15%)</span>
                 <span className="whitespace-nowrap">R {data.vatAmount.toFixed(2)}</span>
               </div>
             )}

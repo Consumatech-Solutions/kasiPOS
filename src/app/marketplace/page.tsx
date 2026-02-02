@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { useMarketplaceOrders } from '@/hooks/use-marketplace-orders';
 import { useMarketplaceStores } from '@/hooks/use-marketplace-stores';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -19,29 +20,20 @@ import type { MarketplaceOrderItem } from '@/lib/api/marketplace-orders';
 export default function MarketplacePage() {
   const [orderCode, setOrderCode] = useState('');
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
-  const { toast } = useToast();
   const { findByOrderCode, foundOrder, searchLoading } = useMarketplaceOrders({ autoLoad: false });
   const { stores: marketplaces, loading: storesLoading } = useMarketplaceStores({ activeOnly: true, autoLoad: true });
 
   const handleSearch = async () => {
     if (!orderCode.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please enter an order code.',
-        variant: 'destructive',
-      });
+      feedback.error('Order code required', 'Enter an order code to search.', 'Type the code and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
       return;
     }
 
     try {
-      const order = await findByOrderCode(orderCode.trim());
+      await findByOrderCode(orderCode.trim());
       setSearchDialogOpen(true);
-    } catch (error: any) {
-      toast({
-        title: 'Order Not Found',
-        description: error?.response?.data?.message || 'No order found with this code.',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      feedback.fromError(error, 'Order not found', 'Check the order code and try again.', ERROR_CODES.MARKETPLACE_ORDER);
     }
   };
 

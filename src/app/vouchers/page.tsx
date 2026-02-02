@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { useVouchers } from '@/hooks/use-vouchers';
 import type { Voucher } from '@/types';
 import { format } from 'date-fns';
@@ -31,7 +32,6 @@ const voucherSchema = z.object({
 });
 
 export default function VouchersPage() {
-  const { toast } = useToast();
   const { vouchers, loading, createVoucher, updateVoucher, deleteVoucher, isCreating, isUpdating, isDeleting } = useVouchers({ page: 1, limit: 10 });
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
@@ -90,40 +90,23 @@ export default function VouchersPage() {
 
       if (editingVoucher?.id) {
         await updateVoucher(editingVoucher.id, voucherData);
-        toast({
-          title: 'Success',
-          description: 'Voucher updated successfully.',
-        });
+        feedback.success('Voucher updated', 'Voucher updated successfully.');
       } else {
         await createVoucher(voucherData);
-        toast({
-          title: 'Success',
-          description: 'Voucher created successfully.',
-        });
+        feedback.success('Voucher created', 'Voucher created successfully.');
       }
       setVoucherDialogOpen(false);
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to save voucher.',
-      });
+    } catch (error: unknown) {
+      feedback.fromError(error, 'Failed to save voucher', 'Check your connection and try again.', ERROR_CODES.VOUCHER);
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
       await deleteVoucher(id);
-      toast({
-        title: 'Success',
-        description: 'Voucher deleted successfully.',
-      });
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to delete voucher.',
-      });
+      feedback.success('Voucher deleted', 'Voucher deleted successfully.');
+    } catch (error: unknown) {
+      feedback.fromError(error, 'Failed to delete voucher', 'Try again or check your connection.', ERROR_CODES.VOUCHER);
     }
   };
 

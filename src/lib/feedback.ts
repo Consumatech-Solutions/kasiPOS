@@ -1,11 +1,18 @@
 /**
- * Global notification pattern for the app.
- * Use for consistent success/error feedback (toast) with actionable messages.
+ * Global notification system for the app.
+ * Single standard way to show success/error: toast with clear, actionable messages.
+ *
+ * Rules:
+ * - Success: clear confirmation (e.g. "Sale recorded successfully").
+ * - Error: what failed + why (if known) + what to do next (e.g. "Sale failed — check your connection and try again").
+ * - Always log errors for devs (console.error with ref/code).
+ * - Optional error code in message for support (e.g. "Ref: SALE-001 · KPOS-abc123").
  *
  * Usage:
  *   import { feedback } from '@/lib/feedback';
- *   feedback.success('Saved', 'Your changes were saved.');
- *   feedback.error('Failed to save', err.message, 'Check your connection and try again.', err.code);
+ *   feedback.success('Sale recorded', 'Sale recorded successfully.');
+ *   feedback.error('Sale failed', 'Server unreachable.', 'Check your connection and try again.', { code: 'SALE-001' });
+ *   catch (err) { feedback.fromError(err, 'Sale failed', 'Check your connection and try again.', 'SALE-001'); }
  */
 
 import { toast } from '@/hooks/use-toast';
@@ -18,8 +25,8 @@ function genLogId(): string {
   return `${LOG_ID_PREFIX}-${part}`;
 }
 
-/** Extract a user-friendly message from an unknown error. */
-function getErrorMessage(error: unknown): string {
+/** Extract a user-friendly message from an unknown error (no stack traces or technical jargon). */
+export function getErrorMessage(error: unknown): string {
   if (error == null) return 'Something went wrong.';
   if (typeof error === 'string') return error;
   if (error instanceof Error) return error.message;
@@ -27,6 +34,18 @@ function getErrorMessage(error: unknown): string {
   if (obj?.response?.data?.message) return obj.response.data.message;
   if (obj?.message) return String(obj.message);
   return 'Something went wrong.';
+}
+
+/** Build description for error toast: reason, recovery, then ref for support. */
+function buildErrorDescription(reason?: string, recovery?: string, code?: string, logId?: string): string {
+  const parts: string[] = [];
+  if (reason) parts.push(reason);
+  if (recovery) parts.push(recovery);
+  if (code || logId) {
+    const ref = [code, logId].filter(Boolean).join(' · ');
+    parts.push(`Ref: ${ref}`);
+  }
+  return parts.join(' ');
 }
 
 /**
@@ -39,8 +58,8 @@ export function useAppFeedback() {
 
 export const feedback = {
   /**
-   * Show a success toast.
-   * Use after completing an action (save, delete, submit).
+   * Show a success toast. Use after completing an action (save, delete, submit).
+   * Example: feedback.success('Sale recorded', 'Sale recorded successfully.');
    */
   success(title: string, description?: string): void {
     toast({
@@ -51,8 +70,9 @@ export const feedback = {
   },
 
   /**
-   * Show an error toast with optional recovery suggestion and log ID for support.
-   * Use in catch blocks for async operations.
+   * Show an error toast with reason, recovery suggestion, and optional ref for support.
+   * Use in catch blocks or when validation fails.
+   * Example: feedback.error('Sale failed', 'Server unreachable.', 'Check your connection and try again.', { code: 'SALE-001' });
    */
   error(
     title: string,
@@ -61,34 +81,33 @@ export const feedback = {
     options?: { logId?: string; code?: string }
   ): void {
     const logId = options?.logId ?? genLogId();
-    const parts: string[] = [];
-    if (reason) parts.push(reason);
-    if (recovery) parts.push(recovery);
-    if (options?.code || logId) {
-      parts.push(`Ref: ${options?.code ? `${options.code} · ` : ''}${logId}`);
-    }
+    const description = buildErrorDescription(reason, recovery, options?.code, logId);
     toast({
       title,
-      description: parts.length > 0 ? parts.join(' ') : undefined,
+      description: description || undefined,
       variant: 'destructive',
     });
+    if (typeof window !== 'undefined') {
+      console.error('[Feedback]', title, description, { logId, code: options?.code });
+    }
   },
 
   /**
-   * Show an error toast from a caught error (extracts message, optional recovery, log ID).
+   * Show an error toast from a caught error. Extracts user-friendly message, shows recovery, logs for devs.
+   * Always use in catch blocks for async operations so the user knows what happened and what to do next.
+   * Example: catch (err) { feedback.fromError(err, 'Sale failed', 'Check your connection and try again.', 'SALE-001'); }
    */
   fromError(
     error: unknown,
     title: string = 'Action failed',
-    recovery?: string
+    recovery: string = 'Check your connection and try again.',
+    code?: string
   ): string {
     const logId = genLogId();
     const reason = getErrorMessage(error);
-    const code = (error as { code?: string })?.code;
     feedback.error(title, reason, recovery, { logId, code });
     return logId;
   },
 };
 
-export { genLogId, getErrorMessage };
-
+export { genLogId };

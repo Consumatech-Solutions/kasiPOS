@@ -154,7 +154,7 @@ export default function StoreSetupPage() {
               />
               {currentStore && (
                 <div>
-                  <FormLabel>Logo du magasin (Optionnel)</FormLabel>
+                  <FormLabel>Store logo (Optional)</FormLabel>
                   <div className="mt-2">
                     <ImageUpload
                       productId={`store-${currentStore.id}`}
