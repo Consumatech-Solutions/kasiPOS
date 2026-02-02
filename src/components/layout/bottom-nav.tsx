@@ -29,17 +29,20 @@ export default function BottomNav() {
 
 
   return (
-    <nav className="sticky bottom-0 left-0 z-30 w-full h-16 bg-card border-t bottom-nav">
-      <div className="flex h-full w-full items-center font-medium gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide scroll-smooth">
+    <nav className="sticky bottom-0 left-0 z-30 w-full max-w-full min-w-0 h-16 bg-card border-t bottom-nav pb-[env(safe-area-inset-bottom)]">
+      <div className="flex h-full w-full min-w-0 items-center font-medium gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide scroll-smooth">
         <div className="flex h-full items-center gap-2 min-w-fit px-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
             return (
-              <Button key={item.label} variant={isActive ? 'secondary' : 'ghost'} asChild className="flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0">
-                <Link
-                  href={item.href}
-                >
+              <Button
+                key={item.label}
+                variant={isActive ? 'secondary' : 'ghost'}
+                asChild
+                className={`flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2 ${isActive ? 'border-destructive' : 'border-transparent'}`}
+              >
+                <Link href={item.href}>
                   <Icon className="w-5 h-5 mb-1" />
                   <span>{item.label}</span>
                 </Link>

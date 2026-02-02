@@ -11,7 +11,7 @@ interface BarcodeDisplayProps {
   className?: string;
 }
 
-// Cache global pour éviter de régénérer les barcodes déjà générés
+// Global cache to avoid regenerating barcodes
 const barcodeCache = new Map<string, string>();
 
 export function BarcodeDisplay({ 
@@ -26,13 +26,13 @@ export function BarcodeDisplay({
   const [svgContent, setSvgContent] = useState<string>('');
   const currentValueRef = useRef<string>('');
   
-  // Mémoriser la clé de cache
+  // Memoize cache key
   const cacheKey = useMemo(() => {
     const barcodeValue = String(value || '').trim();
     return barcodeValue ? `${barcodeValue}-${format}-${width}-${height}` : '';
   }, [value, format, width, height]);
 
-  // Charger depuis le cache si disponible
+  // Load from cache if available
   useEffect(() => {
     const barcodeValue = String(value || '').trim();
     
@@ -42,32 +42,32 @@ export function BarcodeDisplay({
       return;
     }
 
-    // Si la valeur n'a pas changé et qu'on a déjà du contenu, ne rien faire
+    // If value unchanged and we already have content, skip
     if (currentValueRef.current === barcodeValue && svgContent) {
       return;
     }
 
     currentValueRef.current = barcodeValue;
 
-    // Si le barcode est dans le cache, l'utiliser
+    // If barcode is in cache, use it
     if (barcodeCache.has(cacheKey)) {
       setSvgContent(barcodeCache.get(cacheKey)!);
       return;
     }
 
-    // Générer le barcode
+    // Generate barcode
     (async () => {
       try {
         const jsbarcodeModule = await import('jsbarcode');
         const JsBarcode = (jsbarcodeModule as any).default || jsbarcodeModule;
         
-        // Vérifier à nouveau le cache (peut-être qu'un autre composant l'a généré entre-temps)
+        // Re-check cache (another component may have generated it meanwhile)
         if (barcodeCache.has(cacheKey)) {
           setSvgContent(barcodeCache.get(cacheKey)!);
           return;
         }
 
-        // Créer un SVG temporaire pour la génération
+        // Create temporary SVG for generation
         const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         
         // Determine format based on length
@@ -99,7 +99,7 @@ export function BarcodeDisplay({
           textMargin: 5,
         });
         
-        // Sauvegarder dans le cache et l'état
+        // Save to cache and state
         const content = tempSvg.innerHTML;
         if (content && currentValueRef.current === barcodeValue) {
           barcodeCache.set(cacheKey, content);
@@ -112,11 +112,11 @@ export function BarcodeDisplay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cacheKey, format, width, height, displayValue, value]);
 
-  // Appliquer le contenu SVG au DOM
+  // Apply SVG content to DOM
   useEffect(() => {
     if (!barcodeRef.current || !svgContent) return;
 
-    // Ne mettre à jour que si le contenu a changé
+    // Update only if content changed
     if (barcodeRef.current.innerHTML !== svgContent) {
       barcodeRef.current.innerHTML = svgContent;
       

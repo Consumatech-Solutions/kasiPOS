@@ -15,7 +15,7 @@ interface OfflineState {
 
 const CACHE_DURATION = 5000; // Cache result for 5 seconds
 const NETWORK_TEST_TIMEOUT = 3000; // 3 second timeout for network test
-const NETWORK_TEST_URL = '/favicon.ico'; // Small asset to test connectivity
+const NETWORK_TEST_URL = '/manifest.json'; // Small asset that returns 200 when app is up
 
 class OfflineDetector {
   private state: OfflineState = {

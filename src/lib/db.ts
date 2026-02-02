@@ -3,7 +3,7 @@ import type { Product, Customer, Transaction, Voucher, Category, StockAdjustment
 
 export interface ProductImageRecord {
   id: string;
-  productId: string; // Toujours stocké comme string pour éviter les problèmes de type avec IndexedDB
+  productId: string; // Always stored as string to avoid IndexedDB type issues
   imageData: Blob;
   mimeType: string;
   size: number;
@@ -81,7 +81,7 @@ export class KasiPosDexie extends Dexie {
     this.version(10).stores({
       stores: '++id, name, ownerId',
       products: '++id, name, category, barcode, storeId',
-      // customers supprimé explicitement pour permettre le changement de clé primaire dans la version 11
+      // customers omitted to allow primary key change in version 11
       transactions: '++id, customerId, date, storeId',
       vouchers: '++id, code, isActive, storeId',
       categories: '++id, name',
@@ -91,14 +91,14 @@ export class KasiPosDexie extends Dexie {
       users: '++id, &phone, role, storeId',
       productImages: 'id, productId, synced, createdAt',
     }).upgrade(async tx => {
-      // Supprimer explicitement la table customers pour permettre le changement de clé primaire
-      // Dexie supprimera automatiquement la table si elle n'est pas dans la définition des stores
+      // Explicitly clear customers table to allow primary key change
+      // Dexie will drop the table if it is not in the stores definition
       try {
         const customersTable = tx.table('customers');
         await customersTable.clear();
         console.log('Version 10: Cleared customers table to prepare for primary key change');
       } catch (error) {
-        // La table pourrait ne pas exister, ce qui est OK
+        // Table might not exist, which is OK
         console.log('Version 10: Customers table already removed or does not exist');
       }
     });
@@ -227,17 +227,15 @@ export class KasiPosDexie extends Dexie {
   }
 }
 
-// Instance singleton de la base de données
+// Singleton database instance
 let dbInstance: KasiPosDexie | null = null;
 
 /**
- * Obtient l'instance de la base de données.
- * Ne peut être appelé que côté client (dans le navigateur).
- * 
- * @throws {Error} Si appelé côté serveur
+ * Get the database instance. Must be called on the client (browser) only.
+ * @throws {Error} If called on the server
  */
 export function getDb(): KasiPosDexie {
-  // Vérifier que nous sommes côté client
+  // Ensure we are on the client
   if (typeof window === 'undefined') {
     throw new Error('Database can only be accessed on the client side');
   }
@@ -249,6 +247,5 @@ export function getDb(): KasiPosDexie {
   return dbInstance;
 }
 
-// Export pour compatibilité avec le code existant
-// Utilise getDb() pour éviter les problèmes SSR
+// Export for backward compatibility; uses getDb() to avoid SSR issues
 export const db = typeof window !== 'undefined' ? getDb() : (null as any);

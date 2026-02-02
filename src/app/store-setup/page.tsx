@@ -19,7 +19,7 @@ import { Upload, Printer, ScanLine, CreditCard, FileUp, Sparkles, MoveRight } fr
 import { Textarea } from '@/components/ui/textarea';
 import type { Store } from '@/types';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { ImageUpload } from '@/components/catalogue/image-upload';
 
 
@@ -39,7 +39,6 @@ const TOTAL_STEPS = 4;
 
 export default function StoreSetupPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const { settings, setSetting } = useSettings();
   const { currentStore } = settings;
   const { updateStore, createStore } = useStore();
@@ -75,21 +74,21 @@ export default function StoreSetupPage() {
       const currentData = form.getValues();
       
       if (currentStore && currentStore.id) {
-        // Mettre à jour le magasin existant
+        // Update existing store
         const updateData: any = {
           ...currentData,
           ...(logoUrl !== null && { logoUrl }),
         };
         await updateStore(currentStore.id, updateData);
         
-        // Mettre à jour le contexte
+        // Update context
         const updatedStore = {
           ...currentStore,
           ...updateData,
         };
         setSetting('currentStore', updatedStore);
       } else {
-        // Créer un nouveau magasin
+        // Create new store
         const createData: any = {
           ...currentData,
           ...(logoUrl && { logoUrl }),
@@ -106,13 +105,12 @@ export default function StoreSetupPage() {
           await updateStore(currentStore.id, { isSetupComplete: true });
           setSetting('currentStore', { ...currentStore, isSetupComplete: true });
         }
-        toast({ title: "Succès", description: "Configuration du magasin terminée !" });
+        feedback.success('Store setup completed', 'Store setup completed!');
         router.push('/');
       }
     } catch (error) {
       console.error("Failed to save store:", error);
-      const errorMessage = error instanceof Error ? error.message : "Échec de l'enregistrement.";
-      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
+      feedback.fromError(error, 'Failed to save store', 'Check your connection and try again.');
     }
   };
 

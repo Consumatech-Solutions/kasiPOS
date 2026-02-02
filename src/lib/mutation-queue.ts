@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { offlineDetector, isOffline, checkOfflineStatus } from '@/lib/offline-detector';
+import { feedback, genLogId } from '@/lib/feedback';
 
 export interface QueuedMutation {
   id: string;
@@ -277,9 +278,16 @@ class MutationQueue {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * mutation.retries));
           // Try again (mutation stays at front of queue)
         } else {
-          // Max retries reached - remove from queue
+          // Max retries reached - remove from queue; show user-visible error
           mutation.status = 'failed';
-          console.error('[MutationQueue] Mutation failed after max retries:', mutation.mutationKey, error);
+          const logId = genLogId();
+          console.error('[MutationQueue] Mutation failed after max retries:', mutation.mutationKey, error, logId);
+          feedback.error(
+            'Sync failed',
+            error?.message ?? 'Changes could not be synced to the server.',
+            'Your data is saved locally. Check your connection and try again.',
+            { logId, code: error?.code }
+          );
           this.queue.shift();
           this.currentMutation = null;
           this.persistQueue();

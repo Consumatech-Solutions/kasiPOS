@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useSettings } from '@/components/settings-provider';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
 
@@ -23,7 +23,6 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
     const { login } = useSettings();
-    const { toast } = useToast();
     const router = useRouter();
 
     const form = useForm<z.infer<typeof loginSchema>>({
@@ -49,31 +48,21 @@ export default function LoginPage() {
                 // router.push('/'); 
             }
         } catch (error: any) {
-            // Gérer les erreurs réseau spécifiquement
             if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-                // Ne logger que si nécessaire (mode développement)
                 if (process.env.NODE_ENV === 'development') {
-                    console.warn('Backend non accessible. Vérifiez que le serveur backend est démarré sur http://localhost:3001');
+                    console.warn('Backend not reachable. Ensure backend is running on http://localhost:3001');
                 }
-                toast({
-                    variant: "destructive",
-                    title: "Erreur de connexion",
-                    description: "Impossible de se connecter au serveur. Vérifiez que le backend est démarré.",
-                });
+                feedback.error('Connection error', 'Cannot reach server.', 'Ensure the backend is running and try again.');
                 return;
             }
-            
-            // Logger les autres erreurs uniquement en développement
-            if (process.env.NODE_ENV === 'development') {
+
+            // 401 = backend rejected credentials (wrong phone/password or account not found)
+            const status = error.response?.status;
+            const message = error.response?.data?.message || (status === 401 ? 'Invalid phone number or password.' : 'Login failed. Please try again.');
+            if (process.env.NODE_ENV === 'development' && status !== 401) {
                 console.error('Login error:', error);
             }
-            
-            const message = error.response?.data?.message || 'Numéro de téléphone ou mot de passe invalide.';
-            toast({
-                variant: 'destructive',
-                title: 'Échec de la connexion',
-                description: message,
-            });
+            feedback.error('Login failed', message, status === 401 ? 'Check your phone number and password.' : 'Try again or request access if you don\'t have an account.');
         }
     };
 

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import type { Customer, Transaction } from '@/types';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
 import { useNetworkStatus } from '@/hooks/use-network-status';
@@ -25,7 +25,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 
 export default function CustomersPage() {
-  const { toast } = useToast();
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
@@ -80,7 +79,7 @@ export default function CustomersPage() {
       if (editingCustomer) {
         if (isOnline) {
           await updateCustomer(editingCustomer.id, data);
-          toast({ title: "Success", description: "Customer updated successfully." });
+          feedback.success('Customer updated', 'Customer updated successfully.');
         } else {
           // Offline: queue mutation (optimistic update already done by hook)
           mutationQueue.add({
@@ -88,12 +87,12 @@ export default function CustomersPage() {
             mutationFn: () => customersApi.update(editingCustomer.id, data),
             variables: { id: editingCustomer.id, data },
           });
-          toast({ title: "Success", description: "Customer update queued. Will sync when online." });
+          feedback.success('Queued', 'Customer update queued. Will sync when online.');
         }
       } else {
         if (isOnline) {
           await createCustomer(data);
-          toast({ title: "Success", description: "Customer added successfully." });
+          feedback.success('Customer added', 'Customer added successfully.');
         } else {
           // Offline: queue mutation (optimistic update already done by hook)
           mutationQueue.add({
@@ -101,15 +100,14 @@ export default function CustomersPage() {
             mutationFn: () => customersApi.create(data),
             variables: data,
           });
-          toast({ title: "Success", description: "Customer queued. Will sync when online." });
+          feedback.success('Queued', 'Customer queued. Will sync when online.');
         }
       }
       setCustomerDialogOpen(false);
       setEditingCustomer(null);
     } catch (error) {
       console.error("Failed to save customer:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to save customer.";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      feedback.fromError(error, 'Failed to save customer', 'Check your connection and try again.');
     }
   };
 
@@ -120,7 +118,7 @@ export default function CustomersPage() {
     try {
       if (isOnline) {
         await deleteCustomer(id);
-        toast({ title: "Success", description: "Customer deleted successfully." });
+        feedback.success('Customer deleted', 'Customer deleted successfully.');
       } else {
         // Offline: queue mutation (optimistic update already done by hook)
         mutationQueue.add({
@@ -128,12 +126,11 @@ export default function CustomersPage() {
           mutationFn: () => customersApi.delete(id),
           variables: { id },
         });
-        toast({ title: "Success", description: "Customer deletion queued. Will sync when online." });
+        feedback.success('Queued', 'Customer deletion queued. Will sync when online.');
       }
     } catch (error) {
       console.error("Failed to delete customer:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete customer.";
-      toast({ variant: "destructive", title: "Error", description: errorMessage });
+      feedback.fromError(error, 'Failed to delete customer', 'Try again or check your connection.');
     } finally {
       setDeletingCustomerId(null);
     }
@@ -173,28 +170,31 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="p-2 sm:p-4">
+    <div className="p-2 sm:p-4 overflow-y-auto h-full">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">Customers</CardTitle>
-          <CardDescription className="text-sm">Manage your customer database and loyalty program.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
-            <div className="relative flex-grow">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input 
-                placeholder="Search by name or contact..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg sm:text-xl">Customers</CardTitle>
+            <CardDescription className="text-sm">Manage your customer database and loyalty program.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 pb-4">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input 
+                  placeholder="Search by name or contact..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+              </Button>
             </div>
-            <Button onClick={() => openCustomerDialog()} className="w-full sm:w-auto min-h-[44px] touch-target">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
-            </Button>
-          </div>
-
+          </CardContent>
+        </div>
+        <CardContent>
           <div className="border rounded-md overflow-auto">
             <Table>
               <TableHeader>

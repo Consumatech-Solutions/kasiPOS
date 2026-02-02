@@ -18,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/components/settings-provider';
 import { Search, History, Edit, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,7 +41,6 @@ const reasons: StockAdjustmentReason[] = ['New stock received', 'Shrinkage', 'Da
 export default function InventoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
-  const { toast } = useToast();
   const { isOnline } = useNetworkStatus();
   
   // Use API hooks for products and categories
@@ -121,10 +120,7 @@ export default function InventoryPage() {
         // Refresh the products list to show updated stock
         await refreshProducts();
 
-        toast({
-          title: "Success",
-          description: `Stock for ${selectedProduct.name} updated.`,
-        });
+        feedback.success('Stock updated', `Stock for ${selectedProduct.name} updated.`);
       } else {
         // Offline: optimistically update stock in cache
         const productQueryKeys = apiProducts.map((p: any) => ['products', 'list', { page: 1, limit: 10 }]);
@@ -146,27 +142,19 @@ export default function InventoryPage() {
           },
         });
 
-        toast({
-          title: "Success",
-          description: `Stock adjustment queued. Will sync when online.`,
-        });
+        feedback.success('Queued', 'Stock adjustment queued. Will sync when online.');
       }
       setAdjustmentDialogOpen(false);
       setSelectedProduct(null);
     } catch (error: any) {
       console.error("Failed to adjust stock:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to adjust stock.";
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: errorMessage,
-      });
+      feedback.fromError(error, 'Failed to adjust stock', 'Check your connection and try again.');
     }
   };
 
   const handleThresholdUpdate = async (id: string) => {
     if (thresholdValue < 0) {
-      toast({ variant: "destructive", title: "Error", description: "Threshold must be zero or more." });
+      feedback.error('Invalid threshold', 'Threshold must be zero or more.', 'Enter a value ≥ 0.');
       return;
     }
     
@@ -177,7 +165,7 @@ export default function InventoryPage() {
         // Refresh the products list to show updated threshold
         await refreshProducts();
         
-        toast({ title: "Success", description: "Low stock trigger updated." });
+        feedback.success('Low stock trigger updated', 'Low stock trigger updated.');
       } else {
         // Offline: queue mutation (optimistic update already done by hook)
         mutationQueue.add({
@@ -185,56 +173,55 @@ export default function InventoryPage() {
           mutationFn: () => catalogueApi.products.update(id, { lowStockThreshold: thresholdValue } as any),
           variables: { id, data: { lowStockThreshold: thresholdValue } },
         });
-        toast({ title: "Success", description: "Threshold update queued. Will sync when online." });
+        feedback.success('Queued', 'Threshold update queued. Will sync when online.');
       }
       setEditingThresholdId(null);
     } catch (error: any) {
       console.error("Failed to update threshold:", error);
-      const errorMessage = error?.response?.data?.message || error?.message || "Failed to update threshold.";
-      toast({ 
-        variant: "destructive", 
-        title: "Error", 
-        description: errorMessage 
-      });
+      feedback.fromError(error, 'Failed to update threshold', 'Check your connection and try again.');
     }
   };
 
   return (
-    <>
+    <div className="p-2 sm:p-4 overflow-y-auto h-full">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">Inventory Management</CardTitle>
-          <CardDescription className="text-sm">Manage your product inventory and set low stock alerts.</CardDescription>
-        </CardHeader>
+        <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg sm:text-xl">Inventory Management</CardTitle>
+            <CardDescription className="text-sm">Manage your product inventory and set low stock alerts.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 pb-4">
+                <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search by product name..."
+                        className="pl-10"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Filter by category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {categories?.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                <div className="flex items-center space-x-2">
+                    <Switch 
+                        id="low-stock-filter" 
+                        checked={showLowStockOnly}
+                        onCheckedChange={setShowLowStockOnly}
+                    />
+                    <Label htmlFor="low-stock-filter">Low Stock Only</Label>
+                </div>
+            </div>
+          </CardContent>
+        </div>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-4">
-              <div className="relative flex-grow">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                      placeholder="Search by product name..."
-                      className="pl-10"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-              </div>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full sm:w-[180px]">
-                      <SelectValue placeholder="Filter by category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {categories?.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
-                  </SelectContent>
-              </Select>
-              <div className="flex items-center space-x-2">
-                  <Switch 
-                      id="low-stock-filter" 
-                      checked={showLowStockOnly}
-                      onCheckedChange={setShowLowStockOnly}
-                  />
-                  <Label htmlFor="low-stock-filter">Low Stock Only</Label>
-              </div>
-          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -306,7 +293,7 @@ export default function InventoryPage() {
                     <TableCell className="hidden lg:table-cell">
                        <div className="flex items-center gap-2">
                         {editingThresholdId === product.id ? (
-                          <>
+                          <div className="flex items-center gap-2">
                             <Input 
                               type="number" 
                               className="w-24 h-8"
@@ -316,14 +303,14 @@ export default function InventoryPage() {
                               onKeyDown={(e) => e.key === 'Enter' && handleThresholdUpdate(product.id!)}
                               autoFocus
                             />
-                          </>
+                          </div>
                         ) : (
-                          <>
+                          <div className="flex items-center gap-2">
                             <span>{(product as any).lowStockThreshold || 0}</span>
                             <Button variant="ghost" size="icon" className="h-8 w-8 touch-target" onClick={() => { setEditingThresholdId(product.id!); setThresholdValue((product as any).lowStockThreshold || 0); }}>
                               <Edit className="h-3 w-3"/>
                             </Button>
-                          </>
+                          </div>
                         )}
                        </div>
                     </TableCell>
@@ -448,6 +435,6 @@ export default function InventoryPage() {
            )}
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

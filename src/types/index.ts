@@ -189,6 +189,8 @@ export interface AppSettings {
   campaigns: boolean;
   marketplace: boolean;
   boph: boolean;
+  /** Admin-only: show VAT line in checkout summary (prices remain VAT-inclusive). */
+  showVatInCheckout?: boolean;
   isLoggedIn: boolean;
   currentUser: User | null;
   currentStore: Store | null;

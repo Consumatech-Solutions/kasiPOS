@@ -1,4 +1,4 @@
-// Types pour l'API Backend Catalogue
+// Types for Backend Catalogue API
 
 export interface ApiCategory {
   id: string; // UUID
@@ -56,7 +56,7 @@ export interface UpdateProductDto {
 export interface CategoryRecord extends ApiCategory {
   synced: boolean;
   lastSyncedAt?: string;
-  storeId?: number; // Pour compatibilité avec l'existant
+  storeId?: number; // For backward compatibility
 }
 
 export interface ProductRecord {

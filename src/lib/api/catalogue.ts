@@ -22,11 +22,10 @@ export const catalogueApi = {
       const url = `${API_BASE_PATH}/categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
 
-      // Si la réponse contient meta, c'est une réponse paginée
+      // If response has meta, it is paginated
       if (response.data?.meta) {
         return response.data;
       }
-      // Sinon, retourner directement le tableau (rétrocompatibilité)
       return Array.isArray(response.data) ? response.data : response.data?.data || [];
     },
 
@@ -62,11 +61,10 @@ export const catalogueApi = {
       const url = `${API_BASE_PATH}/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
 
-      // Si la réponse contient meta, c'est une réponse paginée
+      // If response has meta, it is paginated
       if (response.data?.meta) {
         return response.data;
       }
-      // Sinon, retourner directement le tableau (rétrocompatibilité)
       return Array.isArray(response.data) ? response.data : response.data?.data || [];
     },
 

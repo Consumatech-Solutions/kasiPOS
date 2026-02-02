@@ -13,7 +13,7 @@ interface SettingsContextType {
   setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   isPwa: boolean;
   logout: () => void;
-  login: (user: User) => Promise<void>;
+  login: (user: User & { accessToken?: string }) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -24,6 +24,7 @@ const defaultSettings: AppSettings = {
   campaigns: true,
   marketplace: true,
   boph: true,
+  showVatInCheckout: true,
   isLoggedIn: false,
   currentUser: null,
   currentStore: null,
@@ -45,6 +46,7 @@ function getInitialSettings(): AppSettings {
     return { 
         ...defaultSettings, 
         theme: storedSettings.theme || 'light', 
+        showVatInCheckout: storedSettings.showVatInCheckout !== false,
         currentUser,
         currentStore: storedSettings.currentStore || null,
         isLoggedIn: !!currentUser
@@ -129,21 +131,40 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 // ...
 
+  // Helper: treat as network/offline error (from API core or axios)
+  const isNetworkError = (err: any) =>
+    err?.isNetworkError === true ||
+    err?.isOffline === true ||
+    err?.code === 'ERR_NETWORK' ||
+    err?.message === 'Network Error' ||
+    (typeof err?.message === 'string' && err.message.includes('Network request failed'));
+
   // This effect runs on mount to check for updated user data
   useEffect(() => {
     const bootstrapData = async () => {
         if (settings.currentUser) {
              try {
-                // 1. Refresh User Profile to get latest role/storeId
-                const userResponse = await authApi.getProfile();
-                const freshUser = userResponse.data;
-                
-                // Update settings and localStorage with fresh user data
-                setSetting('currentUser', freshUser);
-                localStorage.setItem('user', JSON.stringify(freshUser));
+                // 1. Refresh User Profile to get latest role/storeId (skip if backend unreachable to avoid console noise)
+                let freshUser = settings.currentUser;
+                try {
+                  const userResponse = await authApi.getProfile();
+                  freshUser = userResponse.data;
+                  setSetting('currentUser', freshUser);
+                  localStorage.setItem('user', JSON.stringify(freshUser));
+                } catch (profileErr: any) {
+                  if (isNetworkError(profileErr)) {
+                    if (process.env.NODE_ENV === 'development' && !(window as any).__bootstrapNetworkWarned) {
+                      (window as any).__bootstrapNetworkWarned = true;
+                      console.warn('[SettingsProvider] Backend not reachable. Using cached user and store.');
+                    }
+                    // Keep settings.currentUser; load store from IndexedDB below
+                  } else {
+                    throw profileErr;
+                  }
+                }
 
                 // 2. Fetch Store if user has a storeId and save permanently
-                if (freshUser.storeId && storesApi?.getMyStore) {
+                if (freshUser?.storeId && storesApi?.getMyStore) {
                      try {
                         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
                         const store = await fetchAndSaveStore(setSetting);
@@ -151,53 +172,35 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                             setSetting('currentStore', store);
                         }
                      } catch (error: any) {
-                        // If network fails, try loading from IndexedDB
-                        if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-                            console.log('[SettingsProvider] Network error - loading store from IndexedDB');
+                        if (isNetworkError(error)) {
                             const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
-                            const cachedStore = await loadStoreFromIndexedDB(freshUser.storeId);
-                            if (cachedStore) {
-                                setSetting('currentStore', cachedStore);
-                            }
+                            const cachedStore = await loadStoreFromIndexedDB(freshUser!.storeId);
+                            if (cachedStore) setSetting('currentStore', cachedStore);
                         } else if (process.env.NODE_ENV === 'development') {
                             console.warn('Failed to fetch store:', error);
                         }
                      }
                 } else if (!settings.currentStore && storesApi?.getMyStore) {
-                     // Fallback check - try to fetch store
                      try {
                         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
                         const store = await fetchAndSaveStore(setSetting);
-                        if (store) {
-                            setSetting('currentStore', store);
-                        }
+                        if (store) setSetting('currentStore', store);
                      } catch (e) {
-                         // Try loading from IndexedDB as last resort
-                         const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
-                         const cachedStore = await loadStoreFromIndexedDB();
-                         if (cachedStore) {
-                             setSetting('currentStore', cachedStore);
+                         if (isNetworkError(e)) {
+                             const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
+                             const cachedStore = await loadStoreFromIndexedDB();
+                             if (cachedStore) setSetting('currentStore', cachedStore);
                          }
                      }
                 } else if (!settings.currentStore) {
-                    // If no storeId and no store in settings, try loading from IndexedDB
                     const { loadStoreFromIndexedDB } = await import('@/lib/store-persistence');
                     const cachedStore = await loadStoreFromIndexedDB();
-                    if (cachedStore) {
-                        setSetting('currentStore', cachedStore);
-                    }
+                    if (cachedStore) setSetting('currentStore', cachedStore);
                 }
              } catch (error: any) {
-                 // Ne logger que les erreurs non-réseau en développement
-                 if (process.env.NODE_ENV === 'development') {
-                     if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-                         // Erreur réseau attendue si le backend n'est pas démarré
-                         console.warn('Backend non accessible. Mode hors ligne activé.');
-                     } else {
-                         console.error('Failed to bootstrap app data:', error);
-                     }
+                 if (!isNetworkError(error) && process.env.NODE_ENV === 'development') {
+                     console.error('Failed to bootstrap app data:', error);
                  }
-                 // Continuer avec les données locales en cas d'erreur réseau
              }
         }
     };
@@ -211,8 +214,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     root.classList.remove('light', 'dark');
     root.classList.add(settings.theme);
     try {
-      // Persist only theme to localStorage
-      window.localStorage.setItem('kasi-pos-settings', JSON.stringify({ theme: settings.theme }));
+      // Persist theme and admin display prefs to localStorage
+      window.localStorage.setItem('kasi-pos-settings', JSON.stringify({
+        theme: settings.theme,
+        showVatInCheckout: settings.showVatInCheckout,
+      }));
       // Persist user explicitly as requested
       if (settings.currentUser) {
           window.localStorage.setItem('user', JSON.stringify(settings.currentUser));

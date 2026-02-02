@@ -31,8 +31,10 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   const [selectedMobileProvider, setSelectedMobileProvider] = useState('');
 
   const tenderedAmount = parseFloat(tendered) || 0;
-  const changeDue = tenderedAmount - cartTotal;
+  // Prevent negative change on initial load or when amount tendered is insufficient
+  const change = Math.max(0, tenderedAmount - cartTotal);
   const canCompleteCashSale = tenderedAmount >= cartTotal;
+  const isInsufficient = tenderedAmount > 0 && tenderedAmount < cartTotal;
   const canCompleteMobileSale = (customer?.contact || mobileNumber.length > 10) && selectedMobileProvider;
 
 
@@ -54,18 +56,17 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   const handleBackspace = () => setTendered(tendered.slice(0, -1));
 
   const handleCompleteCashSale = () => {
-    if (canCompleteCashSale) {
-      onCompleteSale({
-        items: cartItems,
-        total: cartTotal,
-        paymentMethod: 'Cash',
-      });
-    }
+    if (isLoading || !canCompleteCashSale) return;
+    onCompleteSale({
+      items: cartItems,
+      total: cartTotal,
+      paymentMethod: 'Cash',
+    });
   };
 
   const handlePlaceholderComplete = () => {
-    if (!method) return;
-     if (method === 'Mobile Money' && !canCompleteMobileSale) return;
+    if (isLoading || !method) return;
+    if (method === 'Mobile Money' && !canCompleteMobileSale) return;
     onCompleteSale({
       items: cartItems,
       total: cartTotal,
@@ -104,8 +105,20 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Change:</span>
-                  <span className={`font-bold ${changeDue < 0 ? 'text-destructive' : 'text-green-600'}`}>R {changeDue.toFixed(2)}</span>
+                  <span className="font-bold text-green-600">
+                    R {Math.max(0, tenderedAmount - cartTotal).toFixed(2)}
+                  </span>
                 </div>
+                {tenderedAmount === 0 && (
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
+                    No amount entered. Enter the amount received from the customer.
+                  </p>
+                )}
+                {isInsufficient && (
+                  <p className="text-sm text-destructive">
+                    Amount insufficient. Add R {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -123,20 +136,27 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
               </div>
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {quickBills.map(bill => (
-                    <Button key={bill} variant="outline" className="h-12" onClick={() => setTendered(bill.toString())}>R{bill}</Button>
+                    <Button key={bill} type="button" variant="outline" className="h-12" onClick={() => setTendered(bill.toString())} disabled={isLoading}>R{bill}</Button>
                 ))}
-                 <Button variant="outline" className="h-12" onClick={() => setTendered(cartTotal.toFixed(2))}>EXACT</Button>
+                 <Button type="button" variant="outline" className="h-12" onClick={() => setTendered(cartTotal.toFixed(2))} disabled={isLoading}>EXACT</Button>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {keypadKeys.map(key => (
-                    <Button key={key} variant="outline" className="h-12 text-xl" onClick={() => handleKeyPress(key)}>{key}</Button>
+                    <Button key={key} type="button" variant="outline" className="h-12 text-xl" onClick={() => handleKeyPress(key)} disabled={isLoading}>{key}</Button>
                 ))}
-                <Button variant="outline" className="h-12 text-xl" onClick={handleBackspace}>&larr;</Button>
+                <Button type="button" variant="outline" className="h-12 text-xl" onClick={handleBackspace} disabled={isLoading}>&larr;</Button>
               </div>
               <DialogFooter className="mt-4 gap-2">
-                  <Button variant="secondary" className="w-full h-14 touch-target" onClick={handleClear} disabled={isLoading}>Clear</Button>
-                  <Button className="w-full h-14 touch-target px-4" onClick={handleCompleteCashSale} disabled={!canCompleteCashSale || isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button type="button" variant="secondary" className="w-full h-14 touch-target" onClick={handleClear} disabled={isLoading}>Clear</Button>
+                  <Button
+                    type="button"
+                    className="w-full h-14 touch-target px-4"
+                    onClick={handleCompleteCashSale}
+                    disabled={!canCompleteCashSale || isLoading}
+                    aria-busy={isLoading}
+                    aria-disabled={!canCompleteCashSale || isLoading}
+                  >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
                     {isLoading ? 'Processing...' : 'Complete Sale'}
                   </Button>
               </DialogFooter>
@@ -155,9 +175,9 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 <p className="mt-2">Waiting for card machine interaction...</p>
             </div>
             <DialogFooter className="mt-6">
-                <DialogClose asChild><Button variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
-                <Button onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <DialogClose asChild><Button type="button" variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
+                <Button type="button" onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target" disabled={isLoading} aria-busy={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
                   {isLoading ? 'Processing...' : 'Simulate Successful Payment'}
                 </Button>
             </DialogFooter>
@@ -209,9 +229,9 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 </div>
               </div>
               <DialogFooter className="mt-8">
-                  <DialogClose asChild><Button variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
-                  <Button onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target px-4" disabled={!canCompleteMobileSale || isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <DialogClose asChild><Button type="button" variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
+                  <Button type="button" onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target px-4" disabled={!canCompleteMobileSale || isLoading} aria-busy={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
                     {isLoading ? 'Processing...' : `Send Payment Request for R${cartTotal.toFixed(2)}`}
                   </Button>
               </DialogFooter>

@@ -20,7 +20,7 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
     return null;
   }
 
-  // Calculer les pages à afficher (max 5 pages visibles)
+  // Compute pages to show (max 5 visible)
   const getPageNumbers = (): (number | 'ellipsis')[] => {
     const pages: (number | 'ellipsis')[] = [];
     const maxVisible = 5;
@@ -37,19 +37,18 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
         pages.push(i);
       }
     } else {
-      // Afficher avec ellipses
       if (page <= 3) {
-        // Début: [1] [2] [3] [4] ... [last]
+        // Start: [1] [2] [3] [4] ... [last]
         for (let i = 1; i <= 4; i++) pages.push(i);
         pages.push('ellipsis');
         pages.push(totalPages);
       } else if (page >= totalPages - 2) {
-        // Fin: [1] ... [n-3] [n-2] [n-1] [n]
+        // End: [1] ... [n-3] [n-2] [n-1] [n]
         pages.push(1);
         pages.push('ellipsis');
         for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
       } else {
-        // Milieu: [1] ... [p-1] [p] [p+1] ... [last]
+        // Middle: [1] ... [p-1] [p] [p+1] ... [last]
         pages.push(1);
         pages.push('ellipsis');
         pages.push(page - 1);

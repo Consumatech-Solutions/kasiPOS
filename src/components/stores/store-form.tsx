@@ -12,7 +12,7 @@ import { ImageUpload } from '@/components/catalogue/image-upload';
 import { useState } from 'react';
 
 const storeSchema = z.object({
-  name: z.string().min(2, { message: "Le nom du magasin doit contenir au moins 2 caractères." }),
+  name: z.string().min(2, { message: "Store name must be at least 2 characters." }),
   vatNumber: z.string().optional(),
   receiptHeader: z.string().optional(),
   receiptFooter: z.string().optional(),
@@ -59,7 +59,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
             <FormItem>
               <FormLabel>Store Name *</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="Ex: Mon Magasin" disabled={disabled} />
+                <Input {...field} placeholder="e.g. My Store" disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -112,7 +112,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
             <FormItem>
               <FormLabel>Receipt Footer</FormLabel>
               <FormControl>
-                <Textarea {...field} rows={3} placeholder="Ex: À bientôt !" disabled={disabled} />
+                <Textarea {...field} rows={3} placeholder="e.g. See you soon!" disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>

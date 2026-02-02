@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { use, useState, useMemo, useEffect } from "react";
 import Image from "next/image";
-import { useParams } from "next/navigation";
 import Link from "next/link";
 
 import type { Transaction, TransactionItem, Customer } from "@/types";
@@ -76,14 +75,11 @@ const quickAccessCategories = [
   "Toiletries",
 ];
 
-export default function StorePosPage() {
-  // Utiliser useParams() directement - Next.js 15 permet cela dans les Client Components
-  // Éviter d'énumérer les clés pour éviter les warnings React DevTools
-  const params = useParams();
-  const storeId =
-    typeof params === "object" && params !== null && "storeId" in params
-      ? String(params.storeId)
-      : null;
+type PageProps = { params: Promise<{ storeId?: string }> };
+
+export default function StorePosPage({ params }: PageProps) {
+  const resolvedParams = use(params);
+  const storeId = resolvedParams?.storeId ? String(resolvedParams.storeId) : null;
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();

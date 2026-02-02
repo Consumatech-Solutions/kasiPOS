@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/components/settings-provider';
 import { authApi } from '@/lib/api';
+import type { User } from '@/types';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -22,7 +23,6 @@ const profileSchema = z.object({
 
 export default function ProfilePage() {
     const router = useRouter();
-    const { toast } = useToast();
     const { settings, login, logout } = useSettings();
     const { currentUser } = settings;
 
@@ -36,7 +36,7 @@ export default function ProfilePage() {
 
     const onSubmit = async (values: z.infer<typeof profileSchema>) => {
         if (!currentUser) {
-            toast({ variant: 'destructive', title: 'Error', description: 'No user is logged in.' });
+            feedback.error('Error', 'No user is logged in.', 'Sign in again and try again.');
             return;
         }
 
@@ -44,16 +44,12 @@ export default function ProfilePage() {
         const phoneChanged = values.phone !== currentUser.phone;
 
         if (!phoneChanged && !nameChanged) {
-            toast({ title: 'No Changes', description: 'You have not made any changes.' });
+            feedback.success('No changes', 'You have not made any changes.');
             return;
         }
 
         if (phoneChanged) {
-             toast({ 
-                variant: 'destructive', 
-                title: 'Operation Not Allowed', 
-                description: 'Updating phone number is not supported yet. Please contact admin.' 
-            });
+            feedback.error('Operation not allowed', 'Updating phone number is not supported yet.', 'Please contact admin.');
             return;
         }
 
@@ -71,26 +67,18 @@ export default function ProfilePage() {
             // We need to preserve the token though.
             const accessToken = localStorage.getItem('token');
             if (accessToken) {
-                 await login({ ...updatedUser, accessToken });
+                 await login({ ...updatedUser, accessToken } as User & { accessToken?: string });
             } else {
                 // If for some reason token is missing (unlikely if logged in), just update user
                 await login(updatedUser);
             }
             
-            toast({
-                title: 'Profile Updated',
-                description: 'Your name has been successfully updated.',
-            });
+            feedback.success('Profile updated', 'Your name has been successfully updated.');
             router.push('/');
 
         } catch (error: any) {
             console.error('Failed to update profile:', error);
-            const message = error.response?.data?.message || 'Could not update your profile.';
-            toast({
-                variant: 'destructive',
-                title: 'Update Failed',
-                description: message,
-            });
+            feedback.fromError(error, 'Update failed', 'Check your connection and try again.');
         }
     };
 

@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { SettingsProvider } from '@/components/settings-provider';
 import { ClientDbProvider } from '@/components/client-db-provider';
 import { QueryProvider } from '@/components/providers/query-provider';
+import { CartProvider } from '@/components/providers/cart-provider';
 import { DataPreloader } from '@/components/providers/data-preloader';
 import { SyncStatusIndicator } from '@/components/sync-status-indicator';
 
@@ -15,6 +16,10 @@ export const metadata: Metadata = {
   title: 'KasiPOS',
   description: 'Modern Point of Sale for small businesses.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/icons/icon-192x192.svg',
+    apple: '/icons/icon-192x192.svg',
+  },
 };
 
 export const viewport: Viewport = {
@@ -36,8 +41,10 @@ export default function RootLayout({
         <QueryProvider>
           <ClientDbProvider>
             <SettingsProvider>
-              <DataPreloader />
-              <AppShell>{children}</AppShell>
+              <CartProvider>
+                <DataPreloader />
+                <AppShell>{children}</AppShell>
+              </CartProvider>
               <Toaster />
               <SyncStatusIndicator />
             </SettingsProvider>

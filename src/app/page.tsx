@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import Image from 'next/image';
 
 import type { Product, Transaction, TransactionItem, Customer } from '@/types';
@@ -11,24 +10,37 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, LayoutGrid, List } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
+import { ReceiptModal, type ReceiptData } from '@/components/pos/ReceiptModal';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
 import { useCategories, useProducts, productKeys } from '@/hooks/use-catalogue';
-import { transactionsApi } from '@/lib/api/transactions';
+import { transactionsApi, toCreateTransactionDto } from '@/lib/api/transactions';
+import { feedback } from '@/lib/feedback';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
 import { getProductInitials } from '@/lib/utils/product-initials';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
+import { useCart } from '@/components/providers/cart-provider';
+import { buildReceiptData as buildReceiptDataFromUtil } from '@/lib/receipt-utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 
 
@@ -39,7 +51,7 @@ export default function PosPage() {
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
 
-  const [cart, setCart] = useState<Map<string, TransactionItem>>(new Map());
+  const { cart, addToCart, updateQuantity, clearCart, isCartHydrated } = useCart();
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryView, setCategoryView] = useState<'carousel' | 'grid'>('carousel');
@@ -51,8 +63,17 @@ export default function PosPage() {
   const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | undefined>(undefined);
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [isClearCartDialogOpen, setIsClearCartDialogOpen] = useState(false);
+  const [insufficientStockPopup, setInsufficientStockPopup] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
-  const { toast } = useToast();
+  const clearCartAndResetCoupons = () => {
+    clearCart();
+    setAppliedDiscount(0);
+    setAppliedVoucherCode(undefined);
+    setIsClearCartDialogOpen(false);
+  };
 
   // API Hooks
   const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
@@ -119,65 +140,16 @@ export default function PosPage() {
     setCategoryView('carousel');
   };
 
-  const addToCart = (product: Product) => {
-    const productId = product.id;
-    if (!productId) return;
-    const unitPrice = typeof product.price === 'number' ? product.price : parseFloat(String(product.price)) || 0;
-    setCart((prevCart) => {
-      const newCart = new Map(prevCart);
-      const existingItem = newCart.get(productId);
-      if (existingItem) {
-        existingItem.quantity += 1;
-        existingItem.totalPrice = existingItem.quantity * existingItem.unitPrice;
-      } else {
-        newCart.set(productId, {
-          productId: productId,
-          productName: product.name,
-          quantity: 1,
-          unitPrice: unitPrice,
-          totalPrice: unitPrice,
-          imageUrl: (product as any).productImage || product.imageUrl,
-          stock: product.stock,
-        });
-      }
-      return newCart;
-    });
-  };
-
-  const updateQuantity = (productId: string, newQuantity: number) => {
-    setCart((prevCart) => {
-      const newCart = new Map(prevCart);
-      const item = newCart.get(productId);
-      if (item) {
-        if (newQuantity <= 0) {
-          newCart.delete(productId);
-        } else {
-          item.quantity = newQuantity;
-          item.totalPrice = item.quantity * item.unitPrice;
-        }
-      }
-      return newCart;
-    });
-  };
-
-  const clearCart = () => {
-    setCart(new Map());
-    setAppliedDiscount(0);
-    setAppliedVoucherCode(undefined);
-  }
-
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
-  const vat = cartSubtotal * 0.15;
   const cartTotal = cartSubtotal - appliedDiscount;
+  const VAT_RATE = 15;
+  const vatIncluded = cartTotal * (VAT_RATE / (100 + VAT_RATE));
+  const showVatInCheckout = settings.showVatInCheckout !== false;
 
   const handleOpenVoucherModal = () => {
     if (cartSubtotal < 5) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot Redeem Voucher',
-        description: 'You need a cart total of at least R5 to redeem a voucher.',
-      });
+      feedback.error('Cannot redeem voucher', 'You need a cart total of at least R5 to redeem a voucher.', 'Add more items to the cart.');
       return;
     }
     setIsVoucherModalOpen(true);
@@ -185,11 +157,7 @@ export default function PosPage() {
 
   const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money') => {
     if (cart.size === 0) {
-      toast({
-        title: "Cart is empty",
-        description: "Please add products to the cart before checkout.",
-        variant: 'destructive'
-      });
+      feedback.error('Cart is empty', 'Please add products to the cart before checkout.', 'Add products and try again.');
       return;
     }
     setActivePaymentMethod(method);
@@ -198,10 +166,7 @@ export default function PosPage() {
   const handleApplyVoucher = (code: string, amount: number) => {
     setAppliedVoucherCode(code);
     setAppliedDiscount(amount);
-    toast({
-        title: "Voucher Applied",
-        description: `Discount of R${amount.toFixed(2)} applied.`,
-    });
+    feedback.success('Voucher applied', `Discount of R${amount.toFixed(2)} applied.`);
   };
 
   const handleCustomerSelect = (customerId: string) => {
@@ -212,13 +177,19 @@ export default function PosPage() {
   const [isCompletingSale, setIsCompletingSale] = useState(false);
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
-    // Ensure store exists, fetch if missing
+    if (isCompletingSale) return;
+    setIsCompletingSale(true);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Complete Sale] Started', { method: transactionDetails.paymentMethod, items: transactionDetails.items.length, total: transactionDetails.total });
+    }
     const currentStore = await ensureStore();
     if (!currentStore) {
-        return; // Error already shown by ensureStore
+      setIsCompletingSale(false);
+      return;
     }
-
-    setIsCompletingSale(true);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Complete Sale] Store resolved', { storeId: currentStore.id, isOnline: isOnline });
+    }
     const newTransaction: Omit<Transaction, 'id'> = {
       ...transactionDetails,
       date: new Date(),
@@ -229,41 +200,65 @@ export default function PosPage() {
       storeId: currentStore.id!,
     };
     
+    const toReceiptData = (saleId: string): ReceiptData =>
+      buildReceiptDataFromUtil({
+        storeName: currentStore.name,
+        saleId,
+        items: newTransaction.items,
+        subtotal: cartSubtotal,
+        discountAmount: appliedDiscount,
+        total: cartTotal,
+        paymentMethod: newTransaction.paymentMethod,
+        showVat: showVatInCheckout,
+        voucherCode: appliedVoucherCode ?? null,
+        timestamp: new Date(),
+      });
+
     if (isOnline) {
       // ONLINE: Use API - backend will update stock
       try {
-        await transactionsApi.create({
-          storeId: newTransaction.storeId,
-          customerId: newTransaction.customerId ?? undefined,
-          items: newTransaction.items,
-          total: newTransaction.total,
-          paymentMethod: newTransaction.paymentMethod,
-          voucherCode: newTransaction.voucherCode ?? undefined,
-          discountAmount: newTransaction.discountAmount ?? undefined,
-        });
+        const payload = toCreateTransactionDto(newTransaction);
+        const response = await transactionsApi.create(payload);
 
-        // Save to local DB for history
-        await db.transactions.add(newTransaction as Transaction);
+        const resData = response.data as { id?: string; data?: { id?: string } } | undefined;
+        const createdId = resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
+        await db.transactions.add({ ...newTransaction, id: String(createdId) } as Transaction);
 
-        // Refresh products from API to get updated stock
         queryClient.invalidateQueries({ queryKey: productKeys.lists(), refetchType: 'all' });
 
-        toast({
-          title: "Sale Complete!",
-          description: `Transaction has been processed successfully.`,
-        });
-
-        // Reset state
-        clearCart();
+        clearCartAndResetCoupons();
         setSelectedCustomerId(undefined);
         setActivePaymentMethod(null);
-      } catch (error) {
+        const receiptPayload = toReceiptData(String(createdId));
+        setReceiptData(receiptPayload);
+        setTimeout(() => setReceiptOpen(true), 0);
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Complete Sale] Success (online)', { createdId: resData?.id ?? resData?.data?.id });
+        }
+        feedback.success('Sale complete!', 'View your receipt below.');
+      } catch (error: unknown) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Complete Sale] Failed', { error, status: (error as { response?: { status?: number } })?.response?.status });
+        }
         console.error("Failed to complete sale:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to complete the sale. Please try again.",
-        });
+        const res = (error as { response?: { data?: unknown; status?: number } })?.response;
+        const is400 = res?.status === 400;
+        if (is400) {
+          const data = res?.data as Record<string, unknown> | undefined;
+          let msg = '';
+          if (typeof data?.message === 'string') msg = data.message;
+          else if (Array.isArray(data?.message) && data.message[0] != null) msg = String(data.message[0]);
+          else if (typeof data?.error === 'string') msg = data.error;
+          else if (data && typeof data === 'object') msg = (data as any).message ?? JSON.stringify(data);
+          setActivePaymentMethod(null);
+          setInsufficientStockPopup({
+            open: true,
+            message: msg || 'Une erreur s\'est produite. Vérifiez les articles et le magasin.',
+          });
+        } else {
+          feedback.fromError(error, 'Failed to complete the sale', 'Check your connection and try again.');
+        }
       } finally {
         setIsCompletingSale(false);
       }
@@ -301,31 +296,28 @@ export default function PosPage() {
         // 3. Queue the transaction for sync when back online
         mutationQueue.add({
           mutationKey: ['transactions', 'create'],
-          mutationFn: () => transactionsApi.create({
-            storeId: newTransaction.storeId,
-            customerId: newTransaction.customerId ?? undefined,
-            items: newTransaction.items,
-            total: newTransaction.total,
-            paymentMethod: newTransaction.paymentMethod,
-            voucherCode: newTransaction.voucherCode ?? undefined,
-            discountAmount: newTransaction.discountAmount ?? undefined,
-          }),
+          mutationFn: () => transactionsApi.create(toCreateTransactionDto(newTransaction)),
           variables: newTransaction,
         });
 
-        // 4. Clear loading state immediately after successful local save
         setIsCompletingSale(false);
 
-        // 5. Show success and clear cart
-        toast({
-          title: "Offline Sale Complete!",
-          description: "Sale saved locally. Will sync when back online.",
-        });
-
-        clearCart();
+        const localSaleId = `LOCAL-${Date.now()}`;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Complete Sale] Success (offline)', { localSaleId });
+        }
+        clearCartAndResetCoupons();
         setSelectedCustomerId(undefined);
         setActivePaymentMethod(null);
+        const receiptPayload = toReceiptData(localSaleId);
+        setReceiptData(receiptPayload);
+        setTimeout(() => setReceiptOpen(true), 0);
+
+        feedback.success('Offline sale complete!', 'Receipt saved. Will sync when back online.');
       } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Complete Sale] Failed (offline)', { error });
+        }
         console.error("Failed to complete offline sale:", error);
         
         // Rollback optimistic updates on error
@@ -337,21 +329,17 @@ export default function PosPage() {
           queryClient.invalidateQueries({ queryKey });
         });
 
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to save the sale locally. Please try again.",
-        });
+        feedback.fromError(error, 'Failed to save the sale locally', 'Try again or check storage.');
         setIsCompletingSale(false);
       }
     }
   };
 
   return (
-    <>
-    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-4 h-full p-2 sm:p-4 bg-muted">
-      {/* Product Selection */}
-      <div className="lg:col-span-1 xl:col-span-3 bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col">
+    <div className="w-full min-w-0 max-w-full min-h-[85vh] overflow-x-hidden pb-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2 sm:gap-4 min-h-[80vh] min-w-0 w-full p-2 sm:p-4 bg-muted">
+      {/* Product Selection — first column: max-h + overflow so scroll stays inside block in responsive */}
+      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[75vh] sm:max-h-[80vh] lg:max-h-[85vh] min-h-0 overflow-y-auto bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col order-1">
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input 
@@ -406,7 +394,7 @@ export default function PosPage() {
                 </div>
             </ScrollArea>
         ) : (
-          <>
+          <div className="flex flex-col flex-grow min-h-0">
             <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Products</p>
             <ScrollArea className="flex-grow pr-1">
             <Table>
@@ -440,11 +428,15 @@ export default function PosPage() {
                         <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
                             <DialogHeader>
                             <DialogTitle>{product.name}</DialogTitle>
+                            <DialogDescription className="sr-only">Product details and image</DialogDescription>
                             </DialogHeader>
                             <div className="flex items-center justify-center">
-                            {isOnline && (product.productImage || product.imageUrl) ? (
+                            {(() => {
+                              const imgUrl = product.productImage || product.imageUrl;
+                              const useImage = imgUrl && !imgUrl.startsWith('blob:');
+                              return useImage ? (
                               <img 
-                                src={product.productImage || product.imageUrl} 
+                                src={imgUrl} 
                                 alt={product.name} 
                                 width={300} 
                                 height={300} 
@@ -461,10 +453,11 @@ export default function PosPage() {
                                   }
                                 }}
                               />
-                            ) : null}
+                            ) : null;
+                            })()}
                             <div 
-                              className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${isOnline && (product.productImage || product.imageUrl) ? 'hidden' : ''}`}
-                              style={{ display: isOnline && (product.productImage || product.imageUrl) ? 'none' : 'flex' }}
+                              className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${(product.productImage || product.imageUrl) && !(product.productImage || product.imageUrl)?.startsWith('blob:') ? 'hidden' : ''}`}
+                              style={{ display: (product.productImage || product.imageUrl) && !(product.productImage || product.imageUrl)?.startsWith('blob:') ? 'none' : 'flex' }}
                             >
                               <span className="text-6xl font-bold text-primary">
                                 {getProductInitials(product.name)}
@@ -483,7 +476,22 @@ export default function PosPage() {
                     <TableCell className="hidden md:table-cell">{product.stock ?? '-'}</TableCell>
                     <TableCell>R{(typeof product.price === 'number' ? product.price : parseFloat(product.price || 0)).toFixed(2)}</TableCell>
                     <TableCell className="text-right">
-                        <Button size="sm" className="min-h-[44px] touch-target" onClick={() => addToCart(product)}>
+                        <Button
+                          size="sm"
+                          className="min-h-[44px] touch-target"
+                          onClick={() => {
+                            const currentQty = cart.get(product.id)?.quantity ?? 0;
+                            const stock = product.stock ?? null;
+                            if (typeof stock === 'number' && stock < currentQty + 1) {
+                              setInsufficientStockPopup({
+                                open: true,
+                                message: `Stock insuffisant pour « ${product.name } ». Stock disponible : ${stock}.`,
+                              });
+                              return;
+                            }
+                            addToCart(product);
+                          }}
+                        >
                         <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Add</span>
                         </Button>
                     </TableCell>
@@ -492,12 +500,12 @@ export default function PosPage() {
                 </TableBody>
             </Table>
             </ScrollArea>
-          </>
+          </div>
         )}
       </div>
 
-      {/* Cart Section */}
-      <div className="lg:col-span-1 xl:col-span-2 bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col h-full lg:sticky lg:top-16">
+      {/* Cart Section — second column: max-h + overflow so scroll stays inside block in responsive */}
+      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[65vh] sm:max-h-[70vh] lg:max-h-[85vh] min-h-0 overflow-y-auto bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col order-2">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 border-b pb-3 shrink-0">
             <div>
                 <h2 className="font-semibold text-base sm:text-lg">Sale #8822</h2>
@@ -513,6 +521,7 @@ export default function PosPage() {
                     <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
                         <DialogHeader>
                             <DialogTitle>Select a Customer</DialogTitle>
+                            <DialogDescription className="sr-only">Search and select a customer for this sale</DialogDescription>
                             <div className="relative mt-4">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <Input 
@@ -563,15 +572,19 @@ export default function PosPage() {
 
         <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
-            {cartItems.length === 0 ? (
+            {!isCartHydrated ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                <p>Loading cart…</p>
+              </div>
+            ) : cartItems.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-500">
                 <p>Cart is empty</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {cartItems.map(item => (
-                  <div key={item.productId} className="flex items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50">
-                    {item.imageUrl ? (
+                  <div key={item.productId} className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 min-w-0">
+                    {item.imageUrl && !item.imageUrl.startsWith('blob:') ? (
                       <div className="relative w-10 h-10 flex-shrink-0">
                         <Image 
                           src={item.imageUrl} 
@@ -604,7 +617,22 @@ export default function PosPage() {
                     <div className="flex items-center gap-1 sm:gap-2">
                       <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
                       <span className="font-bold text-sm w-6 sm:w-4 text-center">{item.quantity}</span>
-                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target" onClick={() => updateQuantity(item.productId, item.quantity + 1)}><Plus className="h-3 w-3" /></Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target"
+                        onClick={() => {
+                          const stock = item.stock;
+                          if (typeof stock === 'number' && item.quantity + 1 > stock) {
+                            setInsufficientStockPopup({
+                              open: true,
+                              message: `Stock insuffisant pour « ${item.productName} ». Stock disponible : ${stock}.`,
+                            });
+                            return;
+                          }
+                          updateQuantity(item.productId, item.quantity + 1);
+                        }}
+                      ><Plus className="h-3 w-3" /></Button>
                     </div>
                     <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-right">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
                     <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
@@ -622,16 +650,27 @@ export default function PosPage() {
                   <span>Subtotal</span>
                   <span>R {cartSubtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-gray-500">
+              {showVatInCheckout && (
+                <div className="flex justify-between text-gray-500">
                   <span>VAT (15%)</span>
-                  <span>R {vat.toFixed(2)}</span>
-              </div>
+                  <span>R {vatIncluded.toFixed(2)}</span>
+                </div>
+              )}
               <div className={`flex justify-between ${appliedDiscount > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
                   <span>Discount Applied</span>
                   <span>-R {appliedDiscount.toFixed(2)}</span>
               </div>
             </div>
-            
+            <div className="mb-3 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+              {showVatInCheckout
+                ? 'Prices are VAT-inclusive. VAT display shows VAT portion included in totals.'
+                : 'Prices are VAT-inclusive. VAT line hidden by store settings.'}
+              {settings.currentUser?.role === 'admin' && (
+                <span className="block mt-1">
+                  <a href="/settings#checkout-display-admin" className="underline hover:text-foreground">Display options in Settings</a>
+                </span>
+              )}
+            </div>
             <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 dark:bg-muted rounded-lg">
               <span className="text-lg font-bold">Total to Pay</span>
               <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
@@ -648,6 +687,15 @@ export default function PosPage() {
                   MOBILE
               </Button>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2 text-muted-foreground hover:text-destructive"
+              onClick={() => setIsClearCartDialogOpen(true)}
+            >
+              Clear cart
+            </Button>
           </div>
         )}
       </div>
@@ -669,6 +717,38 @@ export default function PosPage() {
         onApplyVoucher={handleApplyVoucher}
         cartTotal={cartSubtotal} // Pass subtotal before discount for validation
     />
-    </>
+    <ReceiptModal
+        open={receiptOpen}
+        onClose={() => { setReceiptOpen(false); setReceiptData(null); }}
+        data={receiptData}
+    />
+    <AlertDialog open={isClearCartDialogOpen} onOpenChange={setIsClearCartDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Clear cart?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will remove all items from the cart and clear any applied voucher or discount. You cannot undo this.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={clearCartAndResetCoupons} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Clear cart
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog open={insufficientStockPopup.open} onOpenChange={(open) => !open && setInsufficientStockPopup((prev) => ({ ...prev, open: false }))}>
+      <AlertDialogContent className="z-[100]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Stock insuffisant</AlertDialogTitle>
+          <AlertDialogDescription>{insufficientStockPopup.message}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => setInsufficientStockPopup((prev) => ({ ...prev, open: false }))}>OK</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </div>
   );
 }
