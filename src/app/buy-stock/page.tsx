@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import type { PurchaseOrderItem } from '@/types';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { useSettings } from '@/components/settings-provider';
 import { useProducts } from '@/hooks/use-catalogue';
 
@@ -17,7 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function BuyStockPage() {
-  const { toast } = useToast();
   const { settings } = useSettings();
   const { currentStore } = settings;
 
@@ -51,11 +51,7 @@ export default function BuyStockPage() {
     
     const quantity = quantities[product.id] || 0;
     if (quantity <= 0) {
-      toast({
-        variant: 'destructive',
-        title: "No quantity specified",
-        description: "Please enter a quantity to add the item to your cart.",
-      });
+      feedback.error('No quantity', 'Enter a quantity to add the item to your cart.', 'Enter a number greater than 0.', { code: ERROR_CODES.PURCHASE_ORDER });
       return;
     }
     
@@ -82,10 +78,7 @@ export default function BuyStockPage() {
     
     localStorage.setItem('purchaseOrderCart', JSON.stringify(cart));
     
-    toast({
-      title: "Added to Purchase Order",
-      description: `${quantity} x ${product.name} added to your cart.`,
-    });
+    feedback.success('Added to cart', `${quantity} × ${product.name} added to your purchase order cart.`);
   };
 
   return (

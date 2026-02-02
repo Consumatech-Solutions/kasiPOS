@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { db } from '@/lib/db';
 
 const requestAccessSchema = z.object({
@@ -20,7 +21,6 @@ const requestAccessSchema = z.object({
 
 export default function RequestAccessPage() {
     const router = useRouter();
-    const { toast } = useToast();
 
     const form = useForm<z.infer<typeof requestAccessSchema>>({
         resolver: zodResolver(requestAccessSchema),
@@ -32,20 +32,15 @@ export default function RequestAccessPage() {
     const onSubmit = async (values: z.infer<typeof requestAccessSchema>) => {
         try {
             await authApi.requestOtp(values.phone);
-            
-            toast({
-                title: 'Code Sent!',
-                description: `A verification code has been sent to ${values.phone}.`,
-            });
+            feedback.success('Code sent', `A verification code has been sent to ${values.phone}. Check your messages and enter the code on the next screen.`);
             router.push(`/verify-code?phone=${encodeURIComponent(values.phone)}`);
-        } catch (error: any) {
-             console.error('Request OTP error:', error);
-             const message = error.response?.data?.message || 'Failed to send code. Please try again.';
-            toast({
-                variant: 'destructive',
-                title: 'Access Denied',
-                description: message,
-            });
+        } catch (error: unknown) {
+            feedback.fromError(
+                error,
+                'Could not send code',
+                'Check your mobile number and try again, or try again later.',
+                ERROR_CODES.REQUEST_ACCESS
+            );
         }
     };
 

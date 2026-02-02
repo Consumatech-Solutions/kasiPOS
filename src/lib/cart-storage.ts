@@ -48,24 +48,35 @@ export function cartFromStorage(raw: string | null): Map<string, TransactionItem
 /** Persist cart to localStorage (survives refresh and navigation). Cleared only on checkout or explicit clear. */
 export function saveCartToSessionStorage(cart: Map<string, TransactionItem>): void {
   if (typeof window === 'undefined') return;
+  const payload = cartToStorage(cart);
   try {
-    window.localStorage.setItem(CART_STORAGE_KEY, cartToStorage(cart));
+    if (window.localStorage) window.localStorage.setItem(CART_STORAGE_KEY, payload);
   } catch {
-    // fallback to sessionStorage if localStorage full/disabled
     try {
-      window.sessionStorage.setItem(CART_STORAGE_KEY, cartToStorage(cart));
+      if (window.sessionStorage) window.sessionStorage.setItem(CART_STORAGE_KEY, payload);
     } catch {
-      // ignore
+      // ignore (e.g. private mode, quota, disabled in deployment)
     }
   }
 }
 
-/** Load cart from localStorage (or sessionStorage fallback). */
+/** Load cart from localStorage (or sessionStorage fallback). Safe for SSR and strict deployment environments. */
 export function loadCartFromSessionStorage(): Map<string, TransactionItem> {
   if (typeof window === 'undefined') return new Map();
   try {
-    let raw = window.localStorage.getItem(CART_STORAGE_KEY);
-    if (raw === null) raw = window.sessionStorage.getItem(CART_STORAGE_KEY);
+    let raw: string | null = null;
+    try {
+      if (window.localStorage) raw = window.localStorage.getItem(CART_STORAGE_KEY);
+    } catch {
+      // localStorage can throw (e.g. private mode, disabled)
+    }
+    if (raw === null && window.sessionStorage) {
+      try {
+        raw = window.sessionStorage.getItem(CART_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
     return cartFromStorage(raw);
   } catch {
     return new Map();

@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { useSettings } from '@/components/settings-provider';
 import { storesApi } from '@/lib/api/stores';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { saveStorePermanently, loadStoreFromIndexedDB } from '@/lib/store-persistence';
 import type { Store } from '@/types';
 
 export function useEnsureStore() {
   const { settings, setSetting } = useSettings();
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const ensureStore = async (): Promise<Store | null> => {
@@ -26,11 +26,7 @@ export function useEnsureStore() {
         setSetting('currentStore', cachedStore);
         return cachedStore;
       }
-      toast({
-        variant: 'destructive',
-        title: 'Offline',
-        description: 'Cannot fetch store while offline. Please check your connection.',
-      });
+      feedback.error('Offline', 'Cannot fetch store while offline.', 'Check your connection and try again.', { code: ERROR_CODES.STORE });
       return null;
     }
 
@@ -44,29 +40,21 @@ export function useEnsureStore() {
       
       setIsLoading(false);
       return store;
-    } catch (error: any) {
+    } catch (error: unknown) {
       setIsLoading(false);
       
       // If network error, try loading from IndexedDB
-      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      const err = error as { code?: string; message?: string };
+      if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
         console.log('[useEnsureStore] Network error - attempting to load store from IndexedDB');
         const cachedStore = await loadStoreFromIndexedDB(settings.currentUser?.storeId);
         if (cachedStore) {
           setSetting('currentStore', cachedStore);
-          toast({
-            title: 'Using Cached Store',
-            description: 'Loaded store from offline cache.',
-          });
+          feedback.success('Using cached store', 'Loaded store from offline cache.');
           return cachedStore;
         }
       }
-      
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to fetch store.';
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: errorMessage,
-      });
+      feedback.fromError(error, 'Failed to load store', 'Check your connection and try again.', ERROR_CODES.STORE);
       return null;
     }
   };

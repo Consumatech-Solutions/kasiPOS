@@ -144,8 +144,11 @@ export default function PosPage() {
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
   const cartTotal = cartSubtotal - appliedDiscount;
   const VAT_RATE = 15;
-  const vatIncluded = cartTotal * (VAT_RATE / (100 + VAT_RATE));
   const showVatInCheckout = settings.showVatInCheckout !== false;
+  // VAT on: add VAT to total (Total = Subtotal + VAT)
+  // VAT off: VAT is included in the total (no addition)
+  const vatAmount = showVatInCheckout ? cartTotal * (VAT_RATE / 100) : 0;
+  const amountToPay = showVatInCheckout ? cartTotal + vatAmount : cartTotal;
 
   const handleOpenVoucherModal = () => {
     if (cartSubtotal < 5) {
@@ -196,7 +199,7 @@ export default function PosPage() {
       customerId: selectedCustomerId,
       voucherCode: appliedVoucherCode,
       discountAmount: appliedDiscount,
-      total: cartTotal, // Use the final calculated total
+      total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
       storeId: currentStore.id!,
     };
     
@@ -205,9 +208,9 @@ export default function PosPage() {
         storeName: currentStore.name,
         saleId,
         items: newTransaction.items,
-        subtotal: cartSubtotal,
+        subtotal: cartTotal, // Ex-VAT subtotal when VAT on, otherwise same as total
         discountAmount: appliedDiscount,
-        total: cartTotal,
+        total: amountToPay,
         paymentMethod: newTransaction.paymentMethod,
         showVat: showVatInCheckout,
         voucherCode: appliedVoucherCode ?? null,
@@ -254,7 +257,7 @@ export default function PosPage() {
           setActivePaymentMethod(null);
           setInsufficientStockPopup({
             open: true,
-            message: msg || 'Une erreur s\'est produite. Vérifiez les articles et le magasin.',
+            message: msg || 'Something went wrong. Check the items and store.',
           });
         } else {
           feedback.fromError(error, 'Failed to complete the sale', 'Check your connection and try again.');
@@ -485,7 +488,7 @@ export default function PosPage() {
                             if (typeof stock === 'number' && stock < currentQty + 1) {
                               setInsufficientStockPopup({
                                 open: true,
-                                message: `Stock insuffisant pour « ${product.name } ». Stock disponible : ${stock}.`,
+                                message: `Insufficient stock for "${product.name}". Available: ${stock}.`,
                               });
                               return;
                             }
@@ -626,7 +629,7 @@ export default function PosPage() {
                           if (typeof stock === 'number' && item.quantity + 1 > stock) {
                             setInsufficientStockPopup({
                               open: true,
-                              message: `Stock insuffisant pour « ${item.productName} ». Stock disponible : ${stock}.`,
+                              message: `Insufficient stock for "${item.productName}". Available: ${stock}.`,
                             });
                             return;
                           }
@@ -648,12 +651,12 @@ export default function PosPage() {
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span>R {cartSubtotal.toFixed(2)}</span>
+                  <span>R {cartTotal.toFixed(2)}</span>
               </div>
               {showVatInCheckout && (
                 <div className="flex justify-between text-gray-500">
                   <span>VAT (15%)</span>
-                  <span>R {vatIncluded.toFixed(2)}</span>
+                  <span>R {vatAmount.toFixed(2)}</span>
                 </div>
               )}
               <div className={`flex justify-between ${appliedDiscount > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
@@ -663,8 +666,8 @@ export default function PosPage() {
             </div>
             <div className="mb-3 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
               {showVatInCheckout
-                ? 'Prices are VAT-inclusive. VAT display shows VAT portion included in totals.'
-                : 'Prices are VAT-inclusive. VAT line hidden by store settings.'}
+                ? 'VAT is added to the total. Total = Subtotal + VAT.'
+                : 'VAT is included in the total (no addition).'}
               {settings.currentUser?.role === 'admin' && (
                 <span className="block mt-1">
                   <a href="/settings#checkout-display-admin" className="underline hover:text-foreground">Display options in Settings</a>
@@ -673,7 +676,7 @@ export default function PosPage() {
             </div>
             <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 dark:bg-muted rounded-lg">
               <span className="text-lg font-bold">Total to Pay</span>
-              <span className="text-2xl font-bold">R {cartTotal.toFixed(2)}</span>
+              <span className="text-2xl font-bold">R {amountToPay.toFixed(2)}</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 sm:gap-3">
@@ -704,7 +707,7 @@ export default function PosPage() {
         isOpen={!!activePaymentMethod}
         onClose={() => setActivePaymentMethod(null)}
         method={activePaymentMethod}
-        cartTotal={cartTotal}
+        cartTotal={amountToPay}
         cartItems={cartItems}
         onCompleteSale={handleCompleteSale}
         customer={selectedCustomer}
@@ -741,7 +744,7 @@ export default function PosPage() {
     <AlertDialog open={insufficientStockPopup.open} onOpenChange={(open) => !open && setInsufficientStockPopup((prev) => ({ ...prev, open: false }))}>
       <AlertDialogContent className="z-[100]">
         <AlertDialogHeader>
-          <AlertDialogTitle>Stock insuffisant</AlertDialogTitle>
+          <AlertDialogTitle>Insufficient stock</AlertDialogTitle>
           <AlertDialogDescription>{insufficientStockPopup.message}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2, Minus, Plus, Trash2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -25,7 +26,6 @@ const DELIVERY_FEE = 150.00;
 
 export default function BuyStockCartPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const { settings } = useSettings();
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
@@ -82,7 +82,7 @@ export default function BuyStockCartPage() {
       return; // Error already shown by ensureStore
     }
     if (cart.length === 0) {
-      toast({ variant: 'destructive', title: 'Cart is empty', description: 'Please add items to your cart before confirming.' });
+      feedback.error('Cart is empty', 'Add items to your cart before confirming.', 'Go to Buy Stock and add items, then try again.', { code: ERROR_CODES.PURCHASE_ORDER });
       return;
     }
     
@@ -104,10 +104,8 @@ export default function BuyStockCartPage() {
         setIsOrderConfirmed(true);
         setCart([]); // Clear the cart
         localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
-      } catch (error: any) {
-        console.error('Failed to save purchase order:', error);
-        const errorMessage = error?.response?.data?.message || error?.message || 'Could not save the purchase order.';
-        toast({ variant: 'destructive', title: 'Error', description: errorMessage });
+      } catch (error: unknown) {
+        feedback.fromError(error, 'Purchase order failed', 'Check your connection and try again.', ERROR_CODES.PURCHASE_ORDER);
       } finally {
         setIsConfirmingOrder(false);
       }
@@ -139,17 +137,13 @@ export default function BuyStockCartPage() {
         setCart([]); // Clear the cart
         localStorage.removeItem('purchaseOrderCart'); // Clear localStorage
         
-        toast({
-          title: "Order Queued!",
-          description: "Order saved locally. Will sync when back online.",
-        });
-      } catch (error: any) {
-        console.error('Failed to queue purchase order:', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to save order locally.' });
+        feedback.success('Order queued', 'Order saved locally. It will sync when you are back online.');
+      } catch (error: unknown) {
+        feedback.fromError(error, 'Failed to save order locally', 'Try again or check storage.', ERROR_CODES.PURCHASE_ORDER);
         setIsConfirmingOrder(false);
       }
     }
-  }, [cart, subtotal, total, deliveryMethod, ensureStore, toast, isOnline]);
+  }, [cart, subtotal, total, deliveryMethod, ensureStore, isOnline]);
   
   const closeConfirmationDialog = useCallback(() => {
     setIsOrderConfirmed(false);

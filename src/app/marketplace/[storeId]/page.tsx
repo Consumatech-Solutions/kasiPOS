@@ -28,7 +28,8 @@ import {
   List,
   ArrowLeft,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { feedback } from "@/lib/feedback";
+import { ERROR_CODES } from "@/lib/error-codes";
 import { Badge } from "@/components/ui/badge";
 import {
   Carousel,
@@ -107,8 +108,6 @@ export default function StorePosPage({ params }: PageProps) {
   const [activePaymentMethod, setActivePaymentMethod] = useState<
     "Cash" | "Card" | "Mobile Money" | null
   >(null);
-
-  const { toast } = useToast();
 
   // API Hooks
   const { categories: apiCategories, loading: categoriesLoading } =
@@ -231,19 +230,11 @@ export default function StorePosPage({ params }: PageProps) {
 
   const handleCheckout = (method: "Cash" | "Card" | "Mobile Money") => {
     if (cart.size === 0) {
-      toast({
-        title: "Cart is empty",
-        description: "Please add products to the cart before checkout.",
-        variant: "destructive",
-      });
+      feedback.error('Cart is empty', 'Add products to the cart before checkout.', 'Add items and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
       return;
     }
     if (!selectedCustomerId) {
-      toast({
-        title: "No customer selected",
-        description: "Please select a customer for this marketplace order.",
-        variant: "destructive",
-      });
+      feedback.error('No customer selected', 'A customer is required for this marketplace order.', 'Click Add Customer and select a customer.', { code: ERROR_CODES.MARKETPLACE_ORDER });
       return;
     }
     setActivePaymentMethod(method);
@@ -260,20 +251,12 @@ export default function StorePosPage({ params }: PageProps) {
     transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
   ) => {
     if (!currentStore || !storeId) {
-      toast({
-        title: "Error",
-        description: "Store context not found.",
-        variant: "destructive",
-      });
+      feedback.error('Order failed', 'Store context was not found.', 'Refresh the page and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
       return;
     }
 
     if (!selectedCustomerId) {
-      toast({
-        title: "Error",
-        description: "Customer not selected.",
-        variant: "destructive",
-      });
+      feedback.error('Order failed', 'No customer was selected.', 'Select a customer and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
       return;
     }
 
@@ -305,26 +288,19 @@ export default function StorePosPage({ params }: PageProps) {
       const response = await createOrder(orderData);
       const createdOrder = response.data;
 
-      toast({
-        title: "Order Created",
-        description: `Marketplace order ${createdOrder.orderCode} has been created successfully.`,
-      });
+      feedback.success('Order created', `Marketplace order ${createdOrder.orderCode} has been created successfully.`);
 
       // Clear cart and reset state
       setCart(new Map());
       setSelectedCustomerId(undefined);
       setActivePaymentMethod(null);
-    } catch (error: any) {
-      console.error("Failed to create marketplace order:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to create marketplace order.";
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+    } catch (error: unknown) {
+      feedback.fromError(
+        error,
+        'Order failed',
+        'Check your connection and try again.',
+        ERROR_CODES.MARKETPLACE_ORDER
+      );
     } finally {
       setIsCompletingOrder(false);
     }

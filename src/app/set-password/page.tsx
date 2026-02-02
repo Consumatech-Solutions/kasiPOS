@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { useSettings } from '@/components/settings-provider';
 import { db } from '@/lib/db';
 
@@ -27,7 +28,6 @@ export default function SetPasswordPage() {
     const searchParams = useSearchParams();
     // Use get() directly to avoid Next.js 15 searchParams key access warnings
     const phone = searchParams ? searchParams.get('phone') : null;
-    const { toast } = useToast();
     const { login } = useSettings();
 
     const form = useForm<z.infer<typeof setPasswordSchema>>({
@@ -40,45 +40,36 @@ export default function SetPasswordPage() {
 
     const onSubmit = async (values: z.infer<typeof setPasswordSchema>) => {
         if (!phone) {
-            toast({ variant: 'destructive', title: 'Error', description: 'No phone number provided.' });
+            feedback.error('Set password failed', 'No phone number was provided.', 'Go back to Request Access and enter your mobile number.', { code: ERROR_CODES.SET_PASSWORD });
             router.push('/request-access');
             return;
         }
 
-        const tempToken = localStorage.getItem('kasi-pos-temp-token');
+        const tempToken = typeof window !== 'undefined' ? localStorage.getItem('kasi-pos-temp-token') : null;
         if (!tempToken) {
-             toast({ variant: 'destructive', title: 'Error', description: 'Session expired. Please request a new code.' });
-             router.push('/request-access');
-             return;
+            feedback.error('Session expired', 'Your verification session has expired.', 'Request a new code from Request Access and try again.', { code: ERROR_CODES.SET_PASSWORD });
+            router.push('/request-access');
+            return;
         }
 
         try {
-             // Pass tempToken via headers (handled in api.ts interceptor if we set it, 
-             // but here we call setPassword which explicitly accepts it or we rely on interceptor logic.
-             // Our API wrapper `setPassword` takes (password, tempToken) and sets header.
-             const response = await authApi.setPassword(values.password, tempToken);
-             
-             if (response.data && response.data.accessToken) {
-                toast({ title: "All Set!", description: "Your password has been set." });
-                
-                // Clear temp token
-                localStorage.removeItem('kasi-pos-temp-token');
-                
-                // Login user - this will automatically fetch and save store via SettingsProvider
-                await login({ 
-                    ...response.data.user, 
-                    accessToken: response.data.accessToken 
+            const response = await authApi.setPassword(values.password, tempToken);
+            
+            if (response.data && response.data.accessToken) {
+                feedback.success('Password set', 'Your password has been set. You can now sign in.');
+                if (typeof window !== 'undefined') localStorage.removeItem('kasi-pos-temp-token');
+                await login({
+                    ...response.data.user,
+                    accessToken: response.data.accessToken,
                 });
-             }
-
-        } catch (error: any) {
-            console.error('Set password error:', error);
-            const message = error.response?.data?.message || 'Failed to update password.';
-             toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: message,
-            });
+            }
+        } catch (error: unknown) {
+            feedback.fromError(
+                error,
+                'Set password failed',
+                'Ensure your password meets the requirements and try again, or request a new code.',
+                ERROR_CODES.SET_PASSWORD
+            );
         }
     };
 

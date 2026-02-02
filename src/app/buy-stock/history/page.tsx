@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Package, MoreVertical, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useSettings } from '@/components/settings-provider';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import type { PurchaseOrder } from '@/types';
 import { format } from 'date-fns';
 import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
@@ -31,7 +32,6 @@ import {
 export default function BuyStockHistoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
-  const { toast } = useToast();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
@@ -79,21 +79,9 @@ export default function BuyStockHistoryPage() {
         )
       );
 
-      toast({
-        title: 'Status Updated',
-        description: `Purchase order status changed to ${newStatus}.`,
-      });
-    } catch (error: any) {
-      console.error('Failed to update purchase order status:', error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Could not update the purchase order status.';
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: errorMessage,
-      });
+      feedback.success('Status updated', `Purchase order status changed to ${newStatus}.`);
+    } catch (error: unknown) {
+      feedback.fromError(error, 'Failed to update status', 'Check your connection and try again.', ERROR_CODES.PURCHASE_ORDER);
     } finally {
       setUpdatingStatus(null);
     }

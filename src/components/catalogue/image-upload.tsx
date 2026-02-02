@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { filesApi } from '@/lib/api/files';
-import { useToast } from '@/hooks/use-toast';
+import { feedback } from '@/lib/feedback';
+import { ERROR_CODES } from '@/lib/error-codes';
 import { cn } from '@/lib/utils';
 
 interface ImageUploadProps {
@@ -32,7 +33,6 @@ export function ImageUpload({
   const [preview, setPreview] = useState<string | null>(currentImageUrl || null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
 
   // Update preview when currentImageUrl changes
   useEffect(() => {
@@ -66,11 +66,7 @@ export function ImageUpload({
     if (validationError) {
       setError(validationError);
       onUploadError?.(validationError);
-      toast({
-        variant: 'destructive',
-        title: 'Invalid file',
-        description: validationError,
-      });
+      feedback.error('Invalid file', validationError, `Use an image under ${maxSizeMB}MB (JPEG, PNG, GIF, WebP).`, { code: ERROR_CODES.IMAGE_UPLOAD });
       return;
     }
 
@@ -81,7 +77,7 @@ export function ImageUpload({
     };
     reader.readAsDataURL(file);
 
-    // Uploader directement vers DigitalOcean Spaces
+    // Upload directly to DigitalOcean Spaces
     setUploading(true);
     try {
       const response = await filesApi.uploadProductImage(file);
@@ -100,28 +96,14 @@ export function ImageUpload({
 
       setPreview(imageUrl);
       onUploadSuccess(imageUrl);
-      
-      toast({
-        title: 'Image uploaded successfully',
-        description: 'The product image has been uploaded.',
-      });
-
+      feedback.success('Image uploaded', 'The product image has been uploaded.');
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Image upload failed';
       setError(errorMessage);
       onUploadError?.(errorMessage);
-      
-      // Keep preview if we already had an image
-      if (!currentImageUrl) {
-        setPreview(null);
-      }
-      
-      toast({
-        variant: 'destructive',
-        title: 'Upload failed',
-        description: errorMessage,
-      });
+      if (!currentImageUrl) setPreview(null);
+      feedback.fromError(err, 'Upload failed', 'Check file size (max 2MB) and format, then try again.', ERROR_CODES.IMAGE_UPLOAD);
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -145,19 +127,12 @@ export function ImageUpload({
 
       setPreview(null);
       onDelete?.();
-      toast({
-        title: 'Image deleted',
-        description: 'The product image has been removed.',
-      });
-    } catch (err: any) {
+      feedback.success('Image deleted', 'The product image has been removed.');
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete image';
       setError(errorMessage);
       onUploadError?.(errorMessage);
-      toast({
-        variant: 'destructive',
-        title: 'Delete failed',
-        description: errorMessage,
-      });
+      feedback.fromError(err, 'Delete failed', 'Try again or check your connection.', ERROR_CODES.IMAGE_UPLOAD);
     }
   };
 
