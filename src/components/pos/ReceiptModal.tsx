@@ -373,7 +373,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         </div>
         )}
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
+        <DialogFooter className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {data ? (
             <>
               <Button
@@ -391,7 +391,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 ) : (
                   <>
                     <Printer className="mr-2 h-4 w-4" />
-                    Print
                   </>
                 )}
               </Button>
@@ -412,7 +411,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 onClick={handleDownloadPdf}
               >
                 <Download className="mr-2 h-4 w-4" />
-                Save as PDF
               </Button>
               <Button
                 type="button"
@@ -422,7 +420,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 onClick={handleEmailReceipt}
                 className="w-full sm:w-auto"
               >
-                Send by email <Mail className="h-4 w-4" />
+                 <Mail className="h-4 w-4 mr-2" />
               </Button>
               <Button
                 type="button"
@@ -432,13 +430,11 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 onClick={handleSmsReceipt}
                 className="w-full sm:w-auto"
               >
-                Send by SMS <MessageCircle className="h-4 w-4" />
+                 <MessageCircle className="h-4 w-4" />
               </Button>
             </>
           ) : null}
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Close
-          </Button>
+
         </DialogFooter>
       </DialogContent>
       <DeviceSelector
