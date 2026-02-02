@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -12,8 +12,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { TransactionItem } from '@/types';
-import { Printer, Download, Mail, MessageCircle } from 'lucide-react';
+import { Printer, Download, Mail, MessageCircle, Settings, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { DeviceSelector } from '@/components/device-selector';
+import { getStoredDevice, printReceipt, getDevices } from '@/lib/device-service';
+import { Printer as ThermalPrinter, Text, Br, Line, Row, Cut, render } from 'react-thermal-printer';
 
 export interface ReceiptData {
   storeName: string;
@@ -53,6 +56,8 @@ function formatReceiptDate(d: Date): string {
 export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const buildPrintHtml = (d: ReceiptData): string => {
     const rows = d.items
@@ -97,6 +102,140 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
       </div>
       <p class="footer">Thank you for your purchase</p>
     `;
+  };
+
+  const buildThermalReceipt = async (receiptData: ReceiptData): Promise<Uint8Array> => {
+    const formattedDate = formatReceiptDate(receiptData.timestamp);
+    
+    return await render(
+      <ThermalPrinter type="epson" width={42}>
+        <Text align="center" bold={true} size={{ width: 2, height: 2 }}>
+          {receiptData.storeName}
+        </Text>
+        <Br />
+        <Line />
+        <Text align="left">Sale ID: {receiptData.saleId}</Text>
+        <Text align="left">Date: {formattedDate}</Text>
+        <Line />
+        <Text align="left">Item              Qty  Price    Total</Text>
+        <Line />
+        {receiptData.items.map((item, index) => {
+          const itemName = item.productName.length > 18 
+            ? item.productName.substring(0, 15) + '...' 
+            : item.productName.padEnd(18);
+          const qty = item.quantity.toString().padStart(3);
+          const price = `R ${(item.unitPrice ?? 0).toFixed(2)}`.padStart(8);
+          const total = `R ${(item.totalPrice ?? 0).toFixed(2)}`.padStart(8);
+          return (
+            <React.Fragment key={index}>
+              <Text align="left">{itemName} {qty} {price} {total}</Text>
+            </React.Fragment>
+          );
+        })}
+        <Line />
+        <Row left="Subtotal" right={`R ${receiptData.subtotal.toFixed(2)}`} />
+        {receiptData.discountAmount > 0 && (
+          <Row left="Discount" right={`-R ${receiptData.discountAmount.toFixed(2)}`} />
+        )}
+        {receiptData.voucherCode && (
+          <Text align="left">Voucher: {receiptData.voucherCode}</Text>
+        )}
+        {receiptData.showVat && (
+          <Text align="left">VAT (15%) included: {`R ${receiptData.vatAmount.toFixed(2)}`}</Text>
+        )}
+        <Line />
+        <Text bold={true}>
+          Total: {`R ${receiptData.total.toFixed(2)}`}
+        </Text>
+        <Text align="left">Payment: {receiptData.paymentMethod}</Text>
+        <Line />
+        <Text align="center">Thank you for your purchase</Text>
+        <Br />
+        <Cut />
+      </ThermalPrinter>
+    );
+  };
+
+  const handleThermalPrint = async () => {
+    if (!data) return;
+
+    setIsPrinting(true);
+    try {
+      // Check for stored printer device
+      let deviceId = getStoredDevice('printer');
+
+      // If no device stored, show device selector
+      if (!deviceId) {
+        // Check if devices are available
+        try {
+          const devices = await getDevices('printer');
+          if (devices.length === 0) {
+            toast({
+              variant: 'destructive',
+              title: 'No printer found',
+              description: 'Please connect a printer device and try again.',
+            });
+            setIsPrinting(false);
+            return;
+          }
+          // Show device selector
+          setShowDeviceSelector(true);
+          setIsPrinting(false);
+          return;
+        } catch (error: any) {
+          toast({
+            variant: 'destructive',
+            title: 'Printer server error',
+            description: error.message || 'Cannot connect to printer server.',
+          });
+          setIsPrinting(false);
+          return;
+        }
+      }
+
+      // Build thermal receipt
+      const receiptData = await buildThermalReceipt(data);
+
+      // Print to device
+      await printReceipt(deviceId, receiptData);
+
+      toast({
+        title: 'Print successful',
+        description: 'Receipt sent to printer.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Print failed',
+        description: error.message || 'Failed to print receipt.',
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleDeviceSelect = async (deviceId: string) => {
+    // Device is already stored by DeviceSelector component
+    // Now print with the selected device
+    if (data) {
+      setIsPrinting(true);
+      try {
+        const receiptData = await buildThermalReceipt(data);
+        await printReceipt(deviceId, receiptData);
+        toast({
+          title: 'Print successful',
+          description: 'Receipt sent to printer.',
+        });
+      } catch (error: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Print failed',
+          description: error.message || 'Failed to print receipt.',
+        });
+      } finally {
+        setIsPrinting(false);
+      }
+    }
   };
 
   const handlePrint = () => {
@@ -253,11 +392,31 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 type="button"
                 variant="default"
                 className="w-full sm:w-auto"
-                onClick={handlePrint}
+                onClick={handleThermalPrint}
+                disabled={isPrinting}
               >
-                <Printer className="mr-2 h-4 w-4" />
-                Print
+                {isPrinting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Printing...
+                  </>
+                ) : (
+                  <>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                  </>
+                )}
               </Button>
+              {/* <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Select printer device"
+                onClick={() => setShowDeviceSelector(true)}
+                disabled={isPrinting}
+              >
+                <Settings className="h-4 w-4" />
+              </Button> */}
               <Button
                 type="button"
                 variant="outline"
@@ -273,8 +432,9 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 size="icon"
                 title="Email receipt"
                 onClick={handleEmailReceipt}
+                className="w-full sm:w-auto"
               >
-                <Mail className="h-4 w-4" />
+                Send by email <Mail className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
@@ -282,8 +442,9 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 size="icon"
                 title="SMS receipt"
                 onClick={handleSmsReceipt}
+                className="w-full sm:w-auto"
               >
-                <MessageCircle className="h-4 w-4" />
+                Send by SMS <MessageCircle className="h-4 w-4" />
               </Button>
             </>
           ) : null}
@@ -292,6 +453,12 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
           </Button>
         </DialogFooter>
       </DialogContent>
+      <DeviceSelector
+        type="printer"
+        open={showDeviceSelector}
+        onClose={() => setShowDeviceSelector(false)}
+        onSelect={handleDeviceSelect}
+      />
     </Dialog>
   );
 }

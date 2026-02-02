@@ -19,6 +19,7 @@ import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
 import { ReceiptModal, type ReceiptData } from '@/components/pos/ReceiptModal';
+import { BarcodeScanner } from '@/components/barcode-scanner';
 import { useSettings } from '@/components/settings-provider';
 import { useCustomers } from '@/hooks/use-customers';
 import { useCategories, useProducts, productKeys } from '@/hooks/use-catalogue';
@@ -67,6 +68,7 @@ export default function PosPage() {
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [isClearCartDialogOpen, setIsClearCartDialogOpen] = useState(false);
   const [insufficientStockPopup, setInsufficientStockPopup] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
 
   const clearCartAndResetCoupons = () => {
     clearCart();
@@ -174,6 +176,45 @@ export default function PosPage() {
       setCustomerDialogOpen(false);
   }
 
+  const handleBarcodeScan = (barcode: string) => {
+    // First, try to find product by barcode
+    const productByBarcode = products?.find(
+      (p) => p.barCode === barcode
+    );
+
+    if (productByBarcode) {
+      // Product found by barcode - add to cart
+      const currentQty = cart.get(productByBarcode.id)?.quantity ?? 0;
+      const stock = productByBarcode.stock ?? null;
+      if (typeof stock === 'number' && stock < currentQty + 1) {
+        setInsufficientStockPopup({
+          open: true,
+          message: `Stock insuffisant pour « ${productByBarcode.name } ». Stock disponible : ${stock}.`,
+        });
+        return;
+      }
+      // Convert ApiProduct to Product format for addToCart
+      const productForCart = {
+        id: productByBarcode.id,
+        name: productByBarcode.name,
+        price: productByBarcode.price,
+        costPrice: productByBarcode.costPrice,
+        stock: productByBarcode.stock ?? 0,
+        category: productByBarcode.category?.name || '',
+        barCode: productByBarcode.barCode || undefined,
+        imageUrl: productByBarcode.productImage || '',
+        productImage: productByBarcode.productImage || undefined,
+      } as Product;
+      addToCart(productForCart);
+      feedback.success('Product added', `${productByBarcode.name} added to cart.`);
+    } else {
+      // Product not found - set search term to barcode for user to see results
+      setProductSearch(barcode);
+      setCategoryView('carousel'); // Switch to product view
+      feedback.success('Barcode scanned', `No product found with barcode "${barcode}". Showing search results.`);
+    }
+  };
+
   const [isCompletingSale, setIsCompletingSale] = useState(false);
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
@@ -217,7 +258,9 @@ export default function PosPage() {
     if (isOnline) {
       // ONLINE: Use API - backend will update stock
       try {
-        const payload = toCreateTransactionDto(newTransaction);
+        const payload = toCreateTransactionDto(newTransaction as Omit<Transaction, 'id'> & {
+          items: Array<TransactionItem & { [k: string]: unknown }>;
+        });
         const response = await transactionsApi.create(payload);
 
         const resData = response.data as { id?: string; data?: { id?: string } } | undefined;
@@ -296,7 +339,9 @@ export default function PosPage() {
         // 3. Queue the transaction for sync when back online
         mutationQueue.add({
           mutationKey: ['transactions', 'create'],
-          mutationFn: () => transactionsApi.create(toCreateTransactionDto(newTransaction)),
+          mutationFn: () => transactionsApi.create(toCreateTransactionDto(newTransaction as Omit<Transaction, 'id'> & {
+            items: Array<TransactionItem & { [k: string]: unknown }>;
+          })),
           variables: newTransaction,
         });
 
@@ -344,11 +389,18 @@ export default function PosPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input 
             placeholder={categoryView === 'grid' ? "Search categories..." : "Scan barcode or search item..."}
-            className="pl-10 h-12"
+            className="pl-10 pr-10 h-12"
             value={categoryView === 'grid' ? categorySearch : productSearch}
             onChange={(e) => categoryView === 'grid' ? setCategorySearch(e.target.value) : setProductSearch(e.target.value)}
           />
-          <QrCode className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <button
+            type="button"
+            onClick={() => setIsBarcodeScannerOpen(true)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+            title="Scan barcode"
+          >
+            <QrCode className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+          </button>
         </div>
 
         <div className="flex justify-between items-center mb-2">
@@ -749,6 +801,22 @@ export default function PosPage() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <Dialog open={isBarcodeScannerOpen} onOpenChange={setIsBarcodeScannerOpen}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Scan Barcode</DialogTitle>
+          <DialogDescription>
+            Use your camera or barcode scanner device to scan a product barcode.
+          </DialogDescription>
+        </DialogHeader>
+        <BarcodeScanner
+          isOpen={isBarcodeScannerOpen}
+          onScan={handleBarcodeScan}
+          onClose={() => setIsBarcodeScannerOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

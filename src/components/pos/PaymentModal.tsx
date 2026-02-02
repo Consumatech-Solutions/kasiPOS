@@ -9,7 +9,10 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Phone, Loader2 } from 'lucide-react';
+import { Phone, Loader2, CreditCard, CheckCircle2, XCircle, Settings } from 'lucide-react';
+import { DeviceSelector } from '@/components/device-selector';
+import { getStoredDevice, connectPos, getDevices } from '@/lib/device-service';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface PaymentModalProps {
@@ -29,6 +32,10 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   const [tendered, setTendered] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [selectedMobileProvider, setSelectedMobileProvider] = useState('');
+  const [showPosDeviceSelector, setShowPosDeviceSelector] = useState(false);
+  const [posConnected, setPosConnected] = useState(false);
+  const [isConnectingPos, setIsConnectingPos] = useState(false);
+  const { toast } = useToast();
 
   const tenderedAmount = parseFloat(tendered) || 0;
   // Prevent negative change on initial load or when amount tendered is insufficient
@@ -44,8 +51,44 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
       setTendered('');
       setMobileNumber(customer?.contact || '');
       setSelectedMobileProvider('');
+      setPosConnected(false);
+      
+      // Check for POS device when Card payment is selected
+      if (method === 'Card') {
+        const deviceId = getStoredDevice('pos');
+        if (deviceId) {
+          // Try to connect to POS device
+          handleConnectPos(deviceId);
+        }
+      }
     }
   }, [isOpen, method, customer]);
+
+  const handleConnectPos = async (deviceId: string) => {
+    setIsConnectingPos(true);
+    try {
+      await connectPos(deviceId);
+      setPosConnected(true);
+      toast({
+        title: 'POS device connected',
+        description: 'Card reader is ready to process payments.',
+      });
+    } catch (error: any) {
+      setPosConnected(false);
+      toast({
+        variant: 'destructive',
+        title: 'POS connection failed',
+        description: error.message || 'Failed to connect to POS device.',
+      });
+    } finally {
+      setIsConnectingPos(false);
+    }
+  };
+
+  const handlePosDeviceSelect = async (deviceId: string) => {
+    // Device is already stored by DeviceSelector component
+    await handleConnectPos(deviceId);
+  };
   
   const handleKeyPress = (key: string) => {
     if (key === '.' && tendered.includes('.')) return;
@@ -164,21 +207,78 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
           </div>
         );
       case 'Card':
+        const posDeviceId = getStoredDevice('pos');
         return (
           <div>
             <DialogHeader className="text-center mb-6">
                 <DialogTitle className="text-2xl">Card Payment</DialogTitle>
                 <DialogDescription>Total amount to be charged to the card.</DialogDescription>
             </DialogHeader>
+            
+            {/* POS Device Connection Status */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-semibold text-sm">POS Device</p>
+                    <p className="text-xs text-muted-foreground">
+                      {posDeviceId ? 'Device selected' : 'No device selected'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isConnectingPos ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Connecting...</span>
+                    </>
+                  ) : posConnected ? (
+                    <>
+                      <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      <span className="text-xs text-green-600 font-medium">Connected</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Not Connected</span>
+                    </>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPosDeviceSelector(true)}
+                    disabled={isConnectingPos}
+                  >
+                    <Settings className="h-4 w-4 mr-1" />
+                    {posDeviceId ? 'Change' : 'Select'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
              <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
                 <p className="text-4xl font-bold text-foreground">R {cartTotal.toFixed(2)}</p>
-                <p className="mt-2">Waiting for card machine interaction...</p>
+                <p className="mt-2">
+                  {posConnected 
+                    ? 'Waiting for card machine interaction...' 
+                    : posDeviceId 
+                      ? 'Connect to POS device to process payment'
+                      : 'Select a POS device to process payment'}
+                </p>
             </div>
             <DialogFooter className="mt-6">
                 <DialogClose asChild><Button type="button" variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
-                <Button type="button" onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target" disabled={isLoading} aria-busy={isLoading}>
+                <Button 
+                  type="button" 
+                  onClick={handlePlaceholderComplete} 
+                  className="w-full min-h-[44px] touch-target" 
+                  disabled={isLoading || !posConnected} 
+                  aria-busy={isLoading}
+                >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
-                  {isLoading ? 'Processing...' : 'Simulate Successful Payment'}
+                  {isLoading ? 'Processing...' : posConnected ? 'Process Payment' : 'Connect POS Device First'}
                 </Button>
             </DialogFooter>
           </div>
@@ -243,10 +343,18 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl">
-        {renderContent()}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl">
+          {renderContent()}
+        </DialogContent>
+      </Dialog>
+      <DeviceSelector
+        type="pos"
+        open={showPosDeviceSelector}
+        onClose={() => setShowPosDeviceSelector(false)}
+        onSelect={handlePosDeviceSelect}
+      />
+    </>
   );
 }
