@@ -71,7 +71,7 @@ export async function loadStoreFromIndexedDB(storeId?: string | number | null): 
     const db = getDb();
     if (storeId != null && storeId !== '') {
       // Load specific store by ID (number or UUID string)
-      const store = await db.stores.get(storeId as number);
+      const store = await db.stores.get(storeId);
       if (store) {
         console.log('[StorePersistence] Loaded store from IndexedDB:', storeId);
         return store as Store;

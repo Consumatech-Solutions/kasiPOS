@@ -5,7 +5,7 @@ export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
 
 export type Parcel = {
   id: string;
-  storeId: number;
+  storeId: string;
   deliveryNumber: string;
   customerName: string;
   status: ParcelStatus;
@@ -21,7 +21,7 @@ export type Parcel = {
 };
 
 export type CreateParcelDto = {
-  storeId: number;
+  storeId: string;
   deliveryNumber: string;
   customerName: string;
 };

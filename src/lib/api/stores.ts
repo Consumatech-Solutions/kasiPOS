@@ -8,9 +8,9 @@ export const storesApi = {
   getMyStore: () => api.get<Store>('/stores/my-store'),
 
   /**
-   * Get store by ID
+   * Get store by ID (UUID string)
    */
-  getById: (id: number) => api.get<Store>(`/stores/${id}`),
+  getById: (id: string) => api.get<Store>(`/stores/${id}`),
 
   /**
    * Create a new store
@@ -18,7 +18,7 @@ export const storesApi = {
   create: (data: CreateStoreDto) => api.post<Store>('/stores', data),
 
   /**
-   * Update a store
+   * Update a store (id: UUID string)
    */
-  update: (id: number, data: UpdateStoreDto) => api.patch<Store>(`/stores/${id}`, data),
+  update: (id: string, data: UpdateStoreDto) => api.patch<Store>(`/stores/${id}`, data),
 };

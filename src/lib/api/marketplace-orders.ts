@@ -14,7 +14,7 @@ export type MarketplaceOrder = {
   id: string;
   orderCode: string;
   marketplaceStoreId: string;
-  storeId: number;
+  storeId: string;
   customerId?: string | null;
   items: MarketplaceOrderItem[];
   subtotal: number;
@@ -38,7 +38,7 @@ export type CreateMarketplaceOrderItemDto = {
 
 export type CreateMarketplaceOrderDto = {
   marketplaceStoreId: string;
-  storeId: number;
+  storeId: string;
   customerId?: string;
   items: CreateMarketplaceOrderItemDto[];
   subtotal: number;
