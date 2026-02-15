@@ -13,7 +13,7 @@ export interface ProductImageRecord {
   updatedAt: string;
 }
 
-// Interfaces pour les enregistrements IndexedDB avec synchronisation
+// Interfaces for IndexedDB records with sync
 export interface CustomerRecord extends Customer {
   synced?: boolean;
   lastSyncedAt?: string;

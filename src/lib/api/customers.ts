@@ -39,7 +39,7 @@ export const customersApi = {
   },
 
   /**
-   * Mettre à jour un client
+   * Update a customer
    */
   update: (id: string, data: UpdateCustomerDto) => {
     return api.patch<Customer>(`/customers/${id}`, data);

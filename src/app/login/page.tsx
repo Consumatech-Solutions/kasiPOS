@@ -111,6 +111,8 @@ export default function LoginPage() {
             </Form>
             <p className="mt-4 text-center text-sm text-muted-foreground">
                 First time here? <Button variant="link" className="p-0 min-h-[44px] touch-target" asChild><Link href="/request-access">Request Access</Link></Button>
+                {' · '}
+                Store admin? <Button variant="link" className="p-0 min-h-[44px] touch-target" asChild><Link href="/set-password-store-admin">Set your password</Link></Button>
             </p>
         </CardContent>
       </Card>

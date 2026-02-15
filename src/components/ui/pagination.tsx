@@ -32,7 +32,7 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
     }
 
     if (totalPages <= maxVisible) {
-      // Afficher toutes les pages
+      // Display all pages
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
