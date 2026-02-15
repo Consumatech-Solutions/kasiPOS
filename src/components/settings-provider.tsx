@@ -57,7 +57,7 @@ function getInitialSettings(): AppSettings {
   }
 }
 
-const AUTH_ROUTES = ['/login', '/request-access', '/verify-code', '/set-password'];
+const AUTH_ROUTES = ['/login', '/request-access', '/verify-code', '/set-password', '/set-password-store-admin'];
 const SETUP_ROUTE = '/store-setup';
 
 
@@ -272,8 +272,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 router.push('/');
              }
              
-             // Role-based route protection for staff
-             if (settings.currentUser?.role === 'staff' && pathname.startsWith('/settings')) {
+             // Role-based route protection: only admin can access /settings
+             if ((settings.currentUser?.role === 'staff' || settings.currentUser?.role === 'store_admin') && pathname.startsWith('/settings')) {
                 router.push('/');
              }
         }

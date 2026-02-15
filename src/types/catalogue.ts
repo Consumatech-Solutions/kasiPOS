@@ -52,7 +52,7 @@ export interface UpdateProductDto {
   productImage?: string;
 }
 
-// Types pour IndexedDB avec synchronisation
+// Types for IndexedDB with sync
 export interface CategoryRecord extends ApiCategory {
   synced: boolean;
   lastSyncedAt?: string;

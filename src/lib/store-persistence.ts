@@ -60,17 +60,18 @@ export async function saveStorePermanently(
 /**
  * Load store from IndexedDB
  * Used as fallback when API is unavailable
+ * @param storeId - Store ID (number for legacy, string UUID for store_admin)
  */
-export async function loadStoreFromIndexedDB(storeId?: number): Promise<Store | null> {
+export async function loadStoreFromIndexedDB(storeId?: string | number | null): Promise<Store | null> {
   if (typeof window === 'undefined') {
     return null;
   }
 
   try {
     const db = getDb();
-    if (storeId) {
-      // Load specific store by ID
-      const store = await db.stores.get(storeId);
+    if (storeId != null && storeId !== '') {
+      // Load specific store by ID (number or UUID string)
+      const store = await db.stores.get(storeId as number);
       if (store) {
         console.log('[StorePersistence] Loaded store from IndexedDB:', storeId);
         return store as Store;

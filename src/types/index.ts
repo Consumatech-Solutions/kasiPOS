@@ -168,12 +168,17 @@ export interface PurchaseOrder {
   storeId: number;
 }
 
+/** User roles: admin (back-office), staff (store staff), store_admin (store owner from assign-store). */
+export type UserRole = 'admin' | 'staff' | 'store_admin';
+
 export interface User {
   id: string;
+  email?: string;
   phone: string;
   name: string;
-  role: 'admin' | 'staff';
-  storeId: number | null;
+  role: UserRole;
+  /** Store UUID (for staff/store_admin); null for admin. */
+  storeId: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
