@@ -152,6 +152,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                   setSetting('currentUser', freshUser);
                   localStorage.setItem('user', JSON.stringify(freshUser));
                 } catch (profileErr: any) {
+                  if (profileErr?.response?.status === 401) {
+                    // Token expired or invalid; clear session and redirect to login
+                    logout();
+                    return;
+                  }
                   if (isNetworkError(profileErr)) {
                     if (process.env.NODE_ENV === 'development' && !(window as any).__bootstrapNetworkWarned) {
                       (window as any).__bootstrapNetworkWarned = true;
@@ -207,7 +212,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (isInitialLoad) {
         bootstrapData();
     }
-  }, [isInitialLoad, setSetting]);
+  }, [isInitialLoad, setSetting, logout, settings.currentUser]);
 
   useEffect(() => {
     const root = window.document.documentElement;

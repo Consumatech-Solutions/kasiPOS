@@ -1,6 +1,7 @@
 
 export interface Store {
-  id: number;
+  /** Store ID: UUID (string) from backend. */
+  id: string;
   name: string;
   vatNumber: string | null;
   logoUrl: string | null;
@@ -84,7 +85,8 @@ export interface Transaction {
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
   voucherCode?: string | null;
   discountAmount?: number | null;
-  storeId: number;
+  /** Store ID: UUID (string) from backend. */
+  storeId: string;
 }
 
 export interface Voucher {
@@ -99,7 +101,7 @@ export interface Voucher {
   maxUsesPerCustomer?: number | null;
   currentUses?: number;
   customerUsages?: Record<string, number> | null;
-  storeId: number;
+  storeId: string;
   createdAt?: string; // ISO date string
   updatedAt?: string; // ISO date string
 }
@@ -107,7 +109,7 @@ export interface Voucher {
 export interface Category {
   id?: number;
   name: string;
-  storeId?: number; // Optional for backward compatibility, but not used for filtering
+  storeId?: string; // Optional for backward compatibility, but not used for filtering
 
 }
 
@@ -123,7 +125,7 @@ export interface StockAdjustment {
   newStock: number;
   reason: StockAdjustmentReason;
   note?: string | null;
-  storeId: number;
+  storeId: string;
 }
 
 export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
@@ -140,7 +142,7 @@ export interface Parcel {
   collectingPersonName?: string | null;
   collectingPersonPhone?: string | null;
   collectingPersonId?: string | null;
-  storeId: number;
+  storeId: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -165,7 +167,7 @@ export interface PurchaseOrder {
   total: number;
   deliveryMethod: 'delivery' | 'collection';
   status: 'pending' | 'completed' | 'cancelled';
-  storeId: number;
+  storeId: string;
 }
 
 /** User roles: admin (back-office), staff (store staff), store_admin (store owner from assign-store). */

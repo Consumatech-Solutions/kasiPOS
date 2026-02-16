@@ -284,26 +284,46 @@ export default function PosPage() {
         }
         feedback.success('Sale complete!', 'View your receipt below.');
       } catch (error: unknown) {
+        const err = error as { message?: string; response?: { status?: number; data?: unknown } };
+        const status = err?.response?.status;
+        const data = err?.response?.data as Record<string, unknown> | undefined;
+        const serverMessage =
+          typeof data?.message === 'string'
+            ? data.message
+            : Array.isArray(data?.message) && data.message[0] != null
+              ? String(data.message[0])
+              : typeof data?.error === 'string'
+                ? data.error
+                : data && typeof data === 'object'
+                  ? (data as { message?: string }).message ?? undefined
+                  : undefined;
+
         if (process.env.NODE_ENV === 'development') {
-          console.error('[Complete Sale] Failed', { error, status: (error as { response?: { status?: number } })?.response?.status });
+          console.error('[Complete Sale] Failed', {
+            status,
+            serverMessage: serverMessage ?? err?.message,
+            message: err?.message,
+            data: data ? JSON.stringify(data) : undefined,
+          });
         }
-        console.error("Failed to complete sale:", error);
-        const res = (error as { response?: { data?: unknown; status?: number } })?.response;
-        const is400 = res?.status === 400;
-        if (is400) {
-          const data = res?.data as Record<string, unknown> | undefined;
-          let msg = '';
-          if (typeof data?.message === 'string') msg = data.message;
-          else if (Array.isArray(data?.message) && data.message[0] != null) msg = String(data.message[0]);
-          else if (typeof data?.error === 'string') msg = data.error;
-          else if (data && typeof data === 'object') msg = (data as any).message ?? JSON.stringify(data);
-          setActivePaymentMethod(null);
+
+        setActivePaymentMethod(null);
+        const showInPopup = status != null && status >= 400 && status < 500 && (serverMessage || status === 400);
+        const isStoreIdError = serverMessage && /storeId|integer/i.test(serverMessage);
+        const popupMessage = isStoreIdError
+          ? 'Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support.'
+          : (serverMessage || 'Something went wrong. Check the items and store.');
+        if (showInPopup) {
           setInsufficientStockPopup({
             open: true,
-            message: msg || 'Something went wrong. Check the items and store.',
+            message: popupMessage,
           });
         } else {
-          feedback.fromError(error, 'Failed to complete the sale', 'Check your connection and try again.');
+          feedback.fromError(
+            error,
+            'Failed to complete the sale',
+            serverMessage ? `${serverMessage} Try again or check your connection.` : 'Check your connection and try again.'
+          );
         }
       } finally {
         setIsCompletingSale(false);
@@ -793,6 +813,7 @@ export default function PosPage() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
     <AlertDialog open={insufficientStockPopup.open} onOpenChange={(open) => !open && setInsufficientStockPopup((prev) => ({ ...prev, open: false }))}>
       <AlertDialogContent className="z-[100]">
         <AlertDialogHeader>

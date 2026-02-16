@@ -47,7 +47,7 @@ export function useStore() {
     }
   }, []);
 
-  const updateStore = useCallback(async (id: number, data: UpdateStoreDto) => {
+  const updateStore = useCallback(async (id: string, data: UpdateStoreDto) => {
     try {
       if (!store) {
         throw new Error('No store to update');

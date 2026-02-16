@@ -19,7 +19,8 @@ export type CreateTransactionItemDto = {
 };
 
 export type CreateTransactionDto = {
-  storeId: number | string;
+  /** Store ID: UUID string from backend. */
+  storeId: string;
   customerId?: string;
   items: CreateTransactionItemDto[];
   total: number;
@@ -41,9 +42,9 @@ export interface GetTransactionsParams extends PaginationParams {
   search?: string;
 }
 
-/** Normalize transaction-like data into CreateTransactionDto (storeId number, productId string, no extra fields). */
+/** Normalize transaction-like data into CreateTransactionDto (storeId as UUID string, productId string, no extra fields). */
 export function toCreateTransactionDto(raw: {
-  storeId: number | string;
+  storeId: string | number;
   customerId?: string | null;
   items: Array<{ productId: string | number; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string; [k: string]: unknown }>;
   total: number;
@@ -51,9 +52,9 @@ export function toCreateTransactionDto(raw: {
   voucherCode?: string | null;
   discountAmount?: number | null;
 }): CreateTransactionDto {
-  const storeId = typeof raw.storeId === 'number' ? raw.storeId : Number(raw.storeId);
+  const storeId = raw.storeId != null && raw.storeId !== '' ? String(raw.storeId) : '';
   return {
-    storeId: Number.isFinite(storeId) ? storeId : raw.storeId,
+    storeId,
     customerId: raw.customerId ?? undefined,
     items: raw.items.map((item) => ({
       productId: String(item.productId),

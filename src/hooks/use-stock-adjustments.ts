@@ -87,7 +87,7 @@ export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
           newStock: newAdjustment.newStock,
           reason: newAdjustment.reason,
           note: newAdjustment.note || null,
-          storeId: 0, // Will be filled by backend
+          storeId: '', // Will be filled by backend
           createdAt: new Date().toISOString(),
         };
         queryClient.setQueryData<{ data: StockAdjustment[]; meta: PaginationMeta }>(queryKey, {
