@@ -764,9 +764,9 @@ export default function PosPage() {
             </div>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="w-full mt-2 text-muted-foreground hover:text-destructive"
+              className="w-full bg-destructive/50 text-black hover:bg-destructive/10 hover:text-black mt-2"
               onClick={() => setIsClearCartDialogOpen(true)}
             >
               Clear cart

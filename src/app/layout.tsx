@@ -9,6 +9,7 @@ import { QueryProvider } from '@/components/providers/query-provider';
 import { CartProvider } from '@/components/providers/cart-provider';
 import { DataPreloader } from '@/components/providers/data-preloader';
 import { SyncStatusIndicator } from '@/components/sync-status-indicator';
+import { HardwareSetupProvider } from '@/components/hardware-setup/HardwareSetupProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -41,12 +42,14 @@ export default function RootLayout({
         <QueryProvider>
           <ClientDbProvider>
             <SettingsProvider>
-              <CartProvider>
-                <DataPreloader />
-                <AppShell>{children}</AppShell>
-              </CartProvider>
-              <Toaster />
-              <SyncStatusIndicator />
+              <HardwareSetupProvider>
+                <CartProvider>
+                  <DataPreloader />
+                  <AppShell>{children}</AppShell>
+                </CartProvider>
+                <Toaster />
+                <SyncStatusIndicator />
+              </HardwareSetupProvider>
             </SettingsProvider>
           </ClientDbProvider>
         </QueryProvider>

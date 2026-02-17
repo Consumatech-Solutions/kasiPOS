@@ -16,6 +16,7 @@ import { Printer, Download, Mail, MessageCircle, Settings, Loader2 } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { DeviceSelector } from '@/components/device-selector';
 import { getStoredDevice, printReceipt, getDevices } from '@/lib/device-service';
+import { ToastAction } from '@/components/ui/toast';
 import { Printer as ThermalPrinter, Text, Br, Line, Row, Cut, render } from 'react-thermal-printer';
 import { feedback } from '@/lib/feedback';
 
@@ -59,6 +60,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const { toast } = useToast();
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isFailureRecovery, setIsFailureRecovery] = useState(false);
 
   const buildPrintHtml = (d: ReceiptData): string => {
     const rows = d.items
@@ -204,11 +206,23 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         title: 'Print successful',
         description: 'Receipt sent to printer.',
       });
+      setIsFailureRecovery(false);
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Print failed',
         description: error.message || 'Failed to print receipt.',
+        action: (
+          <ToastAction
+            altText="Search for another device"
+            onClick={() => {
+              setIsFailureRecovery(true);
+              setShowDeviceSelector(true);
+            }}
+          >
+            Search for another device
+          </ToastAction>
+        ),
       });
     } finally {
       setIsPrinting(false);
@@ -220,6 +234,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
     // Now print with the selected device
     if (data) {
       setIsPrinting(true);
+      setShowDeviceSelector(false);
       try {
         const receiptData = await buildThermalReceipt(data);
         await printReceipt(deviceId, receiptData);
@@ -227,11 +242,23 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
           title: 'Print successful',
           description: 'Receipt sent to printer.',
         });
+        setIsFailureRecovery(false);
       } catch (error: any) {
         toast({
           variant: 'destructive',
           title: 'Print failed',
           description: error.message || 'Failed to print receipt.',
+          action: (
+            <ToastAction
+              altText="Search for another device"
+              onClick={() => {
+                setIsFailureRecovery(true);
+                setShowDeviceSelector(true);
+              }}
+            >
+              Search for another device
+            </ToastAction>
+          ),
         });
       } finally {
         setIsPrinting(false);
