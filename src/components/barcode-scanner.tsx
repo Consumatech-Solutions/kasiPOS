@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Camera } from 'lucide-react';
+import { Loader2, Camera, ScanLine, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeviceSelector } from '@/components/device-selector';
 import { getStoredDevice, pollScanner, getDevices } from '@/lib/device-service';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
@@ -89,7 +90,25 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
               // Other error - stop polling
               pollingRef.current = false;
               setIsPolling(false);
-              setError(err.message || 'Failed to scan barcode');
+              const errorMsg = err.message || 'Failed to scan barcode';
+              setError(errorMsg);
+              // Show toast with option to search for another device
+              toast({
+                variant: 'destructive',
+                title: 'Scan failed',
+                description: errorMsg,
+                action: (
+                  <ToastAction
+                    altText="Search for another device"
+                    onClick={() => {
+                      setShowDeviceSelector(true);
+                    }}
+                  >
+                    <Search className="mr-2 h-4 w-4" />
+                    Search for another device
+                  </ToastAction>
+                ),
+              });
               return;
             }
           }
@@ -201,6 +220,7 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
   const handleDeviceSelect = async (deviceId: string) => {
     // Device is already stored by DeviceSelector component
     // Start polling with the selected device
+    setShowDeviceSelector(false);
     setIsPolling(true);
     pollingRef.current = true;
     setError(null);
@@ -228,7 +248,25 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
           } else {
             pollingRef.current = false;
             setIsPolling(false);
-            setError(err.message || 'Failed to scan barcode');
+            const errorMsg = err.message || 'Failed to scan barcode';
+            setError(errorMsg);
+            // Show toast with option to search for another device
+            toast({
+              variant: 'destructive',
+              title: 'Scan failed',
+              description: errorMsg,
+              action: (
+                <ToastAction
+                  altText="Search for another device"
+                  onClick={() => {
+                    setShowDeviceSelector(true);
+                  }}
+                >
+                  <Search className="mr-2 h-4 w-4" />
+                  Search for another device
+                </ToastAction>
+              ),
+            });
             return;
           }
         }
@@ -317,7 +355,18 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
           {error && scanMode === 'device' && (
             <Alert variant="destructive">
               <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="flex flex-col gap-2">
+                <span>{error}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeviceSelector(true)}
+                  className="w-full sm:w-auto self-start"
+                >
+                  <Search className="mr-2 h-4 w-4" />
+                  Search for another device
+                </Button>
+              </AlertDescription>
             </Alert>
           )}
         </TabsContent>

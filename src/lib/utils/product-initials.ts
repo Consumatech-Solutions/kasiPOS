@@ -24,3 +24,4 @@ export function getProductInitials(name: string | null | undefined): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+
