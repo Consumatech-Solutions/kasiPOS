@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,9 @@ import { useSettings } from "@/components/settings-provider";
 import { useParcels } from "@/hooks/use-parcels";
 import type { Parcel } from "@/lib/api/parcels";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { mutationQueue } from "@/lib/mutation-queue";
+import { parcelsApi } from "@/lib/api/parcels";
 
 import {
   Card,
@@ -87,6 +90,7 @@ export default function BophPage() {
   const { settings } = useSettings();
   const { currentStore: settingsStore } = settings;
   const { ensureStore } = useEnsureStore();
+  const { isOnline } = useNetworkStatus();
 
   const {
     parcels: allParcels,
@@ -657,19 +661,35 @@ export default function BophPage() {
                   return; // Error already shown by ensureStore
                 }
 
+                const payload = {
+                  storeId: currentStore.id!,
+                  deliveryNumber: values.deliveryNumber,
+                  customerName: values.customerName,
+                };
+
                 try {
-                  await createParcel({
-                    storeId: currentStore.id!,
-                    deliveryNumber: values.deliveryNumber,
-                    customerName: values.customerName,
-                  });
-                  toast({
-                    title: "Parcel Added",
-                    description: `Parcel ${values.deliveryNumber} has been added successfully.`,
-                  });
-                  setIsCreateModalOpen(false);
-                  createParcelForm.reset();
-                  refreshParcels();
+                  if (isOnline) {
+                    await createParcel(payload);
+                    toast({
+                      title: "Parcel Added",
+                      description: `Parcel ${values.deliveryNumber} has been added successfully.`,
+                    });
+                    setIsCreateModalOpen(false);
+                    createParcelForm.reset();
+                    refreshParcels();
+                  } else {
+                    mutationQueue.add({
+                      mutationKey: ["parcels", "create"],
+                      mutationFn: () => parcelsApi.create(payload),
+                      variables: payload,
+                    });
+                    toast({
+                      title: "Queued",
+                      description: "Parcel queued. Will sync when online.",
+                    });
+                    setIsCreateModalOpen(false);
+                    createParcelForm.reset();
+                  }
                 } catch (error: any) {
                   console.error("Failed to create parcel:", error);
                   const errorMessage =

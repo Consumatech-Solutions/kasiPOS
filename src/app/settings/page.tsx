@@ -23,6 +23,7 @@ import { feedback } from '@/lib/feedback';
 import { Badge } from '@/components/ui/badge';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
+import { mutationQueue } from '@/lib/mutation-queue';
 
 type Feature = 'campaigns' | 'marketplace' | 'boph';
 
@@ -183,8 +184,18 @@ export default function SettingsPage() {
     try {
       if (editingUser) {
         // Update existing user
-        await usersApi.update(editingUser.id!, { name: values.name, email: values.email.trim(), phone: values.phone });
-        feedback.success('User updated', 'User updated successfully.');
+        const updateData = { name: values.name, email: values.email.trim(), phone: values.phone };
+        if (isOnline) {
+          await usersApi.update(editingUser.id!, updateData);
+          feedback.success('User updated', 'User updated successfully.');
+        } else {
+          mutationQueue.add({
+            mutationKey: ['users', 'update'],
+            mutationFn: () => usersApi.update(editingUser.id!, updateData),
+            variables: { id: editingUser.id, data: updateData },
+          });
+          feedback.success('Queued', 'User update queued. Will sync when online.');
+        }
       } else {
         // Add new staff user for this store only (POST /users)
         const phone = normalizePhone(values.phone);
@@ -192,14 +203,24 @@ export default function SettingsPage() {
           feedback.error('Invalid number', 'Please enter at least 10 digits.', undefined, { code: 'USER' });
           return;
         }
-        await usersApi.create({
-            name: values.name.trim(),
-            email: values.email.trim(),
-            phone,
-            role: 'staff',
-            storeId,
-        });
-        feedback.success('Staff user added', 'They will receive an SMS to set up their password. They are assigned to this store only.');
+        const createData = {
+          name: values.name.trim(),
+          email: values.email.trim(),
+          phone,
+          role: 'staff',
+          storeId,
+        };
+        if (isOnline) {
+          await usersApi.create(createData);
+          feedback.success('Staff user added', 'They will receive an SMS to set up their password. They are assigned to this store only.');
+        } else {
+          mutationQueue.add({
+            mutationKey: ['users', 'create'],
+            mutationFn: () => usersApi.create(createData),
+            variables: createData,
+          });
+          feedback.success('Queued', 'Staff queued. Will sync when online.');
+        }
       }
       setUserDialogOpen(false);
       fetchUsers(); // Refresh list
@@ -226,8 +247,17 @@ export default function SettingsPage() {
         feedback.error('Cannot delete', 'You cannot delete your own account.', 'Ask another admin to remove you.');
         return;
       }
-      await usersApi.remove(id);
-      feedback.success('User deleted', 'User deleted successfully.');
+      if (isOnline) {
+        await usersApi.remove(id);
+        feedback.success('User deleted', 'User deleted successfully.');
+      } else {
+        mutationQueue.add({
+          mutationKey: ['users', 'delete'],
+          mutationFn: () => usersApi.remove(id),
+          variables: { id },
+        });
+        feedback.success('Queued', 'User deletion queued. Will sync when online.');
+      }
       fetchUsers(); // Refresh list
     } catch (error) {
       console.error("Failed to delete user:", error);

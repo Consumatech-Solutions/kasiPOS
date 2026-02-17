@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { offlineDetector, isOffline, checkOfflineStatus } from '@/lib/offline-detector';
 import { feedback, genLogId } from '@/lib/feedback';
+import { executeMutation } from '@/lib/mutation-registry';
 
 export interface QueuedMutation {
   id: string;
@@ -101,16 +102,32 @@ class MutationQueue {
 
   private setupOnlineListener() {
     if (typeof window !== 'undefined') {
-      // Use enhanced offline detector instead of native online event
+      // Primary: enhanced offline detector
       const unsubscribe = offlineDetector.subscribe((isOffline) => {
         if (!isOffline) {
           console.log('[MutationQueue] Network online - processing queued mutations');
           this.processQueue();
         }
       });
-      
-      // Store unsubscribe function for cleanup
-      this.onlineHandler = unsubscribe;
+
+      // Fallback: native 'online' event (in case detector's network test fails, e.g. /manifest.json)
+      const onNativeOnline = () => {
+        window.setTimeout(() => {
+          checkOfflineStatus(true).then((offline) => {
+            if (!offline && this.queue.length > 0) {
+              console.log('[MutationQueue] Native online - processing queued mutations');
+              this.processQueue();
+            }
+          });
+        }, 2000);
+      };
+      window.addEventListener('online', onNativeOnline);
+
+      // Cleanup: unsubscribe detector and remove native listener
+      this.onlineHandler = () => {
+        unsubscribe();
+        window.removeEventListener('online', onNativeOnline);
+      };
     }
   }
 
@@ -119,10 +136,28 @@ class MutationQueue {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const parsed = JSON.parse(stored);
-          // We can only restore metadata, not the actual functions
-          // The functions will be re-created when the app reconnects
-          console.log(`[MutationQueue] Found ${parsed.length} queued mutations from previous session`);
+          const parsed = JSON.parse(stored) as Array<{
+            id: string;
+            mutationKey: string[];
+            variables: unknown;
+            timestamp: number;
+            retries: number;
+          }>;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            for (const m of parsed) {
+              this.queue.push({
+                id: m.id,
+                mutationKey: m.mutationKey,
+                variables: m.variables,
+                timestamp: m.timestamp,
+                retries: m.retries ?? 0,
+                status: 'pending',
+                mutationFn: () => executeMutation(m.mutationKey, m.variables),
+              });
+            }
+            console.log(`[MutationQueue] Restored ${parsed.length} queued mutations from previous session`);
+            this.notifyStatusChange();
+          }
         }
       } catch (error) {
         console.error('[MutationQueue] Failed to restore queue:', error);
@@ -150,10 +185,11 @@ class MutationQueue {
 
   setQueryClient(queryClient: QueryClient) {
     this.queryClient = queryClient;
-    // Try to process queue when client is set (check if online using enhanced detector)
-    if (typeof window !== 'undefined') {
-      checkOfflineStatus().then((isOffline) => {
+    // Process queue when client is set and we're online (e.g. after reload with pending items)
+    if (typeof window !== 'undefined' && this.queue.length > 0) {
+      checkOfflineStatus(true).then((isOffline) => {
         if (!isOffline) {
+          console.log('[MutationQueue] QueryClient set, processing restored queue');
           this.processQueue();
         }
       });

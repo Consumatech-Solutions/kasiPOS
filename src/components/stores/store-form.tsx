@@ -72,7 +72,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
             <FormItem>
               <FormLabel>VAT Number</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="Ex: 123456789" disabled={disabled} />
+                <Input {...field} placeholder="e.g. 123456789" disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -99,7 +99,7 @@ export function StoreForm({ store, onSubmit, onCancel, disabled = false }: Store
             <FormItem>
               <FormLabel>Receipt Header</FormLabel>
               <FormControl>
-                <Textarea {...field} rows={3} placeholder="Ex: Merci de votre visite" disabled={disabled} />
+                <Textarea {...field} rows={3} placeholder="e.g. Thank you for your visit" disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>

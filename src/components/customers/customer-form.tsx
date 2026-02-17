@@ -51,7 +51,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, i
             <FormItem>
               <FormLabel>Customer Name *</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="Ex: John Doe" disabled={disabled} />
+                <Input {...field} placeholder="e.g. John Doe" disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -64,7 +64,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, i
             <FormItem>
               <FormLabel>Contact (Phone/Email) *</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="Ex: +1234567890" disabled={disabled} />
+                <Input {...field} placeholder="e.g. +1234567890" disabled={disabled} />
               </FormControl>
               <FormMessage />
             </FormItem>
