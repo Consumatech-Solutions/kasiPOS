@@ -21,7 +21,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical, QrCode } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BarcodeDisplay } from '@/components/barcode-display';
+import { BarcodeScanner } from '@/components/barcode-scanner';
 import { Pagination } from '@/components/ui/pagination';
 import { ImageUpload } from '@/components/catalogue/image-upload';
 import { ProductImage } from '@/components/catalogue/product-image';
@@ -66,6 +67,7 @@ export default function CataloguePage() {
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [activeCatalogueTab, setActiveCatalogueTab] = useState<string>('products');
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
 
   // Generate a unique barcode (EAN-13 format: 13 digits)
   const generateBarcode = (): string => {
@@ -171,14 +173,6 @@ export default function CataloguePage() {
     },
   });
 
-  // Generate barcode for new product
-  const handleGenerateBarcode = () => {
-    const newBarcode = generateBarcode();
-    productForm.setValue('barcode', newBarcode);
-    feedback.success('Barcode Generated', `New barcode "${newBarcode}" has been generated.`);
-  };
-
-
   // Handlers for Products
   const openProductDialog = async (product?: ApiProduct | Product) => {
     productForm.reset();
@@ -209,13 +203,12 @@ export default function CataloguePage() {
       setProductImageUrl(imageUrl || null);
     } else {
       setEditingProduct(null);
-      const newBarcode = generateBarcode();
       productForm.setValue('name', '');
       productForm.setValue('price', 0);
       productForm.setValue('costPrice', 0);
       productForm.setValue('stock', 0);
       productForm.setValue('category', '');
-      productForm.setValue('barcode', newBarcode);
+      productForm.setValue('barcode', '');
       productForm.setValue('imageUrl', '');
       productForm.setValue('imageHint', '');
       setProductImageUrl(null);
@@ -228,8 +221,7 @@ export default function CataloguePage() {
       // Use the uploaded image URL if available, otherwise use the form value
       const imageUrl = productImageUrl || values.imageUrl || '';
       
-      // Generate barcode if not provided
-      const barCode = values.barcode || generateBarcode();
+      const barCode = (values.barcode ?? '').trim() || undefined;
 
       const productData = {
         name: values.name,
@@ -738,16 +730,16 @@ export default function CataloguePage() {
                             <div className="space-y-2">
                                 <div className="flex gap-2">
                                     <FormControl>
-                                        <Input {...field} readOnly className="bg-muted" />
+                                        <Input {...field} placeholder="Enter or scan barcode" />
                                     </FormControl>
                                     <Button 
                                         type="button" 
                                         variant="outline" 
                                         size="icon"
-                                        onClick={handleGenerateBarcode}
-                                        title="Generate new barcode"
+                                        onClick={() => setIsBarcodeScannerOpen(true)}
+                                        title="Scan barcode"
                                     >
-                                        <RefreshCw className="h-4 w-4"/>
+                                        <QrCode className="h-4 w-4" />
                                     </Button>
                                 </div>
                                 {field.value && (
@@ -832,7 +824,24 @@ export default function CataloguePage() {
         </DialogContent>
     </Dialog>
 
-
+    <Dialog open={isBarcodeScannerOpen} onOpenChange={setIsBarcodeScannerOpen}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Scan barcode</DialogTitle>
+          <DialogDescription>
+            Use your camera or barcode scanner device to read the product barcode.
+          </DialogDescription>
+        </DialogHeader>
+        <BarcodeScanner
+          isOpen={isBarcodeScannerOpen}
+          onScan={(barcode) => {
+            productForm.setValue('barcode', barcode);
+            setIsBarcodeScannerOpen(false);
+          }}
+          onClose={() => setIsBarcodeScannerOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

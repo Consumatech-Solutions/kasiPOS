@@ -16,8 +16,14 @@ import { ERROR_CODES } from '@/lib/error-codes';
 import { db } from '@/lib/db';
 
 const requestAccessSchema = z.object({
-  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
+  phone: z.string().min(10, { message: "Please enter a valid mobile number (at least 10 digits)." }),
 });
+
+/** Normalize phone to digits only (and optional leading +). Backend often expects digits only. */
+function normalizePhone(input: string): string {
+  const digits = input.replace(/\D/g, '');
+  return digits;
+}
 
 export default function RequestAccessPage() {
     const router = useRouter();
@@ -30,10 +36,15 @@ export default function RequestAccessPage() {
     });
 
     const onSubmit = async (values: z.infer<typeof requestAccessSchema>) => {
+        const phone = normalizePhone(values.phone);
+        if (phone.length < 10) {
+            feedback.error('Invalid number', 'Please enter at least 10 digits.', undefined, { code: ERROR_CODES.REQUEST_ACCESS });
+            return;
+        }
         try {
-            await authApi.requestOtp(values.phone);
-            feedback.success('Code sent', `A verification code has been sent to ${values.phone}. Check your messages and enter the code on the next screen.`);
-            router.push(`/verify-code?phone=${encodeURIComponent(values.phone)}`);
+            await authApi.requestOtp(phone);
+            feedback.success('Code sent', `A verification code has been sent to ${phone}. Check your messages and enter the code on the next screen.`);
+            router.push(`/verify-code?phone=${encodeURIComponent(phone)}`);
         } catch (error: unknown) {
             feedback.fromError(
                 error,

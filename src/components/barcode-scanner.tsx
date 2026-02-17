@@ -285,7 +285,7 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
             Camera
           </TabsTrigger>
           <TabsTrigger value="device" className="flex items-center gap-2">
-            <ScanLine className="h-4 w-4" />
+            <Camera className="h-4 w-4" />
             Scanner Device
           </TabsTrigger>
         </TabsList>
@@ -337,7 +337,7 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
             </div>
           ) : (
             <div className="py-8 text-center">
-              <ScanLine className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+              <Camera className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg font-semibold mb-2">Ready to scan</p>
               <p className="text-sm text-muted-foreground mb-4">
                 {getStoredDevice('scanner') 
