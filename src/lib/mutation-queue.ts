@@ -110,7 +110,7 @@ class MutationQueue {
         }
       });
 
-      // Fallback: native 'online' event (in case detector's network test fails, e.g. /manifest.json)
+      // Fallback: native 'online' event – always try processQueue so sync runs without refresh
       const onNativeOnline = () => {
         window.setTimeout(() => {
           checkOfflineStatus(true).then((offline) => {
@@ -119,7 +119,7 @@ class MutationQueue {
               this.processQueue();
             }
           });
-        }, 2000);
+        }, 400);
       };
       window.addEventListener('online', onNativeOnline);
 

@@ -2,34 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { offlineDetector } from '@/lib/offline-detector';
 
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(
-    typeof navigator !== 'undefined' ? navigator.onLine : true
+    typeof window !== 'undefined' ? !offlineDetector.isOffline() : true
   );
   const [wasOffline, setWasOffline] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setWasOffline(true);
-      queryClient.resumePausedMutations();
-      queryClient.refetchQueries();
-      setTimeout(() => setWasOffline(false), 3000);
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    const unsubscribe = offlineDetector.subscribe((isOffline) => {
+      const online = !isOffline;
+      setIsOnline(online);
+      if (online) {
+        setWasOffline(true);
+        queryClient.resumePausedMutations();
+        queryClient.refetchQueries();
+        setTimeout(() => setWasOffline(false), 3000);
+      }
+    });
+    return unsubscribe;
   }, [queryClient]);
 
   return {
