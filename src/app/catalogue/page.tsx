@@ -89,67 +89,63 @@ export default function CataloguePage() {
   const typedCategories: Category[] = categories || [];
   const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
 
-  // Auto-generate barcodes for products that don't have one (only once per product)
+  // Auto-generate barcodes for products that don't have one (only once per product).
+  // Depend only on product IDs + loading so we don't re-run when products array reference
+  // changes after each updateProduct (invalidateQueries), which would cause an infinite loop.
   const processedProductsRef = useRef<Set<string | number>>(new Set());
   const isGeneratingRef = useRef(false);
-  
+  const updateProductRef = useRef(updateProduct);
+  updateProductRef.current = updateProduct;
+
+  const productIdsKey = (products ?? [])
+    .map((p) => p.id)
+    .filter(Boolean)
+    .sort()
+    .join(',');
+
   useEffect(() => {
-    // Prevent multiple simultaneous generations
-    if (isGeneratingRef.current || productsLoading || !products || products.length === 0) {
-      return;
-    }
-    
+    if (productsLoading || !products || products.length === 0) return;
+    if (isGeneratingRef.current) return;
+
     const productsWithoutBarcode = products.filter(
-      p => p.id && !processedProductsRef.current.has(p.id) && (!p.barCode || String(p.barCode || '').trim() === '')
+      (p) =>
+        p.id &&
+        !processedProductsRef.current.has(p.id) &&
+        (!p.barCode || String(p.barCode || '').trim() === '')
     );
-    
-    if (productsWithoutBarcode.length > 0) {
-      isGeneratingRef.current = true;
-      
-      // Process products one at a time to avoid race conditions
-      const processProduct = async (product: any) => {
-        if (!product.id) return;
-        
-        // Mark as processed immediately to avoid duplicate generation
-        processedProductsRef.current.add(product.id);
-        
-        try {
-          // Skip if product already has a barcode (double check state)
-          if (product.barCode && String(product.barCode).trim() !== '') {
-            return;
-          }
-          
-          const newBarcode = generateBarcode();
-          await updateProduct(product.id, { barCode: newBarcode });
-        } catch (error: any) {
-          // Handle "Product not found" silently
-          if (error?.message === 'Product not found' || error?.message?.includes('not found')) {
-            return;
-          }
-          
-          // Silently handle network errors - expected when backend is not available
-          // Only log unexpected errors
-          if (error?.response?.status !== 404 && error?.code !== 'ERR_NETWORK' && error?.message !== 'Network Error') {
-            if (process.env.NODE_ENV === 'development') {
-              console.error(`Failed to generate barcode for product ${product.name}:`, error);
-            }
-          }
-          // Remove from processed set on error so it can be retried (only for unexpected errors)
-          if (error?.response?.status !== 404 && error?.code !== 'ERR_NETWORK' && error?.message !== 'Network Error' && error?.message !== 'Product not found') {
-            processedProductsRef.current.delete(product.id);
-          }
+
+    if (productsWithoutBarcode.length === 0) return;
+
+    isGeneratingRef.current = true;
+
+    const processProduct = async (product: (typeof products)[number]) => {
+      if (!product.id) return;
+      processedProductsRef.current.add(product.id);
+      try {
+        if (product.barCode && String(product.barCode).trim() !== '') return;
+        const newBarcode = generateBarcode();
+        await updateProductRef.current(product.id, { barCode: newBarcode });
+      } catch (error: unknown) {
+        const err = error as { message?: string; response?: { status?: number }; code?: string };
+        if (err?.message?.includes('not found') || err?.response?.status === 404 || err?.code === 'ERR_NETWORK') {
+          return;
         }
-      };
-      
-      // Process all products without barcode sequentially
-      (async () => {
-        for (const product of productsWithoutBarcode) {
-          await processProduct(product);
+        if (process.env.NODE_ENV === 'development') {
+          console.error(`Failed to generate barcode for product ${(product as { name?: string }).name}:`, error);
         }
-        isGeneratingRef.current = false;
-      })();
-    }
-  }, [products, productsLoading, updateProduct]);
+        if (err?.response?.status !== 404 && err?.code !== 'ERR_NETWORK') {
+          processedProductsRef.current.delete(product.id);
+        }
+      }
+    };
+
+    (async () => {
+      for (const product of productsWithoutBarcode) {
+        await processProduct(product);
+      }
+      isGeneratingRef.current = false;
+    })();
+  }, [productsLoading, productIdsKey]);
 
   // Form Hooks
   const productForm = useForm<z.infer<typeof productSchema>>({
