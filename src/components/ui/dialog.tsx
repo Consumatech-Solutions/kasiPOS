@@ -32,9 +32,17 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => {
+  // Check if className contains z-[110] or similar high z-index
+  const hasHighZIndex = className?.includes('z-[110]') || className?.includes('!z-[110]');
+  
+  return (
   <DialogPortal>
-    <DialogOverlay />
+    {hasHighZIndex ? (
+      <DialogPrimitive.Overlay className="fixed inset-0 z-[110] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+    ) : (
+      <DialogOverlay />
+    )}
     <DialogPrimitive.Content
       ref={ref}
       onOpenAutoFocus={(e) => {
@@ -59,7 +67,8 @@ const DialogContent = React.forwardRef<
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
-))
+  );
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({
