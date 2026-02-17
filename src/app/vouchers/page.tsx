@@ -17,6 +17,9 @@ import { PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
 import { feedback } from '@/lib/feedback';
 import { ERROR_CODES } from '@/lib/error-codes';
 import { useVouchers } from '@/hooks/use-vouchers';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { mutationQueue } from '@/lib/mutation-queue';
+import { vouchersApi } from '@/lib/api/vouchers';
 import type { Voucher } from '@/types';
 import { format } from 'date-fns';
 
@@ -32,6 +35,7 @@ const voucherSchema = z.object({
 });
 
 export default function VouchersPage() {
+  const { isOnline } = useNetworkStatus();
   const { vouchers, loading, createVoucher, updateVoucher, deleteVoucher, isCreating, isUpdating, isDeleting } = useVouchers({ page: 1, limit: 10 });
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
@@ -89,11 +93,29 @@ export default function VouchersPage() {
       };
 
       if (editingVoucher?.id) {
-        await updateVoucher(editingVoucher.id, voucherData);
-        feedback.success('Voucher updated', 'Voucher updated successfully.');
+        if (isOnline) {
+          await updateVoucher(editingVoucher.id, voucherData);
+          feedback.success('Voucher updated', 'Voucher updated successfully.');
+        } else {
+          mutationQueue.add({
+            mutationKey: ['vouchers', 'update'],
+            mutationFn: () => vouchersApi.update(editingVoucher.id, voucherData),
+            variables: { id: editingVoucher.id, data: voucherData },
+          });
+          feedback.success('Queued', 'Voucher update queued. Will sync when online.');
+        }
       } else {
-        await createVoucher(voucherData);
-        feedback.success('Voucher created', 'Voucher created successfully.');
+        if (isOnline) {
+          await createVoucher(voucherData);
+          feedback.success('Voucher created', 'Voucher created successfully.');
+        } else {
+          mutationQueue.add({
+            mutationKey: ['vouchers', 'create'],
+            mutationFn: () => vouchersApi.create(voucherData),
+            variables: voucherData,
+          });
+          feedback.success('Queued', 'Voucher queued. Will sync when online.');
+        }
       }
       setVoucherDialogOpen(false);
     } catch (error: unknown) {
@@ -103,8 +125,17 @@ export default function VouchersPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteVoucher(id);
-      feedback.success('Voucher deleted', 'Voucher deleted successfully.');
+      if (isOnline) {
+        await deleteVoucher(id);
+        feedback.success('Voucher deleted', 'Voucher deleted successfully.');
+      } else {
+        mutationQueue.add({
+          mutationKey: ['vouchers', 'delete'],
+          mutationFn: () => vouchersApi.delete(id),
+          variables: { id },
+        });
+        feedback.success('Queued', 'Voucher deletion queued. Will sync when online.');
+      }
     } catch (error: unknown) {
       feedback.fromError(error, 'Failed to delete voucher', 'Try again or check your connection.', ERROR_CODES.VOUCHER);
     }

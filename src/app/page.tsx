@@ -192,7 +192,7 @@ export default function PosPage() {
       if (typeof stock === 'number' && stock < currentQty + 1) {
         setInsufficientStockPopup({
           open: true,
-          message: `Stock insuffisant pour « ${productByBarcode.name } ». Stock disponible : ${stock}.`,
+          message: `Insufficient stock for "${productByBarcode.name}". Available stock: ${stock}.`,
         });
         return;
       }

@@ -1,6 +1,6 @@
 /**
  * Enhanced Offline Detection Utility
- * 
+ *
  * Provides reliable offline detection by combining:
  * - navigator.onLine status
  * - Actual network connectivity tests
@@ -155,11 +155,7 @@ class OfflineDetector {
    */
   subscribe(callback: (isOffline: boolean) => void): () => void {
     this.listeners.add(callback);
-    
-    // Immediately call with current status
     callback(this.state.isOffline);
-    
-    // Return unsubscribe function
     return () => {
       this.listeners.delete(callback);
     };

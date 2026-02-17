@@ -14,14 +14,8 @@ export function useNetworkStatus() {
     const handleOnline = () => {
       setIsOnline(true);
       setWasOffline(true);
-      
-      // Resume any paused queries/mutations when coming back online
       queryClient.resumePausedMutations();
-      
-      // Refetch all active queries to ensure data is fresh
       queryClient.refetchQueries();
-      
-      // Clear the wasOffline flag after a short delay
       setTimeout(() => setWasOffline(false), 3000);
     };
 

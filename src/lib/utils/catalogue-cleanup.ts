@@ -26,7 +26,7 @@ const MOCK_PRODUCTS = [
   'Sunfoil Cooking Oil 2L',
   'Selati White Sugar 2.5kg',
   'Five Roses Teabags 102s',
-  'Nescafé Classic Coffee 200g',
+  'Nescafe Classic Coffee 200g',
   'Sunlight Bar Soap',
 ];
 
