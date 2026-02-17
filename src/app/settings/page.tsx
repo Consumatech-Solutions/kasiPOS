@@ -28,8 +28,14 @@ type Feature = 'campaigns' | 'marketplace' | 'boph';
 
 const userManagementSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email address." }),
   phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
 });
+
+/** Normalize phone to digits only; backend often expects digits only. */
+function normalizePhone(input: string): string {
+  return input.replace(/\D/g, '');
+}
 
 const passwordSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
@@ -79,25 +85,43 @@ export default function SettingsPage() {
     return false;
   };
 
+  const userManagementStoreId = settingsStore?.id ?? currentUser?.storeId ?? null;
+
+  // Ensure we have a store when admin/store_admin opens Settings (so User Management can show and add staff)
+  useEffect(() => {
+    const needStore = (isAdmin || currentUser?.role === 'store_admin') && !userManagementStoreId;
+    if (needStore) {
+      ensureStore().catch(() => {});
+    }
+  }, [isAdmin, currentUser?.role, userManagementStoreId]);
+
   const fetchUsers = async () => {
-    const storeId = settingsStore?.id || currentUser?.storeId;
-    if (!storeId) return;
+    if (!userManagementStoreId) {
+      setUsers([]);
+      setTotalPages(0);
+      return;
+    }
     try {
-        const response = await usersApi.findAll(storeId, page, TABLE_LIMIT);
-        setUsers(response.data.data);
-        setTotalPages(response.data.meta.totalPages);
+        const response = await usersApi.findAll(userManagementStoreId, page, TABLE_LIMIT);
+        const body = response.data;
+        const list = Array.isArray(body?.data) ? body.data : [];
+        const totalPages = typeof body?.meta?.totalPages === 'number' ? body.meta.totalPages : 0;
+        setUsers(list as User[]);
+        setTotalPages(totalPages);
     } catch (error) {
         console.error('Failed to fetch users:', error);
+        setUsers([]);
+        setTotalPages(0);
     }
   };
 
   useEffect(() => {
     fetchUsers();
-  }, [settingsStore?.id, currentUser?.storeId, page]);
+  }, [userManagementStoreId, page]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
-    defaultValues: { name: '', phone: '' },
+    defaultValues: { name: '', email: '', phone: '' },
   });
 
   const passwordForm = useForm<z.infer<typeof passwordSchema>>({
@@ -142,45 +166,51 @@ export default function SettingsPage() {
     setSelectedFeature(null);
     if (user) {
       setEditingUser(user);
-      userForm.reset({ name: user.name, phone: user.phone });
+      userForm.reset({ name: user.name, email: user.email ?? '', phone: user.phone ?? '' });
     } else {
       setEditingUser(null);
-      userForm.reset({ name: '', phone: '' });
+      userForm.reset({ name: '', email: '', phone: '' });
     }
     setUserDialogOpen(true);
   };
 
   const handleUserSubmit = async (values: z.infer<typeof userManagementSchema>) => {
-    const currentStore = await ensureStore();
-    if (!currentStore) {
-        return; // Error already shown by ensureStore
+    const storeId = userManagementStoreId ?? (await ensureStore())?.id ?? currentUser?.storeId;
+    if (!storeId) {
+      feedback.error('No store', 'Cannot add staff without a store. Open the app and ensure a store is loaded.', undefined, { code: 'USER' });
+      return;
     }
-    const storeId = currentStore.id || currentUser?.storeId;
     try {
       if (editingUser) {
         // Update existing user
-        await usersApi.update(editingUser.id!, { name: values.name, phone: values.phone });
+        await usersApi.update(editingUser.id!, { name: values.name, email: values.email.trim(), phone: values.phone });
         feedback.success('User updated', 'User updated successfully.');
       } else {
-        // Add new staff user via API
+        // Add new staff user for this store only (POST /users)
+        const phone = normalizePhone(values.phone);
+        if (phone.length < 10) {
+          feedback.error('Invalid number', 'Please enter at least 10 digits.', undefined, { code: 'USER' });
+          return;
+        }
         await usersApi.create({
-            name: values.name,
-            phone: values.phone,
+            name: values.name.trim(),
+            email: values.email.trim(),
+            phone,
             role: 'staff',
-            storeId: storeId,
+            storeId,
         });
-        feedback.success('Staff user added', 'They will receive an SMS to set up their password.');
+        feedback.success('Staff user added', 'They will receive an SMS to set up their password. They are assigned to this store only.');
       }
       setUserDialogOpen(false);
       fetchUsers(); // Refresh list
     } catch (error: any) {
       console.error("Failed to save user:", error);
-      if (!editingUser) {
+      if (!editingUser && isDuplicatePhoneError(error)) {
         setUserDialogOpen(false);
         setDuplicatePhonePopupOpen(true);
         return;
       }
-      feedback.fromError(error, 'Failed to save user', 'Check your connection and try again.');
+      feedback.fromError(error, 'Failed to save user', 'Check the details and try again, or try again later.');
     }
   };
 
@@ -425,15 +455,26 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {isAdmin && (
+        {(isAdmin || currentUser?.role === 'store_admin') && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Users /> User Management</CardTitle>
-              <CardDescription>Add, edit, or remove staff members from your store.</CardDescription>
+              <CardDescription>
+                {userManagementStoreId && settingsStore?.name
+                  ? `Staff for this store only: ${settingsStore.name}. Add, edit, or remove staff assigned to this store.`
+                  : userManagementStoreId
+                    ? 'Staff for this store only. Add, edit, or remove staff assigned to this store.'
+                    : 'Load or select a store to manage its staff. Only staff assigned to the current store are shown.'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex justify-end mb-4">
-                <Button type="button" onClick={(e) => { e.stopPropagation(); openUserDialog(); }}>
+                <Button
+                  type="button"
+                  disabled={!userManagementStoreId}
+                  onClick={(e) => { e.stopPropagation(); openUserDialog(); }}
+                  title={!userManagementStoreId ? 'Select or load a store first' : 'Add staff to this store'}
+                >
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Staff
                 </Button>
               </div>
@@ -550,6 +591,17 @@ export default function SettingsPage() {
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={userForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl><Input {...field} type="email" placeholder="staff@example.com" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
