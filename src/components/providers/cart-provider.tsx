@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { TransactionItem } from '@/types';
 import type { Product } from '@/types';
-import { loadCartFromSessionStorage, saveCartToSessionStorage } from '@/lib/cart-storage';
+import { loadCartFromSessionStorageAsync, saveCartToSessionStorage } from '@/lib/cart-storage';
 
 /**
  * Cart state is persisted in localStorage so the payment cart stays operational
@@ -39,12 +39,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return;
     if (cartMemoryCache && cartMemoryCache.size > 0) {
       setCartState(new Map(cartMemoryCache));
-    } else {
-      const loaded = loadCartFromSessionStorage();
+      setHydrated(true);
+      return;
+    }
+    loadCartFromSessionStorageAsync().then((loaded) => {
       if (loaded.size > 0) cartMemoryCache = new Map(loaded);
       setCartState(loaded);
-    }
-    setHydrated(true);
+      setHydrated(true);
+    });
   }, []);
 
   useEffect(() => {

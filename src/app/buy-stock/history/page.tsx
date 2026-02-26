@@ -6,11 +6,15 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Package, MoreVertical, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
 import { useSettings } from '@/components/settings-provider';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { feedback } from '@/lib/feedback';
 import { ERROR_CODES } from '@/lib/error-codes';
 import type { PurchaseOrder } from '@/types';
 import { format } from 'date-fns';
 import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
+import { getPurchaseOrdersFromDexie, savePurchaseOrdersToDexie, updatePurchaseOrderStatusInDexie } from '@/lib/entity-cache';
+import { mutationQueue } from '@/lib/mutation-queue';
+import { executeMutation } from '@/lib/mutation-registry';
 
 import {
   Accordion,
@@ -32,6 +36,7 @@ import {
 export default function BuyStockHistoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const { isOnline } = useNetworkStatus();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
@@ -44,15 +49,25 @@ export default function BuyStockHistoryPage() {
 
     try {
       setLoading(true);
-      const response = await purchaseOrdersApi.getAll({ page: 1, limit: 10 });
-      const orders = Array.isArray(response.data) ? response.data : response.data.data;
-      // Sort by date descending
-      const sortedOrders = orders.sort((a: any, b: any) => {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : (a.date ? new Date(a.date).getTime() : 0);
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : (b.date ? new Date(b.date).getTime() : 0);
-        return dateB - dateA;
-      });
-      setPurchaseOrders(sortedOrders);
+      if (!isOnline) {
+        const { data } = await getPurchaseOrdersFromDexie(1, 10);
+        const sorted = [...data].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        setPurchaseOrders(sorted);
+      } else {
+        const response = await purchaseOrdersApi.getAll({ page: 1, limit: 10 });
+        const orders = Array.isArray(response.data) ? response.data : (response.data as { data?: PurchaseOrder[] })?.data ?? [];
+        const sortedOrders = [...orders].sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        });
+        if (sortedOrders.length) await savePurchaseOrdersToDexie(sortedOrders);
+        setPurchaseOrders(sortedOrders);
+      }
     } catch (error) {
       console.error('Failed to load purchase orders:', error);
       setPurchaseOrders([]);
@@ -63,23 +78,35 @@ export default function BuyStockHistoryPage() {
 
   useEffect(() => {
     loadOrders();
-  }, [currentStore]);
+  }, [currentStore, isOnline]);
 
   const handleStatusChange = async (orderId: string, newStatus: 'pending' | 'completed' | 'cancelled') => {
     if (!orderId) return;
 
     try {
       setUpdatingStatus(orderId);
-      await purchaseOrdersApi.updateStatus(orderId, { status: newStatus });
-      
-      // Update local state
-      setPurchaseOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order
-        )
-      );
-
-      feedback.success('Status updated', `Purchase order status changed to ${newStatus}.`);
+      if (isOnline) {
+        await purchaseOrdersApi.updateStatus(orderId, { status: newStatus });
+        setPurchaseOrders((prev) =>
+          prev.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+        feedback.success('Status updated', `Purchase order status changed to ${newStatus}.`);
+      } else {
+        setPurchaseOrders((prev) =>
+          prev.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+        await updatePurchaseOrderStatusInDexie(orderId, newStatus);
+        mutationQueue.add({
+          mutationKey: ['purchaseOrders', 'updateStatus'],
+          mutationFn: () => executeMutation(['purchaseOrders', 'updateStatus'], { id: orderId, status: newStatus }),
+          variables: { id: orderId, status: newStatus },
+        });
+        feedback.success('Status updated', 'Change will sync when online.');
+      }
     } catch (error: unknown) {
       feedback.fromError(error, 'Failed to update status', 'Check your connection and try again.', ERROR_CODES.PURCHASE_ORDER);
     } finally {

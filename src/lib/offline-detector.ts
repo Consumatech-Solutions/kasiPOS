@@ -1,10 +1,8 @@
 /**
- * Enhanced Offline Detection Utility
+ * Offline Detection Utility
  *
- * Provides reliable offline detection by combining:
- * - navigator.onLine status
- * - Actual network connectivity tests
- * - Cached results to avoid excessive checks
+ * Determines connectivity by calling the backend URL. If the backend cannot be
+ * reached, the app is considered offline. Runs a connectivity check every 10s.
  */
 
 interface OfflineState {
@@ -13,9 +11,11 @@ interface OfflineState {
   isChecking: boolean;
 }
 
-const CACHE_DURATION = 5000; // Cache result for 5 seconds
-const NETWORK_TEST_TIMEOUT = 3000; // 3 second timeout for network test
-const NETWORK_TEST_URL = '/manifest.json'; // Small asset that returns 200 when app is up
+const CONNECTIVITY_CHECK_INTERVAL_MS = 10000; // Check every 10 seconds
+const NETWORK_TEST_TIMEOUT = 5000; // Timeout for backend reachability
+const BACKEND_URL = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL
+  : 'http://localhost:3001';
 
 function isDevHost(): boolean {
   if (typeof window === 'undefined') return false;
@@ -32,17 +32,23 @@ class OfflineDetector {
 
   private checkPromise: Promise<boolean> | null = null;
   private listeners: Set<(isOffline: boolean) => void> = new Set();
+  private intervalId: ReturnType<typeof setInterval> | null = null;
   /** Dev only: when true, report offline so you can test without cutting the network */
   private forceOffline = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
-      // Initialize with navigator.onLine
+      // Initial state; first check will run immediately via interval
       this.state.isOffline = !navigator.onLine;
-      
-      // Listen to online/offline events
+
       window.addEventListener('online', this.handleOnline);
       window.addEventListener('offline', this.handleOffline);
+
+      // Run connectivity check every 10 seconds (backend reachability)
+      this.checkConnectivity(true);
+      this.intervalId = setInterval(() => {
+        this.checkConnectivity(true);
+      }, CONNECTIVITY_CHECK_INTERVAL_MS);
     }
   }
 
@@ -97,71 +103,47 @@ class OfflineDetector {
   }
 
   /**
-   * Check network connectivity with actual network request
+   * Check connectivity by calling the backend URL. If the backend cannot be
+   * reached, we are considered offline.
    */
   private async checkConnectivity(force: boolean = false): Promise<boolean> {
-    // Return cached result if still valid and not forcing
-    const now = Date.now();
-    if (!force && (now - this.state.lastChecked) < CACHE_DURATION) {
-      return !this.state.isOffline;
-    }
-
-    // If already checking, return the existing promise
-    if (this.checkPromise) {
+    if (this.checkPromise && !force) {
       return this.checkPromise;
     }
 
-    // Start new connectivity check
     this.checkPromise = (async () => {
       this.state.isChecking = true;
 
       try {
-        // First check navigator.onLine (fast check)
+        if (this.forceOffline && isDevHost()) {
+          this.setState(true);
+          return false;
+        }
+
         if (!navigator.onLine) {
           this.setState(true);
           return false;
         }
 
-        // Perform actual network test with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), NETWORK_TEST_TIMEOUT);
+        const url = BACKEND_URL.replace(/\/$/, '');
 
         try {
-          const response = await fetch(NETWORK_TEST_URL, {
+          const response = await fetch(url, {
             method: 'HEAD',
             cache: 'no-cache',
             signal: controller.signal,
+            mode: 'cors',
           });
-
           clearTimeout(timeoutId);
-
-          // If we get any response (even 404), we're online
           const isOnline = response.status !== 0;
           this.setState(!isOnline);
           return isOnline;
-        } catch (error: any) {
+        } catch {
           clearTimeout(timeoutId);
-
-          // AbortError means timeout - treat as offline
-          if (error.name === 'AbortError') {
-            this.setState(true);
-            return false;
-          }
-
-          // Network errors mean offline
-          if (
-            error.message?.includes('Failed to fetch') ||
-            error.message?.includes('NetworkError') ||
-            error.code === 'ERR_NETWORK'
-          ) {
-            this.setState(true);
-            return false;
-          }
-
-          // Other errors might mean we're online but resource doesn't exist
-          // In that case, if navigator.onLine is true, assume we're online
-          this.setState(!navigator.onLine);
-          return navigator.onLine;
+          this.setState(true);
+          return false;
         }
       } finally {
         this.state.isChecking = false;
@@ -208,12 +190,16 @@ class OfflineDetector {
   }
 
   /**
-   * Cleanup - remove event listeners
+   * Cleanup - remove event listeners and stop periodic check
    */
   destroy() {
     if (typeof window !== 'undefined') {
       window.removeEventListener('online', this.handleOnline);
       window.removeEventListener('offline', this.handleOffline);
+      if (this.intervalId != null) {
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+      }
     }
     this.listeners.clear();
   }

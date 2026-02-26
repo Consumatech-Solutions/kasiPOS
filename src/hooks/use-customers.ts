@@ -2,6 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/customers';
+import { checkOfflineStatus } from '@/lib/offline-detector';
+import { getCustomersFromDexie, saveCustomersToDexie } from '@/lib/entity-cache';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
@@ -62,9 +64,17 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
+      const isOffline = await checkOfflineStatus();
+      if (isOffline) {
+        return getCustomersFromDexie(initialPage, initialLimit, searchQuery?.trim() || undefined);
+      }
       try {
         const response = await customersApi.getAll(Object.keys(params).length > 0 ? params : undefined);
-        return normalizeCustomerResponse(response.data);
+        const normalized = normalizeCustomerResponse(response.data);
+        if (normalized.data?.length) {
+          await saveCustomersToDexie(normalized.data);
+        }
+        return normalized;
       } catch (err: any) {
         // If 400 error, try without pagination parameters
         if (err?.response?.status === 400 && (params.page || params.limit)) {

@@ -7,10 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import type { StockAdjustmentReason, Product } from '@/types';
 import type { ApiProduct } from '@/types/catalogue';
-import { useProducts, useCategories } from '@/hooks/use-catalogue';
+import { useQueryClient } from '@tanstack/react-query';
+import { useProducts, useCategories, productKeys } from '@/hooks/use-catalogue';
 import { useStockAdjustments } from '@/hooks/use-stock-adjustments';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { executeMutation } from '@/lib/mutation-registry';
+import { updateProductStockInDexie } from '@/lib/entity-cache';
 import { stockAdjustmentsApi } from '@/lib/api/stock-adjustments';
 import { catalogueApi } from '@/lib/api/catalogue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,8 +44,9 @@ const reasons: StockAdjustmentReason[] = ['New stock received', 'Shrinkage', 'Da
 export default function InventoryPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
-  
+
   // Use API hooks for products and categories
   const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10);
   const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
@@ -122,27 +126,41 @@ export default function InventoryPage() {
 
         feedback.success('Stock updated', `Stock for ${selectedProduct.name} updated.`);
       } else {
-        // Offline: optimistically update stock in cache
-        const productQueryKeys = apiProducts.map((p: any) => ['products', 'list', { page: 1, limit: 10 }]);
-        // Update stock optimistically
-        // Note: The hook already does optimistic updates, but we queue the mutation
-        mutationQueue.add({
-          mutationKey: ['stockAdjustments', 'create'],
-          mutationFn: () => stockAdjustmentsApi.create({
-            productId: selectedProduct.id!,
-            newStock: values.newStock,
-            reason: values.reason as StockAdjustmentReason,
-            note: values.note,
-          }),
-          variables: {
-            productId: selectedProduct.id!,
-            newStock: values.newStock,
-            reason: values.reason,
-            note: values.note,
-          },
+        // Offline: apply new stock locally so other transactions (e.g. POS) see it
+        const productId = String(selectedProduct.id);
+        const newStock = values.newStock;
+
+        // 1. Update all product list queries in TanStack Query cache
+        const queriesData = queryClient.getQueriesData<{ data: { id?: string; stock?: number | null }[]; meta?: unknown }>({ queryKey: productKeys.lists() });
+        queriesData.forEach(([queryKey, data]) => {
+          if (data?.data && Array.isArray(data.data)) {
+            const updated = {
+              ...data,
+              data: data.data.map((p) =>
+                String(p.id) === productId ? { ...p, stock: newStock } : p
+              ),
+            };
+            queryClient.setQueryData(queryKey, updated);
+          }
         });
 
-        feedback.success('Queued', 'Stock adjustment queued. Will sync when online.');
+        // 2. Update Dexie productCache so POS and others see new stock after reload
+        await updateProductStockInDexie(productId, newStock);
+
+        // 3. Queue for sync when online
+        const variables = {
+          productId: selectedProduct.id!,
+          newStock: values.newStock,
+          reason: values.reason,
+          note: values.note,
+        };
+        mutationQueue.add({
+          mutationKey: ['stockAdjustments', 'create'],
+          mutationFn: () => executeMutation(['stockAdjustments', 'create'], variables),
+          variables,
+        });
+
+        feedback.success('Queued', 'Stock updated locally. Will sync when online.');
       }
       setAdjustmentDialogOpen(false);
       setSelectedProduct(null);

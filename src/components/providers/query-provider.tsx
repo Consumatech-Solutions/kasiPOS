@@ -1,8 +1,9 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { setupQueryPersistence } from '@/lib/query-persister';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createIDBPersister } from '@/lib/query-persister';
 import { mutationQueue } from '@/lib/mutation-queue';
 import { offlineDetector, isOffline } from '@/lib/offline-detector';
 
@@ -73,34 +74,26 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    // Setup persistence after mount
-    setupQueryPersistence(queryClient).catch((error) => {
-      console.error('Failed to setup query persistence:', error);
-    });
-    
-    // Setup mutation queue
     mutationQueue.setQueryClient(queryClient);
-
-    // Subscribe to offline status changes
-    // Note: networkMode: 'offlineFirst' already handles offline behavior for queries
-    const unsubscribe = offlineDetector.subscribe((isOffline) => {
-      if (!isOffline) {
-        // When coming back online:
-        // Resume any paused mutations
+    const unsubscribe = offlineDetector.subscribe((offline) => {
+      if (!offline) {
         queryClient.resumePausedMutations();
-        // Refetch active queries to get fresh data
         queryClient.refetchQueries();
       }
     });
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [queryClient]);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister: createIDBPersister(),
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        buster: 'v1',
+      }}
+    >
       {children}
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

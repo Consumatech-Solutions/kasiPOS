@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
+import ScannerDetector from 'js-scanner-detection';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Camera, ScanLine, Search } from 'lucide-react';
+import { Loader2, Camera, Keyboard, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DeviceSelector } from '@/components/device-selector';
 import { getStoredDevice, pollScanner, getDevices } from '@/lib/device-service';
@@ -17,11 +18,12 @@ interface BarcodeScannerProps {
   isOpen: boolean;
 }
 
-type ScanMode = 'camera' | 'device';
+type ScanMode = 'camera' | 'device' | 'keyboard';
 
 export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const keyboardScannerRef = useRef<ScannerDetector | null>(null);
   const [scanMode, setScanMode] = useState<ScanMode>('camera');
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +125,38 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
     return () => {
       pollingRef.current = false;
       setIsPolling(false);
+    };
+  }, [isOpen, scanMode, onScan, onClose]);
+
+  // Handle keyboard/USB scanner detection (js-scanner-detection)
+  useEffect(() => {
+    if (!isOpen || scanMode !== 'keyboard') {
+      if (keyboardScannerRef.current) {
+        keyboardScannerRef.current.stopScanning();
+        keyboardScannerRef.current = null;
+      }
+      return;
+    }
+    const detector = new ScannerDetector({
+      onComplete: (barcode: string) => {
+        if (keyboardScannerRef.current) {
+          keyboardScannerRef.current.stopScanning();
+          keyboardScannerRef.current = null;
+        }
+        onScan(barcode.trim());
+        onClose();
+      },
+      timeBeforeScanTest: 100,
+      avgTimeByChar: 30,
+      minLength: 6,
+      endChar: [9, 13],
+      stopPropagation: true,
+      preventDefault: true,
+    });
+    keyboardScannerRef.current = detector;
+    return () => {
+      detector.stopScanning();
+      keyboardScannerRef.current = null;
     };
   }, [isOpen, scanMode, onScan, onClose]);
 
@@ -279,11 +313,16 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
   return (
     <div className="space-y-4">
       <Tabs value={scanMode} onValueChange={(value) => setScanMode(value as ScanMode)}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="keyboard" className="flex items-center gap-2">
+            <Keyboard className="h-4 w-4" />
+            Auto
+          </TabsTrigger>
           <TabsTrigger value="camera" className="flex items-center gap-2">
             <Camera className="h-4 w-4" />
             Camera
           </TabsTrigger>
+         
           <TabsTrigger value="device" className="flex items-center gap-2">
             <Camera className="h-4 w-4" />
             Scanner Device
@@ -324,6 +363,19 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
               </AlertDescription>
             </Alert>
           )}
+        </TabsContent>
+
+        <TabsContent value="keyboard" className="space-y-4">
+          <div className="py-8 text-center">
+            <Keyboard className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-lg font-semibold mb-2">USB / keyboard scanner</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Connect a barcode scanner that types like a keyboard. Click below to focus this area, then scan a barcode. The scan is detected automatically and will not be typed into any field.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Detection uses fast key input; minimum 6 characters. Scan when this tab is active.
+            </p>
+          </div>
         </TabsContent>
 
         <TabsContent value="device" className="space-y-4">

@@ -14,17 +14,38 @@ self.addEventListener('unhandledrejection', (event) => {
   }
 });
 
-const CACHE_VERSION = 'kasipos-v3';
+const CACHE_VERSION = 'kasipos-v4';
 const CACHE_NAME = `kasipos-cache-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'kasipos-runtime-cache';
 const API_CACHE = 'kasipos-api-cache';
 
-// Assets to precache on install
-const PRECACHE_ASSETS = [
+// All page routes to precache (aligned with src/lib/page-routes.ts)
+const PRECACHE_PAGES = [
   '/',
-  '/manifest.json',
-  '/offline', // Offline fallback page (if exists)
+  '/catalogue',
+  '/customers',
+  '/inventory',
+  '/transactions',
+  '/vouchers',
+  '/reports',
+  '/settings',
+  '/profile',
+  '/buy-stock',
+  '/buy-stock/cart',
+  '/buy-stock/history',
+  '/marketplace',
+  '/marketplace/orders',
+  '/boph',
+  '/store-setup',
+  '/login',
+  '/request-access',
+  '/verify-code',
+  '/set-password',
+  '/offline',
 ];
+
+// Assets to precache on install (manifest + all pages)
+const PRECACHE_ASSETS = ['/manifest.json', ...PRECACHE_PAGES];
 
 // Cache strategies
 const CACHE_STRATEGIES = {
@@ -330,7 +351,24 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
+
+  if (event.data && event.data.type === 'PRECACHE_URLS' && Array.isArray(event.data.urls)) {
+    const urls = event.data.urls;
+    event.waitUntil(
+      caches.open(CACHE_NAME).then((cache) => {
+        return Promise.allSettled(
+          urls.map((url) =>
+            fetch(new Request(url, { cache: 'reload' }))
+              .then((res) => (res.ok ? cache.put(url, res) : Promise.resolve()))
+              .catch(() => Promise.resolve())
+          )
+        );
+      }).then(() => {
+        if (event.ports && event.ports[0]) event.ports[0].postMessage({ success: true });
+      })
+    );
+  }
+
   if (event.data && event.data.type === 'CLEAR_CACHE') {
     event.waitUntil(
       caches.keys().then((cacheNames) => {
@@ -338,7 +376,7 @@ self.addEventListener('message', (event) => {
           cacheNames.map((cacheName) => caches.delete(cacheName))
         );
       }).then(() => {
-        event.ports[0].postMessage({ success: true });
+        if (event.ports && event.ports[0]) event.ports[0].postMessage({ success: true });
       })
     );
   }

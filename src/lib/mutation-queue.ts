@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { offlineDetector, isOffline, checkOfflineStatus } from '@/lib/offline-detector';
 import { feedback, genLogId } from '@/lib/feedback';
 import { executeMutation } from '@/lib/mutation-registry';
+import { getDb } from '@/lib/db';
 
 export interface QueuedMutation {
   id: string;
@@ -30,7 +31,6 @@ type StatusChangeCallback = (status: SyncStatusData) => void;
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
-const STORAGE_KEY = 'kasipos-mutation-queue';
 
 class MutationQueue {
   private queue: QueuedMutation[] = [];
@@ -41,11 +41,11 @@ class MutationQueue {
   private currentStatus: SyncStatus = 'idle';
   private currentMutation: QueuedMutation | null = null;
   private preloadProgress: { completed: number; total: number } | undefined = undefined;
+  private restorePromise: Promise<void> | null = null;
 
   constructor() {
-    // Restore queue from localStorage on initialization
-    this.restoreQueue();
-    // Setup online listener
+    // Restore queue from Dexie (async)
+    this.restorePromise = this.restoreQueue();
     this.setupOnlineListener();
   }
 
@@ -131,69 +131,89 @@ class MutationQueue {
     }
   }
 
-  private restoreQueue() {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+  private async restoreQueue(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const db = getDb();
+      const records = await db.mutationQueue.orderBy('id').toArray();
+      if (records.length > 0) {
+        for (const m of records) {
+          const mutationKey = typeof m.mutationKey === 'string' ? JSON.parse(m.mutationKey) as string[] : m.mutationKey;
+          this.queue.push({
+            id: `mutation-${m.id ?? m.timestamp}-${Math.random()}`,
+            mutationKey,
+            variables: m.variables,
+            timestamp: m.timestamp,
+            retries: m.retries ?? 0,
+            status: 'pending',
+            mutationFn: () => executeMutation(mutationKey, m.variables),
+          });
+        }
+        console.log(`[MutationQueue] Restored ${records.length} queued mutations from Dexie`);
+        this.notifyStatusChange();
+      }
+      // Migration: if Dexie was empty, try legacy localStorage and migrate
+      if (records.length === 0 && typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('kasipos-mutation-queue');
         if (stored) {
-          const parsed = JSON.parse(stored) as Array<{
-            id: string;
-            mutationKey: string[];
-            variables: unknown;
-            timestamp: number;
-            retries: number;
-          }>;
+          const parsed = JSON.parse(stored) as Array<{ id: string; mutationKey: string[]; variables: unknown; timestamp: number; retries: number }>;
           if (Array.isArray(parsed) && parsed.length > 0) {
-            for (const m of parsed) {
-              this.queue.push({
-                id: m.id,
-                mutationKey: m.mutationKey,
-                variables: m.variables,
-                timestamp: m.timestamp,
-                retries: m.retries ?? 0,
-                status: 'pending',
-                mutationFn: () => executeMutation(m.mutationKey, m.variables),
-              });
-            }
-            console.log(`[MutationQueue] Restored ${parsed.length} queued mutations from previous session`);
-            this.notifyStatusChange();
+            await db.mutationQueue.bulkAdd(parsed.map(m => ({
+              mutationKey: JSON.stringify(m.mutationKey),
+              variables: m.variables,
+              timestamp: m.timestamp,
+              retries: m.retries ?? 0,
+              status: 'pending',
+            })));
+            localStorage.removeItem('kasipos-mutation-queue');
+            return this.restoreQueue();
           }
         }
-      } catch (error) {
-        console.error('[MutationQueue] Failed to restore queue:', error);
       }
+      // After restore, if online and we have items, process
+      const isOfflineStatus = await checkOfflineStatus();
+      if (!isOfflineStatus && this.queue.length > 0) {
+        this.processQueue();
+      }
+    } catch (error) {
+      console.error('[MutationQueue] Failed to restore queue:', error);
     }
   }
 
-  private persistQueue() {
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      try {
-        // Only persist metadata (we can't serialize functions)
-        const toStore = this.queue.map(m => ({
-          id: m.id,
-          mutationKey: m.mutationKey,
-          variables: m.variables,
-          timestamp: m.timestamp,
-          retries: m.retries,
-        }));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
-      } catch (error) {
-        console.error('[MutationQueue] Failed to persist queue:', error);
+  private async persistQueue(): Promise<void> {
+    if (typeof window === 'undefined') return;
+    try {
+      const db = getDb();
+      await db.mutationQueue.clear();
+      if (this.queue.length > 0) {
+        await db.mutationQueue.bulkAdd(
+          this.queue.map(m => ({
+            mutationKey: JSON.stringify(m.mutationKey),
+            variables: m.variables,
+            timestamp: m.timestamp,
+            retries: m.retries,
+            status: m.status ?? 'pending',
+          }))
+        );
       }
+    } catch (error) {
+      console.error('[MutationQueue] Failed to persist queue:', error);
     }
   }
 
   setQueryClient(queryClient: QueryClient) {
     this.queryClient = queryClient;
-    // Process queue when client is set and we're online (e.g. after reload with pending items)
-    if (typeof window !== 'undefined' && this.queue.length > 0) {
-      checkOfflineStatus(true).then((isOffline) => {
-        if (!isOffline) {
-          console.log('[MutationQueue] QueryClient set, processing restored queue');
-          this.processQueue();
-        }
-      });
-    }
+    if (typeof window === 'undefined') return;
+    this.restorePromise?.then(() => {
+      if (this.queue.length > 0) {
+        checkOfflineStatus(true).then((isOffline) => {
+          if (!isOffline) {
+            console.log('[MutationQueue] QueryClient set, processing restored queue');
+            this.processQueue();
+          }
+        });
+      }
+    });
   }
 
   add(mutation: Omit<QueuedMutation, 'id' | 'timestamp' | 'retries' | 'status'>) {
@@ -206,8 +226,8 @@ class MutationQueue {
     };
 
     this.queue.push(queuedMutation);
-    this.persistQueue();
-    
+    void this.persistQueue();
+
     // Update status if not preloading
     if (this.currentStatus !== 'preloading') {
       this.currentStatus = 'idle';
@@ -275,7 +295,7 @@ class MutationQueue {
         mutation.status = 'completed';
         this.queue.shift();
         this.currentMutation = null;
-        this.persistQueue();
+        await this.persistQueue();
         console.log(`[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join('/')}`);
         
         // Invalidate related queries to refresh data
@@ -326,7 +346,7 @@ class MutationQueue {
           );
           this.queue.shift();
           this.currentMutation = null;
-          this.persistQueue();
+          await this.persistQueue();
           this.notifyStatusChange();
         }
       }
@@ -349,7 +369,7 @@ class MutationQueue {
 
   clear() {
     this.queue = [];
-    this.persistQueue();
+    void this.persistQueue();
   }
 
   getPendingCount() {

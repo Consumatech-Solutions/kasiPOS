@@ -2,6 +2,8 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { transactionsApi, type GetTransactionsParams, type CreateTransactionDto } from '@/lib/api/transactions';
+import { checkOfflineStatus } from '@/lib/offline-detector';
+import { getTransactionsFromDexie, saveTransactionsToDexie } from '@/lib/entity-cache';
 import type { Transaction } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
@@ -54,8 +56,16 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
+      const isOffline = await checkOfflineStatus();
+      if (isOffline) {
+        return getTransactionsFromDexie(params.page ?? 1, params.limit ?? 10);
+      }
       const response = await transactionsApi.getAll(params);
-      return normalizeTransactionResponse(response.data);
+      const normalized = normalizeTransactionResponse(response.data);
+      if (normalized.data?.length) {
+        await saveTransactionsToDexie(normalized.data);
+      }
+      return normalized;
     },
     enabled: true, // Always enabled - we'll control loading via refetch
   });

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogueApi } from '@/lib/api/catalogue';
+import { checkOfflineStatus } from '@/lib/offline-detector';
+import { getProductsFromDexie, saveProductsToDexie } from '@/lib/entity-cache';
 import type { ApiCategory, ApiProduct, CreateCategoryDto, UpdateCategoryDto, CreateProductDto, UpdateProductDto } from '@/types/catalogue';
 import type { PaginationMeta, PaginationParams } from '@/types/pagination';
 
@@ -191,8 +193,16 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
   const query = useQuery({
     queryKey,
     queryFn: async () => {
+      const isOffline = await checkOfflineStatus();
+      if (isOffline) {
+        return getProductsFromDexie(currentPage, initialLimit);
+      }
       const response = await catalogueApi.products.getAll({ page: currentPage, limit: initialLimit, ...filters });
-      return normalizeResponse(response);
+      const normalized = normalizeResponse(response);
+      if (normalized.data?.length) {
+        await saveProductsToDexie(normalized.data);
+      }
+      return normalized;
     },
     staleTime: 0, // Always consider data stale to refetch on navigation
     refetchOnMount: 'always', // Always refetch when component mounts
