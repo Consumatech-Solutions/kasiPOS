@@ -7,9 +7,11 @@ import * as z from 'zod';
 import type { Product } from '@/types';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import { feedback } from '@/lib/feedback';
-import { useCategories, useProducts } from '@/hooks/use-catalogue';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCategories, useProducts, productKeys } from '@/hooks/use-catalogue';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { executeMutation } from '@/lib/mutation-registry';
 import { catalogueApi } from '@/lib/api/catalogue';
 
 import { Button } from '@/components/ui/button';
@@ -56,6 +58,7 @@ const productSchema = z.object({
 
 
 export default function CataloguePage() {
+  const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
 
   // Dialog states
@@ -249,28 +252,44 @@ export default function CataloguePage() {
           feedback.success('Product added', 'Product added successfully.');
           refreshProducts();
         } else {
-          // Offline: queue mutation (optimistic update already done by hook)
+          // Offline: optimistic update with temp id, then queue for sync (no custom mutationFn - registry will run on restore)
+          const tempId = `temp-${Date.now()}`;
+          const optimisticProduct = {
+            id: tempId,
+            name: productData.name,
+            price: productData.price,
+            costPrice: productData.costPrice,
+            stock: productData.stock ?? null,
+            barCode: productData.barCode ?? null,
+            productImage: productData.imageUrl ?? null,
+            categoryId: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          queryClient.setQueryData(productKeys.lists(), (old: { data: any[]; meta: any } | undefined) => {
+            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+            return {
+              ...old,
+              data: [optimisticProduct, ...old.data],
+              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
+            };
+          });
+          queryClient.setQueryData(productKeys.list({ page: 1, limit: 10 }), (old: { data: any[]; meta: any } | undefined) => {
+            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+            return {
+              ...old,
+              data: [optimisticProduct, ...old.data],
+              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
+            };
+          });
+          const { getDb } = await import('@/lib/db');
+          await getDb().productCache.put({ ...optimisticProduct, createdAt: optimisticProduct.createdAt });
           mutationQueue.add({
             mutationKey: ['products', 'create'],
-            mutationFn: async () => {
-              // Resolve category name to ID
-              const categoriesResp = await catalogueApi.categories.getAll();
-              const categories = 'data' in categoriesResp ? categoriesResp.data : (categoriesResp as any[]);
-              const category = categories.find((c: any) => c.name === productData.category);
-              if (!category) throw new Error(`Category "${productData.category}" not found`);
-              return catalogueApi.products.create({
-                name: productData.name,
-                price: productData.price,
-                costPrice: productData.costPrice,
-                stock: productData.stock,
-                barCode: productData.barCode,
-                productImage: productData.imageUrl,
-                categoryId: category.id,
-              });
-            },
-            variables: productData,
+            mutationFn: () => executeMutation(['products', 'create'], { ...productData, _tempId: tempId }),
+            variables: { ...productData, _tempId: tempId },
           });
-          feedback.success('Queued', 'Product queued. Will sync when online.');
+          feedback.success('Queued', 'Product added. Will sync when online.');
         }
       }
       setProductDialogOpen(false);

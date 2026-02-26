@@ -6,6 +6,7 @@ import { catalogueApi } from '@/lib/api/catalogue';
 import { customersApi } from '@/lib/api/customers';
 import { vouchersApi } from '@/lib/api/vouchers';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { saveProductsToDexie, saveCustomersToDexie } from '@/lib/entity-cache';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
 import { checkOfflineStatus } from '@/lib/offline-detector';
@@ -120,7 +121,7 @@ async function verifyServiceWorkerCache(maxRetries: number = 5, retryDelay: numb
     '/offline', // Offline fallback page (if exists)
   ];
 
-  const CACHE_NAME = 'kasipos-cache-v3'; // Must match CACHE_NAME in sw.js
+  const CACHE_NAME = 'kasipos-cache-kasipos-v4'; // Must match CACHE_NAME in sw.js
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -293,28 +294,38 @@ export function DataPreloader() {
       };
 
       /**
-       * Preload a single page by fetching it
-       * The service worker will automatically cache it
+       * Preload a single page by loading it in a hidden iframe.
+       * This triggers the browser to request the document and all its script/style chunks,
+       * which the service worker will cache for full offline support.
        */
       async function preloadPage(route: string): Promise<void> {
-        try {
-          // Fetch the page - service worker will cache it automatically
-          const response = await fetch(route, {
-            method: 'GET',
-            cache: 'default', // Let service worker handle caching
-          });
-          
-          if (response.ok) {
-            // Read the response to ensure it's fully loaded
-            await response.text();
-            console.log(`[DataPreloader] Preloaded page: ${route}`);
-          } else {
-            console.warn(`[DataPreloader] Failed to preload page ${route}: ${response.status}`);
-          }
-        } catch (error) {
-          console.warn(`[DataPreloader] Error preloading page ${route}:`, error);
-          // Continue even if one page fails
-        }
+        const timeout = 10000; // 10s max per page
+        return new Promise((resolve) => {
+          const iframe = document.createElement('iframe');
+          iframe.setAttribute('aria-hidden', 'true');
+          iframe.style.position = 'absolute';
+          iframe.style.width = '0';
+          iframe.style.height = '0';
+          iframe.style.border = 'none';
+          iframe.style.visibility = 'hidden';
+          iframe.style.pointerEvents = 'none';
+          const done = () => {
+            try {
+              if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+            } catch {
+              // ignore
+            }
+            resolve();
+          };
+          const t = setTimeout(done, timeout);
+          iframe.onload = () => {
+            clearTimeout(t);
+            setTimeout(done, 500); // Allow subresources to be requested
+          };
+          iframe.onerror = done;
+          iframe.src = route;
+          document.body.appendChild(iframe);
+        });
       }
 
       /**
@@ -337,20 +348,15 @@ export function DataPreloader() {
         }
       }
 
-    // Prefetch products (first 100 for POS)
+    // Prefetch products (first 100 for POS) and persist to Dexie
     queryClient.prefetchQuery({
       queryKey: productKeys.list({ page: 1, limit: 100 }),
       queryFn: async () => {
         const response = await catalogueApi.products.getAll({ page: 1, limit: 100 });
-        // Normalize response to always have data/meta structure
-        if ('data' in response && 'meta' in response) {
-          return response;
-        }
-        const data = Array.isArray(response) ? response : [];
-        return {
-          data,
-          meta: { total: data.length, page: 1, limit: 100, totalPages: 1 },
-        };
+        const data = 'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
+        const meta = 'meta' in response && response.meta ? response.meta : { total: data.length, page: 1, limit: 100, totalPages: 1 };
+        if (data.length) await saveProductsToDexie(data);
+        return { data, meta };
       },
       staleTime: 30 * 60 * 1000, // 30 minutes
     }).then(() => updateProgress()).catch(() => updateProgress());
@@ -373,21 +379,16 @@ export function DataPreloader() {
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // Prefetch recent customers
+    // Prefetch recent customers and persist to Dexie
     queryClient.prefetchQuery({
       queryKey: customerKeys.list({ page: 1, limit: 50 }),
       queryFn: async () => {
         const response = await customersApi.getAll({ page: 1, limit: 50 });
         const responseData = response.data;
-        // Normalize response
-        if (responseData && 'data' in responseData && 'meta' in responseData) {
-          return responseData;
-        }
-        const data = Array.isArray(responseData) ? responseData : [];
-        return {
-          data,
-          meta: { total: data.length, page: 1, limit: 50, totalPages: 1 },
-        };
+        const data = responseData && 'data' in responseData ? responseData.data : Array.isArray(responseData) ? responseData : [];
+        const meta = responseData && 'meta' in responseData ? responseData.meta : { total: data.length, page: 1, limit: 50, totalPages: 1 };
+        if (data.length) await saveCustomersToDexie(data);
+        return { data, meta };
       },
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
@@ -411,13 +412,15 @@ export function DataPreloader() {
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // After all data queries complete, preload pages
-    // Wait a bit for data queries to start, then begin page preloading
+    // After all data queries complete, preload pages (iframe loads full assets), then tell SW to precache URLs
     setTimeout(async () => {
       if (pagesToPreload.length > 0) {
-        console.log(`[DataPreloader] Starting to preload ${pagesToPreload.length} pages...`);
-        await preloadPagesInBatches(pagesToPreload, 3);
+        console.log(`[DataPreloader] Starting to preload ${pagesToPreload.length} pages (iframe)...`);
+        await preloadPagesInBatches(pagesToPreload, 2);
         console.log('[DataPreloader] All pages preloaded');
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'PRECACHE_URLS', urls: pagesToPreload });
+        }
       }
     }, 1000); // Small delay to let data queries start first
     }

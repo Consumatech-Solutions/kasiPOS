@@ -313,10 +313,10 @@ export default function SettingsPage() {
         await Promise.all(registrations.map(reg => reg.unregister()));
       }
 
-      // Clear IndexedDB query cache
+      // Clear Dexie query cache
       try {
-        const { del } = await import('idb-keyval');
-        await del('REACT_QUERY_OFFLINE_CACHE');
+        const { getDb } = await import('@/lib/db');
+        await getDb().keyVal.delete('REACT_QUERY_OFFLINE_CACHE');
       } catch (e) {
         console.warn('Failed to clear query cache:', e);
       }

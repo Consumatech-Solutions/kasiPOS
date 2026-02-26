@@ -1,8 +1,8 @@
 /**
  * Registry to re-execute queued mutations after page reload.
- * Maps mutationKey + variables to the actual API call (mutationFn cannot be serialized to localStorage).
+ * Maps mutationKey + variables to the actual API call (mutationFn cannot be serialized to Dexie).
  */
-import { transactionsApi, toCreateTransactionDto } from '@/lib/api/transactions';
+import { transactionsApi, toCreateTransactionDto, type CreateTransactionDto, type CreateTransactionItemDto } from '@/lib/api/transactions';
 import { catalogueApi } from '@/lib/api/catalogue';
 import type { ApiCategory } from '@/types/catalogue';
 import { customersApi } from '@/lib/api/customers';
@@ -11,6 +11,7 @@ import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
 import { vouchersApi } from '@/lib/api/vouchers';
 import { parcelsApi } from '@/lib/api/parcels';
 import { usersApi } from '@/lib/api/users';
+import { getDb } from '@/lib/db';
 
 const DELIVERY_FEE = 150;
 
@@ -45,16 +46,40 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
 
   switch (`${type}/${action}`) {
     case 'transactions/create': {
-      return transactionsApi.create(toCreateTransactionDto(variables as Parameters<typeof toCreateTransactionDto>[0]));
+      const raw = variables as Parameters<typeof toCreateTransactionDto>[0] & { items?: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string }> };
+      const mappings = await getDb().syncIdMapping.toArray();
+      const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
+      const resolvedItems: CreateTransactionItemDto[] | undefined = raw.items?.map((item) => ({
+        productId: map.get(String(item.productId)) ?? String(item.productId),
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        ...(item.imageUrl != null && { imageUrl: item.imageUrl }),
+      }));
+      const resolved = resolvedItems ? { ...raw, items: resolvedItems } : raw;
+      const dto = toCreateTransactionDto(resolved as Parameters<typeof toCreateTransactionDto>[0]);
+      // Cast: toCreateTransactionDto return type can be inferred as unknown[] for items by TS in some configs
+      return transactionsApi.create(dto as unknown as CreateTransactionDto);
     }
 
     case 'products/create': {
-      const productData = variables as Record<string, unknown>;
+      const productData = { ...(variables as Record<string, unknown>) };
+      const _tempId = productData._tempId as string | undefined;
+      delete productData._tempId;
       const categoryId = productData.categoryId ?? (await resolveCategoryId(String(productData.category ?? '')));
-      return catalogueApi.products.create({
+      const result = await catalogueApi.products.create({
         ...normalizeProductPayload(productData),
         categoryId,
       } as Parameters<typeof catalogueApi.products.create>[0]);
+      if (_tempId && result?.id) {
+        await getDb().syncIdMapping.put({
+          tempId: _tempId,
+          serverId: String(result.id),
+          createdAt: Date.now(),
+        });
+      }
+      return result;
     }
 
     case 'products/update': {
@@ -116,6 +141,11 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
         total: v.total,
         deliveryMethod: v.deliveryMethod,
       });
+    }
+
+    case 'purchaseOrders/updateStatus': {
+      const v = variables as { id: string; status: 'pending' | 'completed' | 'cancelled' };
+      return purchaseOrdersApi.updateStatus(v.id, { status: v.status });
     }
 
     case 'vouchers/create':

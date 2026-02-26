@@ -345,7 +345,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl md:min-w-[800px] min-w-[90vw]">
           {renderContent()}
         </DialogContent>
       </Dialog>

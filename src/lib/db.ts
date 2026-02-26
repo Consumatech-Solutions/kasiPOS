@@ -24,6 +24,38 @@ export interface StoreRecord extends Store {
   lastSyncedAt?: string;
 }
 
+export interface KeyValRecord {
+  key: string;
+  value: string;
+}
+
+export interface MutationQueueRecord {
+  id?: number;
+  mutationKey: string; // JSON string of string[]
+  variables: unknown;
+  timestamp: number;
+  retries: number;
+  status?: string;
+}
+
+export interface SyncIdMappingRecord {
+  tempId: string;
+  serverId: string;
+  createdAt?: number;
+}
+
+export interface ProductCacheRecord {
+  id: string;
+  [key: string]: unknown;
+  createdAt?: string;
+}
+
+export interface TransactionCacheRecord {
+  id: string;
+  [key: string]: unknown;
+  date?: string;
+}
+
 export class KasiPosDexie extends Dexie {
   stores!: Table<StoreRecord>;
   products!: Table<Product>;
@@ -36,9 +68,48 @@ export class KasiPosDexie extends Dexie {
   purchaseOrders!: Table<PurchaseOrder>;
   users!: Table<User>;
   productImages!: Table<ProductImageRecord>;
+  keyVal!: Table<KeyValRecord>;
+  mutationQueue!: Table<MutationQueueRecord>;
+  syncIdMapping!: Table<SyncIdMappingRecord>;
+  productCache!: Table<ProductCacheRecord>;
+  transactionCache!: Table<TransactionCacheRecord>;
 
   constructor() {
     super('kasiPosDatabase');
+    this.version(15).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt, storeId',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name, storeId',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+      keyVal: 'key',
+      mutationQueue: '++id, timestamp',
+      syncIdMapping: 'tempId, createdAt',
+      productCache: 'id, createdAt',
+      transactionCache: 'id, date',
+    });
+    this.version(14).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt, storeId',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name, storeId',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+      keyVal: 'key',
+      mutationQueue: '++id, timestamp',
+      syncIdMapping: 'tempId, createdAt',
+    });
     this.version(13).stores({
       stores: '++id, name, ownerId',
       products: '++id, name, category, barcode, storeId',
