@@ -219,6 +219,7 @@ export default function PosPage() {
   };
 
   const [isCompletingSale, setIsCompletingSale] = useState(false);
+  
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
     if (isCompletingSale) return;
@@ -638,11 +639,11 @@ export default function PosPage() {
                         </ScrollArea>
                     </DialogContent>
                 </Dialog>
-                <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={handleOpenVoucherModal}>
+                {settings?.campaigns &&<Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={handleOpenVoucherModal}>
                     <Ticket className="mr-1 sm:mr-2 h-4 w-4"/>
                     <span className="hidden sm:inline">Redeem Voucher</span>
                     <span className="sm:hidden">Voucher</span>
-                </Button>
+                </Button>}
             </div>
         </div>
 
