@@ -21,9 +21,9 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 const defaultSettings: AppSettings = {
   theme: 'light',
   language: 'en',
-  campaigns: true,
-  marketplace: true,
-  boph: true,
+  campaigns: false,
+  marketplace: false,
+  boph: false,
   showVatInCheckout: true,
   isLoggedIn: false,
   currentUser: null,
@@ -43,13 +43,18 @@ function getInitialSettings(): AppSettings {
     
     // We only keep theme from settings and currentUser from its own key
     // Store will be loaded from IndexedDB in useEffect if not in localStorage
-    return { 
-        ...defaultSettings, 
-        theme: storedSettings.theme || 'light', 
+    const currentStore = storedSettings.currentStore || null;
+    const modules = currentStore?.enabledModules;
+    return {
+        ...defaultSettings,
+        theme: storedSettings.theme || 'light',
         showVatInCheckout: storedSettings.showVatInCheckout !== false,
         currentUser,
-        currentStore: storedSettings.currentStore || null,
-        isLoggedIn: !!currentUser
+        currentStore,
+        isLoggedIn: !!currentUser,
+        campaigns: modules?.campaigns ?? defaultSettings.campaigns,
+        marketplace: modules?.marketplace ?? defaultSettings.marketplace,
+        boph: modules?.boph ?? defaultSettings.boph,
     };
   } catch (error) {
     console.error('Error reading settings from localStorage', error);
@@ -72,6 +77,21 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setSetting = useCallback(<K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // Sync store.enabledModules into settings when currentStore changes (from API or IndexedDB)
+  useEffect(() => {
+    const store = settings.currentStore;
+    const modules = store?.enabledModules;
+    if (!modules) return;
+    setSettings((prev) => {
+      if (prev.currentStore?.id !== store?.id) return prev;
+      const campaigns = modules.campaigns ?? prev.campaigns;
+      const marketplace = modules.marketplace ?? prev.marketplace;
+      const boph = modules.boph ?? prev.boph;
+      if (prev.campaigns === campaigns && prev.marketplace === marketplace && prev.boph === boph) return prev;
+      return { ...prev, campaigns, marketplace, boph };
+    });
+  }, [settings.currentStore?.id, settings.currentStore?.enabledModules]);
 
   // Load store from IndexedDB on initial load if not in localStorage
   useEffect(() => {
@@ -169,10 +189,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 // 2. Fetch Store if user has a storeId and save permanently
-                if (freshUser?.storeId && storesApi?.getMyStore) {
+                if (freshUser?.storeId) {
                      try {
                         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
                         const store = await fetchAndSaveStore(setSetting);
+                        console.log('[SettingsProvider] Fetched store:', store);
                         if (store) {
                             setSetting('currentStore', store);
                         }
@@ -185,7 +206,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                             console.warn('Failed to fetch store:', error);
                         }
                      }
-                } else if (!settings.currentStore && storesApi?.getMyStore) {
+                } else if (!settings.currentStore) {
                      try {
                         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
                         const store = await fetchAndSaveStore(setSetting);

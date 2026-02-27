@@ -1,4 +1,12 @@
 
+/** Store-level feature flags; used for nav and settings. */
+export interface StoreEnabledModules {
+  boph?: boolean;
+  campaigns?: boolean;
+  groupbuying?: boolean;
+  marketplace?: boolean;
+}
+
 export interface Store {
   /** Store ID: UUID (string) from backend. */
   id: string;
@@ -9,6 +17,8 @@ export interface Store {
   receiptFooter: string | null;
   isSetupComplete: boolean;
   ownerId: string;
+  /** Feature flags for this store; drives nav and settings. */
+  enabledModules?: StoreEnabledModules;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +37,7 @@ export interface UpdateStoreDto {
   receiptHeader?: string;
   receiptFooter?: string;
   isSetupComplete?: boolean;
+  enabledModules?: StoreEnabledModules;
 }
 
 export interface Product {

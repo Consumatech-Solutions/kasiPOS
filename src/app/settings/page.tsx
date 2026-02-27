@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
 import { usersApi } from '@/lib/api';
+import { storesApi } from '@/lib/api/stores';
+import { saveStorePermanently } from '@/lib/store-persistence';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
@@ -53,7 +55,8 @@ export default function SettingsPage() {
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
-  
+  const [isUpdatingModules, setIsUpdatingModules] = useState(false);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   
@@ -130,19 +133,44 @@ export default function SettingsPage() {
     defaultValues: { password: '', confirmPassword: '' },
   });
 
+  const updateStoreModule = async (feature: Feature, enabled: boolean) => {
+    const store = settings.currentStore;
+    if (!store?.id) {
+      setSetting(feature, enabled);
+      return;
+    }
+    setIsUpdatingModules(true);
+    try {
+      const nextModules = { ...store.enabledModules, [feature]: enabled };
+      const response = await storesApi.update(store.id, { enabledModules: nextModules });
+      if (response?.data) {
+        setSetting('currentStore', response.data);
+        await saveStorePermanently(response.data, setSetting);
+      } else {
+        setSetting(feature, enabled);
+      }
+    } catch (err: any) {
+      console.error('Failed to update store modules:', err);
+      feedback.error('Update failed', err?.message ?? 'Could not update feature. Try again.');
+      setSetting(feature, !enabled); // revert local state
+    } finally {
+      setIsUpdatingModules(false);
+    }
+  };
+
   const handleToggle = (feature: Feature, checked: boolean) => {
     if (checked) {
       setUserDialogOpen(false);
       setSelectedFeature(feature);
       setModalOpen(true);
     } else {
-      setSetting(feature, false);
+      updateStoreModule(feature, false);
     }
   };
-  
-  const handleConfirm = () => {
+
+  const handleConfirm = async () => {
     if (selectedFeature) {
-      setSetting(selectedFeature, true);
+      await updateStoreModule(selectedFeature, true);
     }
     setModalOpen(false);
     setSelectedFeature(null);
@@ -436,6 +464,7 @@ export default function SettingsPage() {
                   id="campaigns-toggle"
                   checked={settings.campaigns}
                   onCheckedChange={(checked) => handleToggle('campaigns', checked)}
+                  disabled={isUpdatingModules}
                   />
               </div>
 
@@ -448,6 +477,7 @@ export default function SettingsPage() {
                   id="marketplace-toggle"
                   checked={settings.marketplace}
                   onCheckedChange={(checked) => handleToggle('marketplace', checked)}
+                  disabled={isUpdatingModules}
                   />
               </div>
 
@@ -460,6 +490,7 @@ export default function SettingsPage() {
                   id="boph-toggle"
                   checked={settings.boph}
                   onCheckedChange={(checked) => handleToggle('boph', checked)}
+                  disabled={isUpdatingModules}
                   />
               </div>
 
