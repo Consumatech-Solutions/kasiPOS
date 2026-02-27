@@ -4,7 +4,7 @@ export type DeviceType = 'printer' | 'scanner' | 'reader';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected';
 
-export type ModalStep = 'searching' | 'found' | 'connecting' | 'success' | 'error';
+export type ModalStep = 'choice' | 'searching' | 'found' | 'connecting' | 'success' | 'error';
 
 export interface HardwareDevice {
   id: DeviceType;
