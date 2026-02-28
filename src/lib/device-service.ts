@@ -17,6 +17,8 @@ import {
   isWebHIDAvailable,
   type WebHIDDevice,
 } from './webhid-scanner';
+import { getQzPrinters, printViaQz } from './qz-tray';
+import { isAndroid } from './platform';
 
 const PRINTER_SERVER_URL = 'http://localhost:7788';
 
@@ -24,7 +26,7 @@ export interface Device {
   id: string;
   type: 'printer' | 'scanner' | 'pos';
   connection: 'usb' | 'bluetooth' | 'serial';
-  connectionType: 'webusb' | 'webhid' | 'server';
+  connectionType: 'webusb' | 'webhid' | 'server' | 'qz';
   name: string;
   vendorId?: number;
   productId?: number;
@@ -66,6 +68,54 @@ const STORAGE_KEYS = {
 } as const;
 
 const CONNECTION_TYPE_KEY = 'kasiPOS_deviceConnectionType';
+const PRINTER_MODE_KEY = 'kasiPOS_printerMode';
+
+export type PrinterMode = 'thermal' | 'browser';
+
+/**
+ * Get stored printer mode (thermal or browser). Defaults to 'thermal' if unset.
+ */
+export function getPrinterMode(): PrinterMode {
+  if (typeof window === 'undefined') return 'thermal';
+  const stored = localStorage.getItem(PRINTER_MODE_KEY);
+  if (stored === 'thermal' || stored === 'browser') return stored;
+  return 'thermal';
+}
+
+/**
+ * Persist the user's printer mode so it is remembered across sessions.
+ */
+export function setPrinterMode(mode: PrinterMode): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PRINTER_MODE_KEY, mode);
+}
+
+/**
+ * Build minimal ESC/POS test payload for onboarding test print.
+ * Sends "KasiPOS test" and a cut so we can verify the printer works.
+ */
+export function buildTestPrintPayload(): Uint8Array {
+  // ESC @ = Initialize printer
+  // ESC a 1 = Center alignment
+  // "KasiPOS test\n"
+  // ESC a 0 = Left alignment
+  // GS V 0 = Full cut
+  const text = 'KasiPOS test\n';
+  const encoder = new TextEncoder();
+  const textBytes = encoder.encode(text);
+  const init = new Uint8Array([0x1b, 0x40]);
+  const center = new Uint8Array([0x1b, 0x61, 0x01]);
+  const left = new Uint8Array([0x1b, 0x61, 0x00]);
+  const cut = new Uint8Array([0x1d, 0x56, 0x00]);
+  const out = new Uint8Array(init.length + center.length + textBytes.length + left.length + cut.length);
+  let off = 0;
+  out.set(init, off); off += init.length;
+  out.set(center, off); off += center.length;
+  out.set(textBytes, off); off += textBytes.length;
+  out.set(left, off); off += left.length;
+  out.set(cut, off);
+  return out;
+}
 
 /**
  * Check if printer-server is accessible
@@ -195,8 +245,23 @@ export async function getDevices(type?: 'printer' | 'scanner' | 'pos'): Promise<
 }
 
 /**
+ * Get printers from QZ Tray only (no WebUSB/server).
+ */
+export async function getQzDevices(): Promise<Device[]> {
+  const printers = await getQzPrinters();
+  return printers.map((p) => ({
+    id: p.id,
+    type: 'printer' as const,
+    connection: 'serial' as const,
+    connectionType: 'qz' as const,
+    name: p.name,
+    connected: false,
+  }));
+}
+
+/**
  * Print receipt data to a specific printer device
- * Uses WebUSB if device ID starts with 'webusb_', otherwise falls back to server API
+ * Routes to WebUSB, QZ Tray, or server API based on device ID prefix
  */
 export async function printReceipt(deviceId: string, data: Uint8Array): Promise<PrintResponse> {
   // Check if this is a WebUSB device
@@ -205,6 +270,23 @@ export async function printReceipt(deviceId: string, data: Uint8Array): Promise<
       throw new Error('WebUSB API is not available in this browser');
     }
     return await printToWebUSB(deviceId, data);
+  }
+
+  // Check if this is a QZ Tray device
+  if (deviceId.startsWith('qz_')) {
+    await printViaQz(deviceId, data);
+    return { success: true, message: 'Printed via QZ Tray' };
+  }
+
+  // Check if this is Android thermal (RawBT intent)
+  if (deviceId === 'thermal-android') {
+    if (!isAndroid()) {
+      throw new Error('Android thermal printing is only available on Android devices');
+    }
+    const base64 = btoa(String.fromCharCode(...data));
+    const intentUrl = `rawbt:base64,${base64}`;
+    window.location.href = intentUrl;
+    return { success: true, message: 'Printed via RawBT' };
   }
 
   // Fallback to server API
@@ -370,24 +452,25 @@ export function getStoredDevice(type: 'printer' | 'scanner' | 'pos'): string | n
 /**
  * Get stored device connection type from localStorage
  */
-export function getStoredDeviceConnectionType(type: 'printer' | 'scanner' | 'pos'): 'webusb' | 'webhid' | 'server' | null {
+export function getStoredDeviceConnectionType(type: 'printer' | 'scanner' | 'pos'): 'webusb' | 'webhid' | 'server' | 'qz' | null {
   if (typeof window === 'undefined') return null;
   const key = `${CONNECTION_TYPE_KEY}_${type}`;
   const stored = localStorage.getItem(key);
-  if (stored === 'webusb' || stored === 'webhid' || stored === 'server') {
+  if (stored === 'webusb' || stored === 'webhid' || stored === 'server' || stored === 'qz') {
     return stored;
   }
   // Infer from device ID if connection type not stored
   const deviceId = getStoredDevice(type);
   if (deviceId?.startsWith('webusb_')) return 'webusb';
   if (deviceId?.startsWith('webhid_')) return 'webhid';
+  if (deviceId?.startsWith('qz_')) return 'qz';
   return 'server';
 }
 
 /**
  * Store device ID in localStorage
  */
-export function storeDevice(type: 'printer' | 'scanner' | 'pos', deviceId: string, connectionType?: 'webusb' | 'webhid' | 'server'): void {
+export function storeDevice(type: 'printer' | 'scanner' | 'pos', deviceId: string, connectionType?: 'webusb' | 'webhid' | 'server' | 'qz'): void {
   if (typeof window === 'undefined') return;
   const key = STORAGE_KEYS[type];
   localStorage.setItem(key, deviceId);
@@ -404,6 +487,9 @@ export function storeDevice(type: 'printer' | 'scanner' | 'pos', deviceId: strin
     } else if (deviceId.startsWith('webhid_')) {
       const typeKey = `${CONNECTION_TYPE_KEY}_${type}`;
       localStorage.setItem(typeKey, 'webhid');
+    } else if (deviceId.startsWith('qz_')) {
+      const typeKey = `${CONNECTION_TYPE_KEY}_${type}`;
+      localStorage.setItem(typeKey, 'qz');
     } else {
       const typeKey = `${CONNECTION_TYPE_KEY}_${type}`;
       localStorage.setItem(typeKey, 'server');
@@ -412,7 +498,8 @@ export function storeDevice(type: 'printer' | 'scanner' | 'pos', deviceId: strin
 }
 
 /**
- * Clear stored device ID from localStorage
+ * Clear stored device ID from localStorage.
+ * For printer, also clears printer mode so next visit can choose again.
  */
 export function clearStoredDevice(type: 'printer' | 'scanner' | 'pos'): void {
   if (typeof window === 'undefined') return;
@@ -420,5 +507,8 @@ export function clearStoredDevice(type: 'printer' | 'scanner' | 'pos'): void {
   localStorage.removeItem(key);
   const typeKey = `${CONNECTION_TYPE_KEY}_${type}`;
   localStorage.removeItem(typeKey);
+  if (type === 'printer') {
+    localStorage.removeItem(PRINTER_MODE_KEY);
+  }
 }
 

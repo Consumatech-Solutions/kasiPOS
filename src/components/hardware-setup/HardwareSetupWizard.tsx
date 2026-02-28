@@ -5,7 +5,8 @@ import { Printer, ScanBarcode, CreditCard } from 'lucide-react';
 import { HardwareDevice, ConnectionStatus } from './types';
 import { DeviceCard } from './DeviceCard';
 import { ConnectionModal } from './ConnectionModal';
-import { getStoredDevice } from '@/lib/device-service';
+import { PrinterSetupModal } from './PrinterSetupModal';
+import { getStoredDevice, getPrinterMode } from '@/lib/device-service';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -37,23 +38,30 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({ onComp
   const [selectedDevice, setSelectedDevice] = useState<HardwareDevice | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Check stored devices on mount and update status
+  // Check stored devices on mount and update status.
+  // Printer is considered connected if we have a stored device ID or user chose browser print.
   useEffect(() => {
     const checkStoredDevices = () => {
       const updatedDevices = INITIAL_DEVICES.map(device => {
-        const storedDeviceId = getStoredDevice(
-          device.id === 'printer' ? 'printer' : 
-          device.id === 'scanner' ? 'scanner' : 
-          'pos'
-        );
-        
+        const serviceType = device.id === 'printer' ? 'printer' : device.id === 'scanner' ? 'scanner' : 'pos';
+        const storedDeviceId = getStoredDevice(serviceType);
+        const isPrinterConnected =
+          device.id === 'printer' && (!!storedDeviceId || getPrinterMode() === 'browser');
+        const isConnected =
+          device.id === 'printer' ? isPrinterConnected : !!storedDeviceId;
+
+        const deviceId =
+          device.id === 'printer'
+            ? storedDeviceId || (getPrinterMode() === 'browser' ? 'browser' : undefined)
+            : storedDeviceId || undefined;
+
         return {
           ...device,
-          status: (storedDeviceId ? 'connected' : 'disconnected') as ConnectionStatus,
-          deviceId: storedDeviceId || undefined,
+          status: (isConnected ? 'connected' : 'disconnected') as ConnectionStatus,
+          deviceId,
         };
       });
-      
+
       setDevices(updatedDevices);
     };
 
@@ -148,8 +156,17 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({ onComp
         </p>
       </div>
 
-      {/* Connection Modal */}
-      {selectedDevice && (
+      {/* Connection Modal - Printer uses PrinterSetupModal, others use ConnectionModal */}
+      {selectedDevice?.id === 'printer' ? (
+        <PrinterSetupModal
+          open={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedDevice(null);
+          }}
+          onSuccess={(deviceId) => handleConnectSuccess(deviceId, 'printer')}
+        />
+      ) : selectedDevice ? (
         <ConnectionModal
           device={selectedDevice}
           isOpen={isModalOpen}
@@ -159,7 +176,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({ onComp
           }}
           onConnect={handleConnectSuccess}
         />
-      )}
+      ) : null}
     </div>
   );
 };

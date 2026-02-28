@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
 import { usersApi } from '@/lib/api';
+import { storesApi } from '@/lib/api/stores';
+import { saveStorePermanently } from '@/lib/store-persistence';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
@@ -25,7 +27,7 @@ import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { mutationQueue } from '@/lib/mutation-queue';
 
-type Feature = 'campaigns' | 'marketplace' | 'boph';
+type Feature = 'campaigns' | 'marketplace' | 'boph' | 'buyStock';
 
 const userManagementSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -53,7 +55,8 @@ export default function SettingsPage() {
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
-  
+  const [isUpdatingModules, setIsUpdatingModules] = useState(false);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   
@@ -130,19 +133,69 @@ export default function SettingsPage() {
     defaultValues: { password: '', confirmPassword: '' },
   });
 
+  const updateStoreModule = async (feature: Feature, enabled: boolean) => {
+    const store = settings.currentStore;
+    if (!store?.id) {
+      setSetting(feature, enabled);
+      return;
+    }
+    setIsUpdatingModules(true);
+    try {
+      const nextModules = { ...store.enabledModules, [feature]: enabled };
+      const response = await storesApi.update(store.id, { enabledModules: nextModules });
+      if (response?.data) {
+        setSetting('currentStore', response.data);
+        await saveStorePermanently(response.data, setSetting);
+      } else {
+        setSetting(feature, enabled);
+      }
+    } catch (err: any) {
+      console.error('Failed to update store modules:', err);
+      feedback.error('Update failed', err?.message ?? 'Could not update feature. Try again.');
+      setSetting(feature, !enabled); // revert local state
+    } finally {
+      setIsUpdatingModules(false);
+    }
+  };
+
+  const updateShowVatInCheckout = async (checked: boolean) => {
+    const store = settings.currentStore;
+    if (!store?.id) {
+      setSetting('showVatInCheckout', checked);
+      return;
+    }
+    setIsUpdatingModules(true);
+    try {
+      const nextModules = { ...store.enabledModules, showVatInCheckout: checked };
+      const response = await storesApi.update(store.id, { enabledModules: nextModules });
+      if (response?.data) {
+        setSetting('currentStore', response.data);
+        await saveStorePermanently(response.data, setSetting);
+      } else {
+        setSetting('showVatInCheckout', checked);
+      }
+    } catch (err: any) {
+      console.error('Failed to update showVatInCheckout:', err);
+      feedback.error('Update failed', err?.message ?? 'Could not update setting. Try again.');
+      setSetting('showVatInCheckout', !checked);
+    } finally {
+      setIsUpdatingModules(false);
+    }
+  };
+
   const handleToggle = (feature: Feature, checked: boolean) => {
     if (checked) {
       setUserDialogOpen(false);
       setSelectedFeature(feature);
       setModalOpen(true);
     } else {
-      setSetting(feature, false);
+      updateStoreModule(feature, false);
     }
   };
-  
-  const handleConfirm = () => {
+
+  const handleConfirm = async () => {
     if (selectedFeature) {
-      setSetting(selectedFeature, true);
+      await updateStoreModule(selectedFeature, true);
     }
     setModalOpen(false);
     setSelectedFeature(null);
@@ -155,9 +208,10 @@ export default function SettingsPage() {
 
   const getFeatureDetails = (feature: Feature | null) => {
     switch(feature) {
-      case 'campaigns': return { title: 'Opt-In to Campaigns', description: "Campaigns allow you to create and manage discount vouchers for your customers. By opting in, you'll be able to create percentage-based or fixed-amount discounts to drive sales." };
+      case 'campaigns': return { title: 'Opt-In to Campaigns', description: "Campaigns allow you to create and participate in loyalty and reward programmes." };
       case 'marketplace': return { title: 'Opt-In to Marketplace', description: "The Marketplace feature allows you to place orders from popular third-party online stores on behalf of your customers, earning a service fee for each order." };
       case 'boph': return { title: 'Opt-In to BOPH', description: "BOPH (Buy Online, Pickup Here) lets your store act as a pickup point for online orders. You'll manage incoming parcels and hand them off to customers, earning a fee for the service." };
+      case 'buyStock': return { title: 'Opt-In to Buy Stock', description: "Buy Stock lets you order inventory and manage purchase orders for your store." };
       default: return { title: '', description: '' };
     }
   }
@@ -429,13 +483,14 @@ export default function SettingsPage() {
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                  <Label htmlFor="campaigns-toggle" className="font-semibold">Voucher Campaigns</Label>
-                  <p className="text-sm text-muted-foreground">Enable to create and manage discount vouchers.</p>
+                  <Label htmlFor="campaigns-toggle" className="font-semibold">Campaigns</Label>
+                  <p className="text-sm text-muted-foreground">Enable to create and participate in loyalty and reward programmes.</p>
                   </div>
                   <Switch
                   id="campaigns-toggle"
                   checked={settings.campaigns}
                   onCheckedChange={(checked) => handleToggle('campaigns', checked)}
+                  disabled={isUpdatingModules}
                   />
               </div>
 
@@ -448,6 +503,7 @@ export default function SettingsPage() {
                   id="marketplace-toggle"
                   checked={settings.marketplace}
                   onCheckedChange={(checked) => handleToggle('marketplace', checked)}
+                  disabled={isUpdatingModules}
                   />
               </div>
 
@@ -460,6 +516,20 @@ export default function SettingsPage() {
                   id="boph-toggle"
                   checked={settings.boph}
                   onCheckedChange={(checked) => handleToggle('boph', checked)}
+                  disabled={isUpdatingModules}
+                  />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                  <Label htmlFor="buy-stock-toggle" className="font-semibold">Buy Stock</Label>
+                  <p className="text-sm text-muted-foreground">Enable ordering inventory and managing purchase orders.</p>
+                  </div>
+                  <Switch
+                  id="buy-stock-toggle"
+                  checked={settings.buyStock}
+                  onCheckedChange={(checked) => handleToggle('buyStock', checked)}
+                  disabled={isUpdatingModules}
                   />
               </div>
 
@@ -477,7 +547,8 @@ export default function SettingsPage() {
                     <Switch
                       id="show-vat-toggle"
                       checked={settings.showVatInCheckout !== false}
-                      onCheckedChange={(checked) => setSetting('showVatInCheckout', checked)}
+                      onCheckedChange={(checked) => updateShowVatInCheckout(checked)}
+                      disabled={isUpdatingModules}
                     />
                   </div>
                 </>
