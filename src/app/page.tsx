@@ -219,6 +219,7 @@ export default function PosPage() {
   };
 
   const [isCompletingSale, setIsCompletingSale] = useState(false);
+  
 
   const handleCompleteSale = async (transactionDetails: Omit<Transaction, 'id' | 'date' | 'storeId'>) => {
     if (isCompletingSale) return;
@@ -404,11 +405,12 @@ export default function PosPage() {
   };
 
   return (
-    <div className="w-full min-w-0 max-w-full min-h-[85vh] overflow-x-hidden pb-4">
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2 sm:gap-4 min-h-[80vh] min-w-0 w-full p-2 sm:p-4 bg-muted">
-      {/* Product Selection — first column: max-h + overflow so scroll stays inside block in responsive */}
-      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[75vh] sm:max-h-[80vh] lg:max-h-[85vh] min-h-0 overflow-y-auto bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col order-1">
-        <div className="relative mb-4">
+    <div className="w-full min-w-0 max-w-full min-h-[85vh] lg:h-full lg:min-h-0 lg:overflow-hidden lg:flex lg:flex-col overflow-x-hidden pb-4">
+    <div className="flex-1 lg:min-h-0 lg:overflow-hidden py-4 px-2 sm:px-4 bg-muted">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2 sm:gap-4 min-h-[80vh] lg:min-h-0 lg:h-full min-w-0 w-full">
+      {/* Product Selection — first column: fixed height on desktop, product list scrolls independently */}
+      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[75vh] sm:max-h-[80vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-1">
+        <div className="relative mb-4 shrink-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <Input 
             placeholder={categoryView === 'grid' ? "Search categories..." : "Scan barcode or search item..."}
@@ -426,7 +428,7 @@ export default function PosPage() {
           </button>
         </div>
 
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex justify-between items-center mb-2 shrink-0">
             <p className="text-xs font-semibold text-gray-500 uppercase">Categories</p>
             <Button variant="ghost" size="icon" className="h-10 w-10 touch-target" onClick={() => setCategoryView(prev => prev === 'carousel' ? 'grid' : 'carousel')}>
                 {categoryView === 'carousel' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
@@ -434,7 +436,7 @@ export default function PosPage() {
         </div>
 
         {categoryView === 'carousel' ? (
-            <Carousel opts={{ align: "start", slidesToScroll: 'auto' }} className="w-full mb-4">
+            <Carousel opts={{ align: "start", slidesToScroll: 'auto' }} className="w-full mb-4 shrink-0">
             <CarouselContent className="-ml-2">
               <CarouselItem className="basis-auto pl-2">
                   <Button variant={activeCategory === null ? 'secondary' : 'outline'} size="sm" onClick={() => selectCategory(null)}>
@@ -456,7 +458,7 @@ export default function PosPage() {
 
 
         {categoryView === 'grid' ? (
-            <ScrollArea className="flex-grow pr-1">
+            <ScrollArea className="flex-1 min-h-0 pr-1">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     <button onClick={() => selectCategory(null)} className={`aspect-square rounded-lg flex items-center justify-center text-center p-2 transition-colors ${activeCategory === null ? 'bg-secondary text-secondary-foreground' : 'bg-card hover:bg-accent hover:text-accent-foreground border'}`}>
                         <p className="font-semibold">All</p>
@@ -469,9 +471,9 @@ export default function PosPage() {
                 </div>
             </ScrollArea>
         ) : (
-          <div className="flex flex-col flex-grow min-h-0">
-            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Products</p>
-            <ScrollArea className="flex-grow pr-1">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <p className="text-xs font-semibold text-gray-500 mb-2 uppercase shrink-0">Products</p>
+            <ScrollArea className="flex-1 min-h-0 pr-1">
             <Table>
                 <TableHeader>
                 <TableRow>
@@ -579,8 +581,8 @@ export default function PosPage() {
         )}
       </div>
 
-      {/* Cart Section — second column: max-h + overflow so scroll stays inside block in responsive */}
-      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[65vh] sm:max-h-[70vh] lg:max-h-[85vh] min-h-0 overflow-y-auto bg-white dark:bg-card rounded-lg p-2 sm:p-4 flex flex-col order-2">
+      {/* Cart Section — second column: fixed height on desktop, cart items scroll independently */}
+      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[65vh] sm:max-h-[70vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-2">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 border-b pb-3 shrink-0">
             <div>
                 <h2 className="font-semibold text-base sm:text-lg">Sale #8822</h2>
@@ -637,15 +639,15 @@ export default function PosPage() {
                         </ScrollArea>
                     </DialogContent>
                 </Dialog>
-                <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={handleOpenVoucherModal}>
+                {settings?.campaigns &&<Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={handleOpenVoucherModal}>
                     <Ticket className="mr-1 sm:mr-2 h-4 w-4"/>
                     <span className="hidden sm:inline">Redeem Voucher</span>
                     <span className="sm:hidden">Voucher</span>
-                </Button>
+                </Button>}
             </div>
         </div>
 
-        <div className="flex-grow min-h-0">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <ScrollArea className="h-full pr-4">
             {!isCartHydrated ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -718,7 +720,7 @@ export default function PosPage() {
           </ScrollArea>
         </div>
 
-        {cartItems.length > 0 && (
+        {cartItems.length > 0 ? (
           <div className="pt-4 border-t shrink-0">
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
@@ -772,8 +774,9 @@ export default function PosPage() {
               Clear cart
             </Button>
           </div>
-        )}
+        ) : null}
       </div>
+    </div>
     </div>
     <PaymentModal 
         isOpen={!!activePaymentMethod}

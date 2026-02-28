@@ -89,7 +89,7 @@ export default function CataloguePage() {
   // Hooks for data with sync and pagination
   const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
   // Type assertion for callbacks
-  const typedCategories: Category[] = categories || [];
+  const typedCategories: ApiCategory[] = categories || [];
   const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
 
   // Auto-generate barcodes for products that don't have one (only once per product).
@@ -106,49 +106,6 @@ export default function CataloguePage() {
     .sort()
     .join(',');
 
-  useEffect(() => {
-    if (productsLoading || !products || products.length === 0) return;
-    if (isGeneratingRef.current) return;
-
-    const productsWithoutBarcode = products.filter(
-      (p) =>
-        p.id &&
-        !processedProductsRef.current.has(p.id) &&
-        (!p.barCode || String(p.barCode || '').trim() === '')
-    );
-
-    if (productsWithoutBarcode.length === 0) return;
-
-    isGeneratingRef.current = true;
-
-    const processProduct = async (product: (typeof products)[number]) => {
-      if (!product.id) return;
-      processedProductsRef.current.add(product.id);
-      try {
-        if (product.barCode && String(product.barCode).trim() !== '') return;
-        const newBarcode = generateBarcode();
-        await updateProductRef.current(product.id, { barCode: newBarcode });
-      } catch (error: unknown) {
-        const err = error as { message?: string; response?: { status?: number }; code?: string };
-        if (err?.message?.includes('not found') || err?.response?.status === 404 || err?.code === 'ERR_NETWORK') {
-          return;
-        }
-        if (process.env.NODE_ENV === 'development') {
-          console.error(`Failed to generate barcode for product ${(product as { name?: string }).name}:`, error);
-        }
-        if (err?.response?.status !== 404 && err?.code !== 'ERR_NETWORK') {
-          processedProductsRef.current.delete(product.id);
-        }
-      }
-    };
-
-    (async () => {
-      for (const product of productsWithoutBarcode) {
-        await processProduct(product);
-      }
-      isGeneratingRef.current = false;
-    })();
-  }, [productsLoading, productIdsKey]);
 
   // Form Hooks
   const productForm = useForm<z.infer<typeof productSchema>>({
@@ -437,7 +394,6 @@ export default function CataloguePage() {
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Image</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Name</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Category</TableHead>
-                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden lg:table-cell">Barcode</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Price</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Cost Price</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Stock</TableHead>
@@ -453,9 +409,7 @@ export default function CataloguePage() {
                   products.map(p => {
                     const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0;
                     const costPrice = typeof p.costPrice === 'number' ? p.costPrice : parseFloat(String(p.costPrice)) || 0;
-                    
-                    const barcodeValue = p.barCode ? String(p.barCode).trim() : '';
-                    const hasBarcode = barcodeValue !== '';
+              
                     
                     return (
                     <TableRow key={`product-${p.id}`}>
@@ -480,51 +434,6 @@ export default function CataloguePage() {
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{(p.category as any)?.name || (typeof p.category === 'string' ? p.category : 'No Category')}</TableCell>
-                      <TableCell className="p-2 hidden lg:table-cell">
-                        {hasBarcode ? (
-                          <div className="w-[180px] min-h-[70px] flex flex-col items-center justify-center gap-1 border-2 border-blue-300 rounded p-2 bg-blue-50">
-                            <div className="w-full flex justify-center bg-white rounded p-2" style={{ minHeight: '50px', width: '100%' }}>
-                              <BarcodeDisplay 
-                                key={`barcode-${p.id}-${barcodeValue}`}
-                                value={barcodeValue} 
-                                format={barcodeValue.length === 13 ? "EAN13" : "CODE128"} 
-                                height={50} 
-                                width={1.5} 
-                                displayValue={false}
-                                className="w-full"
-                              />
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate w-full text-center font-mono" title={barcodeValue}>
-                              {barcodeValue}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-muted-foreground text-sm">-</span>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 text-xs"
-                              onClick={async () => {
-                                const newBarcode = generateBarcode();
-                                try {
-                                  const updated = await updateProduct(p.id!, { barCode: newBarcode });
-                                  // Verify the barcode was saved
-                                  if (process.env.NODE_ENV === 'development') {
-                                    console.log('Barcode updated:', { productId: p.id, barCode: updated.barCode });
-                                  }
-                                  feedback.success('Barcode Generated', `Barcode "${newBarcode}" has been generated for ${p.name}.`);
-                                } catch (error) {
-                                  console.error('Error generating barcode:', error);
-                                  feedback.fromError(error, 'Failed to generate barcode', 'Try again or edit the product.');
-                                }
-                              }}
-                            >
-                              Generate
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
                       <TableCell>R{price.toFixed(2)}</TableCell>
                       <TableCell className="hidden md:table-cell">R{costPrice.toFixed(2)}</TableCell>
                       <TableCell className="hidden sm:table-cell">{p.stock}</TableCell>
@@ -605,7 +514,7 @@ export default function CataloguePage() {
                     <TableCell colSpan={2} className="text-center">Loading categories...</TableCell>
                   </TableRow>
                 ) : typedCategories && typedCategories.length > 0 ? (
-                  typedCategories.map((c: Category) => (
+                  typedCategories.map((c: ApiCategory) => (
                     <TableRow key={c.id}>
                       <TableCell>{c.name}</TableCell>
                       <TableCell className="text-right">
@@ -701,11 +610,11 @@ export default function CataloguePage() {
                                 </FormControl>
                                 <SelectContent>
                                     {typedCategories
-                                      .filter((c: Category, index: number, self: Category[]) => 
+                                      .filter((c: ApiCategory, index: number, self: ApiCategory[]) => 
                                         // Keep only the first occurrence of each category name
-                                        index === self.findIndex((cat: Category) => cat.name === c.name)
+                                        index === self.findIndex((cat: ApiCategory) => cat.name === c.name)
                                       )
-                                      .map((c: Category, index: number) => (
+                                      .map((c: ApiCategory, index: number) => (
                                         <SelectItem 
                                           key={c.id ? String(c.id) : `category-${index}`} 
                                           value={c.name}
@@ -727,8 +636,8 @@ export default function CataloguePage() {
                     )} />
                     <FormField control={productForm.control} name="costPrice" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Cost Price</FormLabel>
-                            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                            <FormLabel>Cost Price (Optional)</FormLabel>
+                            <FormControl><Input required type="number" step="0.01" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -741,7 +650,7 @@ export default function CataloguePage() {
                     )} />
                      <FormField control={productForm.control} name="barcode" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Barcode</FormLabel>
+                            <FormLabel>Barcode (Optional)</FormLabel>
                             <div className="space-y-2">
                                 <div className="flex gap-2">
                                     <FormControl>
@@ -773,7 +682,7 @@ export default function CataloguePage() {
                     )} />
                     <FormField control={productForm.control} name="imageUrl" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Product Image</FormLabel>
+                            <FormLabel>Product Image (Optional)</FormLabel>
                             <FormControl>
                                 <ImageUpload
                                     productId={editingProduct?.id || `temp-${Date.now()}`}

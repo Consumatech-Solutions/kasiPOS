@@ -15,7 +15,9 @@ import type { TransactionItem } from '@/types';
 import { Printer, Download, Mail, MessageCircle, Settings, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { DeviceSelector } from '@/components/device-selector';
-import { getStoredDevice, printReceipt, getDevices } from '@/lib/device-service';
+import { PrinterSetupModal } from '@/components/hardware-setup/PrinterSetupModal';
+import { getStoredDevice, printReceipt, getDevices, getPrinterMode } from '@/lib/device-service';
+import { getPrintStrategy } from '@/lib/platform';
 import { ToastAction } from '@/components/ui/toast';
 import { Printer as ThermalPrinter, Text, Br, Line, Row, Cut, render } from 'react-thermal-printer';
 import { feedback } from '@/lib/feedback';
@@ -59,8 +61,10 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+  const [showPrinterSetup, setShowPrinterSetup] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isFailureRecovery, setIsFailureRecovery] = useState(false);
+  const printerMode = getPrinterMode();
 
   const buildPrintHtml = (d: ReceiptData): string => {
     const rows = d.items
@@ -173,10 +177,15 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         try {
           const devices = await getDevices('printer');
           if (devices.length === 0) {
+            const strategy = getPrintStrategy();
+            const hint =
+              strategy === 'android'
+                ? 'Please ensure RawBT or POS Printer Driver is running and your printer is paired.'
+                : 'Please ensure QZ Tray (Desktop) or your printer server is running.';
             toast({
               variant: 'destructive',
               title: 'No printer found',
-              description: 'Please connect a printer device and try again.',
+              description: hint,
             });
             setIsPrinting(false);
             return;
@@ -214,13 +223,13 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         description: error.message || 'Failed to print receipt.',
         action: (
           <ToastAction
-            altText="Search for another device"
+            altText="Change printer setup"
             onClick={() => {
               setIsFailureRecovery(true);
-              setShowDeviceSelector(true);
+              setShowPrinterSetup(true);
             }}
           >
-            Search for another device
+            Change printer setup
           </ToastAction>
         ),
       });
@@ -250,13 +259,13 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
           description: error.message || 'Failed to print receipt.',
           action: (
             <ToastAction
-              altText="Search for another device"
+              altText="Change printer setup"
               onClick={() => {
                 setIsFailureRecovery(true);
-                setShowDeviceSelector(true);
+                setShowPrinterSetup(true);
               }}
             >
-              Search for another device
+              Change printer setup
             </ToastAction>
           ),
         });
@@ -403,34 +412,36 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         <DialogFooter className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {data ? (
             <>
-              <Button
-                type="button"
-                variant="default"
-                className="w-full sm:w-auto"
-                onClick={handleThermalPrint}
-                disabled={isPrinting}
-              >
-                {isPrinting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Printing...
-                  </>
-                ) : (
-                  <>
-                    <Printer className="mr-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
-              {/* <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                title="Select printer device"
-                onClick={() => setShowDeviceSelector(true)}
-                disabled={isPrinting}
-              >
-                <Settings className="h-4 w-4" />
-              </Button> */}
+              {printerMode === 'browser' ? (
+                <Button
+                  type="button"
+                  variant="default"
+                  className="w-full sm:w-auto"
+                  onClick={handlePrint}
+                >
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="default"
+                  className="w-full sm:w-auto"
+                  onClick={handleThermalPrint}
+                  disabled={isPrinting}
+                >
+                  {isPrinting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Printing...
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="mr-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -439,6 +450,19 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
               >
                 <Download className="mr-2 h-4 w-4" />
               </Button>
+              {printerMode === 'browser' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                  onClick={handleThermalPrint}
+                  disabled={isPrinting}
+                  title="Print to thermal receipt printer"
+                >
+                  {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                  Thermal
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -469,6 +493,11 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         open={showDeviceSelector}
         onClose={() => setShowDeviceSelector(false)}
         onSelect={handleDeviceSelect}
+      />
+      <PrinterSetupModal
+        open={showPrinterSetup}
+        onClose={() => setShowPrinterSetup(false)}
+        onSuccess={() => setShowPrinterSetup(false)}
       />
     </Dialog>
   );

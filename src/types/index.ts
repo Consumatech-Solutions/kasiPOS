@@ -1,4 +1,14 @@
 
+/** Store-level feature flags; used for nav and settings (synced with backend enabledModules/enabledFeatures). */
+export interface StoreEnabledModules {
+  boph?: boolean;
+  buyStock?: boolean;
+  campaigns?: boolean;
+  groupbuying?: boolean;
+  marketplace?: boolean;
+  showVatInCheckout?: boolean;
+}
+
 export interface Store {
   /** Store ID: UUID (string) from backend. */
   id: string;
@@ -9,6 +19,8 @@ export interface Store {
   receiptFooter: string | null;
   isSetupComplete: boolean;
   ownerId: string;
+  /** Feature flags for this store; drives nav and settings. */
+  enabledModules?: StoreEnabledModules;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +39,7 @@ export interface UpdateStoreDto {
   receiptHeader?: string;
   receiptFooter?: string;
   isSetupComplete?: boolean;
+  enabledModules?: StoreEnabledModules;
 }
 
 export interface Product {
@@ -196,6 +209,7 @@ export interface AppSettings {
   campaigns: boolean;
   marketplace: boolean;
   boph: boolean;
+  buyStock: boolean;
   /** Admin-only: show VAT line in checkout summary (prices remain VAT-inclusive). */
   showVatInCheckout?: boolean;
   isLoggedIn: boolean;
