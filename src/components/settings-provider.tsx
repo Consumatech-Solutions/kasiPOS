@@ -24,6 +24,7 @@ const defaultSettings: AppSettings = {
   campaigns: false,
   marketplace: false,
   boph: false,
+  buyStock: true,
   showVatInCheckout: true,
   isLoggedIn: false,
   currentUser: null,
@@ -48,13 +49,14 @@ function getInitialSettings(): AppSettings {
     return {
         ...defaultSettings,
         theme: storedSettings.theme || 'light',
-        showVatInCheckout: storedSettings.showVatInCheckout !== false,
         currentUser,
         currentStore,
         isLoggedIn: !!currentUser,
         campaigns: modules?.campaigns ?? defaultSettings.campaigns,
         marketplace: modules?.marketplace ?? defaultSettings.marketplace,
         boph: modules?.boph ?? defaultSettings.boph,
+        buyStock: modules?.buyStock ?? defaultSettings.buyStock,
+        showVatInCheckout: modules?.showVatInCheckout ?? (typeof storedSettings.showVatInCheckout === 'boolean' ? storedSettings.showVatInCheckout : defaultSettings.showVatInCheckout),
     };
   } catch (error) {
     console.error('Error reading settings from localStorage', error);
@@ -88,8 +90,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const campaigns = modules.campaigns ?? prev.campaigns;
       const marketplace = modules.marketplace ?? prev.marketplace;
       const boph = modules.boph ?? prev.boph;
-      if (prev.campaigns === campaigns && prev.marketplace === marketplace && prev.boph === boph) return prev;
-      return { ...prev, campaigns, marketplace, boph };
+      const buyStock = modules.buyStock ?? prev.buyStock;
+      const showVatInCheckout = modules?.showVatInCheckout ?? prev.showVatInCheckout;
+      if (prev.campaigns === campaigns && prev.marketplace === marketplace && prev.boph === boph && prev.buyStock === buyStock && prev.showVatInCheckout === showVatInCheckout) return prev;
+      return { ...prev, campaigns, marketplace, boph, buyStock, showVatInCheckout };
     });
   }, [settings.currentStore?.id, settings.currentStore?.enabledModules]);
 

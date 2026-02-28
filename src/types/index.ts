@@ -1,10 +1,12 @@
 
-/** Store-level feature flags; used for nav and settings. */
+/** Store-level feature flags; used for nav and settings (synced with backend enabledModules/enabledFeatures). */
 export interface StoreEnabledModules {
   boph?: boolean;
+  buyStock?: boolean;
   campaigns?: boolean;
   groupbuying?: boolean;
   marketplace?: boolean;
+  showVatInCheckout?: boolean;
 }
 
 export interface Store {
@@ -207,6 +209,7 @@ export interface AppSettings {
   campaigns: boolean;
   marketplace: boolean;
   boph: boolean;
+  buyStock: boolean;
   /** Admin-only: show VAT line in checkout summary (prices remain VAT-inclusive). */
   showVatInCheckout?: boolean;
   isLoggedIn: boolean;

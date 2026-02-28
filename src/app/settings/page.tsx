@@ -27,7 +27,7 @@ import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { mutationQueue } from '@/lib/mutation-queue';
 
-type Feature = 'campaigns' | 'marketplace' | 'boph';
+type Feature = 'campaigns' | 'marketplace' | 'boph' | 'buyStock';
 
 const userManagementSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -158,6 +158,31 @@ export default function SettingsPage() {
     }
   };
 
+  const updateShowVatInCheckout = async (checked: boolean) => {
+    const store = settings.currentStore;
+    if (!store?.id) {
+      setSetting('showVatInCheckout', checked);
+      return;
+    }
+    setIsUpdatingModules(true);
+    try {
+      const nextModules = { ...store.enabledModules, showVatInCheckout: checked };
+      const response = await storesApi.update(store.id, { enabledModules: nextModules });
+      if (response?.data) {
+        setSetting('currentStore', response.data);
+        await saveStorePermanently(response.data, setSetting);
+      } else {
+        setSetting('showVatInCheckout', checked);
+      }
+    } catch (err: any) {
+      console.error('Failed to update showVatInCheckout:', err);
+      feedback.error('Update failed', err?.message ?? 'Could not update setting. Try again.');
+      setSetting('showVatInCheckout', !checked);
+    } finally {
+      setIsUpdatingModules(false);
+    }
+  };
+
   const handleToggle = (feature: Feature, checked: boolean) => {
     if (checked) {
       setUserDialogOpen(false);
@@ -183,9 +208,10 @@ export default function SettingsPage() {
 
   const getFeatureDetails = (feature: Feature | null) => {
     switch(feature) {
-      case 'campaigns': return { title: 'Opt-In to Campaigns', description: "Campaigns allow you to create and manage discount vouchers for your customers. By opting in, you'll be able to create percentage-based or fixed-amount discounts to drive sales." };
+      case 'campaigns': return { title: 'Opt-In to Campaigns', description: "Campaigns allow you to create and participate in loyalty and reward programmes." };
       case 'marketplace': return { title: 'Opt-In to Marketplace', description: "The Marketplace feature allows you to place orders from popular third-party online stores on behalf of your customers, earning a service fee for each order." };
       case 'boph': return { title: 'Opt-In to BOPH', description: "BOPH (Buy Online, Pickup Here) lets your store act as a pickup point for online orders. You'll manage incoming parcels and hand them off to customers, earning a fee for the service." };
+      case 'buyStock': return { title: 'Opt-In to Buy Stock', description: "Buy Stock lets you order inventory and manage purchase orders for your store." };
       default: return { title: '', description: '' };
     }
   }
@@ -457,8 +483,8 @@ export default function SettingsPage() {
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                  <Label htmlFor="campaigns-toggle" className="font-semibold">Voucher Campaigns</Label>
-                  <p className="text-sm text-muted-foreground">Enable to create and manage discount vouchers.</p>
+                  <Label htmlFor="campaigns-toggle" className="font-semibold">Campaigns</Label>
+                  <p className="text-sm text-muted-foreground">Enable to create and participate in loyalty and reward programmes.</p>
                   </div>
                   <Switch
                   id="campaigns-toggle"
@@ -494,6 +520,19 @@ export default function SettingsPage() {
                   />
               </div>
 
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                  <Label htmlFor="buy-stock-toggle" className="font-semibold">Buy Stock</Label>
+                  <p className="text-sm text-muted-foreground">Enable ordering inventory and managing purchase orders.</p>
+                  </div>
+                  <Switch
+                  id="buy-stock-toggle"
+                  checked={settings.buyStock}
+                  onCheckedChange={(checked) => handleToggle('buyStock', checked)}
+                  disabled={isUpdatingModules}
+                  />
+              </div>
+
               {(isAdmin || currentUser != null) && (
                 <>
                   <div id="checkout-display-admin" className="space-y-2 pt-4 scroll-mt-4">
@@ -508,7 +547,8 @@ export default function SettingsPage() {
                     <Switch
                       id="show-vat-toggle"
                       checked={settings.showVatInCheckout !== false}
-                      onCheckedChange={(checked) => setSetting('showVatInCheckout', checked)}
+                      onCheckedChange={(checked) => updateShowVatInCheckout(checked)}
+                      disabled={isUpdatingModules}
                     />
                   </div>
                 </>
