@@ -742,7 +742,7 @@ export default function PosPage() {
               {showVatInCheckout
                 ? 'VAT is added to the total. Total = Subtotal + VAT.'
                 : 'VAT is included in the total (no addition).'}
-              {settings.currentUser?.role === 'admin' && (
+              {(settings.currentUser?.role === 'admin' || settings.currentStore?.ownerId === settings.currentUser?.id || settings.currentUser?.role === 'store_admin') && (
                 <span className="block mt-1">
                   <a href="/settings#checkout-display-admin" className="underline hover:text-foreground">Display options in Settings</a>
                 </span>

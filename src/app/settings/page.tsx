@@ -51,7 +51,9 @@ const passwordSchema = z.object({
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
   const { currentUser, currentStore: settingsStore } = settings;
-  const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin';
+  console.log('currentUser', currentUser);
+  console.log('settingsStore', settingsStore);
+  const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin' || settingsStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin';
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -600,7 +602,7 @@ export default function SettingsPage() {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.phone}</TableCell>
-                      <TableCell><Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="capitalize">{user.role}</Badge></TableCell>
+                      <TableCell><Badge variant={user.role === 'admin' || user.storeId === settingsStore?.id  || user.role === 'store_admin' ? 'default' : 'secondary'} className="capitalize">{user.role}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openUserDialog(user)} title="Edit user">
