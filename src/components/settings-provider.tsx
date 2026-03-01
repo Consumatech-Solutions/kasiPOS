@@ -303,7 +303,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
              }
              
              // Role-based route protection: only admin can access /settings
-             if ((settings.currentUser?.role === 'staff' || settings.currentUser?.role === 'store_admin') && pathname.startsWith('/settings')) {
+             if (settings.currentUser?.role === 'staff' && pathname.startsWith('/settings')) {
                 router.push('/');
              }
         }
