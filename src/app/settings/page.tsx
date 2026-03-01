@@ -51,8 +51,6 @@ const passwordSchema = z.object({
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
   const { currentUser, currentStore: settingsStore } = settings;
-  console.log('currentUser', currentUser);
-  console.log('settingsStore', settingsStore);
   const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin' || settingsStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin';
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
