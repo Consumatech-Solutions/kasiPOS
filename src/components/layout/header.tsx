@@ -146,8 +146,6 @@ export default function Header() {
     }
   };
 
-  console.log('currentUser', currentUser);
-  console.log('currentStore', currentStore);
 
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
