@@ -24,7 +24,7 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const keyboardScannerRef = useRef<ScannerDetector | null>(null);
-  const [scanMode, setScanMode] = useState<ScanMode>('camera');
+  const [scanMode, setScanMode] = useState<ScanMode>('keyboard');
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | undefined>(undefined);
@@ -366,14 +366,16 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
         </TabsContent>
 
         <TabsContent value="keyboard" className="space-y-4">
-          <div className="py-8 text-center">
-            <Keyboard className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-lg font-semibold mb-2">USB / keyboard scanner</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Connect a barcode scanner that types like a keyboard. Click below to focus this area, then scan a barcode. The scan is detected automatically and will not be typed into any field.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Detection uses fast key input; minimum 6 characters. Scan when this tab is active.
+          <div
+            tabIndex={0}
+            autoFocus
+            role="button"
+            aria-label="Focus area for barcode scanner"
+            className="py-8 text-center w-full max-w-md mx-auto px-4 rounded-lg border-2 border-dashed border-muted-foreground/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-muted/50"
+            onClick={(e) => (e.currentTarget as HTMLElement).focus()}
+          >
+            <p className="text-sm text-muted-foreground">
+              Click here to focus this tab and then scan the barcode
             </p>
           </div>
         </TabsContent>

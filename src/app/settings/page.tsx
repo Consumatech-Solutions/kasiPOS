@@ -7,7 +7,7 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -25,7 +25,9 @@ import { feedback } from '@/lib/feedback';
 import { Badge } from '@/components/ui/badge';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
+import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { cn } from '@/lib/utils';
 
 type Feature = 'campaigns' | 'marketplace' | 'boph' | 'buyStock';
 
@@ -50,6 +52,7 @@ const passwordSchema = z.object({
 
 export default function SettingsPage() {
   const { settings, setSetting } = useSettings();
+  const { openHardwareSetup } = useHardwareSetup();
   const { currentUser, currentStore: settingsStore } = settings;
   const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin' || settingsStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin';
   const { ensureStore } = useEnsureStore();
@@ -476,12 +479,33 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-              <div className="space-y-2 pt-4">
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <Label htmlFor="hardware-setup" className="font-semibold flex items-center gap-2">
+                  <Printer className="w-5 h-5" />
+                  Hardware setup
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Configure receipt printer, barcode scanner, and card reader.
+                </p>
+              </div>
+              <Button
+                id="hardware-setup"
+                onClick={openHardwareSetup}
+                variant="outline"
+                className="min-h-[44px] touch-target"
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                Launch hardware setup
+              </Button>
+            </div>
+
+              <div className={cn("space-y-2 pt-4 transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
                   <h3 className="text-lg font-semibold">Feature Management</h3>
-                  <p className="text-sm text-muted-foreground">Enable or disable optional features.</p>
+                  <p className="text-sm text-muted-foreground">Enable or disable optional features. Requires internet connection.</p>
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="campaigns-toggle" className="font-semibold">Campaigns</Label>
                   <p className="text-sm text-muted-foreground">Enable to create and participate in loyalty and reward programmes.</p>
@@ -490,11 +514,11 @@ export default function SettingsPage() {
                   id="campaigns-toggle"
                   checked={settings.campaigns}
                   onCheckedChange={(checked) => handleToggle('campaigns', checked)}
-                  disabled={isUpdatingModules}
+                  disabled={!isOnline || isUpdatingModules}
                   />
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="marketplace-toggle" className="font-semibold">Marketplace</Label>
                   <p className="text-sm text-muted-foreground">Enable ordering from third-party stores.</p>
@@ -503,11 +527,11 @@ export default function SettingsPage() {
                   id="marketplace-toggle"
                   checked={settings.marketplace}
                   onCheckedChange={(checked) => handleToggle('marketplace', checked)}
-                  disabled={isUpdatingModules}
+                  disabled={!isOnline || isUpdatingModules}
                   />
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="boph-toggle" className="font-semibold">Buy Online, Pickup Here (BOPH)</Label>
                   <p className="text-sm text-muted-foreground">Enable parcel pickup point services.</p>
@@ -516,11 +540,11 @@ export default function SettingsPage() {
                   id="boph-toggle"
                   checked={settings.boph}
                   onCheckedChange={(checked) => handleToggle('boph', checked)}
-                  disabled={isUpdatingModules}
+                  disabled={!isOnline || isUpdatingModules}
                   />
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="buy-stock-toggle" className="font-semibold">Buy Stock</Label>
                   <p className="text-sm text-muted-foreground">Enable ordering inventory and managing purchase orders.</p>
@@ -529,7 +553,7 @@ export default function SettingsPage() {
                   id="buy-stock-toggle"
                   checked={settings.buyStock}
                   onCheckedChange={(checked) => handleToggle('buyStock', checked)}
-                  disabled={isUpdatingModules}
+                  disabled={!isOnline || isUpdatingModules}
                   />
               </div>
 
