@@ -7,6 +7,7 @@ import { useSettings } from '../settings-provider';
 interface HardwareSetupContextType {
   isOnboardingComplete: boolean;
   markOnboardingComplete: () => void;
+  openHardwareSetup: () => void;
 }
 
 const HardwareSetupContext = createContext<HardwareSetupContextType | undefined>(undefined);
@@ -16,6 +17,7 @@ const STORAGE_KEY = 'kasiPOS_hardwareSetupCompleted';
 export function HardwareSetupProvider({ children }: { children: React.ReactNode }) {
   const { settings } = useSettings();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
 
   useEffect(() => {
@@ -41,21 +43,32 @@ export function HardwareSetupProvider({ children }: { children: React.ReactNode 
     setShowOnboarding(false);
   };
 
+  const handleComplete = () => {
+    markOnboardingComplete();
+    setManualOpen(false);
+  };
+
   const handleSkip = () => {
     markOnboardingComplete();
+    setManualOpen(false);
   };
+
+  const openHardwareSetup = () => setManualOpen(true);
 
   const value = {
     isOnboardingComplete,
     markOnboardingComplete,
+    openHardwareSetup,
   };
+
+  const showWizard = showOnboarding || manualOpen;
 
   return (
     <HardwareSetupContext.Provider value={value}>
       {children}
-      {showOnboarding && (
+      {showWizard && (
         <HardwareSetupWizard
-          onComplete={markOnboardingComplete}
+          onComplete={handleComplete}
           onSkip={handleSkip}
         />
       )}

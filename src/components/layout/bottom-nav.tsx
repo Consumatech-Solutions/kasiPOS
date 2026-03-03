@@ -6,11 +6,14 @@ import { usePathname } from 'next/navigation';
 import { navItems as allNavItems } from '@/lib/nav-config';
 import { Button } from '../ui/button';
 import { useSettings } from '../settings-provider';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { settings } = useSettings();
+  const { isOnline } = useNetworkStatus();
 
   const navItems = useMemo(() => {
     const userRole = settings.currentUser?.role;
@@ -35,14 +38,19 @@ export default function BottomNav() {
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const isFeatureGreyed = item.featureFlag && !isOnline;
             return (
               <Button
                 key={item.label}
                 variant={isActive ? 'secondary' : 'ghost'}
                 asChild
-                className={`flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2 ${isActive ? 'border-destructive' : 'border-transparent'}`}
+                className={cn(
+                  'flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2',
+                  isActive ? 'border-destructive' : 'border-transparent',
+                  isFeatureGreyed && 'opacity-50 pointer-events-none cursor-not-allowed'
+                )}
               >
-                <Link href={item.href}>
+                <Link href={item.href} aria-disabled={isFeatureGreyed}>
                   <Icon className="w-5 h-5 mb-1" />
                   <span>{item.label}</span>
                 </Link>
