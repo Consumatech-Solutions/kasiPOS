@@ -42,10 +42,12 @@ import {
   AlertCircle,
   Info,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Printer
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSettings } from '../settings-provider';
+import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
 import { useNotifications, type Notification, type NotificationType } from '@/hooks/use-notifications';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { offlineDetector } from '@/lib/offline-detector';
@@ -121,6 +123,7 @@ export default function Header() {
     removeNotification,
   } = useNotifications();
   const { isOnline, wasOffline } = useNetworkStatus();
+  const { openHardwareSetup } = useHardwareSetup();
 
   // Get current page title
   const currentPageTitle = useMemo(() => {
@@ -344,6 +347,10 @@ export default function Header() {
                 Profile
               </DropdownMenuItem>
             </Link>
+            <DropdownMenuItem onClick={openHardwareSetup} className="min-h-[44px] touch-target">
+              <Printer className="mr-2 h-4 w-4" />
+              Hardware setup
+            </DropdownMenuItem>
             {(currentUser?.role === 'admin' || currentStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin') && (
               <Link href="/settings">
                 <DropdownMenuItem className="min-h-[44px] touch-target">
