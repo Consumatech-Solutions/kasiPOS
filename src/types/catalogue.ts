@@ -52,6 +52,39 @@ export interface UpdateProductDto {
   productImage?: string;
 }
 
+// Product templates (Admin Portal) for Store Admin "Add from templates"
+export interface ProductTemplate {
+  id: string;
+  name: string;
+  categoryId: string;
+  category?: { id: string; name: string };
+  price?: number;
+  costPrice?: number;
+  productImage?: string | null;
+  [key: string]: unknown;
+}
+
+/** One entry for POST /products/add-template. Backend uses JWT to get storeId (req.user.storeId), not the body. */
+export interface AddTemplateItem {
+  categoryId: string; // store category UUID (destination)
+  productTemplateIds: string[];
+}
+
+/** Body for POST /products/add-template. Only items; no role nor storeId (backend reads them from JWT / req.user). */
+export interface AddTemplateRequest {
+  items: AddTemplateItem[];
+}
+
+/** Response of POST /products/add-template (201): array of created products */
+export interface AddTemplateProductResponse {
+  id: string;
+  name: string;
+  categoryId: string;
+  storeId: string;
+  price: number;
+  costPrice: number;
+}
+
 // Types for IndexedDB with sync
 export interface CategoryRecord extends ApiCategory {
   synced: boolean;
