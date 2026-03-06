@@ -59,7 +59,7 @@ export default function LoginPage() {
 
             if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
                 if (process.env.NODE_ENV === 'development') {
-                    console.warn('Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:3001).');
+                    console.warn('Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:3000).');
                 }
                 feedback.error('Connection error', 'Cannot reach server.', 'Ensure the backend is running and try again.', { code: ERROR_CODES.LOGIN });
                 return;

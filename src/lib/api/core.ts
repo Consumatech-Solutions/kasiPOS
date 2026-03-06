@@ -1,6 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 // Check if we're online
 const isOnline = () => {
@@ -78,7 +78,7 @@ api.interceptors.response.use(
             ) {
                 if (!(window as any).__backendNetworkErrorLogged) {
                     console.warn('⚠️ Backend not available - running in offline mode. Categories and products will be managed locally.', {
-                        backendUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+                        backendUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
                     });
                     (window as any).__backendNetworkErrorLogged = true;
                 }

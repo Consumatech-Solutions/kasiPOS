@@ -90,10 +90,10 @@ export const catalogueApi = {
       await api.delete(`${API_BASE_PATH}/products/${id}`);
     },
 
-    /** POST /products/add-template. Auth: Bearer JWT (role/storeId from token; backend loads user from DB). Body: only { items }. */
+    /** POST /products/add-template. Creates products in the store from the selected templates (does not create or update templates). Auth: Bearer JWT. Body: { items }. */
     addTemplate: async (data: AddTemplateRequest): Promise<AddTemplateProductResponse[]> => {
       const response = await api.post<AddTemplateProductResponse[]>(`${API_BASE_PATH}/products/add-template`, data);
-      return Array.isArray(response.data) ? response.data : response.data?.data ?? [];
+      return Array.isArray(response.data) ? response.data : (response.data as unknown as { data: AddTemplateProductResponse[] })?.data ?? [];
     },
   },
 
@@ -106,6 +106,13 @@ export const catalogueApi = {
       const raw = response.data;
       if (Array.isArray(raw)) return raw;
       return (raw as { data: ProductTemplate[] })?.data ?? [];
+    },
+
+    /** GET /product-templates/for-store. Store Admin only. Returns all templates with category/brand for Add Templates flow. */
+    getForStore: async (): Promise<ProductTemplate[]> => {
+      const response = await api.get<ProductTemplate[]>(`${API_BASE_PATH}/product-templates/for-store`);
+      const raw = response.data;
+      return Array.isArray(raw) ? raw : [];
     },
   },
 };

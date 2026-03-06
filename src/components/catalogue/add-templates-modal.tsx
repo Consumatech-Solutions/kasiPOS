@@ -18,16 +18,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Loader2, Search, ChevronLeft } from 'lucide-react';
 import { catalogueApi } from '@/lib/api/catalogue';
-import type { ApiCategory } from '@/types/catalogue';
 import type { ProductTemplate } from '@/types/catalogue';
 import { feedback } from '@/lib/feedback';
 
@@ -38,7 +30,6 @@ const STEP_3 = 3;
 export interface AddTemplatesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  storeCategories: ApiCategory[];
   onSuccess?: () => void;
 }
 
@@ -51,20 +42,17 @@ interface TemplateCategory {
 export function AddTemplatesModal({
   open,
   onOpenChange,
-  storeCategories,
   onSuccess,
 }: AddTemplatesModalProps) {
   const [step, setStep] = useState(STEP_1);
   const [categorySearch, setCategorySearch] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
-  /** Store category ID per template category ID (for Step 3 multi-item) */
-  const [destinationByTemplateCategoryId, setDestinationByTemplateCategoryId] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['product-templates'],
-    queryFn: () => catalogueApi.productTemplates.getAll(),
+    queryKey: ['product-templates', 'for-store'],
+    queryFn: () => catalogueApi.productTemplates.getForStore(),
     enabled: open,
   });
 
@@ -140,10 +128,6 @@ export function AddTemplatesModal({
     [selectedCategories, selectedTemplateIds]
   );
 
-  const setDestinationForTemplateCategory = useCallback((templateCategoryId: string, storeCategoryId: string) => {
-    setDestinationByTemplateCategoryId((prev) => ({ ...prev, [templateCategoryId]: storeCategoryId }));
-  }, []);
-
   const handleNextFromStep1 = useCallback(() => {
     const templateIds = new Set<string>();
     selectedCategories.forEach((c) => c.templates.forEach((t) => templateIds.add(t.id)));
@@ -154,35 +138,27 @@ export function AddTemplatesModal({
   const handleFinish = useCallback(async () => {
     const items = selectedCategoriesWithProducts
       .map((cat) => ({
-        categoryId: destinationByTemplateCategoryId[cat.id],
+        categoryName: cat.name,
         productTemplateIds: cat.templates
           .filter((t) => selectedTemplateIds.has(t.id))
           .map((t) => t.id),
       }))
-      .filter((item) => item.categoryId && item.productTemplateIds.length > 0);
+      .filter((item) => item.productTemplateIds.length > 0);
 
-    const missing = selectedCategoriesWithProducts.filter(
-      (cat) => !destinationByTemplateCategoryId[cat.id]
-    );
-    if (missing.length > 0 || items.length === 0) {
-      feedback.error(
-        'Invalid selection',
-        'Choose a destination store category for each template category.',
-        'Select a category in the dropdown for each row.'
-      );
+    if (items.length === 0) {
+      feedback.error('Invalid selection', 'Select at least one product to add.', 'Go back and select products.');
       return;
     }
     setIsSubmitting(true);
     try {
       const created = await catalogueApi.products.addTemplate({ items });
       const count = Array.isArray(created) ? created.length : 0;
-      feedback.success('Templates added', `${count} product(s) added to your catalogue.`);
+      feedback.success('Products added', `${count} product(s) added to your catalogue. Categories are created if needed.`);
       onOpenChange(false);
       onSuccess?.();
       setStep(STEP_1);
       setSelectedCategoryIds(new Set());
       setSelectedTemplateIds(new Set());
-      setDestinationByTemplateCategoryId({});
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
       const status = e?.response?.status;
@@ -198,7 +174,7 @@ export function AddTemplatesModal({
             console.warn(
               '[Add Templates] 403 Forbidden. Your app sees role:',
               user?.role ?? '(none)',
-              '— Backend must allow role "store_admin" on POST /products/add-template and the JWT must include this role.'
+              '— Backend must allow role "store_admin" on GET /product-templates/for-store and POST /products/add-template; JWT must include this role.'
             );
           } catch {
             /* ignore */
@@ -207,25 +183,19 @@ export function AddTemplatesModal({
         feedback.error(
           'Not allowed',
           message || 'The server rejected access (Store Admin only).',
-          'If you are Store Admin: the backend JWT must include role "store_admin" and POST /products/add-template must allow that role. Otherwise contact support.'
+          'If you are Store Admin: the backend must allow your role on the template and add-template endpoints. Otherwise contact support.'
         );
       } else if (status === 404) {
         feedback.error('Not found', message || 'Category or template not found.', 'Refresh and try again.');
       } else if (status === 409) {
         feedback.error('Duplicate', message || 'Some products already exist (template already added).', 'Edit or remove existing products.');
       } else {
-        feedback.fromError(err, 'Failed to add templates', 'Check your connection and try again.');
+        feedback.fromError(err, 'Failed to add products', 'Check your connection and try again.');
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [
-    destinationByTemplateCategoryId,
-    selectedCategoriesWithProducts,
-    selectedTemplateIds,
-    onOpenChange,
-    onSuccess,
-  ]);
+  }, [selectedCategoriesWithProducts, selectedTemplateIds, onOpenChange, onSuccess]);
 
   const handleBack = useCallback(() => {
     setStep((s) => Math.max(STEP_1, s - 1));
@@ -238,7 +208,6 @@ export function AddTemplatesModal({
         setCategorySearch('');
         setSelectedCategoryIds(new Set());
         setSelectedTemplateIds(new Set());
-        setDestinationByTemplateCategoryId({});
       }
       onOpenChange(open);
     },
@@ -250,14 +219,14 @@ export function AddTemplatesModal({
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {step === STEP_1 && 'Add from templates'}
+            {step === STEP_1 && 'Add Templates'}
             {step === STEP_2 && 'Select products'}
             {step === STEP_3 && 'Summary'}
           </DialogTitle>
           <DialogDescription>
             {step === STEP_1 && 'Choose template categories from the Admin Portal, then click Next.'}
             {step === STEP_2 && 'Select which products to add. You can expand each category.'}
-            {step === STEP_3 && 'Review and choose the destination category in your store.'}
+            {step === STEP_3 && 'Review the categories and products to be added. Categories will be created if they do not exist. Click Finish and Add.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -368,33 +337,26 @@ export function AddTemplatesModal({
           {step === STEP_3 && (
             <>
               <div className="rounded-md border p-3 space-y-2">
-                <p className="text-sm font-medium">Summary — choose a destination store category for each:</p>
-                <p className="text-xs text-muted-foreground">Total: {totalSelectedCount} product(s)</p>
+                <p className="text-sm font-medium">Categories and products to be added</p>
+                <p className="text-xs text-muted-foreground">Total: {totalSelectedCount} product(s) in {selectedCategoriesWithProducts.length} categor{selectedCategoriesWithProducts.length === 1 ? 'y' : 'ies'}. Categories will be created if they do not exist.</p>
               </div>
               <div className="space-y-3">
                 {selectedCategoriesWithProducts.map((cat) => {
-                  const count = cat.templates.filter((t) => selectedTemplateIds.has(t.id)).length;
+                  const selectedTemplates = cat.templates.filter((t) => selectedTemplateIds.has(t.id));
+                  const count = selectedTemplates.length;
                   return (
-                    <div key={cat.id} className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border p-3">
+                    <div key={cat.id} className="flex flex-col gap-2 rounded-md border p-3">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{cat.name}</p>
                         <p className="text-xs text-muted-foreground">{count} product(s)</p>
                       </div>
-                      <Select
-                        value={destinationByTemplateCategoryId[cat.id] ?? ''}
-                        onValueChange={(value) => setDestinationForTemplateCategory(cat.id, value)}
-                      >
-                        <SelectTrigger className="w-full sm:w-[180px]">
-                          <SelectValue placeholder="Destination category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {storeCategories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
+                      {selectedTemplates.length > 0 && (
+                        <ul className="text-xs text-muted-foreground pl-2 border-l-2 border-muted space-y-0.5 mt-1">
+                          {selectedTemplates.map((t) => (
+                            <li key={t.id}>{t.name}</li>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </ul>
+                      )}
                     </div>
                   );
                 })}
@@ -408,13 +370,7 @@ export function AddTemplatesModal({
                 </Button>
                 <Button
                   onClick={handleFinish}
-                  disabled={
-                    selectedCategoriesWithProducts.some(
-                      (cat) => !destinationByTemplateCategoryId[cat.id]
-                    ) ||
-                    totalSelectedCount === 0 ||
-                    isSubmitting
-                  }
+                  disabled={totalSelectedCount === 0 || isSubmitting}
                 >
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   Finish and Add
