@@ -64,9 +64,9 @@ export interface ProductTemplate {
   [key: string]: unknown;
 }
 
-/** One entry for POST /products/add-template. Backend uses JWT to get storeId (req.user.storeId), not the body. */
+/** One entry for POST /products/add-template. Backend finds or creates category by name, then creates products. */
 export interface AddTemplateItem {
-  categoryId: string; // store category UUID (destination)
+  categoryName: string;
   productTemplateIds: string[];
 }
 
