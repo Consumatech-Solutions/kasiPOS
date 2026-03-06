@@ -23,7 +23,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical, QrCode } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical, QrCode, Layers } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +35,7 @@ import { BarcodeScanner } from '@/components/barcode-scanner';
 import { Pagination } from '@/components/ui/pagination';
 import { ImageUpload } from '@/components/catalogue/image-upload';
 import { ProductImage } from '@/components/catalogue/product-image';
+import { AddTemplatesModal } from '@/components/catalogue/add-templates-modal';
 
 
 // Zod Schemas for validation
@@ -71,6 +72,7 @@ export default function CataloguePage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [activeCatalogueTab, setActiveCatalogueTab] = useState<string>('products');
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+  const [addTemplatesOpen, setAddTemplatesOpen] = useState(false);
 
   // Generate a unique barcode (EAN-13 format: 13 digits)
   const generateBarcode = (): string => {
@@ -370,15 +372,20 @@ export default function CataloguePage() {
                   <TabsTrigger value="products">Products</TabsTrigger>
                   <TabsTrigger value="categories">Categories</TabsTrigger>
                 </TabsList>
-                {activeCatalogueTab === 'products' ? (
-                  <Button onClick={() => openProductDialog()} className="w-full sm:w-auto min-h-[44px] touch-target order-first sm:order-none">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                <div className="flex flex-wrap items-center gap-2 order-first sm:order-none">
+                  {activeCatalogueTab === 'products' ? (
+                    <Button onClick={() => openProductDialog()} className="min-h-[44px] touch-target">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                    </Button>
+                  ) : (
+                    <Button onClick={() => openCategoryDialog()} className="min-h-[44px] touch-target">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Category
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => setAddTemplatesOpen(true)} className="min-h-[44px] touch-target">
+                    <Layers className="mr-2 h-4 w-4" /> Add Templates
                   </Button>
-                ) : (
-                  <Button onClick={() => openCategoryDialog()} className="w-full sm:w-auto min-h-[44px] touch-target order-first sm:order-none">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Category
-                  </Button>
-                )}
+                </div>
               </div>
             </Tabs>
           </CardContent>
@@ -766,6 +773,13 @@ export default function CataloguePage() {
         />
       </DialogContent>
     </Dialog>
+
+    <AddTemplatesModal
+      open={addTemplatesOpen}
+      onOpenChange={setAddTemplatesOpen}
+      storeCategories={typedCategories}
+      onSuccess={() => refreshProducts()}
+    />
     </div>
   );
 }

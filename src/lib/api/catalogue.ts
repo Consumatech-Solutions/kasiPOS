@@ -5,7 +5,10 @@ import type {
   UpdateCategoryDto,
   ApiProduct,
   CreateProductDto,
-  UpdateProductDto
+  UpdateProductDto,
+  ProductTemplate,
+  AddTemplateRequest,
+  AddTemplateProductResponse,
 } from '@/types/catalogue';
 import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
 
@@ -85,6 +88,24 @@ export const catalogueApi = {
 
     delete: async (id: string): Promise<void> => {
       await api.delete(`${API_BASE_PATH}/products/${id}`);
+    },
+
+    /** POST /products/add-template. Auth: Bearer JWT (role/storeId from token; backend loads user from DB). Body: only { items }. */
+    addTemplate: async (data: AddTemplateRequest): Promise<AddTemplateProductResponse[]> => {
+      const response = await api.post<AddTemplateProductResponse[]>(`${API_BASE_PATH}/products/add-template`, data);
+      return Array.isArray(response.data) ? response.data : response.data?.data ?? [];
+    },
+  },
+
+  // Product templates (Admin Portal) for Store Admin
+  productTemplates: {
+    getAll: async (): Promise<ProductTemplate[]> => {
+      const response = await api.get<ProductTemplate[] | { data: ProductTemplate[] }>(
+        `${API_BASE_PATH}/product-templates`
+      );
+      const raw = response.data;
+      if (Array.isArray(raw)) return raw;
+      return (raw as { data: ProductTemplate[] })?.data ?? [];
     },
   },
 };

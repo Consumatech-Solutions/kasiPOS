@@ -49,20 +49,30 @@ export default function LoginPage() {
                 // router.push('/'); 
             }
         } catch (error: unknown) {
-            const err = error as { code?: string; message?: string; response?: { status?: number; data?: { message?: string } } };
+            const err = error as { code?: string; message?: string; response?: { status?: number; data?: Record<string, unknown> } };
+            const data = err?.response?.data;
+            const status = err?.response?.status;
+
+            if (process.env.NODE_ENV === 'development' && err) {
+                console.warn('[Login] Error details:', { status, data, code: err.code, message: err.message });
+            }
+
             if (err?.code === 'ERR_NETWORK' || err?.message === 'Network Error') {
                 if (process.env.NODE_ENV === 'development') {
-                    console.warn('Backend not reachable. Ensure backend is running on http://localhost:3001');
+                    console.warn('Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:3001).');
                 }
                 feedback.error('Connection error', 'Cannot reach server.', 'Ensure the backend is running and try again.', { code: ERROR_CODES.LOGIN });
                 return;
             }
 
-            const status = err?.response?.status;
-            const message = err?.response?.data?.message || (status === 401 ? 'Invalid phone number or password.' : 'Login failed. Please try again.');
+            const serverMessage =
+                (typeof data?.message === 'string' && data.message) ||
+                (typeof (data as { error?: string })?.error === 'string' && (data as { error: string }).error) ||
+                (typeof (data as { msg?: string })?.msg === 'string' && (data as { msg: string }).msg) ||
+                (status === 401 ? 'Invalid phone number or password.' : 'Login failed. Please try again.');
             feedback.error(
                 'Login failed',
-                message,
+                serverMessage,
                 status === 401 ? 'Check your phone number and password.' : 'Try again or request access if you don\'t have an account.',
                 { code: ERROR_CODES.LOGIN }
             );
