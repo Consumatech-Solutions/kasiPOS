@@ -5,9 +5,12 @@ import { format } from 'date-fns';
 import type { Customer, Transaction } from '@/types';
 import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/components/settings-provider';
-import { useCustomers } from '@/hooks/use-customers';
+import { useCustomers, customerKeys } from '@/hooks/use-customers';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { executeMutation } from '@/lib/mutation-registry';
+import { saveCustomersToDexie, updateCustomerInDexie, deleteCustomerFromDexie } from '@/lib/entity-cache';
+import { useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/customers';
 import { CustomerForm } from '@/components/customers/customer-form';
 
@@ -25,6 +28,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 
 export default function CustomersPage() {
+  const queryClient = useQueryClient();
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
@@ -81,7 +85,18 @@ export default function CustomersPage() {
           await updateCustomer(editingCustomer.id, data);
           feedback.success('Customer updated', 'Customer updated successfully.');
         } else {
-          // Offline: queue mutation (optimistic update already done by hook)
+          // Offline: optimistic update then queue
+          const updatedCustomer = { ...editingCustomer, ...data, updatedAt: new Date().toISOString() };
+          const customerQueries = queryClient.getQueriesData<{ data: Customer[]; meta: any }>({ queryKey: customerKeys.lists() });
+          customerQueries.forEach(([queryKey, qData]) => {
+            if (qData?.data) {
+              queryClient.setQueryData(queryKey, {
+                ...qData,
+                data: qData.data.map(c => (c.id === editingCustomer.id ? updatedCustomer : c)),
+              });
+            }
+          });
+          await updateCustomerInDexie(editingCustomer.id, data);
           mutationQueue.add({
             mutationKey: ['customers', 'update'],
             mutationFn: () => customersApi.update(editingCustomer.id, data),
@@ -94,11 +109,36 @@ export default function CustomersPage() {
           await createCustomer(data);
           feedback.success('Customer added', 'Customer added successfully.');
         } else {
-          // Offline: queue mutation (optimistic update already done by hook)
+          // Offline: optimistic update then queue
+          const tempId = `temp-${Date.now()}`;
+          const optimisticCustomer: Customer = {
+            id: tempId,
+            name: data.name,
+            contact: data.contact,
+            loyaltyPoints: data.loyaltyPoints ?? 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          const customerQueries = queryClient.getQueriesData<{ data: Customer[]; meta: any }>({ queryKey: customerKeys.lists() });
+          customerQueries.forEach(([queryKey, qData]) => {
+            if (qData) {
+              queryClient.setQueryData(queryKey, {
+                ...qData,
+                data: [...(qData.data || []), optimisticCustomer],
+                meta: { ...qData.meta, total: (qData.meta?.total ?? 0) + 1 },
+              });
+            } else {
+              queryClient.setQueryData(queryKey, {
+                data: [optimisticCustomer],
+                meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+              });
+            }
+          });
+          await saveCustomersToDexie([optimisticCustomer]);
           mutationQueue.add({
             mutationKey: ['customers', 'create'],
-            mutationFn: () => customersApi.create(data),
-            variables: data,
+            mutationFn: () => executeMutation(['customers', 'create'], { ...data, _tempId: tempId }),
+            variables: { ...data, _tempId: tempId },
           });
           feedback.success('Queued', 'Customer queued. Will sync when online.');
         }
@@ -120,7 +160,18 @@ export default function CustomersPage() {
         await deleteCustomer(id);
         feedback.success('Customer deleted', 'Customer deleted successfully.');
       } else {
-        // Offline: queue mutation (optimistic update already done by hook)
+        // Offline: optimistic update then queue
+        const customerQueries = queryClient.getQueriesData<{ data: Customer[]; meta: any }>({ queryKey: customerKeys.lists() });
+        customerQueries.forEach(([queryKey, qData]) => {
+          if (qData?.data) {
+            queryClient.setQueryData(queryKey, {
+              ...qData,
+              data: qData.data.filter(c => c.id !== id),
+              meta: { ...qData.meta, total: Math.max(0, (qData.meta?.total ?? 1) - 1) },
+            });
+          }
+        });
+        await deleteCustomerFromDexie(id);
         mutationQueue.add({
           mutationKey: ['customers', 'delete'],
           mutationFn: () => customersApi.delete(id),

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
 import type { Product, Transaction, TransactionItem, Customer } from '@/types';
-import { db } from '@/lib/db';
+import { db, getDb } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -260,9 +260,34 @@ export default function PosPage() {
       });
 
     if (isOnline) {
-      // ONLINE: Use API - backend will update stock
+      // ONLINE: Use API - backend will update stock. Resolve temp IDs before sending.
       try {
-        const payload = toCreateTransactionDto(newTransaction as Omit<Transaction, 'id'> & {
+        const mappings = await getDb().syncIdMapping.toArray();
+        const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
+        const unresolvedProductIds = newTransaction.items
+          .map((item) => String(item.productId))
+          .filter((id) => id.startsWith('temp-') && !map.has(id));
+        if (unresolvedProductIds.length > 0) {
+          setIsCompletingSale(false);
+          feedback.error(
+            'Products still syncing',
+            'Some products in your cart haven\'t finished syncing. Please wait a moment and try again.'
+          );
+          return;
+        }
+        const resolvedItems = newTransaction.items.map((item) => ({
+          ...item,
+          productId: map.get(String(item.productId)) ?? String(item.productId),
+        }));
+        const resolvedCustomerId = newTransaction.customerId && String(newTransaction.customerId).startsWith('temp-')
+          ? (map.get(String(newTransaction.customerId)) ?? newTransaction.customerId)
+          : newTransaction.customerId;
+        const resolvedTx = {
+          ...newTransaction,
+          items: resolvedItems,
+          customerId: resolvedCustomerId,
+        };
+        const payload = toCreateTransactionDto(resolvedTx as Omit<Transaction, 'id'> & {
           items: Array<TransactionItem & { [k: string]: unknown }>;
         });
         const response = await transactionsApi.create(payload);

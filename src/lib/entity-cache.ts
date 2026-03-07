@@ -4,13 +4,34 @@
 
 import { getDb } from '@/lib/db';
 import type { PaginationMeta } from '@/types/pagination';
-import type { ApiProduct } from '@/types/catalogue';
+import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import type { Customer, PurchaseOrder } from '@/types';
 import type { Transaction } from '@/types';
 
 const ENTITY_CAP = 10000;
 const PURCHASE_ORDERS_KEY = 'purchaseOrders';
 const PURCHASE_ORDER_CAP = 1000;
+
+export const LAST_SYNC_KEYS = {
+  products: 'products-lastSync',
+  categories: 'categories-lastSync',
+  customers: 'customers-lastSync',
+} as const;
+
+export type LastSyncEntity = keyof typeof LAST_SYNC_KEYS;
+
+export async function getLastSyncAt(entity: LastSyncEntity): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const db = getDb();
+  const record = await db.keyVal.get(LAST_SYNC_KEYS[entity]);
+  return record?.value ?? null;
+}
+
+export async function setLastSyncAt(entity: LastSyncEntity, isoDate: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.keyVal.put({ key: LAST_SYNC_KEYS[entity], value: isoDate });
+}
 
 export async function saveProductsToDexie(data: ApiProduct[]): Promise<void> {
   if (typeof window === 'undefined' || !data.length) return;
@@ -68,6 +89,95 @@ export async function updateProductStockInDexie(productId: string, newStock: num
   }
 }
 
+export async function updateProductInDexie(productId: string, updates: Partial<ApiProduct>): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  const product = await db.productCache.get(productId);
+  if (product) {
+    await db.productCache.put({ ...product, ...updates, id: productId });
+  }
+}
+
+export async function deleteProductFromDexie(productId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.productCache.delete(productId);
+}
+
+export async function saveCategoriesToDexie(data: ApiCategory[]): Promise<void> {
+  if (typeof window === 'undefined' || !data.length) return;
+  const db = getDb();
+  const records = data.map((c) => ({
+    id: c.id,
+    name: c.name,
+    createdAt: c.createdAt ?? new Date().toISOString(),
+    updatedAt: c.updatedAt ?? new Date().toISOString(),
+  }));
+  await db.categoryCache.bulkPut(records);
+  const count = await db.categoryCache.count();
+  if (count > ENTITY_CAP) {
+    const toRemove = count - ENTITY_CAP;
+    const oldest = await db.categoryCache.orderBy('createdAt').limit(toRemove).toArray();
+    await db.categoryCache.bulkDelete(oldest.map((r) => r.id));
+  }
+}
+
+export async function getCategoriesFromDexie(
+  page: number,
+  limit: number
+): Promise<{ data: ApiCategory[]; meta: PaginationMeta }> {
+  if (typeof window === 'undefined') {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
+  const db = getDb();
+  const total = await db.categoryCache.count();
+  const data = await db.categoryCache
+    .orderBy('createdAt')
+    .reverse()
+    .offset((page - 1) * limit)
+    .limit(limit)
+    .toArray();
+  return {
+    data: data as unknown as ApiCategory[],
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+
+export async function updateCategoryInDexie(categoryId: string, updates: Partial<ApiCategory>): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  const category = await db.categoryCache.get(categoryId);
+  if (category) {
+    await db.categoryCache.put({ ...category, ...updates, id: categoryId });
+  }
+}
+
+export async function deleteCategoryFromDexie(categoryId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.categoryCache.delete(categoryId);
+}
+
+export async function updateCustomerInDexie(customerId: string, updates: Partial<Customer>): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  const customer = await db.customers.get(customerId);
+  if (customer) {
+    await db.customers.put({ ...customer, ...updates, id: customerId });
+  }
+}
+
+export async function deleteCustomerFromDexie(customerId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.customers.delete(customerId);
+}
+
 export async function savePurchaseOrdersToDexie(orders: PurchaseOrder[]): Promise<void> {
   if (typeof window === 'undefined' || !orders.length) return;
   const db = getDb();
@@ -123,14 +233,25 @@ export async function getProductsFromDexie(
   }
   const db = getDb();
   const total = await db.productCache.count();
-  const data = await db.productCache
+  const rawData = await db.productCache
     .orderBy('createdAt')
     .reverse()
     .offset((page - 1) * limit)
     .limit(limit)
     .toArray();
+  const categories = await db.categoryCache.toArray();
+  const data = (rawData as unknown as ApiProduct[]).map((product) => {
+    const hasCategory = product.category != null && (typeof product.category === 'string' ? product.category.trim() !== '' : (product.category as { name?: string })?.name);
+    if (product.categoryId && !hasCategory) {
+      const category = categories.find((c) => String(c.id) === String(product.categoryId));
+      if (category) {
+        return { ...product, category: (category as ApiCategory).name };
+      }
+    }
+    return product;
+  });
   return {
-    data: data as unknown as ApiProduct[],
+    data,
     meta: {
       total,
       page,

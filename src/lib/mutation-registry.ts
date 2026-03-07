@@ -7,7 +7,7 @@ import { catalogueApi } from '@/lib/api/catalogue';
 import type { ApiCategory } from '@/types/catalogue';
 import { customersApi } from '@/lib/api/customers';
 import { stockAdjustmentsApi } from '@/lib/api/stock-adjustments';
-import { purchaseOrdersApi } from '@/lib/api/purchase-orders';
+import { purchaseOrdersApi, type CreatePurchaseOrderDto } from '@/lib/api/purchase-orders';
 import { vouchersApi } from '@/lib/api/vouchers';
 import { parcelsApi } from '@/lib/api/parcels';
 import { usersApi } from '@/lib/api/users';
@@ -46,9 +46,17 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
 
   switch (`${type}/${action}`) {
     case 'transactions/create': {
-      const raw = variables as Parameters<typeof toCreateTransactionDto>[0] & { items?: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string }> };
+      const raw = variables as Parameters<typeof toCreateTransactionDto>[0] & { items?: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string }>; customerId?: string };
       const mappings = await getDb().syncIdMapping.toArray();
       const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
+      const unresolvedProductIds = (raw.items ?? [])
+        .map((item) => String(item.productId))
+        .filter((id) => id.startsWith('temp-') && !map.has(id));
+      if (unresolvedProductIds.length > 0) {
+        throw new Error(
+          `Cannot sync transaction: products ${unresolvedProductIds.join(', ')} have not finished syncing. Will retry.`
+        );
+      }
       const resolvedItems: CreateTransactionItemDto[] | undefined = raw.items?.map((item) => ({
         productId: map.get(String(item.productId)) ?? String(item.productId),
         productName: item.productName,
@@ -57,7 +65,12 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
         totalPrice: item.totalPrice,
         ...(item.imageUrl != null && { imageUrl: item.imageUrl }),
       }));
-      const resolved = resolvedItems ? { ...raw, items: resolvedItems } : raw;
+      const resolvedCustomerId = raw.customerId && String(raw.customerId).startsWith('temp-')
+        ? (map.get(String(raw.customerId)) ?? raw.customerId)
+        : raw.customerId;
+      const resolved = resolvedItems
+        ? { ...raw, items: resolvedItems, customerId: resolvedCustomerId }
+        : { ...raw, customerId: resolvedCustomerId };
       const dto = toCreateTransactionDto(resolved as Parameters<typeof toCreateTransactionDto>[0]);
       // Cast: toCreateTransactionDto return type can be inferred as unknown[] for items by TS in some configs
       return transactionsApi.create(dto as unknown as CreateTransactionDto);
@@ -71,6 +84,7 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
       const result = await catalogueApi.products.create({
         ...normalizeProductPayload(productData),
         categoryId,
+        ...(_tempId && { _tempId }),
       } as Parameters<typeof catalogueApi.products.create>[0]);
       if (_tempId && result?.id) {
         await getDb().syncIdMapping.put({
@@ -109,8 +123,25 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
       return catalogueApi.categories.delete(id);
     }
 
-    case 'customers/create':
-      return customersApi.create(variables as Parameters<typeof customersApi.create>[0]);
+    case 'customers/create': {
+      const custData = variables as Parameters<typeof customersApi.create>[0] & { _tempId?: string };
+      const _tempId = custData._tempId;
+      const payload = {
+        name: custData.name,
+        contact: custData.contact,
+        ...(custData.loyaltyPoints != null && { loyaltyPoints: custData.loyaltyPoints }),
+        ...(_tempId && { _tempId }),
+      };
+      const result = await customersApi.create(payload as Parameters<typeof customersApi.create>[0]);
+      if (_tempId && result?.data?.id) {
+        await getDb().syncIdMapping.put({
+          tempId: _tempId,
+          serverId: String(result.data.id),
+          createdAt: Date.now(),
+        });
+      }
+      return result;
+    }
 
     case 'customers/update': {
       const custUpdate = variables as { id: string; data: Parameters<typeof customersApi.update>[1] };
@@ -124,8 +155,11 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
 
     case 'stockAdjustments/create': {
       const adj = variables as { productId: string; newStock: number; reason: string; note?: string };
+      const mappings = await getDb().syncIdMapping.toArray();
+      const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
+      const resolvedProductId = map.get(String(adj.productId)) ?? adj.productId;
       return stockAdjustmentsApi.create({
-        productId: adj.productId,
+        productId: resolvedProductId,
         newStock: adj.newStock,
         reason: adj.reason as Parameters<typeof stockAdjustmentsApi.create>[0]['reason'],
         note: adj.note,
@@ -133,7 +167,7 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
     }
 
     case 'purchaseOrders/create': {
-      const v = variables as { cart: unknown[]; subtotal: number; total: number; deliveryMethod: 'delivery' | 'collection' };
+      const v = variables as { cart: CreatePurchaseOrderDto['items']; subtotal: number; total: number; deliveryMethod: 'delivery' | 'collection' };
       return purchaseOrdersApi.create({
         items: v.cart,
         subtotal: v.subtotal,

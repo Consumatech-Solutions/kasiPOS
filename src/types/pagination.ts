@@ -15,4 +15,6 @@ export interface PaginationParams {
   limit?: number;
   search?: string;
   categoryId?: string;
+  /** ISO 8601 date - return only items updated after this (for incremental sync) */
+  updatedAtAfter?: string;
 }

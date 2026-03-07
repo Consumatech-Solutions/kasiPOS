@@ -7,6 +7,7 @@ import type {
   CreateProductDto,
   UpdateProductDto,
   ProductTemplate,
+  CategoryTemplate,
   AddTemplateRequest,
   AddTemplateProductResponse,
 } from '@/types/catalogue';
@@ -21,6 +22,7 @@ export const catalogueApi = {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
+      if (params?.updatedAtAfter) queryParams.append('updatedAtAfter', params.updatedAtAfter);
 
       const url = `${API_BASE_PATH}/categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
@@ -60,6 +62,7 @@ export const catalogueApi = {
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.search) queryParams.append('search', params.search);
       if (params?.categoryId) queryParams.append('categoryId', params.categoryId);
+      if (params?.updatedAtAfter) queryParams.append('updatedAtAfter', params.updatedAtAfter);
 
       const url = `${API_BASE_PATH}/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
@@ -94,6 +97,18 @@ export const catalogueApi = {
     addTemplate: async (data: AddTemplateRequest): Promise<AddTemplateProductResponse[]> => {
       const response = await api.post<AddTemplateProductResponse[]>(`${API_BASE_PATH}/products/add-template`, data);
       return Array.isArray(response.data) ? response.data : (response.data as unknown as { data: AddTemplateProductResponse[] })?.data ?? [];
+    },
+  },
+
+  // Category templates (Admin Portal) with product templates — for Add from templates flow
+  categoryTemplates: {
+    getAll: async (): Promise<CategoryTemplate[]> => {
+      const response = await api.get<CategoryTemplate[] | { data: CategoryTemplate[] }>(
+        `${API_BASE_PATH}/category-templates`
+      );
+      const raw = response.data;
+      if (Array.isArray(raw)) return raw;
+      return (raw as { data: CategoryTemplate[] })?.data ?? [];
     },
   },
 

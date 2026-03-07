@@ -30,6 +30,8 @@ const STEP_3 = 3;
 export interface AddTemplatesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Optional; no longer used (backend get-or-creates categories by template name). Kept for backward compatibility. */
+  storeCategories?: ApiCategory[];
   onSuccess?: () => void;
 }
 
@@ -50,25 +52,35 @@ export function AddTemplatesModal({
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: templates = [], isLoading: templatesLoading } = useQuery({
-    queryKey: ['product-templates', 'for-store'],
-    queryFn: () => catalogueApi.productTemplates.getForStore(),
+  const { data: categoryTemplatesList = [], isLoading: categoryTemplatesLoading } = useQuery({
+    queryKey: ['category-templates'],
+    queryFn: () => catalogueApi.categoryTemplates.getAll(),
+    enabled: open,
+  });
+
+  const { data: productTemplatesList = [], isLoading: productTemplatesLoading } = useQuery({
+    queryKey: ['product-templates'],
+    queryFn: () => catalogueApi.productTemplates.getAll(),
     enabled: open,
   });
 
   const categoriesWithTemplates = useMemo((): TemplateCategory[] => {
-    const byCategory = new Map<string, TemplateCategory>();
-    for (const t of templates) {
-      const catId = t.categoryId || (t.category as { id?: string })?.id || '';
-      const catName = (t.category as { name?: string })?.name ?? 'Uncategorized';
-      if (!catId) continue;
-      if (!byCategory.has(catId)) {
-        byCategory.set(catId, { id: catId, name: catName, templates: [] });
-      }
-      byCategory.get(catId)!.templates.push(t);
-    }
-    return Array.from(byCategory.values());
-  }, [templates]);
+    return categoryTemplatesList.map((ct) => {
+      const templates = productTemplatesList.filter(
+        (pt) =>
+          pt.categoryTemplateId === ct.id ||
+          pt.categoryTemplate?.id === ct.id ||
+          (pt.category?.id === ct.id)
+      );
+      return {
+        id: ct.id,
+        name: ct.name,
+        templates: (ct.productTemplates?.length ?? 0) > 0 ? (ct.productTemplates ?? []) : templates,
+      };
+    });
+  }, [categoryTemplatesList, productTemplatesList]);
+
+  const templatesLoading = categoryTemplatesLoading || productTemplatesLoading;
 
   const filteredCategories = useMemo(() => {
     if (!categorySearch.trim()) return categoriesWithTemplates;
@@ -138,7 +150,7 @@ export function AddTemplatesModal({
   const handleFinish = useCallback(async () => {
     const items = selectedCategoriesWithProducts
       .map((cat) => ({
-        categoryName: cat.name,
+        categoryTemplateId: cat.id,
         productTemplateIds: cat.templates
           .filter((t) => selectedTemplateIds.has(t.id))
           .map((t) => t.id),
@@ -224,9 +236,9 @@ export function AddTemplatesModal({
             {step === STEP_3 && 'Summary'}
           </DialogTitle>
           <DialogDescription>
-            {step === STEP_1 && 'Choose template categories from the Admin Portal, then click Next.'}
+            {step === STEP_1 && 'Choose category templates (with their product templates), then click Next.'}
             {step === STEP_2 && 'Select which products to add. You can expand each category.'}
-            {step === STEP_3 && 'Review the categories and products to be added. Categories will be created if they do not exist. Click Finish and Add.'}
+            {step === STEP_3 && 'Review and confirm. Categories will be created in your store by template name.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -236,7 +248,7 @@ export function AddTemplatesModal({
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search categories..."
+                  placeholder="Search category templates..."
                   value={categorySearch}
                   onChange={(e) => setCategorySearch(e.target.value)}
                   className="pl-9"
@@ -337,32 +349,23 @@ export function AddTemplatesModal({
           {step === STEP_3 && (
             <>
               <div className="rounded-md border p-3 space-y-2">
-                <p className="text-sm font-medium">Categories and products to be added</p>
-                <p className="text-xs text-muted-foreground">Total: {totalSelectedCount} product(s) in {selectedCategoriesWithProducts.length} categor{selectedCategoriesWithProducts.length === 1 ? 'y' : 'ies'}. Categories will be created if they do not exist.</p>
+                <p className="text-sm font-medium">Summary</p>
+                <p className="text-xs text-muted-foreground">Total: {totalSelectedCount} product(s) from {selectedCategoriesWithProducts.length} category template(s)</p>
               </div>
-              <div className="space-y-3">
+              <ul className="space-y-2">
                 {selectedCategoriesWithProducts.map((cat) => {
                   const selectedTemplates = cat.templates.filter((t) => selectedTemplateIds.has(t.id));
                   const count = selectedTemplates.length;
                   return (
-                    <div key={cat.id} className="flex flex-col gap-2 rounded-md border p-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{cat.name}</p>
-                        <p className="text-xs text-muted-foreground">{count} product(s)</p>
-                      </div>
-                      {selectedTemplates.length > 0 && (
-                        <ul className="text-xs text-muted-foreground pl-2 border-l-2 border-muted space-y-0.5 mt-1">
-                          {selectedTemplates.map((t) => (
-                            <li key={t.id}>{t.name}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                    <li key={cat.id} className="rounded-md border p-3">
+                      <p className="text-sm font-medium truncate">{cat.name}</p>
+                      <p className="text-xs text-muted-foreground">{count} product(s)</p>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
               <p className="text-xs text-muted-foreground">
-                Products will be created with names like &quot;Template name - Your store name&quot;.
+                Categories will be created in your store by template name; products will use names like &quot;Template name - Your store name&quot;.
               </p>
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={handleBack}>
