@@ -56,7 +56,10 @@ export interface UpdateProductDto {
 export interface ProductTemplate {
   id: string;
   name: string;
-  categoryId: string;
+  categoryId?: string; // legacy
+  categoryTemplateId?: string;
+  /** When loaded with category template relation (e.g. from GET /product-templates) */
+  categoryTemplate?: { id: string; name?: string };
   category?: { id: string; name: string };
   price?: number;
   costPrice?: number;
@@ -64,9 +67,18 @@ export interface ProductTemplate {
   [key: string]: unknown;
 }
 
-/** One entry for POST /products/add-template. Backend uses JWT to get storeId (req.user.storeId), not the body. */
+/** Category templates (Admin Portal): global categories with their product templates. */
+export interface CategoryTemplate {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+  productTemplates?: ProductTemplate[];
+}
+
+/** One entry for POST /products/add-template. Backend get-or-creates store category by template name. */
 export interface AddTemplateItem {
-  categoryId: string; // store category UUID (destination)
+  categoryTemplateId: string;
   productTemplateIds: string[];
 }
 
