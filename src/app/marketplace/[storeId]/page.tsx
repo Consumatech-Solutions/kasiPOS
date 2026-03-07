@@ -78,8 +78,8 @@ const quickAccessCategories = [
 
 type PageProps = { params: Promise<{ storeId?: string }> };
 
-export default function StorePosPage(props: PageProps) {
-  const resolvedParams = use(props.params);
+export default function StorePosPage({ params }: PageProps) {
+  const resolvedParams = use(params);
   const storeId = resolvedParams?.storeId ? String(resolvedParams.storeId) : null;
   const { settings } = useSettings();
   const { currentStore } = settings;

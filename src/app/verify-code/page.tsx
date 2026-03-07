@@ -1,6 +1,5 @@
 'use client';
 
-import { Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,9 +20,10 @@ const verifyCodeSchema = z.object({
   code: z.string().length(6, { message: "Code must be 6 digits." }),
 });
 
-function VerifyCodeContent() {
+export default function VerifyCodePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Use get() directly to avoid Next.js 15 searchParams key access warnings
   const phone = searchParams ? searchParams.get('phone') : null;
   const { login } = useSettings();
 
@@ -116,13 +116,5 @@ const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-export default function VerifyCodePage() {
-  return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-muted">Loading...</div>}>
-      <VerifyCodeContent />
-    </Suspense>
   );
 }

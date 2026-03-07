@@ -1,6 +1,5 @@
 'use client';
 
-import { Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -24,9 +23,10 @@ const setPasswordSchema = z.object({
     path: ['confirmPassword'],
 });
 
-function SetPasswordContent() {
+export default function SetPasswordPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    // Use get() directly to avoid Next.js 15 searchParams key access warnings
     const phone = searchParams ? searchParams.get('phone') : null;
     const { login } = useSettings();
 
@@ -115,13 +115,5 @@ function SetPasswordContent() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-export default function SetPasswordPage() {
-  return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-muted">Loading...</div>}>
-      <SetPasswordContent />
-    </Suspense>
   );
 }
