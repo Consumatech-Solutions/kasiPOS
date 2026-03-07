@@ -32,6 +32,17 @@ type StatusChangeCallback = (status: SyncStatusData) => void;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
 
+/** Priority for sync order: categories before products (products reference categories), then customers, then others */
+function getMutationPriority(m: QueuedMutation): number {
+  const [type, action] = m.mutationKey;
+  if (!type || !action) return 999;
+  const key = `${type}/${action}`;
+  if (key.startsWith('categories/')) return 1;
+  if (key.startsWith('products/')) return 2;
+  if (key.startsWith('customers/')) return 3;
+  return 4; // transactions, stockAdjustments, vouchers, etc.
+}
+
 class MutationQueue {
   private queue: QueuedMutation[] = [];
   private processing = false;
@@ -180,6 +191,16 @@ class MutationQueue {
     }
   }
 
+  private sortQueueByDependencyOrder(): void {
+    this.queue.sort((a, b) => {
+      const pa = getMutationPriority(a);
+      const pb = getMutationPriority(b);
+      if (pa !== pb) return pa - pb;
+      return a.timestamp - b.timestamp; // FIFO within same group
+    });
+    void this.persistQueue();
+  }
+
   private async persistQueue(): Promise<void> {
     if (typeof window === 'undefined') return;
     try {
@@ -264,7 +285,8 @@ class MutationQueue {
 
     this.processing = true;
     this.currentStatus = 'syncing';
-    console.log(`[MutationQueue] Processing ${this.queue.length} queued mutations`);
+    this.sortQueueByDependencyOrder();
+    console.log(`[MutationQueue] Processing ${this.queue.length} queued mutations (sorted by dependency order)`);
     this.notifyStatusChange();
 
     while (this.queue.length > 0) {
@@ -308,16 +330,26 @@ class MutationQueue {
         
         this.notifyStatusChange();
       } catch (error: any) {
-        // Check if it's a network error (using enhanced offline detection)
+        const status = error?.response?.status;
+        const is5xx = status >= 500 && status < 600;
         const isOfflineStatus = isOffline();
         const isNetworkError = isOfflineStatus ||
-          error?.code === 'ECONNABORTED' || 
+          error?.code === 'ECONNABORTED' ||
           error?.message?.includes('Network Error') ||
           error?.isOffline ||
           error?.isNetworkError;
         
         if (isNetworkError) {
           console.log('[MutationQueue] Network error - will retry when online');
+          mutation.status = 'pending';
+          this.currentMutation = null;
+          this.currentStatus = 'idle';
+          this.notifyStatusChange();
+          break;
+        }
+        
+        if (is5xx) {
+          console.log('[MutationQueue] Server error (5xx) - will retry');
           mutation.status = 'pending';
           this.currentMutation = null;
           this.currentStatus = 'idle';
@@ -338,9 +370,10 @@ class MutationQueue {
           mutation.status = 'failed';
           const logId = genLogId();
           console.error('[MutationQueue] Mutation failed after max retries:', mutation.mutationKey, error, logId);
+          const userMessage = error?.message ?? 'Changes could not be synced to the server.';
           feedback.error(
             'Sync failed',
-            error?.message ?? 'Changes could not be synced to the server.',
+            userMessage,
             'Your data is saved locally. Check your connection and try again.',
             { logId, code: error?.code }
           );

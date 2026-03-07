@@ -6,7 +6,7 @@ import { catalogueApi } from '@/lib/api/catalogue';
 import { customersApi } from '@/lib/api/customers';
 import { vouchersApi } from '@/lib/api/vouchers';
 import { mutationQueue } from '@/lib/mutation-queue';
-import { saveProductsToDexie, saveCustomersToDexie } from '@/lib/entity-cache';
+import { saveProductsToDexie, saveCustomersToDexie, saveCategoriesToDexie, getLastSyncAt, setLastSyncAt, getProductsFromDexie, getCategoriesFromDexie, getCustomersFromDexie } from '@/lib/entity-cache';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
 import { checkOfflineStatus } from '@/lib/offline-detector';
@@ -36,6 +36,10 @@ const voucherKeys = {
   lists: () => [...voucherKeys.all, 'list'] as const,
   list: (filters?: { page?: number; limit?: number; isActive?: boolean }) => [...voucherKeys.lists(), filters] as const,
 };
+
+const PRELOAD_VERSION_KEY = 'kasipos-preload-version';
+const PRELOAD_TIMESTAMP_KEY = 'kasipos-preload-timestamp';
+const APP_PRELOAD_VERSION = 'kasipos-v4'; // Match CACHE_VERSION in public/sw.js
 
 /**
  * Wait for service worker to be ready and installed
@@ -247,12 +251,21 @@ export function DataPreloader() {
     });
 
     async function startPreloading() {
-      console.log('[DataPreloader] Prefetching essential data and pages for offline use...');
-      
-      // Get pages to preload based on login status
+      // Determine if we need full preload (pages + data) or incremental data sync only
+      const cacheVerified = await verifyServiceWorkerCache();
+      const storedVersion = typeof localStorage !== 'undefined' ? localStorage.getItem(PRELOAD_VERSION_KEY) : null;
+      const needsFullPreload = !cacheVerified || storedVersion !== APP_PRELOAD_VERSION;
+
+      if (needsFullPreload) {
+        console.log('[DataPreloader] Full preload: cache empty or app version changed');
+      } else {
+        console.log('[DataPreloader] Incremental sync: cache valid, skipping page preload');
+      }
+
       const pagesToPreload = getPageRoutesToPreload(settings.isLoggedIn);
       const dataQueryCount = 4; // products, categories, customers, vouchers
-      const totalItems = dataQueryCount + pagesToPreload.length;
+      const pagePreloadCount = needsFullPreload ? pagesToPreload.length : 0;
+      const totalItems = dataQueryCount + pagePreloadCount;
       
       let completed = 0;
       mutationQueue.setPreloadProgress(completed, totalItems);
@@ -263,25 +276,32 @@ export function DataPreloader() {
         
         // When all complete, verify cache and show toast
         if (completed >= totalItems) {
-          // Verify service worker cache before showing ready message
-          // This ensures all assets are cached to prevent "You are offline" page
-          const cacheVerified = await verifyServiceWorkerCache();
+          // Ensure cache is verified (may have been done earlier for conditional preload)
+          const finalCacheVerified = cacheVerified ?? (await verifyServiceWorkerCache());
+          
+          // Store version and timestamp after successful preload
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(PRELOAD_VERSION_KEY, APP_PRELOAD_VERSION);
+            localStorage.setItem(PRELOAD_TIMESTAMP_KEY, String(Date.now()));
+          }
           
           // Only show toast if:
           // 1. All data queries and pages are complete
           // 2. Service worker cache is verified (all assets cached)
           // 3. User is still logged in
-          if (cacheVerified && settings.isLoggedIn) {
+          if (finalCacheVerified && settings.isLoggedIn) {
             setTimeout(() => {
               mutationQueue.setPreloadProgress(totalItems, totalItems);
               toast({
                 title: "Offline Mode Ready!",
-                description: `All data and ${pagesToPreload.length} pages have been downloaded. You can now work offline`,
+                description: needsFullPreload
+                  ? `All data and ${pagesToPreload.length} pages have been downloaded. You can now work offline`
+                  : 'Data synced. You can work offline.',
                 duration: 5000,
               });
             }, 500);
           } else {
-            if (!cacheVerified) {
+            if (!finalCacheVerified) {
               console.warn(
                 '[DataPreloader] Service worker cache not complete - offline mode not fully ready. ' +
                 'The "You are offline" page may still appear. Assets will be cached on next page load.'
@@ -348,47 +368,54 @@ export function DataPreloader() {
         }
       }
 
-    // Prefetch products (first 100 for POS) and persist to Dexie
+    // Prefetch products - incremental sync if lastSyncAt exists
     queryClient.prefetchQuery({
       queryKey: productKeys.list({ page: 1, limit: 100 }),
       queryFn: async () => {
-        const response = await catalogueApi.products.getAll({ page: 1, limit: 100 });
-        const data = 'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
-        const meta = 'meta' in response && response.meta ? response.meta : { total: data.length, page: 1, limit: 100, totalPages: 1 };
-        if (data.length) await saveProductsToDexie(data);
-        return { data, meta };
+        const lastSync = await getLastSyncAt('products');
+        const params: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 100 };
+        if (lastSync) params.updatedAtAfter = lastSync;
+        const response = await catalogueApi.products.getAll(params);
+        const delta = 'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
+        if (delta.length) await saveProductsToDexie(delta);
+        await setLastSyncAt('products', new Date().toISOString());
+        const result = lastSync ? await getProductsFromDexie(1, 100) : { data: delta, meta: 'meta' in response && response.meta ? response.meta : { total: delta.length, page: 1, limit: 100, totalPages: 1 } };
+        return result;
       },
       staleTime: 30 * 60 * 1000, // 30 minutes
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // Prefetch categories
+    // Prefetch categories - incremental sync if lastSyncAt exists
     queryClient.prefetchQuery({
       queryKey: categoryKeys.list({ page: 1, limit: 50 }),
       queryFn: async () => {
-        const response = await catalogueApi.categories.getAll({ page: 1, limit: 50 });
-        // Normalize response
-        if ('data' in response && 'meta' in response) {
-          return response;
-        }
-        const data = Array.isArray(response) ? response : [];
-        return {
-          data,
-          meta: { total: data.length, page: 1, limit: 50, totalPages: 1 },
-        };
+        const lastSync = await getLastSyncAt('categories');
+        const params: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 50 };
+        if (lastSync) params.updatedAtAfter = lastSync;
+        const response = await catalogueApi.categories.getAll(params);
+        const delta = ('data' in response && response.data) ? response.data : Array.isArray(response) ? response : [];
+        if (delta.length) await saveCategoriesToDexie(delta);
+        await setLastSyncAt('categories', new Date().toISOString());
+        const result = lastSync ? await getCategoriesFromDexie(1, 50) : { data: delta, meta: ('meta' in response && response.meta) ? response.meta : { total: delta.length, page: 1, limit: 50, totalPages: 1 } };
+        return result;
       },
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // Prefetch recent customers and persist to Dexie
+    // Prefetch customers - incremental sync if lastSyncAt exists
     queryClient.prefetchQuery({
       queryKey: customerKeys.list({ page: 1, limit: 50 }),
       queryFn: async () => {
-        const response = await customersApi.getAll({ page: 1, limit: 50 });
+        const lastSync = await getLastSyncAt('customers');
+        const params: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 50 };
+        if (lastSync) params.updatedAtAfter = lastSync;
+        const response = await customersApi.getAll(params);
         const responseData = response.data;
-        const data = responseData && 'data' in responseData ? responseData.data : Array.isArray(responseData) ? responseData : [];
-        const meta = responseData && 'meta' in responseData ? responseData.meta : { total: data.length, page: 1, limit: 50, totalPages: 1 };
-        if (data.length) await saveCustomersToDexie(data);
-        return { data, meta };
+        const delta = responseData && 'data' in responseData ? responseData.data : Array.isArray(responseData) ? responseData : [];
+        if (delta.length) await saveCustomersToDexie(delta);
+        await setLastSyncAt('customers', new Date().toISOString());
+        const result = lastSync ? await getCustomersFromDexie(1, 50) : { data: delta, meta: responseData && 'meta' in responseData ? responseData.meta : { total: delta.length, page: 1, limit: 50, totalPages: 1 } };
+        return result;
       },
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
@@ -412,17 +439,17 @@ export function DataPreloader() {
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // After all data queries complete, preload pages (iframe loads full assets), then tell SW to precache URLs
-    setTimeout(async () => {
-      if (pagesToPreload.length > 0) {
+    // Only preload pages when full preload is needed (cache empty or app version changed)
+    if (needsFullPreload && pagesToPreload.length > 0) {
+      setTimeout(async () => {
         console.log(`[DataPreloader] Starting to preload ${pagesToPreload.length} pages (iframe)...`);
         await preloadPagesInBatches(pagesToPreload, 2);
         console.log('[DataPreloader] All pages preloaded');
         if (navigator.serviceWorker?.controller) {
           navigator.serviceWorker.controller.postMessage({ type: 'PRECACHE_URLS', urls: pagesToPreload });
         }
-      }
-    }, 1000); // Small delay to let data queries start first
+      }, 1000); // Small delay to let data queries start first
+    }
     }
   }, [queryClient, toast, settings.isLoggedIn]);
 

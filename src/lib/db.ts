@@ -56,6 +56,13 @@ export interface TransactionCacheRecord {
   date?: string;
 }
 
+export interface CategoryCacheRecord {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export class KasiPosDexie extends Dexie {
   stores!: Table<StoreRecord>;
   products!: Table<Product>;
@@ -73,9 +80,29 @@ export class KasiPosDexie extends Dexie {
   syncIdMapping!: Table<SyncIdMappingRecord>;
   productCache!: Table<ProductCacheRecord>;
   transactionCache!: Table<TransactionCacheRecord>;
+  categoryCache!: Table<CategoryCacheRecord>;
 
   constructor() {
     super('kasiPosDatabase');
+    this.version(16).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt, storeId',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name, storeId',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+      keyVal: 'key',
+      mutationQueue: '++id, timestamp',
+      syncIdMapping: 'tempId, createdAt',
+      productCache: 'id, createdAt',
+      transactionCache: 'id, date',
+      categoryCache: 'id, createdAt',
+    });
     this.version(15).stores({
       stores: '++id, name, ownerId',
       products: '++id, name, category, barcode, storeId',

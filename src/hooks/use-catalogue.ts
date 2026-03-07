@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogueApi } from '@/lib/api/catalogue';
 import { checkOfflineStatus } from '@/lib/offline-detector';
-import { getProductsFromDexie, saveProductsToDexie } from '@/lib/entity-cache';
+import { getProductsFromDexie, saveProductsToDexie, getCategoriesFromDexie, saveCategoriesToDexie } from '@/lib/entity-cache';
 import type { ApiCategory, ApiProduct, CreateCategoryDto, UpdateCategoryDto, CreateProductDto, UpdateProductDto } from '@/types/catalogue';
 import type { PaginationMeta, PaginationParams } from '@/types/pagination';
 
@@ -47,8 +47,16 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
   const query = useQuery({
     queryKey,
     queryFn: async () => {
+      const isOffline = await checkOfflineStatus();
+      if (isOffline) {
+        return getCategoriesFromDexie(initialPage, initialLimit);
+      }
       const response = await catalogueApi.categories.getAll({ page: initialPage, limit: initialLimit });
-      return normalizeResponse(response);
+      const normalized = normalizeResponse(response);
+      if (normalized.data?.length) {
+        await saveCategoriesToDexie(normalized.data);
+      }
+      return normalized;
     },
   });
 
