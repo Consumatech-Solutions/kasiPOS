@@ -20,7 +20,6 @@ import {
 } from '@/components/ui/accordion';
 import { Loader2, Search, ChevronLeft } from 'lucide-react';
 import { catalogueApi } from '@/lib/api/catalogue';
-import type { ApiCategory } from '@/types/catalogue';
 import type { ProductTemplate } from '@/types/catalogue';
 import { feedback } from '@/lib/feedback';
 
@@ -166,7 +165,7 @@ export function AddTemplatesModal({
     try {
       const created = await catalogueApi.products.addTemplate({ items });
       const count = Array.isArray(created) ? created.length : 0;
-      feedback.success('Templates added', `${count} product(s) added to your catalogue.`);
+      feedback.success('Products added', `${count} product(s) added to your catalogue. Categories are created if needed.`);
       onOpenChange(false);
       onSuccess?.();
       setStep(STEP_1);
@@ -187,7 +186,7 @@ export function AddTemplatesModal({
             console.warn(
               '[Add Templates] 403 Forbidden. Your app sees role:',
               user?.role ?? '(none)',
-              '— Backend must allow role "store_admin" on POST /products/add-template and the JWT must include this role.'
+              '— Backend must allow role "store_admin" on GET /product-templates/for-store and POST /products/add-template; JWT must include this role.'
             );
           } catch {
             /* ignore */
@@ -196,14 +195,14 @@ export function AddTemplatesModal({
         feedback.error(
           'Not allowed',
           message || 'The server rejected access (Store Admin only).',
-          'If you are Store Admin: the backend JWT must include role "store_admin" and POST /products/add-template must allow that role. Otherwise contact support.'
+          'If you are Store Admin: the backend must allow your role on the template and add-template endpoints. Otherwise contact support.'
         );
       } else if (status === 404) {
         feedback.error('Not found', message || 'Category or template not found.', 'Refresh and try again.');
       } else if (status === 409) {
         feedback.error('Duplicate', message || 'Some products already exist (template already added).', 'Edit or remove existing products.');
       } else {
-        feedback.fromError(err, 'Failed to add templates', 'Check your connection and try again.');
+        feedback.fromError(err, 'Failed to add products', 'Check your connection and try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -232,7 +231,7 @@ export function AddTemplatesModal({
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {step === STEP_1 && 'Add from templates'}
+            {step === STEP_1 && 'Add Templates'}
             {step === STEP_2 && 'Select products'}
             {step === STEP_3 && 'Summary'}
           </DialogTitle>
@@ -355,7 +354,8 @@ export function AddTemplatesModal({
               </div>
               <ul className="space-y-2">
                 {selectedCategoriesWithProducts.map((cat) => {
-                  const count = cat.templates.filter((t) => selectedTemplateIds.has(t.id)).length;
+                  const selectedTemplates = cat.templates.filter((t) => selectedTemplateIds.has(t.id));
+                  const count = selectedTemplates.length;
                   return (
                     <li key={cat.id} className="rounded-md border p-3">
                       <p className="text-sm font-medium truncate">{cat.name}</p>

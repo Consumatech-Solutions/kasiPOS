@@ -15,7 +15,7 @@ const CONNECTIVITY_CHECK_INTERVAL_MS = 10000; // Check every 10 seconds
 const NETWORK_TEST_TIMEOUT = 5000; // Timeout for backend reachability
 const BACKEND_URL = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
   ? process.env.NEXT_PUBLIC_API_URL
-  : 'http://localhost:3001';
+  : 'http://localhost:3000';
 
 function isDevHost(): boolean {
   if (typeof window === 'undefined') return false;

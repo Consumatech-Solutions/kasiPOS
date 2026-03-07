@@ -8,9 +8,10 @@ import type { Product } from '@/types';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import { feedback } from '@/lib/feedback';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCategories, useProducts, productKeys } from '@/hooks/use-catalogue';
+import { useCategories, useProducts, productKeys, categoryKeys } from '@/hooks/use-catalogue';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { saveCategoriesToDexie, updateCategoryInDexie, deleteCategoryFromDexie, updateProductInDexie, deleteProductFromDexie } from '@/lib/entity-cache';
 import { executeMutation } from '@/lib/mutation-registry';
 import { catalogueApi } from '@/lib/api/catalogue';
 
@@ -89,7 +90,7 @@ export default function CataloguePage() {
 
 
   // Hooks for data with sync and pagination
-  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
+  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
   // Type assertion for callbacks
   const typedCategories: ApiCategory[] = categories || [];
   const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
@@ -197,10 +198,33 @@ export default function CataloguePage() {
           await updateProduct(String(editingProduct.id), productData);
           feedback.success('Product updated', 'Product updated successfully.');
         } else {
-          // Offline: queue mutation (optimistic update already done by hook)
+          // Offline: optimistic update then queue
+          const productId = String(editingProduct.id);
+          const optimisticUpdates = {
+            name: productData.name,
+            price: productData.price,
+            costPrice: productData.costPrice,
+            stock: productData.stock,
+            barCode: productData.barCode ?? null,
+            productImage: productData.imageUrl ?? null,
+            category: productData.category,
+            updatedAt: new Date().toISOString(),
+          };
+          const productQueries = queryClient.getQueriesData<{ data: any[]; meta: any }>({ queryKey: productKeys.lists() });
+          productQueries.forEach(([queryKey, data]) => {
+            if (data?.data) {
+              queryClient.setQueryData(queryKey, {
+                ...data,
+                data: data.data.map((p: any) =>
+                  String(p.id) === productId ? { ...p, ...optimisticUpdates } : p
+                ),
+              });
+            }
+          });
+          await updateProductInDexie(productId, optimisticUpdates);
           mutationQueue.add({
             mutationKey: ['products', 'update'],
-            mutationFn: () => catalogueApi.products.update(String(editingProduct.id), productData),
+            mutationFn: () => catalogueApi.products.update(productId, productData),
             variables: { id: editingProduct.id, data: productData },
           });
           feedback.success('Queued', 'Product update queued. Will sync when online.');
@@ -213,6 +237,7 @@ export default function CataloguePage() {
         } else {
           // Offline: optimistic update with temp id, then queue for sync (no custom mutationFn - registry will run on restore)
           const tempId = `temp-${Date.now()}`;
+          const selectedCategory = typedCategories.find((c) => c.name === productData.category);
           const optimisticProduct = {
             id: tempId,
             name: productData.name,
@@ -221,7 +246,8 @@ export default function CataloguePage() {
             stock: productData.stock ?? null,
             barCode: productData.barCode ?? null,
             productImage: productData.imageUrl ?? null,
-            categoryId: '',
+            categoryId: selectedCategory?.id ?? '',
+            category: productData.category,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -268,10 +294,22 @@ export default function CataloguePage() {
         await deleteProductHook(String(id));
         feedback.success('Product deleted', 'Product deleted successfully.');
       } else {
-        // Offline: queue mutation (optimistic update already done by hook)
+        // Offline: optimistic update then queue
+        const productId = String(id);
+        const productQueries = queryClient.getQueriesData<{ data: any[]; meta: any }>({ queryKey: productKeys.lists() });
+        productQueries.forEach(([queryKey, data]) => {
+          if (data?.data) {
+            queryClient.setQueryData(queryKey, {
+              ...data,
+              data: data.data.filter((p: any) => String(p.id) !== productId),
+              meta: { ...data.meta, total: Math.max(0, (data.meta?.total ?? 1) - 1) },
+            });
+          }
+        });
+        await deleteProductFromDexie(productId);
         mutationQueue.add({
           mutationKey: ['products', 'delete'],
-          mutationFn: () => catalogueApi.products.delete(String(id)),
+          mutationFn: () => catalogueApi.products.delete(productId),
           variables: { id },
         });
         feedback.success('Queued', 'Product deletion queued. Will sync when online.');
@@ -303,7 +341,23 @@ export default function CataloguePage() {
           await updateCategory(String(editingCategory.id), values);
           feedback.success('Category updated', 'Category updated successfully.');
         } else {
-          // Offline: queue mutation (optimistic update already done by hook)
+          // Offline: optimistic update then queue
+          const updatedCategory = { ...editingCategory, ...values, updatedAt: new Date().toISOString() };
+          queryClient.setQueryData(categoryKeys.lists(), (old: { data: ApiCategory[]; meta: any } | undefined) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: old.data.map(cat => (cat.id === editingCategory.id ? updatedCategory : cat)),
+            };
+          });
+          queryClient.setQueryData(categoryKeys.list({ page: 1, limit: 10 }), (old: { data: ApiCategory[]; meta: any } | undefined) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: old.data.map(cat => (cat.id === editingCategory.id ? updatedCategory : cat)),
+            };
+          });
+          await updateCategoryInDexie(String(editingCategory.id), values);
           mutationQueue.add({
             mutationKey: ['categories', 'update'],
             mutationFn: () => catalogueApi.categories.update(String(editingCategory.id), values),
@@ -316,11 +370,35 @@ export default function CataloguePage() {
           await createCategory(values);
           feedback.success('Category added', 'Category added successfully.');
         } else {
-          // Offline: queue mutation (optimistic update already done by hook)
+          // Offline: optimistic update then queue
+          const tempId = `temp-${Date.now()}`;
+          const optimisticCategory: ApiCategory = {
+            id: tempId,
+            name: values.name,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          queryClient.setQueryData(categoryKeys.lists(), (old: { data: ApiCategory[]; meta: any } | undefined) => {
+            if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+            return {
+              ...old,
+              data: [...old.data, optimisticCategory],
+              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
+            };
+          });
+          queryClient.setQueryData(categoryKeys.list({ page: 1, limit: 10 }), (old: { data: ApiCategory[]; meta: any } | undefined) => {
+            if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+            return {
+              ...old,
+              data: [...old.data, optimisticCategory],
+              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
+            };
+          });
+          await saveCategoriesToDexie([optimisticCategory]);
           mutationQueue.add({
             mutationKey: ['categories', 'create'],
-            mutationFn: () => catalogueApi.categories.create(values),
-            variables: values,
+            mutationFn: () => catalogueApi.categories.create({ ...values, _tempId: tempId }),
+            variables: { ...values, _tempId: tempId },
           });
           feedback.success('Queued', 'Category queued. Will sync when online.');
         }
@@ -340,7 +418,24 @@ export default function CataloguePage() {
         await deleteCategoryHook(String(id));
         feedback.success('Category deleted', 'Category deleted successfully.');
       } else {
-        // Offline: queue mutation (optimistic update already done by hook)
+        // Offline: optimistic update then queue
+        queryClient.setQueryData(categoryKeys.lists(), (old: { data: ApiCategory[]; meta: any } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: old.data.filter(cat => cat.id !== id),
+            meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
+          };
+        });
+        queryClient.setQueryData(categoryKeys.list({ page: 1, limit: 10 }), (old: { data: ApiCategory[]; meta: any } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: old.data.filter(cat => cat.id !== id),
+            meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
+          };
+        });
+        await deleteCategoryFromDexie(String(id));
         mutationQueue.add({
           mutationKey: ['categories', 'delete'],
           mutationFn: () => catalogueApi.categories.delete(String(id)),
@@ -777,8 +872,10 @@ export default function CataloguePage() {
     <AddTemplatesModal
       open={addTemplatesOpen}
       onOpenChange={setAddTemplatesOpen}
-      storeCategories={typedCategories}
-      onSuccess={() => refreshProducts()}
+      onSuccess={() => {
+        refreshProducts();
+        refreshCategories();
+      }}
     />
     </div>
   );

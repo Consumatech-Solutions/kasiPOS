@@ -18,6 +18,9 @@ export const customersApi = {
     if (params?.search !== undefined && params.search.trim()) {
       requestParams.search = params.search.trim();
     }
+    if (params?.updatedAtAfter) {
+      requestParams.updatedAtAfter = params.updatedAtAfter;
+    }
     
     return api.get<PaginatedResponse<Customer> | Customer[]>('/customers', {
       params: Object.keys(requestParams).length > 0 ? requestParams : undefined

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stockAdjustmentsApi, type CreateStockAdjustmentDto, type GetStockAdjustmentsParams } from '@/lib/api/stock-adjustments';
+import { getDb } from '@/lib/db';
 import type { StockAdjustment } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
@@ -62,7 +63,14 @@ export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
       let response: { data: StockAdjustment[] | PaginatedResponse<StockAdjustment> };
       
       if (productId) {
-        response = await stockAdjustmentsApi.getByProduct(productId);
+        // Temp product IDs don't exist on server; resolve or return empty
+        const resolvedProductId = String(productId).startsWith('temp-')
+          ? (await getDb().syncIdMapping.get(String(productId)))?.serverId ?? null
+          : productId;
+        if (!resolvedProductId) {
+          return { data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+        }
+        response = await stockAdjustmentsApi.getByProduct(resolvedProductId);
         return normalizeStockAdjustmentResponse(Array.isArray(response.data) ? response.data : []);
       } else {
         const params: GetStockAdjustmentsParams = { page: initialPage, limit: initialLimit };
