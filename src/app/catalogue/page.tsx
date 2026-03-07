@@ -90,7 +90,7 @@ export default function CataloguePage() {
 
 
   // Hooks for data with sync and pagination
-  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
+  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
   // Type assertion for callbacks
   const typedCategories: ApiCategory[] = categories || [];
   const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
@@ -872,8 +872,10 @@ export default function CataloguePage() {
     <AddTemplatesModal
       open={addTemplatesOpen}
       onOpenChange={setAddTemplatesOpen}
-      storeCategories={typedCategories}
-      onSuccess={() => refreshProducts()}
+      onSuccess={() => {
+        refreshProducts();
+        refreshCategories();
+      }}
     />
     </div>
   );
