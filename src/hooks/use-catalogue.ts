@@ -101,11 +101,13 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
         if (!old) return old;
         return {
           ...old,
-          data: old.data.map(cat => cat.id?.startsWith('temp-') ? newCategory : cat),
+          data: old.data.map(cat => (String(cat?.id ?? '').startsWith('temp-') ? newCategory : cat)),
         };
       });
-      // Invalidate to refetch
-      queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      // Defer invalidation to avoid unmount race (dialog/row closing)
+      queueMicrotask(() => {
+        queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      });
     },
   });
 
@@ -120,7 +122,7 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
         queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, {
           ...previousData,
           data: previousData.data.map(cat =>
-            cat.id === id ? { ...cat, ...data, updatedAt: new Date().toISOString() } : cat
+            String(cat.id) === String(id) ? { ...cat, ...data, updatedAt: new Date().toISOString() } : cat
           ),
         });
       }
@@ -133,7 +135,9 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      queueMicrotask(() => {
+        queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      });
     },
   });
 
@@ -144,9 +148,10 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
       const previousData = queryClient.getQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey);
 
       if (previousData) {
+        const idStr = String(id);
         queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, {
           ...previousData,
-          data: previousData.data.filter(cat => cat.id !== id),
+          data: previousData.data.filter(cat => String(cat.id) !== idStr),
           meta: {
             ...previousData.meta,
             total: Math.max(0, previousData.meta.total - 1),
@@ -162,7 +167,9 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      queueMicrotask(() => {
+        queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
+      });
     },
   });
 
@@ -284,10 +291,12 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
         if (!old) return old;
         return {
           ...old,
-          data: old.data.map(prod => prod.id?.startsWith('temp-') ? newProduct : prod),
+          data: old.data.map(prod => (String(prod?.id ?? '').startsWith('temp-') ? newProduct : prod)),
         };
       });
-      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      queueMicrotask(() => {
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      });
     },
   });
 
@@ -329,7 +338,7 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
         queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, {
           ...previousData,
           data: previousData.data.map(prod =>
-            prod.id === id ? { ...prod, ...data, updatedAt: new Date().toISOString() } : prod
+            String(prod.id) === String(id) ? { ...prod, ...data, updatedAt: new Date().toISOString() } : prod
           ),
         });
       }
@@ -342,7 +351,9 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      queueMicrotask(() => {
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      });
     },
   });
 
@@ -353,9 +364,10 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       const previousData = queryClient.getQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey);
 
       if (previousData) {
+        const idStr = String(id);
         queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, {
           ...previousData,
-          data: previousData.data.filter(prod => prod.id !== id),
+          data: previousData.data.filter(prod => String(prod.id) !== idStr),
           meta: {
             ...previousData.meta,
             total: Math.max(0, previousData.meta.total - 1),
@@ -371,7 +383,9 @@ export function useProducts(initialPage: number = 1, initialLimit: number = 10) 
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      queueMicrotask(() => {
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      });
     },
   });
 

@@ -289,6 +289,7 @@ class MutationQueue {
     console.log(`[MutationQueue] Processing ${this.queue.length} queued mutations (sorted by dependency order)`);
     this.notifyStatusChange();
 
+    try {
     while (this.queue.length > 0) {
       // Re-check online status before each mutation (using enhanced offline detection)
       if (typeof window !== 'undefined') {
@@ -320,25 +321,30 @@ class MutationQueue {
         await this.persistQueue();
         console.log(`[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join('/')}`);
         
-        // Invalidate related queries to refresh data
+        // Defer invalidation to avoid re-entering React/query updates during callback (prevents crashes)
         if (this.queryClient && mutation.mutationKey.length > 0) {
-          this.queryClient.invalidateQueries({ 
-            queryKey: [mutation.mutationKey[0]],
-            refetchType: 'all',
+          const key = mutation.mutationKey[0];
+          queueMicrotask(() => {
+            this.queryClient?.invalidateQueries({ queryKey: [key], refetchType: 'all' });
           });
         }
-        
+
         this.notifyStatusChange();
       } catch (error: any) {
         const status = error?.response?.status;
-        const is5xx = status >= 500 && status < 600;
+        const is5xx = typeof status === 'number' && status >= 500 && status < 600;
         const isOfflineStatus = isOffline();
+        const msg = (error?.message ?? '').toLowerCase();
         const isNetworkError = isOfflineStatus ||
           error?.code === 'ECONNABORTED' ||
+          error?.code === 'ERR_CONNECTION_REFUSED' ||
           error?.message?.includes('Network Error') ||
+          msg.includes('failed to fetch') ||
+          msg.includes('load failed') ||
+          msg.includes('connection refused') ||
           error?.isOffline ||
           error?.isNetworkError;
-        
+
         if (isNetworkError) {
           console.log('[MutationQueue] Network error - will retry when online');
           mutation.status = 'pending';
@@ -385,15 +391,15 @@ class MutationQueue {
       }
     }
 
-    this.processing = false;
-    this.currentStatus = this.queue.length > 0 ? 'idle' : 'idle';
-    this.currentMutation = null;
-    
-    if (this.queue.length === 0) {
-      console.log('[MutationQueue] All mutations synced successfully');
+    } finally {
+      this.processing = false;
+      this.currentStatus = 'idle';
+      this.currentMutation = null;
+      if (this.queue.length === 0) {
+        console.log('[MutationQueue] All mutations synced successfully');
+      }
+      this.notifyStatusChange();
     }
-    
-    this.notifyStatusChange();
   }
 
   getQueue() {

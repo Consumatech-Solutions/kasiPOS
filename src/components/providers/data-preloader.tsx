@@ -110,10 +110,10 @@ async function verifyServiceWorkerCache(maxRetries: number = 5, retryDelay: numb
     return false;
   }
 
-  // Wait for service worker to be ready first
+  // Wait for service worker to be ready first (non-blocking: we continue verification either way)
   const swReady = await waitForServiceWorkerReady();
   if (!swReady) {
-    console.warn('[DataPreloader] Service worker not ready - cache verification may be incomplete');
+    console.log('[DataPreloader] Service worker not ready yet - cache verification may complete on next load');
   }
 
   // PRECACHE_ASSETS from public/sw.js - all are required except /offline which might not exist
