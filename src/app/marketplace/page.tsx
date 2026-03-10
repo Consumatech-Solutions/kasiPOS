@@ -11,6 +11,9 @@ import { feedback } from '@/lib/feedback';
 import { ERROR_CODES } from '@/lib/error-codes';
 import { useMarketplaceOrders } from '@/hooks/use-marketplace-orders';
 import { useMarketplaceStores } from '@/hooks/use-marketplace-stores';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { RequireOnlineBanner } from '@/components/require-online-banner';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,6 +21,7 @@ import type { MarketplaceOrderItem } from '@/lib/api/marketplace-orders';
 
 
 export default function MarketplacePage() {
+  const { isOnline } = useNetworkStatus();
   const [orderCode, setOrderCode] = useState('');
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const { findByOrderCode, foundOrder, searchLoading } = useMarketplaceOrders({ autoLoad: false });
@@ -45,6 +49,8 @@ export default function MarketplacePage() {
 
   return (
     <div className="p-2 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
+      <RequireOnlineBanner />
+      <div className={cn(!isOnline && 'opacity-60 pointer-events-none select-none')}>
       <Card>
         <CardHeader>
           <CardTitle className="text-lg sm:text-xl">Marketplace</CardTitle>
@@ -200,6 +206,7 @@ export default function MarketplacePage() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

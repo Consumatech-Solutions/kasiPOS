@@ -1,0 +1,11 @@
+---
+description: All comments and code must be in English
+alwaysApply: true
+---
+
+# Language: English only
+
+- **Comments**: Write all comments (single-line `//`, block `/* */`, JSDoc, and docstrings) in English.
+- **Code**: Use English for variable names, function names, string literals shown to users or used in logic, error messages, log messages, and UI text (labels, placeholders, titles, descriptions).
+- **Documentation**: Keep README, docs, and in-repo documentation in English.
+- **Consistency**: Do not add French or other non-English text in source files; use English only.
