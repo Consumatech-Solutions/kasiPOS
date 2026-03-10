@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical, QrCode, Layers } from 'lucide-react';
 import {
   DropdownMenu,
@@ -74,6 +74,14 @@ export default function CataloguePage() {
   const [activeCatalogueTab, setActiveCatalogueTab] = useState<string>('products');
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
   const [addTemplatesOpen, setAddTemplatesOpen] = useState(false);
+  /** Single delete confirmation (avoids AlertDialog inside table rows; prevents crash when list updates) */
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'product' | 'category'; id: string } | null>(null);
+
+  /** Open delete confirm after releasing focus from dropdown to avoid aria-hidden on focused element */
+  const openDeleteConfirm = useCallback((type: 'product' | 'category', id: string) => {
+    (document.activeElement as HTMLElement)?.blur();
+    setTimeout(() => setDeleteConfirm({ type, id }), 0);
+  }, []);
 
   // Generate a unique barcode (EAN-13 format: 13 digits)
   const generateBarcode = (): string => {
@@ -419,11 +427,12 @@ export default function CataloguePage() {
         feedback.success('Category deleted', 'Category deleted successfully.');
       } else {
         // Offline: optimistic update then queue
+        const idStr = String(id);
         queryClient.setQueryData(categoryKeys.lists(), (old: { data: ApiCategory[]; meta: any } | undefined) => {
           if (!old) return old;
           return {
             ...old,
-            data: old.data.filter(cat => cat.id !== id),
+            data: old.data.filter(cat => String(cat.id) !== idStr),
             meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
           };
         });
@@ -431,7 +440,7 @@ export default function CataloguePage() {
           if (!old) return old;
           return {
             ...old,
-            data: old.data.filter(cat => cat.id !== id),
+            data: old.data.filter(cat => String(cat.id) !== idStr),
             meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
           };
         });
@@ -547,33 +556,26 @@ export default function CataloguePage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[10rem]">
-                            <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer" onClick={() => openProductDialog(p)}>
+                            <DropdownMenuItem
+                              className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer"
+                              onSelect={() => {
+                                (document.activeElement as HTMLElement)?.blur();
+                                setTimeout(() => openProductDialog(p), 50);
+                              }}
+                            >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription className="text-sm">
-                                    This action cannot be undone. This will permanently delete the product.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingProductId === p.id || isDeletingProduct}>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteProduct(p.id!)} disabled={deletingProductId === p.id || isDeletingProduct}>
-                                    {(deletingProductId === p.id || isDeletingProduct) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {deletingProductId === p.id || isDeletingProduct ? 'Deleting...' : 'Delete'}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <DropdownMenuItem
+                              className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive"
+                              onSelect={() => {
+                                (document.activeElement as HTMLElement)?.blur();
+                                setTimeout(() => openDeleteConfirm('product', String(p.id)), 50);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -627,33 +629,26 @@ export default function CataloguePage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[10rem]">
-                            <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer" onClick={() => openCategoryDialog(c)}>
+                            <DropdownMenuItem
+                              className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer"
+                              onSelect={() => {
+                                (document.activeElement as HTMLElement)?.blur();
+                                setTimeout(() => openCategoryDialog(c), 50);
+                              }}
+                            >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive" onSelect={(e) => e.preventDefault()}>
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription className="text-sm">
-                                    This action cannot be undone. This will permanently delete the category. Any products in this category will not be deleted but will need to be re-categorized.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCategoryId === c.id || isDeletingCategory}>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCategory(c.id!)} disabled={deletingCategoryId === c.id || isDeletingCategory}>
-                                    {(deletingCategoryId === c.id || isDeletingCategory) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    {deletingCategoryId === c.id || isDeletingCategory ? 'Deleting...' : 'Delete'}
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <DropdownMenuItem
+                              className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive"
+                              onSelect={() => {
+                                (document.activeElement as HTMLElement)?.blur();
+                                setTimeout(() => openDeleteConfirm('category', String(c.id)), 50);
+                              }}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -683,7 +678,17 @@ export default function CataloguePage() {
       </Card>
 
       {/* Product Dialog */}
-      <Dialog open={productDialogOpen} onOpenChange={setProductDialogOpen}>
+      <Dialog
+        open={productDialogOpen}
+        onOpenChange={(open) => {
+          setProductDialogOpen(open);
+          if (!open) {
+            setEditingProduct(null);
+            setProductImageUrl(null);
+            productForm.reset();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
             <DialogHeader className="flex-shrink-0">
                 <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
@@ -704,7 +709,7 @@ export default function CataloguePage() {
                     <FormField control={productForm.control} name="category" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Category</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a category" />
@@ -821,7 +826,13 @@ export default function CataloguePage() {
     </Dialog>
     
     {/* Category Dialog */}
-    <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+    <Dialog
+      open={categoryDialogOpen}
+      onOpenChange={(open) => {
+        setCategoryDialogOpen(open);
+        if (!open) setEditingCategory(null);
+      }}
+    >
         <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
             <DialogHeader>
                 <DialogTitle className="text-lg sm:text-xl">{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
@@ -877,6 +888,49 @@ export default function CataloguePage() {
         refreshCategories();
       }}
     />
+
+    {/* Single delete confirmation dialog (page-level to avoid unmount crash when list updates) */}
+    <AlertDialog open={deleteConfirm !== null} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+      <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm">
+            {deleteConfirm?.type === 'product'
+              ? 'This action cannot be undone. This will permanently delete the product.'
+              : 'This action cannot be undone. This will permanently delete the category. Any products in this category will not be deleted but will need to be re-categorized.'}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => setDeleteConfirm(null)}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className="min-h-[44px] touch-target w-full sm:w-auto text-destructive focus:ring-destructive"
+            disabled={
+              deleteConfirm?.type === 'product'
+                ? (deletingProductId === deleteConfirm?.id || isDeletingProduct)
+                : (deletingCategoryId === deleteConfirm?.id || isDeletingCategory)
+            }
+            onClick={async () => {
+              if (!deleteConfirm) return;
+              if (deleteConfirm.type === 'product') {
+                await handleDeleteProduct(deleteConfirm.id);
+              } else {
+                await handleDeleteCategory(deleteConfirm.id);
+              }
+              setDeleteConfirm(null);
+            }}
+          >
+            {(deleteConfirm?.type === 'product' ? deletingProductId === deleteConfirm?.id || isDeletingProduct : deletingCategoryId === deleteConfirm?.id || isDeletingCategory) && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            {(deleteConfirm?.type === 'product' ? deletingProductId === deleteConfirm?.id || isDeletingProduct : deletingCategoryId === deleteConfirm?.id || isDeletingCategory)
+              ? 'Deleting...'
+              : 'Delete'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }

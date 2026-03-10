@@ -108,17 +108,22 @@ export async function fetchAndSaveStore(
       return store;
     }
   } catch (error: any) {
-    console.error('[StorePersistence] Error fetching store:', error);
-    
-    // Try to load from IndexedDB as fallback
-    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      console.log('[StorePersistence] Network error - attempting to load from IndexedDB');
+    const isNetworkFailure =
+      error?.isNetworkError === true ||
+      error?.name === 'NetworkError' ||
+      error?.code === 'ERR_NETWORK' ||
+      error?.message === 'Network Error' ||
+      error?.message?.includes('Network request failed');
+
+    if (isNetworkFailure) {
       const cachedStore = await loadStoreFromIndexedDB();
       if (cachedStore && setSetting) {
         setSetting('currentStore', cachedStore);
         return cachedStore;
       }
+      return null;
     }
+    console.error('[StorePersistence] Error fetching store:', error);
   }
 
   return null;
