@@ -7,6 +7,9 @@ import { feedback } from '@/lib/feedback';
 import { ERROR_CODES } from '@/lib/error-codes';
 import { useSettings } from '@/components/settings-provider';
 import { useProducts } from '@/hooks/use-catalogue';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { RequireOnlineBanner } from '@/components/require-online-banner';
+import { cn } from '@/lib/utils';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function BuyStockPage() {
   const { settings } = useSettings();
+  const { isOnline } = useNetworkStatus();
   const { currentStore } = settings;
 
   // Use API hook for products
@@ -83,6 +87,8 @@ export default function BuyStockPage() {
 
   return (
     <div className="p-2 sm:p-4 space-y-4 sm:space-y-6">
+      <RequireOnlineBanner />
+      <div className={cn(!isOnline && 'opacity-60 pointer-events-none select-none')}>
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -224,6 +230,7 @@ export default function BuyStockPage() {
 
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

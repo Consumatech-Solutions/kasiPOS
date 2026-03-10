@@ -15,7 +15,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'KasiPOS',
-  description: 'Modern Point of Sale for small businesses.',
+  description: 'Store admin app — Modern Point of Sale for small businesses. For store administrators only.',
   manifest: '/manifest.json',
   icons: {
     icon: '/icons/icon-192x192.svg',

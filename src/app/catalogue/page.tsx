@@ -486,7 +486,13 @@ export default function CataloguePage() {
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Category
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => setAddTemplatesOpen(true)} className="min-h-[44px] touch-target">
+                  <Button
+                    variant="outline"
+                    onClick={() => isOnline && setAddTemplatesOpen(true)}
+                    className="min-h-[44px] touch-target"
+                    disabled={!isOnline}
+                    title={!isOnline ? 'Downloading templates requires an internet connection.' : undefined}
+                  >
                     <Layers className="mr-2 h-4 w-4" /> Add Templates
                   </Button>
                 </div>

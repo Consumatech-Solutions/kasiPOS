@@ -30,8 +30,9 @@ import { db } from '@/lib/db';
 export default function CustomersPage() {
   const queryClient = useQueryClient();
   const { settings } = useSettings();
-  const { currentStore } = settings;
+  const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
+  const canDeleteCustomer = currentUser?.role === 'store_admin';
   
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
@@ -107,7 +108,13 @@ export default function CustomersPage() {
       } else {
         if (isOnline) {
           await createCustomer(data);
-          feedback.success('Customer added', 'Customer added successfully.');
+          const hasContact = data?.contact?.trim();
+          feedback.success(
+            'Customer created',
+            hasContact
+              ? 'A welcome SMS has been sent to the number provided.'
+              : 'Customer registered.'
+          );
         } else {
           // Offline: optimistic update then queue
           const tempId = `temp-${Date.now()}`;
@@ -154,6 +161,7 @@ export default function CustomersPage() {
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
 
   const handleDeleteCustomer = async (id: string) => {
+    if (!canDeleteCustomer) return;
     setDeletingCustomerId(id);
     try {
       if (isOnline) {
@@ -278,28 +286,30 @@ export default function CustomersPage() {
                           <Button variant="ghost" size="icon" className="touch-target" onClick={() => openCustomerDialog(customer)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="touch-target">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="text-lg sm:text-xl">Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-sm">
-                                  This action cannot be undone. This will permanently delete the customer and their data.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                                <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCustomerId === customer.id || isDeleting}>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCustomer(customer.id)} disabled={deletingCustomerId === customer.id || isDeleting}>
-                                  {(deletingCustomerId === customer.id || isDeleting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                  {deletingCustomerId === customer.id || isDeleting ? 'Deleting...' : 'Delete'}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {canDeleteCustomer && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="touch-target">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-lg sm:text-xl">Delete customer?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-sm">
+                                    This cannot be undone. The customer will be permanently removed from your store.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                                  <AlertDialogCancel className="min-h-[44px] touch-target w-full sm:w-auto" disabled={deletingCustomerId === customer.id || isDeleting}>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="min-h-[44px] touch-target w-full sm:w-auto" onClick={() => handleDeleteCustomer(customer.id)} disabled={deletingCustomerId === customer.id || isDeleting}>
+                                    {(deletingCustomerId === customer.id || isDeleting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    {deletingCustomerId === customer.id || isDeleting ? 'Deleting...' : 'Delete'}
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
