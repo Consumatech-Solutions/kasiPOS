@@ -10,6 +10,8 @@ import { useParcels } from "@/hooks/use-parcels";
 import type { Parcel } from "@/lib/api/parcels";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useNetworkStatus } from "@/hooks/use-network-status";
+import { RequireOnlineBanner } from "@/components/require-online-banner";
+import { cn } from "@/lib/utils";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { parcelsApi } from "@/lib/api/parcels";
 
@@ -278,6 +280,8 @@ export default function BophPage() {
 
   return (
     <div className="p-2 sm:p-4">
+      <RequireOnlineBanner />
+      <div className={cn(!isOnline && "opacity-60 pointer-events-none select-none")}>
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -898,6 +902,7 @@ export default function BophPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }
