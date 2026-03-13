@@ -33,7 +33,8 @@ export default function CustomersPage() {
   const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
   const canDeleteCustomer = currentUser?.role === 'store_admin';
-  
+  const showStoreColumn = currentUser?.role === 'admin' || (customers.length > 0 && customers.some((c) => c.storeId != null));
+
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -43,9 +44,10 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  // Use the API hook
+  // Use the API hook. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
   const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
     searchQuery: searchTerm,
+    storeIdForOffline: currentStore?.id ?? undefined,
   });
 
   // Get customer transactions (still using IndexedDB for transactions)
@@ -261,6 +263,9 @@ export default function CustomersPage() {
                   <TableHead>Customer</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Loyalty Points</TableHead>
+                  {showStoreColumn && (
+                    <TableHead className="hidden sm:table-cell">Store</TableHead>
+                  )}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -278,6 +283,15 @@ export default function CustomersPage() {
                           {customer.loyaltyPoints.toLocaleString()}
                         </Badge>
                       </TableCell>
+                      {showStoreColumn && (
+                        <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
+                          {customer.storeId != null
+                            ? customer.storeId === currentStore?.id
+                              ? currentStore?.name ?? 'This store'
+                              : customer.storeId
+                            : '—'}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1 sm:gap-2">
                           <Button variant="ghost" size="icon" className="touch-target" onClick={() => openHistoryDialog(customer)}>
@@ -316,7 +330,10 @@ export default function CustomersPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center h-24">
+                    <TableCell
+                      colSpan={showStoreColumn ? 5 : 4}
+                      className="text-center h-24"
+                    >
                       No customers found.
                     </TableCell>
                   </TableRow>

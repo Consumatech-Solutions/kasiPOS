@@ -64,12 +64,16 @@ export interface Customer {
   loyaltyPoints: number;
   createdAt: string;
   updatedAt: string;
+  /** Store this customer belongs to (backend scopes by store). */
+  storeId?: string | null;
 }
 
 export interface CreateCustomerDto {
   name: string;
   contact: string;
   loyaltyPoints?: number;
+  /** Optional: for admin only; attach customer to this store. Omit for store admin (backend uses JWT). */
+  storeId?: string | null;
 }
 
 export interface UpdateCustomerDto {

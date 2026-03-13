@@ -264,13 +264,17 @@ export async function getProductsFromDexie(
 export async function getCustomersFromDexie(
   page: number,
   limit: number,
-  search?: string
+  search?: string,
+  storeId?: string | null
 ): Promise<{ data: Customer[]; meta: PaginationMeta }> {
   if (typeof window === 'undefined') {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
   let all = await db.customers.toArray();
+  if (storeId != null && storeId !== '') {
+    all = all.filter((c) => (c as Customer).storeId === storeId);
+  }
   all.sort((a, b) => {
     const aT = (a as Customer).updatedAt ?? '';
     const bT = (b as Customer).updatedAt ?? '';
@@ -299,21 +303,24 @@ export async function getCustomersFromDexie(
 
 export async function getTransactionsFromDexie(
   page: number,
-  limit: number
+  limit: number,
+  storeId?: string | null
 ): Promise<{ data: Transaction[]; meta: PaginationMeta }> {
   if (typeof window === 'undefined') {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
-  const total = await db.transactionCache.count();
-  const data = await db.transactionCache
-    .orderBy('date')
-    .reverse()
-    .offset((page - 1) * limit)
-    .limit(limit)
-    .toArray();
+  let all = await db.transactionCache.toArray();
+  if (storeId != null && storeId !== '') {
+    all = all.filter((t) => (t as Transaction & { storeId?: string }).storeId === storeId);
+  }
+  const sorted = (all as { date?: string }[]).sort((a, b) =>
+    (b.date ?? '').localeCompare(a.date ?? '')
+  );
+  const total = sorted.length;
+  const data = sorted.slice((page - 1) * limit, page * limit) as unknown as Transaction[];
   return {
-    data: data as unknown as Transaction[],
+    data,
     meta: {
       total,
       page,
