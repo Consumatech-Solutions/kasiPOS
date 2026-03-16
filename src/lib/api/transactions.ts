@@ -86,17 +86,19 @@ export const transactionsApi = {
     if (params?.date !== undefined) requestParams.date = params.date;
     if (params?.customerId !== undefined) requestParams.customerId = params.customerId;
     if (params?.search !== undefined) requestParams.search = params.search;
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
 
     return api.get<PaginatedResponse<Transaction> | Transaction[]>('/transactions', {
       params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
     });
   },
 
-  /**
-   * Get a transaction by ID
-   */
-  getById: (id: string) => {
-    return api.get<Transaction>(`/transactions/${id}`);
+  getById: (id: string, params?: { storeId?: string | null }) => {
+    const requestParams: Record<string, string> = {};
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
+    return api.get<Transaction>(`/transactions/${id}`, {
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
+    });
   },
 };
 

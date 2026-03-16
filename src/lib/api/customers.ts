@@ -7,51 +7,43 @@ export const customersApi = {
    * Get all customers with pagination and search
    */
   getAll: (params?: PaginationParams) => {
-    // Use axios params option - only include params if they are provided
     const requestParams: Record<string, number | string> = {};
-    if (params?.page !== undefined) {
-      requestParams.page = params.page;
-    }
-    if (params?.limit !== undefined) {
-      requestParams.limit = params.limit;
-    }
-    if (params?.search !== undefined && params.search.trim()) {
-      requestParams.search = params.search.trim();
-    }
-    if (params?.updatedAtAfter) {
-      requestParams.updatedAtAfter = params.updatedAtAfter;
-    }
-    
+    if (params?.page !== undefined) requestParams.page = params.page;
+    if (params?.limit !== undefined) requestParams.limit = params.limit;
+    if (params?.search !== undefined && params.search.trim()) requestParams.search = params.search.trim();
+    if (params?.updatedAtAfter) requestParams.updatedAtAfter = params.updatedAtAfter;
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
+
     return api.get<PaginatedResponse<Customer> | Customer[]>('/customers', {
-      params: Object.keys(requestParams).length > 0 ? requestParams : undefined
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
     });
   },
 
-  /**
-   * Get customer by ID
-   */
-  getById: (id: string) => {
-    return api.get<Customer>(`/customers/${id}`);
+  getById: (id: string, params?: { storeId?: string | null }) => {
+    const requestParams: Record<string, string> = {};
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
+    return api.get<Customer>(`/customers/${id}`, {
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
+    });
   },
 
-  /**
-   * Create a new customer
-   */
   create: (data: CreateCustomerDto) => {
     return api.post<Customer>('/customers', data);
   },
 
-  /**
-   * Update a customer
-   */
-  update: (id: string, data: UpdateCustomerDto) => {
-    return api.patch<Customer>(`/customers/${id}`, data);
+  update: (id: string, data: UpdateCustomerDto, params?: { storeId?: string | null }) => {
+    const requestParams: Record<string, string> = {};
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
+    return api.patch<Customer>(`/customers/${id}`, data, {
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
+    });
   },
 
-  /**
-   * Delete a customer
-   */
-  delete: (id: string) => {
-    return api.delete(`/customers/${id}`);
+  delete: (id: string, params?: { storeId?: string | null }) => {
+    const requestParams: Record<string, string> = {};
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
+    return api.delete(`/customers/${id}`, {
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
+    });
   },
 };

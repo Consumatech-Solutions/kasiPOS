@@ -38,6 +38,35 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  function isChunkLoadError(msg) {
+    if (!msg) return false;
+    var s = String(msg);
+    return s.indexOf('Loading chunk') !== -1 || s.indexOf('ChunkLoadError') !== -1 || s.indexOf('Loading CSS chunk') !== -1;
+  }
+  function tryReload() {
+    try {
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('kasiPOS_chunkReload') === '1')
+        return;
+      sessionStorage.setItem('kasiPOS_chunkReload', '1');
+      window.location.reload();
+    } catch (e) {}
+  }
+  window.addEventListener('error', function(e) {
+    if (isChunkLoadError(e.message)) { e.preventDefault(); tryReload(); }
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    if (e.reason && isChunkLoadError(e.reason.message || e.reason)) { e.preventDefault(); tryReload(); }
+  });
+})();
+`,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
         <QueryProvider>
           <ClientDbProvider>

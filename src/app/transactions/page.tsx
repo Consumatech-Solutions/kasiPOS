@@ -35,12 +35,13 @@ export default function TransactionsPage() {
   const isTransactionIdSearch = searchTerm && /^[0-9a-f-]{0,36}$/i.test(searchTerm);
   const backendSearch = isTransactionIdSearch ? searchTerm : undefined;
 
-  // Use API hooks - params in query key will auto-refetch when they change
+  // Use API hooks. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
   const { transactions: allTransactions, loading, error } = useTransactions({
     page: 1,
     limit: 10,
     date: dateFilter,
     search: backendSearch,
+    storeIdForOffline: currentStore?.id ?? undefined,
   });
 
   const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
