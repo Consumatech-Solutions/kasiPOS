@@ -3,13 +3,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
-import type { Product, Transaction, TransactionItem, Customer } from '@/types';
+import type { Product, Transaction, TransactionItem, Customer, TransactionDiscount } from '@/types';
 import { db, getDb } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, LayoutGrid, List } from 'lucide-react';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, LayoutGrid, List, Percent } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
+import ApplyDiscountModal from '@/components/pos/ApplyDiscountModal';
 import { ReceiptModal, type ReceiptData } from '@/components/pos/ReceiptModal';
 import { BarcodeScanner } from '@/components/barcode-scanner';
 import { useSettings } from '@/components/settings-provider';
@@ -60,8 +61,10 @@ export default function PosPage() {
   const [productSearch, setProductSearch] = useState('');
   const [activePaymentMethod, setActivePaymentMethod] = useState<'Cash' | 'Card' | 'Mobile Money' | null>(null);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [isApplyDiscountModalOpen, setIsApplyDiscountModalOpen] = useState(false);
   const [appliedDiscount, setAppliedDiscount] = useState(0);
   const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | undefined>(undefined);
+  const [manualDiscount, setManualDiscount] = useState<TransactionDiscount | null>(null);
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
@@ -74,6 +77,7 @@ export default function PosPage() {
     clearCart();
     setAppliedDiscount(0);
     setAppliedVoucherCode(undefined);
+    setManualDiscount(null);
     setIsClearCartDialogOpen(false);
   };
 
@@ -144,7 +148,14 @@ export default function PosPage() {
 
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
-  const cartTotal = cartSubtotal - appliedDiscount;
+  const manualDiscountAmount = useMemo(() => {
+    if (!manualDiscount) return 0;
+    if (manualDiscount.discountType === 'percentage') {
+      return Math.round((cartSubtotal * manualDiscount.discountAmount) / 100 * 100) / 100;
+    }
+    return Math.min(cartSubtotal, Math.max(0, manualDiscount.discountAmount));
+  }, [manualDiscount, cartSubtotal]);
+  const cartTotal = cartSubtotal - appliedDiscount - manualDiscountAmount;
   const VAT_RATE = 15;
   const showVatInCheckout = settings.showVatInCheckout !== false;
   // VAT on: add VAT to total (Total = Subtotal + VAT)
@@ -172,6 +183,15 @@ export default function PosPage() {
     setAppliedVoucherCode(code);
     setAppliedDiscount(amount);
     feedback.success('Voucher applied', `Discount of R${amount.toFixed(2)} applied.`);
+  };
+
+  const handleApplyManualDiscount = (discount: TransactionDiscount) => {
+    setManualDiscount(discount);
+    const amount =
+      discount.discountType === 'percentage'
+        ? (cartSubtotal * discount.discountAmount) / 100
+        : discount.discountAmount;
+    feedback.success('Discount applied', `Discount of R${amount.toFixed(2)} applied.`);
   };
 
   const handleCustomerSelect = (customerId: string) => {
@@ -241,6 +261,7 @@ export default function PosPage() {
       customerId: selectedCustomerId,
       voucherCode: appliedVoucherCode,
       discountAmount: appliedDiscount,
+      discount: manualDiscount ?? undefined,
       total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
       storeId: currentStore.id!,
     };
@@ -251,7 +272,7 @@ export default function PosPage() {
         saleId,
         items: newTransaction.items,
         subtotal: cartTotal, // Ex-VAT subtotal when VAT on, otherwise same as total
-        discountAmount: appliedDiscount,
+        discountAmount: appliedDiscount + manualDiscountAmount,
         total: amountToPay,
         paymentMethod: newTransaction.paymentMethod,
         showVat: showVatInCheckout,
@@ -669,6 +690,10 @@ export default function PosPage() {
                     <span className="hidden sm:inline">Redeem Voucher</span>
                     <span className="sm:hidden">Voucher</span>
                 </Button>}
+                <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={() => cartItems.length > 0 && setIsApplyDiscountModalOpen(true)} disabled={cartItems.length === 0}>
+                  <Percent className="mr-1 sm:mr-2 h-4 w-4"/>
+                  <span>Discount</span>
+                </Button>
             </div>
         </div>
 
@@ -764,7 +789,7 @@ export default function PosPage() {
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span>R {cartTotal.toFixed(2)}</span>
+                  <span>R {cartSubtotal.toFixed(2)}</span>
               </div>
               {showVatInCheckout && (
                 <div className="flex justify-between text-gray-500">
@@ -772,10 +797,12 @@ export default function PosPage() {
                   <span>R {vatAmount.toFixed(2)}</span>
                 </div>
               )}
-              <div className={`flex justify-between ${appliedDiscount > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+              {(appliedDiscount > 0 || manualDiscountAmount > 0) && (
+                <div className="flex justify-between text-green-600 font-medium">
                   <span>Discount Applied</span>
-                  <span>-R {appliedDiscount.toFixed(2)}</span>
-              </div>
+                  <span>-R {(appliedDiscount + manualDiscountAmount).toFixed(2)}</span>
+                </div>
+              )}
             </div>
             <div className="mb-3 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
               {showVatInCheckout
@@ -833,6 +860,12 @@ export default function PosPage() {
         customerId={selectedCustomerId}
         onApplyVoucher={handleApplyVoucher}
         cartTotal={cartSubtotal} // Pass subtotal before discount for validation
+    />
+    <ApplyDiscountModal
+        isOpen={isApplyDiscountModalOpen}
+        onClose={() => setIsApplyDiscountModalOpen(false)}
+        cartSubtotal={cartSubtotal}
+        onApply={handleApplyManualDiscount}
     />
     <ReceiptModal
         open={receiptOpen}
