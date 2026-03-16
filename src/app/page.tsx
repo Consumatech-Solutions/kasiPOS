@@ -683,46 +683,60 @@ export default function PosPage() {
                 <p>Cart is empty</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
+                {/* Column headers (invisible lines: no borders, left-aligned) */}
+                <div className="grid grid-cols-[1fr_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[1fr_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left">
+                  <span>Product</span>
+                  <span>Price</span>
+                  <span>Qty</span>
+                  <span>Total</span>
+                  <span aria-hidden className="w-9" />
+                </div>
                 {cartItems.map(item => (
-                  <div key={item.productId} className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 min-w-0">
-                    {item.imageUrl && !item.imageUrl.startsWith('blob:') ? (
-                      <div className="relative w-10 h-10 flex-shrink-0">
-                        <Image 
-                          src={item.imageUrl} 
-                          alt={item.productName} 
-                          width={40} 
-                          height={40} 
-                          className="rounded-md bg-gray-200 object-cover" 
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const initialsDiv = target.nextElementSibling as HTMLElement;
-                            if (initialsDiv) {
-                              initialsDiv.style.display = 'flex';
-                            }
-                          }} 
-                        />
-                        <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                  <div
+                    key={item.productId}
+                    className="grid grid-cols-[1fr_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[1fr_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 min-w-0"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {item.imageUrl && !item.imageUrl.startsWith('blob:') ? (
+                        <div className="relative w-10 h-10 flex-shrink-0">
+                          <Image 
+                            src={item.imageUrl} 
+                            alt={item.productName} 
+                            width={40} 
+                            height={40} 
+                            className="rounded-md bg-gray-200 object-cover" 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const initialsDiv = target.nextElementSibling as HTMLElement;
+                              if (initialsDiv) {
+                                initialsDiv.style.display = 'flex';
+                              }
+                            }} 
+                          />
+                          <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                            {getProductInitials(item.productName)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
                           {getProductInitials(item.productName)}
                         </div>
+                      )}
+                      <div className="flex-grow min-w-0">
+                        <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
+                        <p className="text-xs text-muted-foreground sm:hidden">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                       </div>
-                    ) : (
-                      <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
-                        {getProductInitials(item.productName)}
-                      </div>
-                    )}
-                    <div className="flex-grow min-w-0">
-                      <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
-                      <p className="text-xs text-gray-500">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
+                    <p className="text-xs sm:text-sm text-muted-foreground text-left hidden sm:block">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
+                    <div className="flex items-center justify-start gap-1 sm:gap-2">
+                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
                       <span className="font-bold text-sm w-6 sm:w-4 text-center">{item.quantity}</span>
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target"
+                        className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0"
                         onClick={() => {
                           const stock = item.stock;
                           if (typeof stock === 'number' && item.quantity + 1 > stock) {
@@ -736,7 +750,7 @@ export default function PosPage() {
                         }}
                       ><Plus className="h-3 w-3" /></Button>
                     </div>
-                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-right">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
+                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-left">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
                     <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}

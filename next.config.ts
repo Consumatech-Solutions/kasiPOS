@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   // Increase chunk load timeout to avoid ChunkLoadError when dev server is slow (e.g. first load or Windows)
   webpack: (config, { isServer, dev }) => {
     if (!isServer && config.output) {
-      config.output.chunkLoadTimeout = dev ? 120000 : 60000; // 2 min in dev, 1 min in prod
+      config.output.chunkLoadTimeout = dev ? 180000 : 60000; // 3 min in dev (avoids ChunkLoadError on slow builds), 1 min in prod
     }
     if (dev) {
       // Avoid UNKNOWN/open webpack.js and "incorrect header check" on .pack.gz (Windows)
