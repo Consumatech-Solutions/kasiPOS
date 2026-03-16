@@ -76,6 +76,8 @@ export default function CataloguePage() {
   const [addTemplatesOpen, setAddTemplatesOpen] = useState(false);
   /** Single delete confirmation (avoids AlertDialog inside table rows; prevents crash when list updates) */
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'product' | 'category'; id: string } | null>(null);
+  /** Modal shown when user tries to add a product or category that already exists (same name) */
+  const [duplicateNameModal, setDuplicateNameModal] = useState<{ type: 'product' | 'category' } | null>(null);
 
   /** Open delete confirm after releasing focus from dropdown to avoid aria-hidden on focused element */
   const openDeleteConfirm = useCallback((type: 'product' | 'category', id: string) => {
@@ -238,6 +240,14 @@ export default function CataloguePage() {
           feedback.success('Queued', 'Product update queued. Will sync when online.');
         }
       } else {
+        const nameLower = (values.name ?? '').toString().trim().toLowerCase();
+        const productExists = (products ?? []).some(
+          (p: { name?: string }) => (p.name ?? '').toString().trim().toLowerCase() === nameLower
+        );
+        if (productExists) {
+          setDuplicateNameModal({ type: 'product' });
+          return;
+        }
         if (isOnline) {
           await createProduct(productData as any);
           feedback.success('Product added', 'Product added successfully.');
@@ -374,6 +384,14 @@ export default function CataloguePage() {
           feedback.success('Queued', 'Category update queued. Will sync when online.');
         }
       } else {
+        const nameLower = (values.name ?? '').toString().trim().toLowerCase();
+        const categoryExists = (typedCategories ?? []).some(
+          (c: ApiCategory) => (c.name ?? '').toString().trim().toLowerCase() === nameLower
+        );
+        if (categoryExists) {
+          setDuplicateNameModal({ type: 'category' });
+          return;
+        }
         if (isOnline) {
           await createCategory(values);
           feedback.success('Category added', 'Category added successfully.');
@@ -865,6 +883,26 @@ export default function CataloguePage() {
                 </form>
             </Form>
         </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!duplicateNameModal} onOpenChange={(open) => !open && setDuplicateNameModal(null)}>
+      <DialogContent className="max-w-[95vw] sm:max-w-[400px] p-4 sm:p-6">
+        <DialogHeader>
+          <DialogTitle className="text-lg sm:text-xl">
+            {duplicateNameModal?.type === 'product' ? 'Product already exists' : 'Category already exists'}
+          </DialogTitle>
+          <DialogDescription className="text-sm">
+            {duplicateNameModal?.type === 'product'
+              ? 'A product with this name already exists. Please choose a different name.'
+              : 'A category with this name already exists. Please choose a different name.'}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button className="min-h-[44px] touch-target" onClick={() => setDuplicateNameModal(null)}>
+            OK
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
 
     <Dialog open={isBarcodeScannerOpen} onOpenChange={setIsBarcodeScannerOpen}>
