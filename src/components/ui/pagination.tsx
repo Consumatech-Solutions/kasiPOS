@@ -10,6 +10,7 @@ interface PaginationProps {
   meta: PaginationMeta;
   onPageChange: (page: number) => void;
   className?: string;
+  currentPage?: number;
 }
 
 export function Pagination({ meta, onPageChange, className }: PaginationProps) {

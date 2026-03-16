@@ -32,11 +32,18 @@ export default function CustomersPage() {
   const { settings } = useSettings();
   const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
+
+    // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+
+    // Use the API hook. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
+  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
+    searchQuery: searchTerm,
+    storeIdForOffline: currentStore?.id ?? undefined,
+  });
+
   const canDeleteCustomer = currentUser?.role === 'store_admin';
   const showStoreColumn = currentUser?.role === 'admin' || (customers.length > 0 && customers.some((c) => c.storeId != null));
-
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
   
   // Dialog states
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
@@ -44,11 +51,7 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  // Use the API hook. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
-  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
-    searchQuery: searchTerm,
-    storeIdForOffline: currentStore?.id ?? undefined,
-  });
+
 
   // Get customer transactions (still using IndexedDB for transactions)
   const customerTransactions = useLiveQuery(() => {
@@ -58,7 +61,7 @@ export default function CustomersPage() {
       return db.transactions
         .where('storeId')
         .equals(currentStore.id!)
-        .filter(t => {
+        .filter((t: any) => {
           // Compare with both possible formats
           const customerId = selectedCustomer.id;
           return t.customerId === customerId || 
@@ -345,8 +348,7 @@ export default function CustomersPage() {
           {pagination.totalPages > 1 && (
             <div className="mt-4">
               <Pagination
-                currentPage={pagination.page}
-                totalPages={pagination.totalPages}
+                meta={pagination}
                 onPageChange={handlePageChange}
               />
             </div>
@@ -392,10 +394,10 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customerTransactions?.map(transaction => (
+                {customerTransactions?.map((transaction: Transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>#{transaction.id}</TableCell>
-                    <TableCell>{format(transaction.date, 'PPP')}</TableCell>
+                    <TableCell>{format(transaction.date || new Date(), 'PPP')}</TableCell>
                     <TableCell>{transaction.items.length}</TableCell>
                     <TableCell className="text-right">R{transaction.total.toFixed(2)}</TableCell>
                   </TableRow>
