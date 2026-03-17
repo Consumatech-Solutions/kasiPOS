@@ -7,11 +7,11 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer, CreditCard, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
-import { usersApi } from '@/lib/api';
+import { usersApi, settingsApi } from '@/lib/api';
 import { storesApi } from '@/lib/api/stores';
 import { saveStorePermanently } from '@/lib/store-persistence';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -59,6 +59,19 @@ export default function SettingsPage() {
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingModules, setIsUpdatingModules] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  const [savingCredit, setSavingCredit] = useState(false);
+  const [storeSettingsCredit, setStoreSettingsCredit] = useState<{
+    creditLimit: number;
+    termType: 'fixed' | 'variable';
+    term?: number;
+  } | null>(null);
+  const [creditForm, setCreditForm] = useState({
+    enabled: false,
+    creditLimit: 500,
+    termType: 'fixed' as 'fixed' | 'variable',
+    term: 7,
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
@@ -126,6 +139,57 @@ export default function SettingsPage() {
     fetchUsers();
   }, [userManagementStoreId, page]);
 
+  // Load store settings (credit config) from GET /settings for admin/store_admin
+  useEffect(() => {
+    if (!isAdmin && currentUser?.role !== 'store_admin') return;
+    if (!isOnline) return;
+    setLoadingSettings(true);
+    settingsApi
+      .get()
+      .then((res) => {
+        const credit = res.data?.credit;
+        const cc = credit?.customerCredit;
+        if (cc) {
+          setStoreSettingsCredit({
+            creditLimit: Number(cc.creditLimit ?? 0),
+            termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+            term: cc.term != null ? Number(cc.term) : 7,
+          });
+          setCreditForm({
+            enabled: true,
+            creditLimit: Number(cc.creditLimit ?? 0),
+            termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+            term: cc.term != null ? Number(cc.term) : 7,
+          });
+          if (settingsStore && credit && !settingsStore.credit) {
+            setSetting('currentStore', { ...settingsStore, credit });
+          }
+        } else {
+          const fromStore = settingsStore?.credit?.customerCredit;
+          if (fromStore) {
+            setCreditForm({
+              enabled: true,
+              creditLimit: Number(fromStore.creditLimit ?? 500),
+              termType: fromStore.termType === 'variable' ? 'variable' : 'fixed',
+              term: fromStore.term != null ? Number(fromStore.term) : 7,
+            });
+          }
+        }
+      })
+      .catch(() => {
+        const fromStore = settingsStore?.credit?.customerCredit;
+        if (fromStore) {
+          setCreditForm({
+            enabled: true,
+            creditLimit: Number(fromStore.creditLimit ?? 500),
+            termType: fromStore.termType === 'variable' ? 'variable' : 'fixed',
+            term: fromStore.term != null ? Number(fromStore.term) : 7,
+          });
+        }
+      })
+      .finally(() => setLoadingSettings(false));
+  }, [isAdmin, currentUser?.role, isOnline, settingsStore?.credit]);
+
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
     defaultValues: { name: '', email: '', phone: '' },
@@ -183,6 +247,50 @@ export default function SettingsPage() {
       setSetting('showVatInCheckout', !checked);
     } finally {
       setIsUpdatingModules(false);
+    }
+  };
+
+  const saveCreditSettings = async () => {
+    if (!settingsStore?.id) {
+      feedback.error('No store', 'Load a store first.', undefined, { code: 'CREDIT' });
+      return;
+    }
+    if (!isOnline) {
+      feedback.error('Offline', 'Connect to the internet to save credit settings.', undefined, { code: 'CREDIT' });
+      return;
+    }
+    setSavingCredit(true);
+    try {
+      const body = creditForm.enabled
+        ? {
+            credit: {
+              customerCredit: {
+                creditLimit: Math.max(0, Number(creditForm.creditLimit) || 0),
+                termType: creditForm.termType,
+                ...(creditForm.termType === 'fixed' && { term: Math.max(0, Number(creditForm.term) ?? 7) }),
+              },
+            },
+          }
+        : { credit: null };
+      const response = await settingsApi.patch(body);
+      const updatedCredit = response.data?.credit ?? null;
+      setSetting('currentStore', { ...settingsStore, credit: updatedCredit });
+      await saveStorePermanently({ ...settingsStore, credit: updatedCredit }, setSetting);
+      setStoreSettingsCredit(
+        updatedCredit?.customerCredit
+          ? {
+              creditLimit: Number(updatedCredit.customerCredit.creditLimit ?? 0),
+              termType: updatedCredit.customerCredit.termType === 'variable' ? 'variable' : 'fixed',
+              term: updatedCredit.customerCredit.term,
+            }
+          : null
+      );
+      feedback.success('Credit settings saved', 'Customer credit configuration has been updated.');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string }; message?: string }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to save.';
+      feedback.error('Save failed', message, undefined, { code: 'CREDIT' });
+    } finally {
+      setSavingCredit(false);
     }
   };
 
@@ -575,6 +683,84 @@ export default function SettingsPage() {
                       disabled={isUpdatingModules}
                     />
                   </div>
+
+                  {(isAdmin || currentUser?.role === 'store_admin') && (
+                    <>
+                      <div id="credit-client" className="space-y-2 pt-4 scroll-mt-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2"><CreditCard className="w-5 h-5" /> Customer credit</h3>
+                        <p className="text-sm text-muted-foreground">Allow sales on credit and set the credit limit and payment term. When enabled, the Credit payment option appears at checkout.</p>
+                      </div>
+                      <div className={cn("space-y-4 p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="credit-enabled" className="font-semibold">Allow sales on credit</Label>
+                          <Switch
+                            id="credit-enabled"
+                            checked={creditForm.enabled}
+                            onCheckedChange={(enabled) => setCreditForm((f) => ({ ...f, enabled }))}
+                            disabled={!isOnline || loadingSettings}
+                          />
+                        </div>
+                        {creditForm.enabled && (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="credit-limit">Credit limit (e.g. max amount per customer)</Label>
+                              <Input
+                                id="credit-limit"
+                                type="number"
+                                min={0}
+                                value={creditForm.creditLimit}
+                                onChange={(e) => setCreditForm((f) => ({ ...f, creditLimit: Number(e.target.value) || 0 }))}
+                                disabled={!isOnline}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Payment term type</Label>
+                              <Select
+                                value={creditForm.termType}
+                                onValueChange={(v: 'fixed' | 'variable') => setCreditForm((f) => ({ ...f, termType: v }))}
+                                disabled={!isOnline}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="fixed">Fixed (number of days)</SelectItem>
+                                  <SelectItem value="variable">Variable</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {creditForm.termType === 'fixed' && (
+                              <div className="space-y-2">
+                                <Label htmlFor="credit-term">Number of days (payment due)</Label>
+                                <Input
+                                  id="credit-term"
+                                  type="number"
+                                  min={0}
+                                  value={creditForm.term}
+                                  onChange={(e) => setCreditForm((f) => ({ ...f, term: Number(e.target.value) ?? 7 }))}
+                                  disabled={!isOnline}
+                                />
+                              </div>
+                            )}
+                            <Button
+                              onClick={saveCreditSettings}
+                              disabled={!isOnline || savingCredit}
+                              className="min-h-[44px] touch-target"
+                            >
+                              {savingCredit ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                'Save credit settings'
+                              )}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
           </CardContent>

@@ -9,6 +9,15 @@ export interface StoreEnabledModules {
   showVatInCheckout?: boolean;
 }
 
+/** Store credit settings (from GET/PATCH settings). When null/absent, credit payment is disabled. */
+export interface StoreCreditSetting {
+  customerCredit: {
+    creditLimit: number;
+    termType: 'fixed' | 'variable';
+    term?: number; // required when termType === 'fixed' (days)
+  };
+}
+
 export interface Store {
   /** Store ID: UUID (string) from backend. */
   id: string;
@@ -21,6 +30,8 @@ export interface Store {
   ownerId: string;
   /** Feature flags for this store; drives nav and settings. */
   enabledModules?: StoreEnabledModules;
+  /** Credit config: when present, Credit payment is available. From store/settings API. */
+  credit?: StoreCreditSetting | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +77,8 @@ export interface Customer {
   updatedAt: string;
   /** Store this customer belongs to (backend scopes by store). */
   storeId?: string | null;
+  /** Total outstanding credit (sales on credit not yet paid). */
+  outstandingCredit?: number;
 }
 
 export interface CreateCustomerDto {
@@ -99,6 +112,12 @@ export interface TransactionDiscount {
   discountReason: string;
 }
 
+/** Credit sale details (payment date, note). */
+export interface TransactionCreditDetails {
+  paymentDate?: string; // ISO 8601
+  note?: string;
+}
+
 export interface Transaction {
   id?: string; // UUID (backend)
   customerId?: string | null;
@@ -106,7 +125,7 @@ export interface Transaction {
   createdAt?: string; // ISO date string from backend
   items: TransactionItem[];
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
+  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
   voucherCode?: string | null;
   /** @deprecated Use discount.discountAmount when discount object is present. */
   discountAmount?: number | null;
@@ -114,6 +133,8 @@ export interface Transaction {
   discount?: TransactionDiscount | null;
   /** Store ID: UUID (string) from backend. */
   storeId: string;
+  /** Present when paymentMethod is 'Credit'. */
+  creditDetails?: TransactionCreditDetails | null;
 }
 
 export interface Voucher {

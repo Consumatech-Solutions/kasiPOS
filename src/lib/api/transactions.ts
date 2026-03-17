@@ -6,7 +6,7 @@
  * GET    /transactions/{id}   Get transaction by ID (UUID). 200 = ok, 401 = unauthorized, 404 = not found.
  */
 import { api } from './core';
-import type { Transaction, TransactionDiscount } from '@/types';
+import type { Transaction, TransactionDiscount, TransactionCreditDetails } from '@/types';
 import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
 
 export type CreateTransactionItemDto = {
@@ -24,12 +24,14 @@ export type CreateTransactionDto = {
   customerId?: string;
   items: CreateTransactionItemDto[];
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
+  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
   voucherCode?: string;
   /** @deprecated Prefer discount object. */
   discountAmount?: number;
   /** Structured discount (manual apply discount). Optional. */
   discount?: TransactionDiscount;
+  /** Required when paymentMethod is 'Credit'. */
+  creditDetails?: TransactionCreditDetails;
 };
 
 export interface GetTransactionsParams extends PaginationParams {
@@ -51,10 +53,11 @@ export function toCreateTransactionDto(raw: {
   customerId?: string | null;
   items: Array<{ productId: string | number; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string; [k: string]: unknown }>;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
+  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
   voucherCode?: string | null;
   discountAmount?: number | null;
   discount?: TransactionDiscount | null;
+  creditDetails?: TransactionCreditDetails | null;
 }): CreateTransactionDto {
   const storeId = raw.storeId != null && raw.storeId !== '' ? String(raw.storeId) : '';
   const dto: CreateTransactionDto = {
@@ -78,6 +81,15 @@ export function toCreateTransactionDto(raw: {
       discountAmount: Number(raw.discount.discountAmount),
       discountReason: String(raw.discount.discountReason).trim(),
     };
+  }
+  if (raw.paymentMethod === 'Credit' && raw.creditDetails != null) {
+    dto.creditDetails = {};
+    if (raw.creditDetails.paymentDate != null && raw.creditDetails.paymentDate !== '') {
+      dto.creditDetails.paymentDate = raw.creditDetails.paymentDate;
+    }
+    if (raw.creditDetails.note != null && raw.creditDetails.note.trim() !== '') {
+      dto.creditDetails.note = raw.creditDetails.note.trim();
+    }
   }
   return dto;
 }
