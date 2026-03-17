@@ -15,7 +15,7 @@ export interface GetStockAdjustmentsParams extends PaginationParams {
 
 export const stockAdjustmentsApi = {
   /**
-   * Create a stock adjustment
+   * Create a stock adjustment.
    */
   create: (data: CreateStockAdjustmentDto) => {
     return api.post<StockAdjustment>('/stock-adjustments', data);
