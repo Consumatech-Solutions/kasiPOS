@@ -64,12 +64,16 @@ export interface Customer {
   loyaltyPoints: number;
   createdAt: string;
   updatedAt: string;
+  /** Store this customer belongs to (backend scopes by store). */
+  storeId?: string | null;
 }
 
 export interface CreateCustomerDto {
   name: string;
   contact: string;
   loyaltyPoints?: number;
+  /** Optional: for admin only; attach customer to this store. Omit for store admin (backend uses JWT). */
+  storeId?: string | null;
 }
 
 export interface UpdateCustomerDto {
@@ -88,6 +92,13 @@ export interface TransactionItem {
   stock?: number;
 }
 
+/** Structured discount on a transaction (manual discount from "Apply discount" modal). */
+export interface TransactionDiscount {
+  discountType: 'amount' | 'percentage';
+  discountAmount: number;
+  discountReason: string;
+}
+
 export interface Transaction {
   id?: string; // UUID (backend)
   customerId?: string | null;
@@ -97,7 +108,10 @@ export interface Transaction {
   total: number;
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
   voucherCode?: string | null;
+  /** @deprecated Use discount.discountAmount when discount object is present. */
   discountAmount?: number | null;
+  /** Structured discount (type, value, reason). Present when a manual discount was applied. */
+  discount?: TransactionDiscount | null;
   /** Store ID: UUID (string) from backend. */
   storeId: string;
 }

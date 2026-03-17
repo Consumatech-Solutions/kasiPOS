@@ -6,10 +6,10 @@ const nextConfig: NextConfig = {
   // Avoid ChunkLoadError with double /_next/ in chunk URLs (basePath/assetPrefix must be consistent)
   basePath: '',
   assetPrefix: '',
-  // Increase chunk load timeout; in dev use memory cache to avoid Windows file-lock and corrupt pack errors
+  // Increase chunk load timeout to avoid ChunkLoadError when dev server is slow (e.g. first load or Windows)
   webpack: (config, { isServer, dev }) => {
     if (!isServer && config.output) {
-      config.output.chunkLoadTimeout = 60000; // 60 seconds (default 12s)
+      config.output.chunkLoadTimeout = dev ? 180000 : 60000; // 3 min in dev (avoids ChunkLoadError on slow builds), 1 min in prod
     }
     if (dev) {
       // Avoid UNKNOWN/open webpack.js and "incorrect header check" on .pack.gz (Windows)

@@ -9,6 +9,8 @@ import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
 interface UseTransactionsOptions extends GetTransactionsParams {
   autoLoad?: boolean;
+  /** When set, offline Dexie list is filtered by this store (e.g. currentStore.id for store admin). */
+  storeIdForOffline?: string | null;
 }
 
 export const transactionKeys = {
@@ -48,9 +50,9 @@ function normalizeTransactionResponse(response: Transaction[] | PaginatedRespons
 }
 
 export function useTransactions(options: UseTransactionsOptions = {}) {
-  const { autoLoad = true, ...params } = options;
+  const { autoLoad = true, storeIdForOffline, ...params } = options;
   const queryClient = useQueryClient();
-  
+
   const queryKey = transactionKeys.list(params);
 
   const query = useQuery({
@@ -58,7 +60,11 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
     queryFn: async () => {
       const isOffline = await checkOfflineStatus();
       if (isOffline) {
-        return getTransactionsFromDexie(params.page ?? 1, params.limit ?? 10);
+        return getTransactionsFromDexie(
+          params.page ?? 1,
+          params.limit ?? 10,
+          storeIdForOffline ?? undefined
+        );
       }
       const response = await transactionsApi.getAll(params);
       const normalized = normalizeTransactionResponse(response.data);

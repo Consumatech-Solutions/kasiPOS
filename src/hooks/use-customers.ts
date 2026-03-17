@@ -11,12 +11,16 @@ interface UseCustomersOptions {
   initialPage?: number;
   initialLimit?: number;
   searchQuery?: string;
+  /** Optional: for admin; scope API list/get/update/delete to this store. Omit for store admin (backend uses JWT). */
+  storeId?: string | null;
+  /** Optional: when set, offline Dexie list is filtered by this store (e.g. currentStore.id for store admin). */
+  storeIdForOffline?: string | null;
 }
 
 export const customerKeys = {
   all: ['customers'] as const,
   lists: () => [...customerKeys.all, 'list'] as const,
-  list: (filters?: { page?: number; limit?: number; search?: string }) => 
+  list: (filters?: { page?: number; limit?: number; search?: string; storeId?: string | null }) =>
     [...customerKeys.lists(), filters] as const,
   details: () => [...customerKeys.all, 'detail'] as const,
   detail: (id: string) => [...customerKeys.details(), id] as const,
@@ -51,14 +55,15 @@ function normalizeCustomerResponse(response: Customer[] | PaginatedResponse<Cust
 }
 
 export function useCustomers(options: UseCustomersOptions = {}) {
-  const { initialPage = 1, initialLimit = 10, searchQuery = '' } = options;
+  const { initialPage = 1, initialLimit = 10, searchQuery = '', storeId, storeIdForOffline } = options;
   const queryClient = useQueryClient();
-  
-  const params: { page?: number; limit?: number; search?: string } = {};
+
+  const params: { page?: number; limit?: number; search?: string; storeId?: string | null } = {};
   if (initialPage !== undefined) params.page = initialPage;
   if (initialLimit !== undefined) params.limit = initialLimit;
   if (searchQuery?.trim()) params.search = searchQuery.trim();
-  
+  if (storeId != null && storeId !== '') params.storeId = storeId;
+
   const queryKey = customerKeys.list(Object.keys(params).length > 0 ? params : undefined);
 
   const query = useQuery({
@@ -66,7 +71,12 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     queryFn: async () => {
       const isOffline = await checkOfflineStatus();
       if (isOffline) {
-        return getCustomersFromDexie(initialPage, initialLimit, searchQuery?.trim() || undefined);
+        return getCustomersFromDexie(
+          initialPage,
+          initialLimit,
+          searchQuery?.trim() || undefined,
+          storeIdForOffline ?? undefined
+        );
       }
       try {
         const response = await customersApi.getAll(Object.keys(params).length > 0 ? params : undefined);
@@ -76,10 +86,13 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         }
         return normalized;
       } catch (err: any) {
-        // If 400 error, try without pagination parameters
         if (err?.response?.status === 400 && (params.page || params.limit)) {
-          const fallbackParams = params.search ? { search: params.search } : undefined;
-          const response = await customersApi.getAll(fallbackParams);
+          const fallbackParams: typeof params = {};
+          if (params.search) fallbackParams.search = params.search;
+          if (params.storeId != null) fallbackParams.storeId = params.storeId;
+          const response = await customersApi.getAll(
+            Object.keys(fallbackParams).length > 0 ? fallbackParams : undefined
+          );
           return normalizeCustomerResponse(response.data);
         }
         throw err;
@@ -101,6 +114,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           loyaltyPoints: newCustomer.loyaltyPoints || 0,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          storeId: newCustomer.storeId ?? storeId ?? undefined,
         };
         queryClient.setQueryData<{ data: Customer[]; meta: PaginationMeta }>(queryKey, {
           ...previousData,
@@ -134,7 +148,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateCustomerDto }) =>
-      customersApi.update(id, data),
+      customersApi.update(id, data, storeId != null && storeId !== '' ? { storeId } : undefined),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
       const previousData = queryClient.getQueryData<{ data: Customer[]; meta: PaginationMeta }>(queryKey);
@@ -161,7 +175,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => customersApi.delete(id),
+    mutationFn: (id: string) =>
+      customersApi.delete(id, storeId != null && storeId !== '' ? { storeId } : undefined),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
       const previousData = queryClient.getQueryData<{ data: Customer[]; meta: PaginationMeta }>(queryKey);
@@ -208,8 +223,13 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     isDeleting: deleteMutation.isPending,
     refresh: () => query.refetch(),
     loadPage: (page: number) => {
-      queryClient.invalidateQueries({ 
-        queryKey: customerKeys.list({ page, limit: initialLimit, search: searchQuery }) 
+      queryClient.invalidateQueries({
+        queryKey: customerKeys.list({
+          page,
+          limit: initialLimit,
+          search: searchQuery,
+          storeId: storeId ?? undefined,
+        }),
       });
     },
   };

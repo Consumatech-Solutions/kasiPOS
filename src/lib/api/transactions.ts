@@ -6,7 +6,7 @@
  * GET    /transactions/{id}   Get transaction by ID (UUID). 200 = ok, 401 = unauthorized, 404 = not found.
  */
 import { api } from './core';
-import type { Transaction } from '@/types';
+import type { Transaction, TransactionDiscount } from '@/types';
 import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
 
 export type CreateTransactionItemDto = {
@@ -26,7 +26,10 @@ export type CreateTransactionDto = {
   total: number;
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
   voucherCode?: string;
+  /** @deprecated Prefer discount object. */
   discountAmount?: number;
+  /** Structured discount (manual apply discount). Optional. */
+  discount?: TransactionDiscount;
 };
 
 export interface GetTransactionsParams extends PaginationParams {
@@ -51,9 +54,10 @@ export function toCreateTransactionDto(raw: {
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
   voucherCode?: string | null;
   discountAmount?: number | null;
+  discount?: TransactionDiscount | null;
 }): CreateTransactionDto {
   const storeId = raw.storeId != null && raw.storeId !== '' ? String(raw.storeId) : '';
-  return {
+  const dto: CreateTransactionDto = {
     storeId,
     customerId: raw.customerId ?? undefined,
     items: raw.items.map((item) => ({
@@ -67,8 +71,15 @@ export function toCreateTransactionDto(raw: {
     total: Number(raw.total),
     paymentMethod: raw.paymentMethod,
     ...(raw.voucherCode != null && raw.voucherCode !== '' && { voucherCode: raw.voucherCode }),
-    ...(raw.discountAmount != null && raw.discountAmount !== 0 && { discountAmount: Number(raw.discountAmount) }),
   };
+  if (raw.discount != null && raw.discount.discountReason != null && raw.discount.discountReason.trim() !== '') {
+    dto.discount = {
+      discountType: raw.discount.discountType,
+      discountAmount: Number(raw.discount.discountAmount),
+      discountReason: String(raw.discount.discountReason).trim(),
+    };
+  }
+  return dto;
 }
 
 export const transactionsApi = {
@@ -86,17 +97,19 @@ export const transactionsApi = {
     if (params?.date !== undefined) requestParams.date = params.date;
     if (params?.customerId !== undefined) requestParams.customerId = params.customerId;
     if (params?.search !== undefined) requestParams.search = params.search;
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
 
     return api.get<PaginatedResponse<Transaction> | Transaction[]>('/transactions', {
       params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
     });
   },
 
-  /**
-   * Get a transaction by ID
-   */
-  getById: (id: string) => {
-    return api.get<Transaction>(`/transactions/${id}`);
+  getById: (id: string, params?: { storeId?: string | null }) => {
+    const requestParams: Record<string, string> = {};
+    if (params?.storeId != null && params.storeId !== '') requestParams.storeId = params.storeId;
+    return api.get<Transaction>(`/transactions/${id}`, {
+      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
+    });
   },
 };
 

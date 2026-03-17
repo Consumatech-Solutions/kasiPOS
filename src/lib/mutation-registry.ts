@@ -6,6 +6,7 @@ import { transactionsApi, toCreateTransactionDto, type CreateTransactionDto, typ
 import { catalogueApi } from '@/lib/api/catalogue';
 import type { ApiCategory } from '@/types/catalogue';
 import { customersApi } from '@/lib/api/customers';
+import type { CreateCustomerDto } from '@/types';
 import { stockAdjustmentsApi } from '@/lib/api/stock-adjustments';
 import { purchaseOrdersApi, type CreatePurchaseOrderDto } from '@/lib/api/purchase-orders';
 import { vouchersApi } from '@/lib/api/vouchers';
@@ -124,15 +125,15 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
     }
 
     case 'customers/create': {
-      const custData = variables as Parameters<typeof customersApi.create>[0] & { _tempId?: string };
+      const custData = variables as CreateCustomerDto & { _tempId?: string };
       const _tempId = custData._tempId;
-      const payload = {
+      const payload: CreateCustomerDto = {
         name: custData.name,
         contact: custData.contact,
         ...(custData.loyaltyPoints != null && { loyaltyPoints: custData.loyaltyPoints }),
-        ...(_tempId && { _tempId }),
+        ...(custData.storeId != null && custData.storeId !== '' && { storeId: custData.storeId }),
       };
-      const result = await customersApi.create(payload as Parameters<typeof customersApi.create>[0]);
+      const result = await customersApi.create(payload);
       if (_tempId && result?.data?.id) {
         await getDb().syncIdMapping.put({
           tempId: _tempId,
