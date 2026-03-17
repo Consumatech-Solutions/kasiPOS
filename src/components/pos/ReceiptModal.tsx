@@ -32,7 +32,7 @@ export interface ReceiptData {
   showVat: boolean;
   vatAmount: number;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
+  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
   voucherCode?: string | null;
 }
 
