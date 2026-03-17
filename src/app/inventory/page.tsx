@@ -48,7 +48,9 @@ export default function InventoryPage() {
   const { isOnline } = useNetworkStatus();
 
   // Use API hooks for products and categories
-  const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10);
+  const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10, {
+    storeIdForOffline: currentStore?.id ?? undefined,
+  });
   const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
 
   const allProducts = apiProducts || [];

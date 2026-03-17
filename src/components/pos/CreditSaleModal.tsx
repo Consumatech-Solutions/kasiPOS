@@ -10,8 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Calendar } from '@/components/ui/calendar';
-import { X, Search, Calendar as CalendarIcon, UserPlus, ChevronDown } from 'lucide-react';
+import { X, Search, UserPlus, ChevronDown, Calendar as CalendarIcon } from 'lucide-react';
 import { useCustomers } from '@/hooks/use-customers';
 import type { Customer } from '@/types';
 import { addDays, format } from 'date-fns';
@@ -50,9 +49,7 @@ export default function CreditSaleModal({
   const [paymentDate, setPaymentDate] = useState<Date>(getDefaultPaymentDate());
   const [note, setNote] = useState('');
   const [customerOpen, setCustomerOpen] = useState(false);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
-  const datePickerRef = useRef<HTMLDivElement>(null);
 
   const { customers, loading: customersLoading } = useCustomers({
     searchQuery: customerSearch,
@@ -94,7 +91,6 @@ export default function CreditSaleModal({
     setPaymentDate(getDefaultPaymentDate());
     setNote('');
     setCustomerOpen(false);
-    setDatePickerOpen(false);
     onClose();
   };
 
@@ -115,18 +111,6 @@ export default function CreditSaleModal({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [customerOpen]);
-
-  // Close date picker when clicking outside
-  useEffect(() => {
-    if (!datePickerOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
-        setDatePickerOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [datePickerOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -257,38 +241,25 @@ export default function CreditSaleModal({
             )}
           </div>
 
-          {/* Payment due date (optional): inline dropdown to avoid Popover focus issues inside Dialog */}
-          <div className="space-y-2" ref={datePickerRef}>
-            <Label className="text-sm font-medium">Payment due date (optional)</Label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setDatePickerOpen((prev) => !prev)}
-                className={cn(
-                  'flex items-center w-full justify-start gap-2 h-11 px-4 py-2 text-sm font-normal rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors text-left',
-                  !paymentDate && 'text-muted-foreground'
-                )}
-                aria-expanded={datePickerOpen}
-                aria-haspopup="dialog"
-              >
-                <CalendarIcon className="h-4 w-4 shrink-0" />
-                {paymentDate ? format(paymentDate, 'dd/MM/yyyy') : 'Pick a date'}
-                <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 transition-transform', datePickerOpen && 'rotate-180')} />
-              </button>
-              {datePickerOpen && (
-                <div className="absolute top-full left-0 z-50 mt-1 rounded-md border bg-popover shadow-md p-0">
-                  <Calendar
-                    mode="single"
-                    selected={paymentDate}
-                    onSelect={(d) => {
-                      if (d) {
-                        setPaymentDate(d);
-                        setDatePickerOpen(false);
-                      }
-                    }}
-                  />
-                </div>
-              )}
+          {/* Payment due date (optional): native date input for reliable datepicker display */}
+          <div className="space-y-2">
+            <Label htmlFor="credit-payment-date" className="text-sm font-medium">Payment due date (optional)</Label>
+            <div className="relative flex items-center">
+              <CalendarIcon className="absolute left-3 h-4 w-4 shrink-0 text-muted-foreground pointer-events-none" />
+              <Input
+                id="credit-payment-date"
+                type="date"
+                value={format(paymentDate, 'yyyy-MM-dd')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v) {
+                    const [y, m, d] = v.split('-').map(Number);
+                    setPaymentDate(new Date(y, m - 1, d));
+                  }
+                }}
+                className="h-11 pl-9 pr-4 text-sm"
+                min={format(new Date(), 'yyyy-MM-dd')}
+              />
             </div>
           </div>
 

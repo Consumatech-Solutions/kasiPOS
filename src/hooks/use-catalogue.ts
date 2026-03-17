@@ -198,24 +198,38 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
   };
 }
 
-export function useProducts(initialPage: number = 1, initialLimit: number = 10) {
+export interface UseProductsOptions {
+  storeIdForOffline?: string | null;
+}
+
+export function useProducts(
+  initialPage: number = 1,
+  initialLimit: number = 10,
+  options?: UseProductsOptions
+) {
+  const storeIdForOffline = options?.storeIdForOffline;
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<Omit<PaginationParams, 'page' | 'limit'>>({});
   const [currentPage, setCurrentPage] = useState(initialPage);
-  
-  const queryKey = productKeys.list({ page: currentPage, limit: initialLimit, ...filters });
+
+  const queryKey = productKeys.list({
+    page: currentPage,
+    limit: initialLimit,
+    ...filters,
+    storeIdForOffline: storeIdForOffline ?? undefined,
+  });
 
   const query = useQuery({
     queryKey,
     queryFn: async () => {
       const isOffline = await checkOfflineStatus();
       if (isOffline) {
-        return getProductsFromDexie(currentPage, initialLimit);
+        return getProductsFromDexie(currentPage, initialLimit, storeIdForOffline);
       }
       const response = await catalogueApi.products.getAll({ page: currentPage, limit: initialLimit, ...filters });
       const normalized = normalizeResponse(response);
       if (normalized.data?.length) {
-        await saveProductsToDexie(normalized.data);
+        await saveProductsToDexie(normalized.data, storeIdForOffline);
       }
       return normalized;
     },

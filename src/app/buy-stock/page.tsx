@@ -26,7 +26,9 @@ export default function BuyStockPage() {
   const { currentStore } = settings;
 
   // Use API hook for products
-  const { products: apiProducts, loading: productsLoading } = useProducts(1, 10);
+  const { products: apiProducts, loading: productsLoading } = useProducts(1, 10, {
+    storeIdForOffline: currentStore?.id ?? undefined,
+  });
   const allProducts = apiProducts || [];
 
   // State to manage quantities for each product (using string IDs for UUIDs)
