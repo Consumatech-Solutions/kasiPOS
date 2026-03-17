@@ -140,7 +140,7 @@ export interface Category {
 
 }
 
-export type StockAdjustmentReason = 'New stock received' | 'Shrinkage' | 'Damages' | 'Expired' | 'Other';
+export type StockAdjustmentReason = 'New stock received' | 'Returns' | 'Shrinkage' | 'Expansion' | 'Damages' | 'Expired';
 
 export interface StockAdjustment {
   id?: string; // UUID (backend)
