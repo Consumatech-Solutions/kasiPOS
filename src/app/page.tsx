@@ -3,13 +3,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
-import type { Product, Transaction, TransactionItem, Customer } from '@/types';
+import type { Product, Transaction, TransactionItem, Customer, TransactionDiscount } from '@/types';
 import { db, getDb } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, LayoutGrid, List } from 'lucide-react';
+import { Plus, Minus, Trash2, User, Ticket, Search, QrCode, CreditCard, LayoutGrid, List, Percent } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
@@ -18,6 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
+import ApplyDiscountModal from '@/components/pos/ApplyDiscountModal';
 import { ReceiptModal, type ReceiptData } from '@/components/pos/ReceiptModal';
 import { BarcodeScanner } from '@/components/barcode-scanner';
 import { useSettings } from '@/components/settings-provider';
@@ -60,8 +61,10 @@ export default function PosPage() {
   const [productSearch, setProductSearch] = useState('');
   const [activePaymentMethod, setActivePaymentMethod] = useState<'Cash' | 'Card' | 'Mobile Money' | null>(null);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [isApplyDiscountModalOpen, setIsApplyDiscountModalOpen] = useState(false);
   const [appliedDiscount, setAppliedDiscount] = useState(0);
   const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | undefined>(undefined);
+  const [manualDiscount, setManualDiscount] = useState<TransactionDiscount | null>(null);
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
@@ -74,6 +77,7 @@ export default function PosPage() {
     clearCart();
     setAppliedDiscount(0);
     setAppliedVoucherCode(undefined);
+    setManualDiscount(null);
     setIsClearCartDialogOpen(false);
   };
 
@@ -144,7 +148,14 @@ export default function PosPage() {
 
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce((acc, item) => acc + item.totalPrice, 0);
-  const cartTotal = cartSubtotal - appliedDiscount;
+  const manualDiscountAmount = useMemo(() => {
+    if (!manualDiscount) return 0;
+    if (manualDiscount.discountType === 'percentage') {
+      return Math.round((cartSubtotal * manualDiscount.discountAmount) / 100 * 100) / 100;
+    }
+    return Math.min(cartSubtotal, Math.max(0, manualDiscount.discountAmount));
+  }, [manualDiscount, cartSubtotal]);
+  const cartTotal = cartSubtotal - appliedDiscount - manualDiscountAmount;
   const VAT_RATE = 15;
   const showVatInCheckout = settings.showVatInCheckout !== false;
   // VAT on: add VAT to total (Total = Subtotal + VAT)
@@ -172,6 +183,15 @@ export default function PosPage() {
     setAppliedVoucherCode(code);
     setAppliedDiscount(amount);
     feedback.success('Voucher applied', `Discount of R${amount.toFixed(2)} applied.`);
+  };
+
+  const handleApplyManualDiscount = (discount: TransactionDiscount) => {
+    setManualDiscount(discount);
+    const amount =
+      discount.discountType === 'percentage'
+        ? (cartSubtotal * discount.discountAmount) / 100
+        : discount.discountAmount;
+    feedback.success('Discount applied', `Discount of R${amount.toFixed(2)} applied.`);
   };
 
   const handleCustomerSelect = (customerId: string) => {
@@ -241,6 +261,7 @@ export default function PosPage() {
       customerId: selectedCustomerId,
       voucherCode: appliedVoucherCode,
       discountAmount: appliedDiscount,
+      discount: manualDiscount ?? undefined,
       total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
       storeId: currentStore.id!,
     };
@@ -251,7 +272,7 @@ export default function PosPage() {
         saleId,
         items: newTransaction.items,
         subtotal: cartTotal, // Ex-VAT subtotal when VAT on, otherwise same as total
-        discountAmount: appliedDiscount,
+        discountAmount: appliedDiscount + manualDiscountAmount,
         total: amountToPay,
         paymentMethod: newTransaction.paymentMethod,
         showVat: showVatInCheckout,
@@ -669,6 +690,10 @@ export default function PosPage() {
                     <span className="hidden sm:inline">Redeem Voucher</span>
                     <span className="sm:hidden">Voucher</span>
                 </Button>}
+                <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={() => cartItems.length > 0 && setIsApplyDiscountModalOpen(true)} disabled={cartItems.length === 0}>
+                  <Percent className="mr-1 sm:mr-2 h-4 w-4"/>
+                  <span>Discount</span>
+                </Button>
             </div>
         </div>
 
@@ -683,46 +708,60 @@ export default function PosPage() {
                 <p>Cart is empty</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
+                {/* Column headers (invisible lines: no borders, left-aligned) */}
+                <div className="grid grid-cols-[1fr_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[1fr_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left">
+                  <span>Product</span>
+                  <span>Price</span>
+                  <span>Qty</span>
+                  <span>Total</span>
+                  <span aria-hidden className="w-9" />
+                </div>
                 {cartItems.map(item => (
-                  <div key={item.productId} className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 min-w-0">
-                    {item.imageUrl && !item.imageUrl.startsWith('blob:') ? (
-                      <div className="relative w-10 h-10 flex-shrink-0">
-                        <Image 
-                          src={item.imageUrl} 
-                          alt={item.productName} 
-                          width={40} 
-                          height={40} 
-                          className="rounded-md bg-gray-200 object-cover" 
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const initialsDiv = target.nextElementSibling as HTMLElement;
-                            if (initialsDiv) {
-                              initialsDiv.style.display = 'flex';
-                            }
-                          }} 
-                        />
-                        <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                  <div
+                    key={item.productId}
+                    className="grid grid-cols-[1fr_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[1fr_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 min-w-0"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {item.imageUrl && !item.imageUrl.startsWith('blob:') ? (
+                        <div className="relative w-10 h-10 flex-shrink-0">
+                          <Image 
+                            src={item.imageUrl} 
+                            alt={item.productName} 
+                            width={40} 
+                            height={40} 
+                            className="rounded-md bg-gray-200 object-cover" 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const initialsDiv = target.nextElementSibling as HTMLElement;
+                              if (initialsDiv) {
+                                initialsDiv.style.display = 'flex';
+                              }
+                            }} 
+                          />
+                          <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
+                            {getProductInitials(item.productName)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
                           {getProductInitials(item.productName)}
                         </div>
+                      )}
+                      <div className="flex-grow min-w-0">
+                        <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
+                        <p className="text-xs text-muted-foreground sm:hidden">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                       </div>
-                    ) : (
-                      <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
-                        {getProductInitials(item.productName)}
-                      </div>
-                    )}
-                    <div className="flex-grow min-w-0">
-                      <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
-                      <p className="text-xs text-gray-500">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
+                    <p className="text-xs sm:text-sm text-muted-foreground text-left hidden sm:block">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
+                    <div className="flex items-center justify-start gap-1 sm:gap-2">
+                      <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
                       <span className="font-bold text-sm w-6 sm:w-4 text-center">{item.quantity}</span>
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target"
+                        className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0"
                         onClick={() => {
                           const stock = item.stock;
                           if (typeof stock === 'number' && item.quantity + 1 > stock) {
@@ -736,7 +775,7 @@ export default function PosPage() {
                         }}
                       ><Plus className="h-3 w-3" /></Button>
                     </div>
-                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-right">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
+                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-left">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
                     <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
@@ -750,7 +789,7 @@ export default function PosPage() {
             <div className="text-sm space-y-2 mb-4">
               <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span>R {cartTotal.toFixed(2)}</span>
+                  <span>R {cartSubtotal.toFixed(2)}</span>
               </div>
               {showVatInCheckout && (
                 <div className="flex justify-between text-gray-500">
@@ -758,10 +797,12 @@ export default function PosPage() {
                   <span>R {vatAmount.toFixed(2)}</span>
                 </div>
               )}
-              <div className={`flex justify-between ${appliedDiscount > 0 ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+              {(appliedDiscount > 0 || manualDiscountAmount > 0) && (
+                <div className="flex justify-between text-green-600 font-medium">
                   <span>Discount Applied</span>
-                  <span>-R {appliedDiscount.toFixed(2)}</span>
-              </div>
+                  <span>-R {(appliedDiscount + manualDiscountAmount).toFixed(2)}</span>
+                </div>
+              )}
             </div>
             <div className="mb-3 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
               {showVatInCheckout
@@ -819,6 +860,12 @@ export default function PosPage() {
         customerId={selectedCustomerId}
         onApplyVoucher={handleApplyVoucher}
         cartTotal={cartSubtotal} // Pass subtotal before discount for validation
+    />
+    <ApplyDiscountModal
+        isOpen={isApplyDiscountModalOpen}
+        onClose={() => setIsApplyDiscountModalOpen(false)}
+        cartSubtotal={cartSubtotal}
+        onApply={handleApplyManualDiscount}
     />
     <ReceiptModal
         open={receiptOpen}

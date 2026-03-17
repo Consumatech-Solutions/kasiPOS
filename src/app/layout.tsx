@@ -43,24 +43,27 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
 (function() {
+  var RELOAD_KEY = 'kasiPOS_chunkReload';
   function isChunkLoadError(msg) {
-    if (!msg) return false;
-    var s = String(msg);
+    if (msg == null) return false;
+    var s = String(typeof msg === 'object' && msg.message != null ? msg.message : msg);
     return s.indexOf('Loading chunk') !== -1 || s.indexOf('ChunkLoadError') !== -1 || s.indexOf('Loading CSS chunk') !== -1;
   }
   function tryReload() {
     try {
-      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('kasiPOS_chunkReload') === '1')
-        return;
-      sessionStorage.setItem('kasiPOS_chunkReload', '1');
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RELOAD_KEY) === '1') return;
+      sessionStorage.setItem(RELOAD_KEY, '1');
       window.location.reload();
     } catch (e) {}
   }
-  window.addEventListener('error', function(e) {
-    if (isChunkLoadError(e.message)) { e.preventDefault(); tryReload(); }
-  });
-  window.addEventListener('unhandledrejection', function(e) {
-    if (e.reason && isChunkLoadError(e.reason.message || e.reason)) { e.preventDefault(); tryReload(); }
+  function onChunkError(e) {
+    var msg = e && (e.message || (e.reason && (e.reason.message || e.reason)));
+    if (isChunkLoadError(msg)) { e.preventDefault && e.preventDefault(); tryReload(); }
+  }
+  window.addEventListener('error', function(e) { onChunkError(e); });
+  window.addEventListener('unhandledrejection', function(e) { onChunkError(e.reason || e); });
+  window.addEventListener('load', function() {
+    try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
   });
 })();
 `,
