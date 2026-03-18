@@ -33,13 +33,17 @@ export async function setLastSyncAt(entity: LastSyncEntity, isoDate: string): Pr
   await db.keyVal.put({ key: LAST_SYNC_KEYS[entity], value: isoDate });
 }
 
-export async function saveProductsToDexie(data: ApiProduct[]): Promise<void> {
+export async function saveProductsToDexie(
+  data: ApiProduct[],
+  storeId?: string | null
+): Promise<void> {
   if (typeof window === 'undefined' || !data.length) return;
   const db = getDb();
   const records = data.map((p) => ({
     ...p,
     id: p.id,
     createdAt: p.createdAt ?? new Date().toISOString(),
+    ...(storeId != null && storeId !== '' && { storeId }),
   }));
   await db.productCache.bulkPut(records);
   const count = await db.productCache.count();
@@ -226,20 +230,39 @@ export async function updatePurchaseOrderStatusInDexie(
 
 export async function getProductsFromDexie(
   page: number,
-  limit: number
+  limit: number,
+  storeIdForOffline?: string | null
 ): Promise<{ data: ApiProduct[]; meta: PaginationMeta }> {
   if (typeof window === 'undefined') {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
-  const total = await db.productCache.count();
-  const rawData = await db.productCache
-    .orderBy('createdAt')
-    .reverse()
-    .offset((page - 1) * limit)
-    .limit(limit)
-    .toArray();
   const categories = await db.categoryCache.toArray();
+
+  let rawData: unknown[];
+  let total: number;
+
+  if (storeIdForOffline != null && storeIdForOffline !== '') {
+    const all = await db.productCache.orderBy('createdAt').reverse().toArray();
+    const storeIdStr = String(storeIdForOffline);
+    const filtered = all.filter((p: { storeId?: string | number | null }) => {
+      const sid = p.storeId;
+      if (sid == null || sid === '') return false;
+      return String(sid) === storeIdStr;
+    });
+    total = filtered.length;
+    const start = (page - 1) * limit;
+    rawData = filtered.slice(start, start + limit);
+  } else {
+    total = await db.productCache.count();
+    rawData = await db.productCache
+      .orderBy('createdAt')
+      .reverse()
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .toArray();
+  }
+
   const data = (rawData as unknown as ApiProduct[]).map((product) => {
     const hasCategory = product.category != null && (typeof product.category === 'string' ? product.category.trim() !== '' : (product.category as { name?: string })?.name);
     if (product.categoryId && !hasCategory) {

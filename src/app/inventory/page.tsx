@@ -33,13 +33,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { getProductInitials } from '@/lib/utils/product-initials';
 
+const REASONS: StockAdjustmentReason[] = ['New stock received', 'Returns', 'Shrinkage', 'Expansion', 'Damages', 'Expired'];
+
 const adjustmentSchema = z.object({
-  newStock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }),
-  reason: z.enum(['New stock received', 'Shrinkage', 'Damages', 'Expired', 'Other']),
+  reason: z.enum(['New stock received', 'Returns', 'Shrinkage', 'Expansion', 'Damages', 'Expired']).optional(),
+  quantityOrUpdated: z.coerce.number().int().min(0).optional(),
   note: z.string().optional(),
 });
-
-const reasons: StockAdjustmentReason[] = ['New stock received', 'Shrinkage', 'Damages', 'Expired', 'Other'];
 
 export default function InventoryPage() {
   const { settings } = useSettings();
@@ -48,7 +48,9 @@ export default function InventoryPage() {
   const { isOnline } = useNetworkStatus();
 
   // Use API hooks for products and categories
-  const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10);
+  const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10, {
+    storeIdForOffline: currentStore?.id ?? undefined,
+  });
   const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
 
   const allProducts = apiProducts || [];
@@ -75,6 +77,7 @@ export default function InventoryPage() {
 
   const form = useForm<z.infer<typeof adjustmentSchema>>({
     resolver: zodResolver(adjustmentSchema),
+    defaultValues: { reason: undefined, quantityOrUpdated: undefined, note: '' },
   });
 
   const filteredProducts = useMemo(() => {
@@ -97,12 +100,48 @@ export default function InventoryPage() {
   const openAdjustmentDialog = (product: any) => {
     setSelectedProduct(product);
     form.reset({
-      newStock: product.stock ?? 0,
-      reason: 'New stock received',
+      reason: undefined as any,
+      quantityOrUpdated: undefined as any,
       note: ''
     });
     setAdjustmentDialogOpen(true);
   };
+
+  const currentStock = selectedProduct?.stock ?? 0;
+  const reason = form.watch('reason');
+  const quantityOrUpdated = form.watch('quantityOrUpdated') ?? 0;
+
+  const computedNewStock = useMemo(() => {
+    if (reason == null || quantityOrUpdated == null) return null;
+    const q = Number(quantityOrUpdated);
+    switch (reason) {
+      case 'New stock received':
+      case 'Returns':
+        return currentStock + q;
+      case 'Damages':
+      case 'Expired':
+        return Math.max(0, currentStock - q);
+      case 'Shrinkage':
+      case 'Expansion':
+        return q;
+      default:
+        return null;
+    }
+  }, [reason, quantityOrUpdated, currentStock]);
+
+  const secondFieldLabel = useMemo(() => {
+    switch (reason) {
+      case 'New stock received': return 'Quantity Received';
+      case 'Returns': return 'Quantity Returned';
+      case 'Shrinkage': return 'Updated Stock Quantity (must be less than the current stock amount)';
+      case 'Expansion': return 'Updated Stock Quantity (must be more than the current stock amount)';
+      case 'Damages': return 'Quantity Damaged';
+      case 'Expired': return 'Quantity Expired';
+      default: return '';
+    }
+  }, [reason]);
+
+  const showUpdatedStockAboveNotes = reason && reason !== 'Shrinkage' && reason !== 'Expansion' && computedNewStock != null;
   
   const openHistoryDialog = (product: any) => {
     setSelectedProduct(product);
@@ -111,12 +150,53 @@ export default function InventoryPage() {
 
   const handleAdjustmentSubmit = async (values: z.infer<typeof adjustmentSchema>) => {
     if (!selectedProduct || !selectedProduct.id) return;
+    if (!values.reason) {
+      feedback.error('Reason required', 'Please select a reason for the adjustment.', 'Select a reason.');
+      return;
+    }
+    if (values.quantityOrUpdated === undefined || values.quantityOrUpdated === null) {
+      feedback.error('Quantity required', 'Please enter a value.', 'Enter the quantity or updated stock.');
+      return;
+    }
+    const q = Number(values.quantityOrUpdated);
+    const cur = currentStock;
+    let newStock: number;
+    switch (values.reason) {
+      case 'New stock received':
+      case 'Returns':
+        newStock = cur + q;
+        break;
+      case 'Damages':
+      case 'Expired':
+        newStock = Math.max(0, cur - q);
+        break;
+      case 'Shrinkage':
+        if (q >= cur) {
+          feedback.error('Invalid value', 'Updated stock must be less than the current stock amount.', 'Enter a lower value.');
+          return;
+        }
+        newStock = q;
+        break;
+      case 'Expansion':
+        if (q <= cur) {
+          feedback.error('Invalid value', 'Updated stock must be more than the current stock amount.', 'Enter a higher value.');
+          return;
+        }
+        newStock = q;
+        break;
+      default:
+        return;
+    }
+    if (newStock < 0) {
+      feedback.error('Invalid value', "Stock can't be negative.", 'Reduce the quantity.');
+      return;
+    }
 
     try {
       if (isOnline) {
         await createAdjustment({
           productId: selectedProduct.id,
-          newStock: values.newStock,
+          newStock,
           reason: values.reason as StockAdjustmentReason,
           note: values.note,
         });
@@ -128,7 +208,6 @@ export default function InventoryPage() {
       } else {
         // Offline: apply new stock locally so other transactions (e.g. POS) see it
         const productId = String(selectedProduct.id);
-        const newStock = values.newStock;
 
         // 1. Update all product list queries in TanStack Query cache
         const queriesData = queryClient.getQueriesData<{ data: { id?: string; stock?: number | null }[]; meta?: unknown }>({ queryKey: productKeys.lists() });
@@ -150,7 +229,7 @@ export default function InventoryPage() {
         // 3. Queue for sync when online
         const variables = {
           productId: selectedProduct.id!,
-          newStock: values.newStock,
+          newStock,
           reason: values.reason,
           note: values.note,
         };
@@ -361,41 +440,70 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">Adjust Stock for {selectedProduct?.name}</DialogTitle>
             <DialogDescription className="text-sm">
-              Current stock: {selectedProduct?.stock ?? 0}. Enter the new stock level and reason for adjustment.
+              Current stock: {currentStock}.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleAdjustmentSubmit)} className="space-y-4">
-              <FormField control={form.control} name="newStock" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>New Stock Quantity</FormLabel>
-                  <FormControl><Input type="number" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="reason" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reason</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a reason" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {reasons.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="note" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Note (Optional)</FormLabel>
-                  <FormControl><Textarea {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormField
+                control={form.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a reason" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {REASONS.map((r) => (
+                          <SelectItem key={r} value={r}>{r}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {reason && (
+                <FormField
+                  control={form.control}
+                  name="quantityOrUpdated"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{secondFieldLabel}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min={0}
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              {showUpdatedStockAboveNotes && (
+                <p className="text-sm font-medium text-muted-foreground">
+                  Updated stock: <span className="text-foreground">{computedNewStock}</span>
+                </p>
+              )}
+              <FormField
+                control={form.control}
+                name="note"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Note (Optional)</FormLabel>
+                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <DialogClose asChild><Button type="button" variant="secondary" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating}>Cancel</Button></DialogClose>
                 <Button type="submit" className="min-h-[44px] touch-target w-full sm:w-auto" disabled={isCreating}>

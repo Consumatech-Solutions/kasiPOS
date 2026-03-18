@@ -19,6 +19,7 @@ import { Eye } from 'lucide-react';
 import PaymentModal from '@/components/pos/PaymentModal';
 import VoucherModal from '@/components/pos/VoucherModal';
 import ApplyDiscountModal from '@/components/pos/ApplyDiscountModal';
+import CreditSaleModal from '@/components/pos/CreditSaleModal';
 import { ReceiptModal, type ReceiptData } from '@/components/pos/ReceiptModal';
 import { BarcodeScanner } from '@/components/barcode-scanner';
 import { useSettings } from '@/components/settings-provider';
@@ -30,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
 import { getProductInitials } from '@/lib/utils/product-initials';
+import { cn } from '@/lib/utils';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { useCart } from '@/components/providers/cart-provider';
 import { buildReceiptData as buildReceiptDataFromUtil } from '@/lib/receipt-utils';
@@ -72,6 +74,7 @@ export default function PosPage() {
   const [isClearCartDialogOpen, setIsClearCartDialogOpen] = useState(false);
   const [insufficientStockPopup, setInsufficientStockPopup] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+  const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
 
   const clearCartAndResetCoupons = () => {
     clearCart();
@@ -83,7 +86,9 @@ export default function PosPage() {
 
   // API Hooks
   const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
-  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 10);
+  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 10, {
+    storeIdForOffline: settings?.currentStore?.id ?? undefined,
+  });
 
   const products = apiProducts;
 
@@ -171,12 +176,41 @@ export default function PosPage() {
     setIsVoucherModalOpen(true);
   };
 
-  const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money') => {
+  const creditConfigured = settings?.currentStore?.credit != null;
+
+  const handleCheckout = (method: 'Cash' | 'Card' | 'Mobile Money' | 'Credit') => {
     if (cart.size === 0) {
       feedback.error('Cart is empty', 'Please add products to the cart before checkout.', 'Add products and try again.');
       return;
     }
+    if (method === 'Credit') {
+      if (!creditConfigured) {
+        feedback.error(
+          'Credit not configured',
+          'Set the customer credit limit in Store settings to allow sales on credit.',
+          'Open Settings'
+        );
+        return;
+      }
+      setIsCreditModalOpen(true);
+      return;
+    }
     setActivePaymentMethod(method);
+  };
+  const creditLimit = settings?.currentStore?.credit?.customerCredit?.creditLimit;
+
+  const handleConfirmCreditSale = (payload: { customerId: string; paymentDate?: string; note?: string }) => {
+    handleCompleteSale({
+      items: cartItems,
+      total: amountToPay,
+      paymentMethod: 'Credit',
+      customerId: payload.customerId,
+      creditDetails: {
+        ...(payload.paymentDate && { paymentDate: payload.paymentDate }),
+        ...(payload.note && { note: payload.note }),
+      },
+    });
+    setIsCreditModalOpen(false);
   };
 
   const handleApplyVoucher = (code: string, amount: number) => {
@@ -258,7 +292,7 @@ export default function PosPage() {
     const newTransaction: Omit<Transaction, 'id'> = {
       ...transactionDetails,
       date: new Date(),
-      customerId: selectedCustomerId,
+      customerId: transactionDetails.customerId ?? selectedCustomerId,
       voucherCode: appliedVoucherCode,
       discountAmount: appliedDiscount,
       discount: manualDiscount ?? undefined,
@@ -332,34 +366,30 @@ export default function PosPage() {
         feedback.success('Sale complete!', 'View your receipt below.');
       } catch (error: unknown) {
         const err = error as { message?: string; response?: { status?: number; data?: unknown } };
-        const status = err?.response?.status;
-        const data = err?.response?.data as Record<string, unknown> | undefined;
-        const serverMessage =
-          typeof data?.message === 'string'
-            ? data.message
-            : Array.isArray(data?.message) && data.message[0] != null
-              ? String(data.message[0])
-              : typeof data?.error === 'string'
-                ? data.error
-                : data && typeof data === 'object'
-                  ? (data as { message?: string }).message ?? undefined
-                  : undefined;
+        const response = err?.response as { status?: number; data?: unknown } | undefined;
+        const status = response?.status;
+        const data = response?.data as Record<string, unknown> | undefined;
+        let serverMessage: string | undefined;
+        if (data && typeof data === 'object') {
+          if (typeof data.message === 'string') serverMessage = data.message;
+          else if (Array.isArray(data.message) && data.message[0] != null) serverMessage = String(data.message[0]);
+          else if (Array.isArray(data.errors) && data.errors[0] != null) serverMessage = String(data.errors[0]);
+          else if (typeof data.error === 'string') serverMessage = data.error;
+          else if (typeof (data as { message?: string }).message === 'string') serverMessage = (data as { message?: string }).message;
+        }
+        const fallbackMessage = err?.message ?? (error instanceof Error ? error.message : String(error));
 
         if (process.env.NODE_ENV === 'development') {
-          console.error('[Complete Sale] Failed', {
-            status,
-            serverMessage: serverMessage ?? err?.message,
-            message: err?.message,
-            data: data ? JSON.stringify(data) : undefined,
-          });
+          console.error('[Complete Sale] Failed', { status, serverMessage, fallbackMessage, data, error });
         }
 
         setActivePaymentMethod(null);
-        const showInPopup = status != null && status >= 400 && status < 500 && (serverMessage || status === 400);
-        const isStoreIdError = serverMessage && /storeId|integer/i.test(serverMessage);
+        const messageForUser = serverMessage ?? fallbackMessage;
+        const showInPopup = status != null && status >= 400 && status < 500 && (messageForUser || status === 400);
+        const isStoreIdError = messageForUser && /storeId|integer/i.test(messageForUser);
         const popupMessage = isStoreIdError
           ? 'Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support.'
-          : (serverMessage || 'Something went wrong. Check the items and store.');
+          : (messageForUser || 'Something went wrong. Check the items and store.');
         if (showInPopup) {
           setInsufficientStockPopup({
             open: true,
@@ -369,7 +399,7 @@ export default function PosPage() {
           feedback.fromError(
             error,
             'Failed to complete the sale',
-            serverMessage ? `${serverMessage} Try again or check your connection.` : 'Check your connection and try again.'
+            messageForUser ? `${messageForUser} Try again or check your connection.` : 'Check your connection and try again.'
           );
         }
       } finally {
@@ -819,7 +849,7 @@ export default function PosPage() {
               <span className="text-2xl font-bold">R {amountToPay.toFixed(2)}</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               <Button size="lg" className="h-12 sm:h-14 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white touch-target" onClick={() => handleCheckout('Cash')}>
                   CASH
               </Button>
@@ -828,6 +858,9 @@ export default function PosPage() {
               </Button>
               <Button size="lg" variant="outline" className="h-12 sm:h-14 text-sm sm:text-base touch-target" onClick={() => handleCheckout('Mobile Money')}>
                   MOBILE
+              </Button>
+              <Button size="lg" variant="outline" className="h-12 sm:h-14 text-sm sm:text-base touch-target" onClick={() => handleCheckout('Credit')}>
+                  CREDIT
               </Button>
             </div>
             <Button
@@ -866,6 +899,14 @@ export default function PosPage() {
         onClose={() => setIsApplyDiscountModalOpen(false)}
         cartSubtotal={cartSubtotal}
         onApply={handleApplyManualDiscount}
+    />
+    <CreditSaleModal
+        isOpen={isCreditModalOpen}
+        onClose={() => setIsCreditModalOpen(false)}
+        amount={amountToPay}
+        creditLimit={creditLimit ?? undefined}
+        onConfirmCredit={handleConfirmCreditSale}
+        isLoading={isCompletingSale}
     />
     <ReceiptModal
         open={receiptOpen}

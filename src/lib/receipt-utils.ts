@@ -14,7 +14,7 @@ export function buildReceiptData(params: {
   subtotal: number;
   discountAmount: number;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
+  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
   showVat: boolean;
   voucherCode?: string | null;
   timestamp?: Date;
@@ -75,7 +75,7 @@ export function validateReceiptContent(data: ReceiptData): string[] {
     }
   }
 
-  const validMethods = ['Cash', 'Card', 'Mobile Money'];
+  const validMethods = ['Cash', 'Card', 'Mobile Money', 'Credit'];
   if (!validMethods.includes(data.paymentMethod)) {
     errors.push(`Invalid payment method: ${data.paymentMethod}`);
   }

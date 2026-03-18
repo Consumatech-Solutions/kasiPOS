@@ -8,6 +8,7 @@ import type { Product } from '@/types';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import { feedback } from '@/lib/feedback';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSettings } from '@/components/settings-provider';
 import { useCategories, useProducts, productKeys, categoryKeys } from '@/hooks/use-catalogue';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
@@ -100,10 +101,13 @@ export default function CataloguePage() {
 
 
   // Hooks for data with sync and pagination
+  const { settings } = useSettings();
   const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
   // Type assertion for callbacks
   const typedCategories: ApiCategory[] = categories || [];
-  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10);
+  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10, {
+    storeIdForOffline: settings?.currentStore?.id ?? undefined,
+  });
 
   // Auto-generate barcodes for products that don't have one (only once per product).
   // Depend only on product IDs + loading so we don't re-run when products array reference
