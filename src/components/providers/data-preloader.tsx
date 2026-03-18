@@ -377,9 +377,9 @@ export function DataPreloader() {
         if (lastSync) params.updatedAtAfter = lastSync;
         const response = await catalogueApi.products.getAll(params);
         const delta = 'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
-        if (delta.length) await saveProductsToDexie(delta);
+        if (delta.length) await saveProductsToDexie(delta, settings?.currentStore?.id ?? undefined);
         await setLastSyncAt('products', new Date().toISOString());
-        const result = lastSync ? await getProductsFromDexie(1, 100) : { data: delta, meta: 'meta' in response && response.meta ? response.meta : { total: delta.length, page: 1, limit: 100, totalPages: 1 } };
+        const result = lastSync ? await getProductsFromDexie(1, 100, settings?.currentStore?.id ?? undefined) : { data: delta, meta: 'meta' in response && response.meta ? response.meta : { total: delta.length, page: 1, limit: 100, totalPages: 1 } };
         return result;
       },
       staleTime: 30 * 60 * 1000, // 30 minutes
