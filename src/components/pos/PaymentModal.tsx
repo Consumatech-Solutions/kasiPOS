@@ -40,8 +40,14 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   const tenderedAmount = parseFloat(tendered) || 0;
   // Prevent negative change on initial load or when amount tendered is insufficient
   const change = Math.max(0, tenderedAmount - cartTotal);
-  const canCompleteCashSale = tenderedAmount >= cartTotal;
-  const isInsufficient = tenderedAmount > 0 && tenderedAmount < cartTotal;
+  
+
+  // round both to 2 decimal places
+  const roundedTenderedAmount = parseFloat(tenderedAmount.toFixed(2));
+  const roundedCartTotal = parseFloat(cartTotal.toFixed(2));
+  const isInsufficient = roundedTenderedAmount > 0 && roundedTenderedAmount < roundedCartTotal;
+  const canCompleteCashSale = roundedTenderedAmount >= roundedCartTotal;
+  console.log(roundedTenderedAmount, roundedCartTotal, 'roundedTenderedAmount, roundedCartTotal', isInsufficient)
   const canCompleteMobileSale = (customer?.contact || mobileNumber.length > 10) && selectedMobileProvider;
 
 
