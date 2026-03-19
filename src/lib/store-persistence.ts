@@ -92,8 +92,8 @@ export async function loadStoreFromIndexedDB(storeId?: string | number | null): 
 }
 
 /**
- * Fetch store from API and save permanently
- * This is the main function to use after authentication
+ * Fetch store from API and save permanently.
+ * Also merges credit config from GET /settings so currentStore.credit is available for the POS.
  */
 export async function fetchAndSaveStore(
   setSetting?: (key: 'currentStore', value: Store | null) => void
@@ -101,9 +101,20 @@ export async function fetchAndSaveStore(
   try {
     const { storesApi } = await import('@/lib/api/stores');
     const response = await storesApi.getMyStore();
-    const store = response.data;
+    let store = response.data;
 
     if (store) {
+      try {
+        const { settingsApi } = await import('@/lib/api/settings');
+        const settingsRes = await settingsApi.get(store.id);
+        const raw = settingsRes.data as { credit?: Store['credit']; data?: { credit?: Store['credit'] } };
+        const credit = raw?.data?.credit ?? raw?.credit ?? undefined;
+        if (credit !== undefined) {
+          store = { ...store, credit };
+        }
+      } catch (_) {
+        // Keep store as-is if GET /settings fails (e.g. not implemented or offline)
+      }
       await saveStorePermanently(store, setSetting);
       return store;
     }

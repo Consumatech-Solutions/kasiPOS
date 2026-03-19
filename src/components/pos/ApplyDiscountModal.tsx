@@ -95,7 +95,6 @@ export default function ApplyDiscountModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         title="Apply discount"
-        hideOverlay
         className="!flex !flex-col w-[380px] max-w-[95vw] !p-0 !gap-0 overflow-hidden border-0 shadow-xl bg-white rounded-xl [&>button]:hidden"
         style={{ borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', padding: 0 }}
       >

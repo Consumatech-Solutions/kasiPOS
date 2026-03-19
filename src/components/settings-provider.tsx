@@ -1,7 +1,7 @@
 
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { AppSettings, User, Store } from '@/types';
 import { storesApi } from '@/lib/api/stores';
@@ -96,6 +96,33 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       return { ...prev, campaigns, marketplace, boph, buyStock, showVatInCheckout };
     });
   }, [settings.currentStore?.id, settings.currentStore?.enabledModules]);
+
+  // After load/refresh (online): ensure credit config is loaded and persisted for offline-first
+  const creditFetchedForStoreIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const store = settings.currentStore;
+    const storeId = settings.currentUser?.storeId ?? store?.id;
+    if (!storeId || !store) return;
+    if (creditFetchedForStoreIdRef.current === storeId) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    creditFetchedForStoreIdRef.current = storeId;
+    (async () => {
+      try {
+        const { settingsApi } = await import('@/lib/api/settings');
+        const res = await settingsApi.get(storeId);
+        const raw = res.data as { credit?: Store['credit']; data?: { credit?: Store['credit'] } };
+        const credit = raw?.data?.credit ?? raw?.credit;
+        if (credit !== undefined) {
+          const storeWithCredit = { ...store, credit };
+          setSetting('currentStore', storeWithCredit);
+          const { saveStorePermanently } = await import('@/lib/store-persistence');
+          await saveStorePermanently(storeWithCredit, setSetting);
+        }
+      } catch (_) {
+        creditFetchedForStoreIdRef.current = null;
+      }
+    })();
+  }, [settings.currentStore, settings.currentUser?.storeId, setSetting]);
 
   // Load store from IndexedDB on initial load if not in localStorage
   useEffect(() => {

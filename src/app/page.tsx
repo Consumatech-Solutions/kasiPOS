@@ -380,16 +380,21 @@ export default function PosPage() {
         const fallbackMessage = err?.message ?? (error instanceof Error ? error.message : String(error));
 
         if (process.env.NODE_ENV === 'development') {
-          console.error('[Complete Sale] Failed', { status, serverMessage, fallbackMessage, data, error });
+          console.error('[Complete Sale] Failed', 'status:', status, 'serverMessage:', serverMessage, 'storeId sent:', newTransaction?.storeId);
+          if (data) console.error('[Complete Sale] Response data:', JSON.stringify(data));
+          console.error('[Complete Sale] Error:', error);
         }
 
         setActivePaymentMethod(null);
         const messageForUser = serverMessage ?? fallbackMessage;
         const showInPopup = status != null && status >= 400 && status < 500 && (messageForUser || status === 400);
         const isStoreIdError = messageForUser && /storeId|integer/i.test(messageForUser);
+        const isCreditNotConfigured = messageForUser && /credit.*not configured|not configured.*credit/i.test(messageForUser);
         const popupMessage = isStoreIdError
           ? 'Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support.'
-          : (messageForUser || 'Something went wrong. Check the items and store.');
+          : isCreditNotConfigured
+            ? 'Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term.'
+            : (messageForUser || 'Something went wrong. Check the items and store.');
         if (showInPopup) {
           setInsufficientStockPopup({
             open: true,
@@ -933,7 +938,7 @@ export default function PosPage() {
     <AlertDialog open={insufficientStockPopup.open} onOpenChange={(open) => !open && setInsufficientStockPopup((prev) => ({ ...prev, open: false }))}>
       <AlertDialogContent className="z-[100]">
         <AlertDialogHeader>
-          <AlertDialogTitle>Insufficient stock</AlertDialogTitle>
+          <AlertDialogTitle>{insufficientStockPopup.message.toLowerCase().includes('credit') ? 'Credit not configured' : 'Insufficient stock'}</AlertDialogTitle>
           <AlertDialogDescription>{insufficientStockPopup.message}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
