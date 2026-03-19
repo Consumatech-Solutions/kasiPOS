@@ -44,7 +44,7 @@ export default function MarketplaceOrdersPage() {
     autoLoad: false,
   });
 
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 100 });
   const customers = allCustomersList || [];
 
   const { stores: marketplaceStores } = useMarketplaceStores({ activeOnly: true, autoLoad: true });
@@ -53,7 +53,7 @@ export default function MarketplaceOrdersPage() {
   useEffect(() => {
     loadOrders({
       page: 1,
-      limit: 10,
+      limit: 500,
       search: searchTerm || undefined,
       marketplaceStoreId: selectedStore,
     });

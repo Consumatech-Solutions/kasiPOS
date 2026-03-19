@@ -50,7 +50,7 @@ function normalizeStockAdjustmentResponse(response: StockAdjustment[] | Paginate
 }
 
 export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
-  const { productId, initialPage = 1, initialLimit = 10 } = options;
+  const { productId, initialPage = 1, initialLimit = 1000 } = options;
   const queryClient = useQueryClient();
 
   const queryKey = productId 

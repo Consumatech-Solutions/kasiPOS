@@ -12,6 +12,7 @@ interface OfflineState {
 }
 
 const CONNECTIVITY_CHECK_INTERVAL_MS = 10000; // Check every 10 seconds
+const OFFLINE_FIRST_CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour - check connectivity to allow sync
 const NETWORK_TEST_TIMEOUT = 5000; // Timeout for backend reachability
 const BACKEND_URL = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL
   ? process.env.NEXT_PUBLIC_API_URL
@@ -33,8 +34,11 @@ class OfflineDetector {
   private checkPromise: Promise<boolean> | null = null;
   private listeners: Set<(isOffline: boolean) => void> = new Set();
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private hourlyIntervalId: ReturnType<typeof setInterval> | null = null;
   /** Dev only: when true, report offline so you can test without cutting the network */
   private forceOffline = false;
+  /** When true, app reports offline (offline-first mode) until hourly check or force sync clears it */
+  private offlineFirstActive = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -49,6 +53,18 @@ class OfflineDetector {
       this.intervalId = setInterval(() => {
         this.checkConnectivity(true);
       }, CONNECTIVITY_CHECK_INTERVAL_MS);
+
+      // Hourly check: if online, clear offline-first mode so sync can run (no error if offline)
+      this.hourlyIntervalId = setInterval(() => {
+        this.checkConnectivity(true).then((isOnline) => {
+          if (isOnline) {
+            this.setOfflineFirstActive(false);
+            this.notifyListeners();
+          }
+        }).catch(() => {
+          // No connection - do nothing, no error
+        });
+      }, OFFLINE_FIRST_CHECK_INTERVAL_MS);
     }
   }
 
@@ -81,10 +97,35 @@ class OfflineDetector {
     this.listeners.forEach(listener => listener(effective));
   }
 
-  /** Dev only: effective offline = forced offline (when dev) OR real offline */
+  /** Effective offline = dev force OR network offline OR offline-first mode */
   getEffectiveOffline(): boolean {
     if (this.forceOffline && isDevHost()) return true;
+    if (this.offlineFirstActive) return true;
     return this.state.isOffline;
+  }
+
+  getOfflineFirstActive(): boolean {
+    return this.offlineFirstActive;
+  }
+
+  setOfflineFirstActive(value: boolean): void {
+    if (this.offlineFirstActive === value) return;
+    this.offlineFirstActive = value;
+    this.notifyListeners();
+  }
+
+  /**
+   * Try to sync now: check connectivity; if online, clear offline-first mode and notify (sync runs).
+   * Returns true if online, false otherwise (UI can show "No connection").
+   */
+  async trySyncNow(): Promise<boolean> {
+    const isOnline = await this.forceCheck();
+    if (isOnline) {
+      this.setOfflineFirstActive(false);
+      this.notifyListeners();
+      return true;
+    }
+    return false;
   }
 
   isDevHost(): boolean {
@@ -164,10 +205,13 @@ class OfflineDetector {
 
   /**
    * Get current offline status (asynchronous, performs fresh check if needed).
-   * In dev with simulate offline, returns true without hitting the network.
+   * Returns true when offline: dev force, offline-first mode, or backend unreachable.
+   * When offline-first is active (sync not yet triggered), we report offline so the
+   * mutation queue does not process even if the device is online.
    */
   async checkOfflineStatus(force: boolean = false): Promise<boolean> {
     if (this.forceOffline && isDevHost()) return true;
+    if (this.offlineFirstActive) return true;
     return !(await this.checkConnectivity(force));
   }
 
@@ -199,6 +243,10 @@ class OfflineDetector {
       if (this.intervalId != null) {
         clearInterval(this.intervalId);
         this.intervalId = null;
+      }
+      if (this.hourlyIntervalId != null) {
+        clearInterval(this.hourlyIntervalId);
+        this.hourlyIntervalId = null;
       }
     }
     this.listeners.clear();
