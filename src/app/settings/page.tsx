@@ -139,13 +139,20 @@ export default function SettingsPage() {
     fetchUsers();
   }, [userManagementStoreId, page]);
 
+  // StoreId for settings: prefer JWT (currentUser.storeId) so backend and frontend use the same store
+  const settingsStoreId = currentUser?.storeId ?? settingsStore?.id ?? undefined;
+
   // Load store settings (credit config) from GET /settings for admin/store_admin
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== 'store_admin') return;
     if (!isOnline) return;
+    if (!settingsStoreId) {
+      setLoadingSettings(false);
+      return;
+    }
     setLoadingSettings(true);
     settingsApi
-      .get()
+      .get(settingsStoreId)
       .then((res) => {
         const credit = res.data?.credit;
         const cc = credit?.customerCredit;
@@ -188,7 +195,7 @@ export default function SettingsPage() {
         }
       })
       .finally(() => setLoadingSettings(false));
-  }, [isAdmin, currentUser?.role, isOnline, settingsStore?.credit]);
+  }, [isAdmin, currentUser?.role, isOnline, settingsStoreId, settingsStore?.credit]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -251,8 +258,8 @@ export default function SettingsPage() {
   };
 
   const saveCreditSettings = async () => {
-    if (!settingsStore?.id) {
-      feedback.error('No store', 'Load a store first.', undefined, { code: 'CREDIT' });
+    if (!settingsStoreId) {
+      feedback.error('No store', 'Load a store first or ensure your account has a store.', undefined, { code: 'CREDIT' });
       return;
     }
     if (!isOnline) {
@@ -261,33 +268,76 @@ export default function SettingsPage() {
     }
     setSavingCredit(true);
     try {
+      const creditLimit = Math.max(0, Number(creditForm.creditLimit) || 0);
+      const termDays = creditForm.termType === 'fixed' ? Math.max(1, Number(creditForm.term) || 7) : undefined;
       const body = creditForm.enabled
         ? {
             credit: {
               customerCredit: {
-                creditLimit: Math.max(0, Number(creditForm.creditLimit) || 0),
+                creditLimit,
                 termType: creditForm.termType,
-                ...(creditForm.termType === 'fixed' && { term: Math.max(0, Number(creditForm.term) ?? 7) }),
+                ...(creditForm.termType === 'fixed' && { term: termDays }),
               },
             },
           }
         : { credit: null };
-      const response = await settingsApi.patch(body);
-      const updatedCredit = response.data?.credit ?? null;
-      setSetting('currentStore', { ...settingsStore, credit: updatedCredit });
-      await saveStorePermanently({ ...settingsStore, credit: updatedCredit }, setSetting);
+      await settingsApi.patch(body, settingsStoreId);
+      // Verify persistence with GET (same storeId as backend uses) so we know credit is available at checkout
+      let updatedCredit: typeof settingsStore.credit = null;
+      if (creditForm.enabled) {
+        try {
+          const verifyRes = await settingsApi.get(settingsStoreId);
+          const verifyRaw = verifyRes.data as { credit?: unknown; data?: { credit?: unknown } };
+          const verified = verifyRaw?.data?.credit ?? verifyRaw?.credit ?? null;
+          if (verified != null && typeof verified === 'object' && 'customerCredit' in (verified as object)) {
+            updatedCredit = verified as typeof settingsStore.credit;
+          }
+        } catch (_) {
+          // GET failed; we still update local state from what we sent, but user may see "not configured" at checkout
+        }
+      }
+      if (updatedCredit == null && creditForm.enabled) {
+        updatedCredit = (body.credit ?? null) as typeof settingsStore.credit;
+      }
+      const normalizedCredit = updatedCredit;
+      if (settingsStore) {
+        setSetting('currentStore', { ...settingsStore, credit: normalizedCredit });
+        await saveStorePermanently({ ...settingsStore, credit: normalizedCredit }, setSetting);
+      }
+      const cc = normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
+        ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } }).customerCredit
+        : null;
       setStoreSettingsCredit(
-        updatedCredit?.customerCredit
+        cc
           ? {
-              creditLimit: Number(updatedCredit.customerCredit.creditLimit ?? 0),
-              termType: updatedCredit.customerCredit.termType === 'variable' ? 'variable' : 'fixed',
-              term: updatedCredit.customerCredit.term,
+              creditLimit: Number(cc.creditLimit ?? 0),
+              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+              term: cc.term,
             }
           : null
       );
-      feedback.success('Credit settings saved', 'Customer credit configuration has been updated.');
+      setCreditForm((f) => (cc ? { ...f, creditLimit: Number(cc.creditLimit ?? 0), termType: cc.termType === 'variable' ? 'variable' : 'fixed', term: cc.term ?? 7 } : f));
+      if (creditForm.enabled && !cc) {
+        feedback.error(
+          'Saved but not confirmed on server',
+          'Credit settings were sent, but the server did not return the stored config.',
+          'Check that store_settings has a row for store ' + settingsStoreId + ' with credit set. Then try a credit sale again.',
+          { code: 'CREDIT' }
+        );
+      } else {
+        feedback.success('Credit settings saved', 'Customer credit configuration has been updated.');
+      }
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string }; message?: string }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Failed to save.';
+      const ax = err as { response?: { data?: { message?: string | string[] }; status?: number }; message?: string };
+      let message: string = (err as Error)?.message ?? 'Failed to save.';
+      if (ax?.response?.data) {
+        const msg = ax.response.data.message;
+        if (typeof msg === 'string') message = msg;
+        else if (Array.isArray(msg) && msg[0]) message = String(msg[0]);
+      }
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Credit settings] PATCH /settings failed', { status: ax?.response?.status, data: ax?.response?.data, err });
+      }
       feedback.error('Save failed', message, undefined, { code: 'CREDIT' });
     } finally {
       setSavingCredit(false);
@@ -689,6 +739,14 @@ export default function SettingsPage() {
                       <div id="credit-client" className="space-y-2 pt-4 scroll-mt-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2"><CreditCard className="w-5 h-5" /> Customer credit</h3>
                         <p className="text-sm text-muted-foreground">Allow sales on credit and set the credit limit and payment term. When enabled, the Credit payment option appears at checkout.</p>
+                        {settingsStoreId ? (
+                          <p className="text-xs text-muted-foreground font-mono">
+                            Configuring for: <span className="font-semibold text-foreground">{settingsStore?.id === settingsStoreId ? (settingsStore.name ?? 'Store') : 'Store (from your account)'}</span> — <span title={settingsStoreId}>{settingsStoreId}</span>
+                            {currentUser?.storeId === settingsStoreId && <span className="ml-1 text-muted-foreground">(JWT)</span>}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">No store. Your account must have a store (storeId in JWT) or load a store so GET/PATCH /settings and checkout use the same store.</p>
+                        )}
                       </div>
                       <div className={cn("space-y-4 p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
                         <div className="flex items-center justify-between">
