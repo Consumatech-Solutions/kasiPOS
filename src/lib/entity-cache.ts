@@ -126,6 +126,67 @@ export async function saveCategoriesToDexie(data: ApiCategory[]): Promise<void> 
   }
 }
 
+/** Replace productCache with a full server snapshot (used after preload sync). */
+export async function replaceProductCache(
+  data: ApiProduct[],
+  storeId?: string | null
+): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.productCache.clear();
+  if (!data.length) return;
+  const records = data.map((p) => ({
+    ...p,
+    id: p.id,
+    createdAt: p.createdAt ?? new Date().toISOString(),
+    ...(storeId != null && storeId !== '' && { storeId }),
+  }));
+  await db.productCache.bulkPut(records);
+  const count = await db.productCache.count();
+  if (count > ENTITY_CAP) {
+    const toRemove = count - ENTITY_CAP;
+    const oldest = await db.productCache.orderBy('createdAt').limit(toRemove).toArray();
+    await db.productCache.bulkDelete(oldest.map((r) => r.id));
+  }
+}
+
+/** Replace categoryCache with a full server snapshot (used after preload sync). */
+export async function replaceCategoryCache(data: ApiCategory[]): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.categoryCache.clear();
+  if (!data.length) return;
+  const records = data.map((c) => ({
+    id: c.id,
+    name: c.name,
+    createdAt: c.createdAt ?? new Date().toISOString(),
+    updatedAt: c.updatedAt ?? new Date().toISOString(),
+  }));
+  await db.categoryCache.bulkPut(records);
+  const count = await db.categoryCache.count();
+  if (count > ENTITY_CAP) {
+    const toRemove = count - ENTITY_CAP;
+    const oldest = await db.categoryCache.orderBy('createdAt').limit(toRemove).toArray();
+    await db.categoryCache.bulkDelete(oldest.map((r) => r.id));
+  }
+}
+
+/** Replace customers table with a full server snapshot (used after preload sync). */
+export async function replaceCustomerCache(data: Customer[]): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const db = getDb();
+  await db.customers.clear();
+  if (!data.length) return;
+  await db.customers.bulkPut(data);
+  const count = await db.customers.count();
+  if (count > ENTITY_CAP) {
+    const allCust = await db.customers.toArray();
+    allCust.sort((a, b) => ((a as Customer).updatedAt ?? '').localeCompare((b as Customer).updatedAt ?? ''));
+    const toDelete = allCust.slice(0, count - ENTITY_CAP).map((r) => r.id);
+    await db.customers.bulkDelete(toDelete);
+  }
+}
+
 export async function getCategoriesFromDexie(
   page: number,
   limit: number

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useSyncStatus } from '@/hooks/use-sync-status';
 import {
   Dialog,
@@ -7,12 +8,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, CheckCircle2, XCircle, Clock, Download } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, Clock, Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { offlineDetector } from '@/lib/offline-detector';
+import { useToast } from '@/hooks/use-toast';
 
 interface SyncStatusModalProps {
   isOpen: boolean;
@@ -21,6 +26,24 @@ interface SyncStatusModalProps {
 
 export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
   const { status, queue, currentMutation, isPreloading, preloadProgress } = useSyncStatus();
+  const [isSyncingNow, setIsSyncingNow] = useState(false);
+  const { toast } = useToast();
+
+  const handleForceSync = async () => {
+    setIsSyncingNow(true);
+    try {
+      const online = await offlineDetector.trySyncNow();
+      if (!online) {
+        toast({
+          title: 'No connection',
+          description: 'Unable to sync. Check your connection.',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsSyncingNow(false);
+    }
+  };
 
   const getStatusIcon = (mutationStatus?: string) => {
     switch (mutationStatus) {
@@ -150,6 +173,23 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
             </div>
           )}
         </ScrollArea>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.location.reload();
+            }}
+            disabled={isSyncingNow || isPreloading}
+          >
+            {isSyncingNow ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Sync now
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

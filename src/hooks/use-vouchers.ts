@@ -24,7 +24,7 @@ function normalizeVoucherResponse(response: Voucher[] | PaginatedResponse<Vouche
       meta: {
         total: response.length,
         page: 1,
-        limit: response.length || 10,
+        limit: response.length || 100,
         totalPages: 1,
       },
     };

@@ -102,10 +102,10 @@ export default function CataloguePage() {
 
   // Hooks for data with sync and pagination
   const { settings } = useSettings();
-  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
+  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 100);
   // Type assertion for callbacks
   const typedCategories: ApiCategory[] = categories || [];
-  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10, {
+  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 500, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
 
@@ -273,24 +273,22 @@ export default function CataloguePage() {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          queryClient.setQueryData(productKeys.lists(), (old: { data: any[]; meta: any } | undefined) => {
-            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
-            return {
-              ...old,
-              data: [optimisticProduct, ...old.data],
-              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
-            };
-          });
-          queryClient.setQueryData(productKeys.list({ page: 1, limit: 10 }), (old: { data: any[]; meta: any } | undefined) => {
-            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
-            return {
-              ...old,
-              data: [optimisticProduct, ...old.data],
-              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
-            };
+          const productQueries = queryClient.getQueriesData<{ data: any[]; meta: any }>({ queryKey: productKeys.lists() });
+          productQueries.forEach(([queryKey, data]) => {
+            if (data?.data) {
+              queryClient.setQueryData(queryKey, {
+                ...data,
+                data: [optimisticProduct, ...data.data],
+                meta: { ...data.meta, total: (data.meta?.total ?? 0) + 1 },
+              });
+            }
           });
           const { getDb } = await import('@/lib/db');
-          await getDb().productCache.put({ ...optimisticProduct, createdAt: optimisticProduct.createdAt });
+          await getDb().productCache.put({
+            ...optimisticProduct,
+            createdAt: optimisticProduct.createdAt,
+            storeId: settings?.currentStore?.id ?? null,
+          });
           mutationQueue.add({
             mutationKey: ['products', 'create'],
             mutationFn: () => executeMutation(['products', 'create'], { ...productData, _tempId: tempId }),

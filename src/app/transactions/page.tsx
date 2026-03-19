@@ -38,13 +38,13 @@ export default function TransactionsPage() {
   // Use API hooks. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
   const { transactions: allTransactions, loading, error } = useTransactions({
     page: 1,
-    limit: 10,
+    limit: 500,
     date: dateFilter,
     search: backendSearch,
     storeIdForOffline: currentStore?.id ?? undefined,
   });
 
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 100 });
   const customers = allCustomersList || [];
 
   const getCustomerName = (customerId: string | undefined | null) => {

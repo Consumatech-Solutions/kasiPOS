@@ -30,6 +30,7 @@ import { feedback } from '@/lib/feedback';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { updateProductStockInDexie } from '@/lib/entity-cache';
 import { getProductInitials } from '@/lib/utils/product-initials';
 import { cn } from '@/lib/utils';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
@@ -54,6 +55,8 @@ export default function PosPage() {
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
+
+  console.log(isOnline, 'isOnline');
 
   const { cart, addToCart, updateQuantity, clearCart, isCartHydrated } = useCart();
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | undefined>();
@@ -85,8 +88,8 @@ export default function PosPage() {
   };
 
   // API Hooks
-  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
-  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 10, {
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 100);
+  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 500, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
 
@@ -128,7 +131,7 @@ export default function PosPage() {
   }, [allCategories, categorySearch]);
   
   // Use API hook for customers
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 100 });
   
   const customers = allCustomersList || [];
 
@@ -419,6 +422,8 @@ export default function PosPage() {
           Array.isArray(key) && key[0] === 'products'
         );
 
+        console.log(productQueries, 'productQueries')
+
         // Update stock optimistically for all product queries
         productQueries.forEach(queryKey => {
           queryClient.setQueryData<{ data: any[]; meta: any }>(queryKey, (old) => {
@@ -437,6 +442,17 @@ export default function PosPage() {
             };
           });
         });
+
+        // 1b. Persist stock to Dexie so reload and other pages match optimistic cache
+        for (const item of newTransaction.items) {
+          const pid = String(item.productId);
+          const row = await getDb().productCache.get(pid);
+          if (row) {
+            const currentStock = typeof row.stock === 'number' ? row.stock : Number(row.stock) || 0;
+            const newStock = Math.max(0, currentStock - item.quantity);
+            await updateProductStockInDexie(pid, newStock);
+          }
+        }
 
         // 2. Save transaction to local IndexedDB
         await db.transactions.add(newTransaction as Transaction);

@@ -6,10 +6,18 @@ import { catalogueApi } from '@/lib/api/catalogue';
 import { customersApi } from '@/lib/api/customers';
 import { vouchersApi } from '@/lib/api/vouchers';
 import { mutationQueue } from '@/lib/mutation-queue';
-import { saveProductsToDexie, saveCustomersToDexie, saveCategoriesToDexie, getLastSyncAt, setLastSyncAt, getProductsFromDexie, getCategoriesFromDexie, getCustomersFromDexie } from '@/lib/entity-cache';
+import {
+  replaceProductCache,
+  replaceCategoryCache,
+  replaceCustomerCache,
+  setLastSyncAt,
+} from '@/lib/entity-cache';
+import type { ApiProduct, ApiCategory } from '@/types/catalogue';
+import type { Customer } from '@/types';
+import type { PaginationMeta } from '@/types/pagination';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
-import { checkOfflineStatus } from '@/lib/offline-detector';
+import { checkOfflineStatus, offlineDetector } from '@/lib/offline-detector';
 import { getPageRoutesToPreload } from '@/lib/page-routes';
 
 // Define query keys locally to avoid circular imports from hooks
@@ -251,6 +259,10 @@ export function DataPreloader() {
     });
 
     async function startPreloading() {
+      // Sync pending mutations first, then replace Dexie with a full server snapshot
+      mutationQueue.triggerSync();
+      await mutationQueue.waitUntilSynced(120_000);
+
       // Determine if we need full preload (pages + data) or incremental data sync only
       const cacheVerified = await verifyServiceWorkerCache();
       const storedVersion = typeof localStorage !== 'undefined' ? localStorage.getItem(PRELOAD_VERSION_KEY) : null;
@@ -299,6 +311,7 @@ export function DataPreloader() {
                   : 'Data synced. You can work offline.',
                 duration: 5000,
               });
+              offlineDetector.setOfflineFirstActive(true);
             }, 500);
           } else {
             if (!finalCacheVerified) {
@@ -368,54 +381,124 @@ export function DataPreloader() {
         }
       }
 
-    // Prefetch products - incremental sync if lastSyncAt exists
+    const storeIdForPreload = settings?.currentStore?.id ?? undefined;
+
+    // Prefetch products — full paginated fetch, replace Dexie (no incremental merge)
     queryClient.prefetchQuery({
       queryKey: productKeys.list({ page: 1, limit: 100 }),
       queryFn: async () => {
-        const lastSync = await getLastSyncAt('products');
-        const params: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 100 };
-        if (lastSync) params.updatedAtAfter = lastSync;
-        const response = await catalogueApi.products.getAll(params);
-        const delta = 'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
-        if (delta.length) await saveProductsToDexie(delta, settings?.currentStore?.id ?? undefined);
+        const pageLimit = 100;
+        const aggregated: ApiProduct[] = [];
+        let page = 1;
+        let totalPages = 1;
+        for (;;) {
+          const response = await catalogueApi.products.getAll({ page, limit: pageLimit });
+          const chunk =
+            'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
+          const meta: PaginationMeta =
+            'meta' in response && response.meta
+              ? response.meta
+              : { total: chunk.length, page, limit: pageLimit, totalPages: 1 };
+          totalPages = meta.totalPages;
+          aggregated.push(...chunk);
+          if (page >= totalPages || chunk.length === 0) break;
+          page += 1;
+        }
+        await replaceProductCache(aggregated, storeIdForPreload ?? null);
         await setLastSyncAt('products', new Date().toISOString());
-        const result = lastSync ? await getProductsFromDexie(1, 100, settings?.currentStore?.id ?? undefined) : { data: delta, meta: 'meta' in response && response.meta ? response.meta : { total: delta.length, page: 1, limit: 100, totalPages: 1 } };
-        return result;
+        const total = aggregated.length;
+        return {
+          data: aggregated.slice(0, pageLimit),
+          meta: {
+            total,
+            page: 1,
+            limit: pageLimit,
+            totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+          },
+        };
       },
       staleTime: 30 * 60 * 1000, // 30 minutes
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // Prefetch categories - incremental sync if lastSyncAt exists
+    // Prefetch categories — full paginated fetch, replace Dexie
     queryClient.prefetchQuery({
       queryKey: categoryKeys.list({ page: 1, limit: 50 }),
       queryFn: async () => {
-        const lastSync = await getLastSyncAt('categories');
-        const params: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 50 };
-        if (lastSync) params.updatedAtAfter = lastSync;
-        const response = await catalogueApi.categories.getAll(params);
-        const delta = ('data' in response && response.data) ? response.data : Array.isArray(response) ? response : [];
-        if (delta.length) await saveCategoriesToDexie(delta);
+        const pageLimit = 50;
+        const aggregated: ApiCategory[] = [];
+        let page = 1;
+        let totalPages = 1;
+        for (;;) {
+          const response = await catalogueApi.categories.getAll({ page, limit: pageLimit });
+          const chunk =
+            'data' in response && response.data ? response.data : Array.isArray(response) ? response : [];
+          const meta: PaginationMeta =
+            'meta' in response && response.meta
+              ? response.meta
+              : { total: chunk.length, page, limit: pageLimit, totalPages: 1 };
+          totalPages = meta.totalPages;
+          aggregated.push(...chunk);
+          if (page >= totalPages || chunk.length === 0) break;
+          page += 1;
+        }
+        await replaceCategoryCache(aggregated);
         await setLastSyncAt('categories', new Date().toISOString());
-        const result = lastSync ? await getCategoriesFromDexie(1, 50) : { data: delta, meta: ('meta' in response && response.meta) ? response.meta : { total: delta.length, page: 1, limit: 50, totalPages: 1 } };
-        return result;
+        const total = aggregated.length;
+        return {
+          data: aggregated.slice(0, pageLimit),
+          meta: {
+            total,
+            page: 1,
+            limit: pageLimit,
+            totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+          },
+        };
       },
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
 
-    // Prefetch customers - incremental sync if lastSyncAt exists
+    // Prefetch customers — full paginated fetch, replace Dexie
     queryClient.prefetchQuery({
       queryKey: customerKeys.list({ page: 1, limit: 50 }),
       queryFn: async () => {
-        const lastSync = await getLastSyncAt('customers');
-        const params: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 50 };
-        if (lastSync) params.updatedAtAfter = lastSync;
-        const response = await customersApi.getAll(params);
-        const responseData = response.data;
-        const delta = responseData && 'data' in responseData ? responseData.data : Array.isArray(responseData) ? responseData : [];
-        if (delta.length) await saveCustomersToDexie(delta);
+        const pageLimit = 50;
+        const aggregated: Customer[] = [];
+        let page = 1;
+        let totalPages = 1;
+        for (;;) {
+          const response = await customersApi.getAll({
+            page,
+            limit: pageLimit,
+            ...(storeIdForPreload != null && storeIdForPreload !== '' ? { storeId: storeIdForPreload } : {}),
+          });
+          const responseData = response.data;
+          const chunk =
+            responseData && 'data' in responseData
+              ? responseData.data
+              : Array.isArray(responseData)
+                ? responseData
+                : [];
+          const meta: PaginationMeta =
+            responseData && 'meta' in responseData
+              ? responseData.meta
+              : { total: chunk.length, page, limit: pageLimit, totalPages: 1 };
+          totalPages = meta.totalPages;
+          aggregated.push(...chunk);
+          if (page >= totalPages || chunk.length === 0) break;
+          page += 1;
+        }
+        await replaceCustomerCache(aggregated);
         await setLastSyncAt('customers', new Date().toISOString());
-        const result = lastSync ? await getCustomersFromDexie(1, 50) : { data: delta, meta: responseData && 'meta' in responseData ? responseData.meta : { total: delta.length, page: 1, limit: 50, totalPages: 1 } };
-        return result;
+        const total = aggregated.length;
+        return {
+          data: aggregated.slice(0, pageLimit),
+          meta: {
+            total,
+            page: 1,
+            limit: pageLimit,
+            totalPages: Math.max(1, Math.ceil(total / pageLimit)),
+          },
+        };
       },
       staleTime: 30 * 60 * 1000,
     }).then(() => updateProgress()).catch(() => updateProgress());
