@@ -911,6 +911,10 @@ export default function PosPage() {
         amount={amountToPay}
         creditLimit={creditLimit ?? undefined}
         onConfirmCredit={handleConfirmCreditSale}
+        onAddCustomer={() => {
+          setCustomerSearchTerm('');
+          setCustomerDialogOpen(true);
+        }}
         isLoading={isCompletingSale}
     />
     <ReceiptModal

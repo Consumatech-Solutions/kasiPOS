@@ -216,7 +216,7 @@ export default function CreditSaleModal({
                         }}
                       >
                         <UserPlus className="h-4 w-4" />
-                        Add New Customer
+                        Add Customer
                       </Button>
                     </div>
                   )}
