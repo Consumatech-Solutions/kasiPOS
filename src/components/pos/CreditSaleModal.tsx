@@ -116,7 +116,6 @@ export default function CreditSaleModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         title="Sell on credit"
-        hideOverlay
         className="!flex !flex-col w-[380px] max-w-[95vw] !p-0 !gap-0 overflow-hidden border-0 shadow-xl bg-white rounded-xl [&>button]:hidden"
         style={{ borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', padding: 0 }}
       >
@@ -217,7 +216,7 @@ export default function CreditSaleModal({
                         }}
                       >
                         <UserPlus className="h-4 w-4" />
-                        Add New Customer
+                        Add Customer
                       </Button>
                     </div>
                   )}

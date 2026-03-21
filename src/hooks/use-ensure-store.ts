@@ -13,9 +13,45 @@ export function useEnsureStore() {
   const [isLoading, setIsLoading] = useState(false);
 
   const ensureStore = async (): Promise<Store | null> => {
-    // If store already exists, return it immediately
-    if (settings.currentStore) {
-      return settings.currentStore;
+    const jwtStoreId = settings.currentUser?.storeId;
+    const current = settings.currentStore;
+
+    // Prefer JWT store so POS and Settings (credit config) use the same store
+    if (current && jwtStoreId && current.id !== jwtStoreId) {
+      if (typeof window !== 'undefined' && !navigator.onLine) {
+        const cached = await loadStoreFromIndexedDB(jwtStoreId);
+        if (cached) {
+          setSetting('currentStore', cached);
+          return cached;
+        }
+      }
+      setIsLoading(true);
+      try {
+        const response = await storesApi.getById(jwtStoreId);
+        let store = response.data;
+        if (store) {
+          const { settingsApi } = await import('@/lib/api/settings');
+          try {
+            const settingsRes = await settingsApi.get(store.id);
+            const raw = settingsRes.data as { credit?: Store['credit']; data?: { credit?: Store['credit'] } };
+            const credit = raw?.data?.credit ?? raw?.credit;
+            if (credit !== undefined) store = { ...store, credit };
+          } catch (_) {}
+          await saveStorePermanently(store, setSetting);
+          setSetting('currentStore', store);
+          setIsLoading(false);
+          return store;
+        }
+      } catch (err) {
+        setIsLoading(false);
+        // Fall back to current store if fetch fails
+        return current;
+      }
+    }
+
+    // If store already exists and matches JWT (or no JWT storeId), return it
+    if (current) {
+      return current;
     }
 
     // If we're offline, try loading from IndexedDB
