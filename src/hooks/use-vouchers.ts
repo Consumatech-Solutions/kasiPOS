@@ -57,7 +57,10 @@ export function useVouchers(options: UseVouchersOptions = {}) {
       const response = await vouchersApi.getAll(params);
       return normalizeVoucherResponse(response.data);
     },
-    enabled: true, // Always enabled - we'll control loading via refetch
+    enabled: true,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({

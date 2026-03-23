@@ -1,6 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSyncStatus } from '@/hooks/use-sync-status';
+import { useSettings } from '@/components/settings-provider';
+import { useToast } from '@/hooks/use-toast';
+import { checkOfflineStatus } from '@/lib/offline-detector';
+import { runManualFullCloudSync, CLOUD_SYNC_LOCAL_HOURS } from '@/lib/cloud-data-pull';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +17,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, CheckCircle2, XCircle, Clock, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, CheckCircle2, XCircle, Clock, Download, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface SyncStatusModalProps {
@@ -21,6 +28,44 @@ interface SyncStatusModalProps {
 
 export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
   const { status, queue, currentMutation, isPreloading, preloadProgress } = useSyncStatus();
+  const queryClient = useQueryClient();
+  const { settings } = useSettings();
+  const { toast } = useToast();
+  const [isManualPulling, setIsManualPulling] = useState(false);
+
+  const scheduleLabel = CLOUD_SYNC_LOCAL_HOURS.map((h) => `${h}:00`).join(', ');
+
+  const handleDownloadFromCloud = async () => {
+    const offline = await checkOfflineStatus();
+    if (offline) {
+      toast({
+        variant: 'destructive',
+        title: 'You are offline',
+        description: 'Connect to the internet, then try downloading from the cloud again.',
+      });
+      return;
+    }
+    setIsManualPulling(true);
+    try {
+      await runManualFullCloudSync({
+        queryClient,
+        storeId: settings?.currentStore?.id ?? undefined,
+      });
+      toast({
+        title: 'Cloud data updated',
+        description: 'Queued changes were uploaded and the latest catalogue data was downloaded.',
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Something went wrong.';
+      toast({
+        variant: 'destructive',
+        title: 'Sync failed',
+        description: message,
+      });
+    } finally {
+      setIsManualPulling(false);
+    }
+  };
 
   const getStatusIcon = (mutationStatus?: string) => {
     switch (mutationStatus) {
@@ -79,9 +124,30 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
           <DialogDescription>
             {isPreloading
               ? 'Downloading essential data for offline use...'
-              : 'View and monitor pending synchronization operations'}
+              : 'Uploads to the cloud run at ' +
+                scheduleLabel +
+                ' (local time) and as soon as possible after you reconnect. Use the button below to pull updates from the cloud at any time.'}
           </DialogDescription>
         </DialogHeader>
+
+        {!isPreloading && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isManualPulling}
+              onClick={() => void handleDownloadFromCloud()}
+              className="gap-2"
+            >
+              {isManualPulling ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Download from cloud now
+            </Button>
+          </div>
+        )}
 
         {isPreloading && preloadProgress && (
           <div className="space-y-2">

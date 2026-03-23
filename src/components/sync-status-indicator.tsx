@@ -2,16 +2,19 @@
 
 import { useState, useMemo } from 'react';
 import { useSyncStatus } from '@/hooks/use-sync-status';
+import { useSettings } from '@/components/settings-provider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Loader2, Download, FolderSync } from 'lucide-react';
+import { Loader2, Download, FolderSync, Cloud } from 'lucide-react';
 import { SyncStatusModal } from './sync-status-modal';
 
 export function SyncStatusIndicator() {
   // ALL HOOKS MUST BE CALLED FIRST - in the same order every render
   // Hook 1: useSyncStatus (contains useState and useEffect internally)
   const syncStatus = useSyncStatus();
-  
+
+  const { settings } = useSettings();
+
   // Hook 2: useState
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -20,7 +23,7 @@ export function SyncStatusIndicator() {
     const isPreloading = syncStatus?.isPreloading ?? false;
     const isSyncing = syncStatus?.isSyncing ?? false;
     const pendingCount = syncStatus?.pendingCount ?? 0;
-    
+
     if (isPreloading) {
       return <Download className="h-4 w-4 animate-pulse" />;
     }
@@ -30,7 +33,7 @@ export function SyncStatusIndicator() {
     if (pendingCount > 0) {
       return <FolderSync className="h-4 w-4" />;
     }
-    return <CheckCircle2 className="h-4 w-4" />;
+    return <Cloud className="h-4 w-4" />;
   }, [syncStatus?.isPreloading, syncStatus?.isSyncing, syncStatus?.pendingCount]);
   
   // Hook 4: useMemo for colorClass
@@ -38,14 +41,14 @@ export function SyncStatusIndicator() {
     const isPreloading = syncStatus?.isPreloading ?? false;
     const isSyncing = syncStatus?.isSyncing ?? false;
     const pendingCount = syncStatus?.pendingCount ?? 0;
-    
+
     if (isPreloading || isSyncing) {
       return 'bg-blue-500 hover:bg-blue-600';
     }
     if (pendingCount > 0) {
       return 'bg-orange-500 hover:bg-orange-600';
     }
-    return 'bg-green-500 hover:bg-green-600';
+    return 'bg-slate-600 hover:bg-slate-700';
   }, [syncStatus?.isPreloading, syncStatus?.isSyncing, syncStatus?.pendingCount]);
 
   // Extract values with defaults to handle undefined case (after all hooks)
@@ -54,9 +57,9 @@ export function SyncStatusIndicator() {
   const isPreloading = syncStatus?.isPreloading ?? false;
   const preloadProgress = syncStatus?.preloadProgress;
 
-  // NOW we can do conditional returns AFTER all hooks are called
-  // Don't show if idle and no pending mutations
-  if (status === 'idle' && pendingCount === 0 && !isPreloading) {
+  const idleQuiet = status === 'idle' && pendingCount === 0 && !isPreloading;
+
+  if (!settings.isLoggedIn) {
     return null;
   }
 
@@ -65,7 +68,8 @@ export function SyncStatusIndicator() {
       <div className="fixed bottom-4 right-4 z-50">
         <Button
           onClick={() => setIsModalOpen(true)}
-          className={`h-12 w-12 rounded-full shadow-lg ${colorClass} text-white p-0 relative`}
+          title={idleQuiet ? 'Cloud sync — tap for status and download' : undefined}
+          className={`h-12 w-12 rounded-full shadow-lg ${colorClass} text-white p-0 relative ${idleQuiet ? 'opacity-90' : ''}`}
           size="icon"
         >
           {icon}

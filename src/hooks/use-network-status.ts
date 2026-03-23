@@ -18,7 +18,6 @@ export function useNetworkStatus() {
       if (online) {
         setWasOffline(true);
         queryClient.resumePausedMutations();
-        queryClient.refetchQueries();
         setTimeout(() => setWasOffline(false), 3000);
       }
     });

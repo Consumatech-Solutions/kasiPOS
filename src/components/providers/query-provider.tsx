@@ -78,7 +78,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = offlineDetector.subscribe((offline) => {
       if (!offline) {
         queryClient.resumePausedMutations();
-        queryClient.refetchQueries();
+        // Catalogue and lists use Dexie when online; cloud pull runs on schedule or manually (see DataPreloader).
       }
     });
     return () => unsubscribe();

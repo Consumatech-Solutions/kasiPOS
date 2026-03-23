@@ -3,9 +3,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/customers';
 import { checkOfflineStatus } from '@/lib/offline-detector';
-import { getCustomersFromDexie, saveCustomersToDexie } from '@/lib/entity-cache';
+import { getCustomersFromDexie } from '@/lib/entity-cache';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types';
-import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
+import type { PaginationMeta } from '@/types/pagination';
 
 interface UseCustomersOptions {
   initialPage?: number;
@@ -25,34 +25,6 @@ export const customerKeys = {
   details: () => [...customerKeys.all, 'detail'] as const,
   detail: (id: string) => [...customerKeys.details(), id] as const,
 };
-
-function normalizeCustomerResponse(response: Customer[] | PaginatedResponse<Customer>): { data: Customer[]; meta: PaginationMeta } {
-  if (Array.isArray(response)) {
-    return {
-      data: response,
-      meta: {
-        total: response.length,
-        page: 1,
-        limit: response.length || 10,
-        totalPages: 1,
-      },
-    };
-  }
-  
-  if ('data' in response && 'meta' in response) {
-    return response;
-  }
-  
-  return {
-    data: [],
-    meta: {
-      total: 0,
-      page: 1,
-      limit: 10,
-      totalPages: 0,
-    },
-  };
-}
 
 export function useCustomers(options: UseCustomersOptions = {}) {
   const { initialPage = 1, initialLimit = 10, searchQuery = '', storeId, storeIdForOffline } = options;
@@ -78,26 +50,16 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           storeIdForOffline ?? undefined
         );
       }
-      try {
-        const response = await customersApi.getAll(Object.keys(params).length > 0 ? params : undefined);
-        const normalized = normalizeCustomerResponse(response.data);
-        if (normalized.data?.length) {
-          await saveCustomersToDexie(normalized.data);
-        }
-        return normalized;
-      } catch (err: any) {
-        if (err?.response?.status === 400 && (params.page || params.limit)) {
-          const fallbackParams: typeof params = {};
-          if (params.search) fallbackParams.search = params.search;
-          if (params.storeId != null) fallbackParams.storeId = params.storeId;
-          const response = await customersApi.getAll(
-            Object.keys(fallbackParams).length > 0 ? fallbackParams : undefined
-          );
-          return normalizeCustomerResponse(response.data);
-        }
-        throw err;
-      }
+      return getCustomersFromDexie(
+        initialPage,
+        initialLimit,
+        searchQuery?.trim() || undefined,
+        storeIdForOffline ?? undefined
+      );
     },
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({

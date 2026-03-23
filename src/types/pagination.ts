@@ -19,4 +19,6 @@ export interface PaginationParams {
   storeId?: string | null;
   /** ISO 8601 date - return only items updated after this (for incremental sync) */
   updatedAtAfter?: string;
+  /** Client-only: React Query key segment for store-scoped Dexie product lists (not sent to APIs). */
+  storeIdForOffline?: string | null;
 }

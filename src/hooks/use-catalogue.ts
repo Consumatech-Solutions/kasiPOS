@@ -23,23 +23,6 @@ export const productKeys = {
   detail: (id: string) => [...productKeys.details(), id] as const,
 };
 
-// Helper to normalize API response
-function normalizeResponse<T>(response: T[] | { data: T[]; meta: PaginationMeta }): { data: T[]; meta: PaginationMeta } {
-  if ('data' in response && 'meta' in response) {
-    return response;
-  }
-  const data = response as T[];
-  return {
-    data,
-    meta: {
-      total: data.length,
-      page: 1,
-      limit: data.length || 10,
-      totalPages: 1,
-    },
-  };
-}
-
 export function useCategories(initialPage: number = 1, initialLimit: number = 10) {
   const queryClient = useQueryClient();
   const queryKey = categoryKeys.list({ page: initialPage, limit: initialLimit });
@@ -51,13 +34,12 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
       if (isOffline) {
         return getCategoriesFromDexie(initialPage, initialLimit);
       }
-      const response = await catalogueApi.categories.getAll({ page: initialPage, limit: initialLimit });
-      const normalized = normalizeResponse(response);
-      if (normalized.data?.length) {
-        await saveCategoriesToDexie(normalized.data);
-      }
-      return normalized;
+      // Online: read from local cache; cloud updates arrive via scheduled or manual pull.
+      return getCategoriesFromDexie(initialPage, initialLimit);
     },
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({
@@ -219,22 +201,20 @@ export function useProducts(
     storeIdForOffline: storeIdForOffline ?? undefined,
   });
 
+  const dexieListFilters = {
+    search: filters.search,
+    categoryId: filters.categoryId,
+  };
+
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const isOffline = await checkOfflineStatus();
-      if (isOffline) {
-        return getProductsFromDexie(currentPage, initialLimit, storeIdForOffline);
-      }
-      const response = await catalogueApi.products.getAll({ page: currentPage, limit: initialLimit, ...filters });
-      const normalized = normalizeResponse(response);
-      if (normalized.data?.length) {
-        await saveProductsToDexie(normalized.data, storeIdForOffline);
-      }
-      return normalized;
+      await checkOfflineStatus();
+      return getProductsFromDexie(currentPage, initialLimit, storeIdForOffline, dexieListFilters);
     },
-    staleTime: 0, // Always consider data stale to refetch on navigation
-    refetchOnMount: 'always', // Always refetch when component mounts
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({
