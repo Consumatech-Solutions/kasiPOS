@@ -12,7 +12,7 @@ interface SettingsContextType {
   settings: AppSettings;
   setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   isPwa: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
   login: (user: User & { accessToken?: string }) => Promise<void>;
 }
 
@@ -101,7 +101,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const creditFetchedForStoreIdRef = useRef<string | null>(null);
   useEffect(() => {
     const store = settings.currentStore;
-    const storeId = settings.currentUser?.storeId ?? store?.id;
+    const storeId = store?.id;
     if (!storeId || !store) return;
     if (creditFetchedForStoreIdRef.current === storeId) return;
     if (typeof navigator !== 'undefined' && !navigator.onLine) return;
@@ -122,7 +122,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         creditFetchedForStoreIdRef.current = null;
       }
     })();
-  }, [settings.currentStore, settings.currentUser?.storeId, setSetting]);
+  }, [settings.currentStore, setSetting]);
 
   // Load store from IndexedDB on initial load if not in localStorage
   useEffect(() => {
@@ -150,15 +150,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     const theme = settings.theme; // Preserve theme across logout
-    
-    try {
-        await authApi.logout();
-    } catch (error) {
-        // Ignore API errors during logout, we want to clear local state anyway
-        console.error('Logout API call failed', error);
-    }
 
-    // Create a new settings object for logout state
     const newSettings = {
         ...defaultSettings,
         theme, // keep the theme
@@ -167,15 +159,20 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         currentStore: null,
     };
     try {
-        // Persist only the parts we want to keep after logout
         window.localStorage.setItem('kasi-pos-settings', JSON.stringify({ theme }));
         window.localStorage.removeItem('token');
-        window.localStorage.removeItem('user'); // Explicitly remove user
+        window.localStorage.removeItem('user');
     } catch (error) {
         console.error('Error saving settings to localStorage on logout', error);
     }
-    setSettings(newSettings); 
-    router.push('/login');
+    setSettings(newSettings);
+    router.replace('/login');
+
+    try {
+        await authApi.logout();
+    } catch (error) {
+        console.error('Logout API call failed', error);
+    }
   }, [router, settings.theme]);
 
 
@@ -205,7 +202,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 } catch (profileErr: any) {
                   if (profileErr?.response?.status === 401) {
                     // Token expired or invalid; clear session and redirect to login
-                    logout();
+                    await logout();
                     return;
                   }
                   if (isNetworkError(profileErr)) {
@@ -223,7 +220,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 if (freshUser?.storeId) {
                      try {
                         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
-                        const store = await fetchAndSaveStore(setSetting);
+                        const store = await fetchAndSaveStore(setSetting, freshUser?.storeId ?? null);
                         console.log('[SettingsProvider] Fetched store:', store);
                         if (store) {
                             setSetting('currentStore', store);
@@ -240,7 +237,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 } else if (!settings.currentStore) {
                      try {
                         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
-                        const store = await fetchAndSaveStore(setSetting);
+                        const store = await fetchAndSaveStore(setSetting, freshUser?.storeId ?? null);
                         if (store) setSetting('currentStore', store);
                      } catch (e) {
                          if (isNetworkError(e)) {
@@ -355,7 +352,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     // Fetch and save store immediately after login
     try {
         const { fetchAndSaveStore } = await import('@/lib/store-persistence');
-        const store = await fetchAndSaveStore(setSetting);
+        const store = await fetchAndSaveStore(setSetting, userData?.storeId ?? null);
         if (store) {
             setSetting('currentStore', store);
         } else {

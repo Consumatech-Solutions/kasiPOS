@@ -7,7 +7,7 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer, CreditCard, Loader2 } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer, CreditCard, Loader2, Crown } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -23,6 +23,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { feedback } from '@/lib/feedback';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
@@ -51,10 +52,13 @@ const passwordSchema = z.object({
 });
 
 export default function SettingsPage() {
-  const { settings, setSetting } = useSettings();
+  const { settings, setSetting, logout } = useSettings();
   const { openHardwareSetup } = useHardwareSetup();
   const { currentUser, currentStore: settingsStore } = settings;
   const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin' || settingsStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin';
+  /** Store admin or platform super admin — both must fully sign out after a successful store role transfer. */
+  const canInitiateStoreRoleTransfer =
+    currentUser?.role === 'store_admin' || String(currentUser?.role ?? '').toLowerCase() === 'admin';
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -83,6 +87,10 @@ export default function SettingsPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userForPassword, setUserForPassword] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
+  const [deleteCurrentAdminOnTransfer, setDeleteCurrentAdminOnTransfer] = useState(false);
+  const [isTransferringRole, setIsTransferringRole] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const TABLE_LIMIT = 5;
@@ -477,6 +485,47 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Failed to delete user:", error);
       feedback.fromError(error, 'Failed to delete user', 'Check your connection and try again.');
+    }
+  };
+
+  const openTransferRoleDialog = (user: User) => {
+    setTransferTargetUser(user);
+    setDeleteCurrentAdminOnTransfer(false);
+    setTransferDialogOpen(true);
+  };
+
+  const confirmTransferRole = async () => {
+    if (!transferTargetUser?.id) return;
+    if (!isOnline) {
+      feedback.error(
+        'Cloud unavailable',
+        'Role transfer requires a cloud connection. Please reconnect and try again.'
+      );
+      return;
+    }
+    setIsTransferringRole(true);
+    try {
+      await storesApi.transferStoreRole({
+        newStoreAdminId: transferTargetUser.id,
+        oldStoreAdminState: deleteCurrentAdminOnTransfer ? 'deleted' : 'staff user',
+      });
+      feedback.success(
+        'Role transferred',
+        deleteCurrentAdminOnTransfer
+          ? 'You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in; your account is removed as selected.'
+          : 'You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in—you will be a staff user at this store.'
+      );
+      setTransferDialogOpen(false);
+      await logout();
+    } catch (error) {
+      console.error('Failed to transfer store admin role:', error);
+      feedback.fromError(
+        error,
+        'Failed to transfer role',
+        'Please verify the selected user is a staff member and try again.'
+      );
+    } finally {
+      setIsTransferringRole(false);
     }
   };
 
@@ -877,6 +926,17 @@ export default function SettingsPage() {
                           <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(user)} title="Set password">
                             <Key className="h-4 w-4" />
                           </Button>
+                          {String(user.role ?? '').toLowerCase() === 'staff' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openTransferRoleDialog(user)}
+                              title="Transfer store admin role to this staff user"
+                              disabled={!isOnline || isTransferringRole}
+                            >
+                              <Crown className="h-4 w-4 text-amber-600" />
+                            </Button>
+                          )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id} title="Delete user">
@@ -1059,6 +1119,70 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={transferDialogOpen} onOpenChange={(open) => !isTransferringRole && setTransferDialogOpen(open)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Store Admin transfer</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  You are transferring Store Admin to{' '}
+                  <span className="font-semibold text-foreground">{transferTargetUser?.name ?? 'this user'}</span>.
+                  Please confirm below. This action cannot be undone.
+                </p>
+                <p>
+                  After you confirm, this app signs you out and the new store admin should be signed out as well
+                  (existing sessions may stay valid until the server ends them or they expire). When both of you sign
+                  in again, roles will match the server—the previous store admin is deleted only if you select that
+                  option in the checkbox.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border p-3 text-sm text-muted-foreground">
+              <p>New Store Admin: {transferTargetUser?.name ?? '-'}</p>
+              <p>Phone: {transferTargetUser?.phone ?? '-'}</p>
+              <p>Current Store Admin: {currentUser?.name ?? 'Current user'}</p>
+            </div>
+
+            <p className="text-sm font-medium text-foreground">
+              What should happen to the current Store Admin account (you)?
+            </p>
+            <div className="flex items-start space-x-2 rounded-md border p-3">
+              <Checkbox
+                id="delete-current-admin-on-transfer"
+                checked={deleteCurrentAdminOnTransfer}
+                onCheckedChange={(checked) => setDeleteCurrentAdminOnTransfer(checked === true)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label htmlFor="delete-current-admin-on-transfer" className="cursor-pointer font-normal">
+                  Delete the current Store Admin
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Unchecked:</span> keep the account and make them a staff
+                  user at this store. <span className="font-medium text-foreground">Checked:</span> remove or deactivate
+                  the current Store Admin per server rules.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" disabled={isTransferringRole}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={() => void confirmTransferRole()} disabled={isTransferringRole || !isOnline}>
+              {isTransferringRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Transfer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

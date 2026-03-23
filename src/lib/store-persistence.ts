@@ -96,7 +96,8 @@ export async function loadStoreFromIndexedDB(storeId?: string | number | null): 
  * Also merges credit config from GET /settings so currentStore.credit is available for the POS.
  */
 export async function fetchAndSaveStore(
-  setSetting?: (key: 'currentStore', value: Store | null) => void
+  setSetting?: (key: 'currentStore', value: Store | null) => void,
+  preferredStoreId?: string | number | null
 ): Promise<Store | null> {
   try {
     const { storesApi } = await import('@/lib/api/stores');
@@ -127,7 +128,7 @@ export async function fetchAndSaveStore(
       error?.message?.includes('Network request failed');
 
     if (isNetworkFailure) {
-      const cachedStore = await loadStoreFromIndexedDB();
+      const cachedStore = await loadStoreFromIndexedDB(preferredStoreId ?? undefined);
       if (cachedStore && setSetting) {
         setSetting('currentStore', cachedStore);
         return cachedStore;
