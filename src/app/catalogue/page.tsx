@@ -543,7 +543,7 @@ export default function CataloguePage() {
   };
 
   return (
-    <div className="p-2 sm:p-4 overflow-y-auto h-full">
+    <div className="h-full p-2 sm:p-4">
       <Card>
         <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="space-y-1 p-4 pb-2 sm:p-6 sm:pb-2">
@@ -613,7 +613,7 @@ export default function CataloguePage() {
                   Sort Name: {productNameSortOrder === 'asc' ? 'A-Z' : 'Z-A'}
                 </Button>
               </div>
-              <div className="border rounded-md overflow-auto overscroll-contain relative z-0" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+              <div className="relative z-0 overflow-x-auto rounded-md border">
                 <Table noScrollWrapper>
                   <TableHeader>
                     <TableRow>
@@ -719,7 +719,7 @@ export default function CataloguePage() {
 
             {/* Categories Tab */}
             <TabsContent value="categories" className="flex flex-col mt-0">
-              <div className="border rounded-md overflow-y-auto overflow-x-auto overscroll-contain relative z-0" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+              <div className="relative z-0 overflow-x-auto rounded-md border">
                 <Table noScrollWrapper>
                     <TableHeader>
                   <TableRow className="border-b bg-card">
