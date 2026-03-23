@@ -53,6 +53,10 @@ const productSchema = z.object({
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
   costPrice: z.coerce.number().min(0, { message: "Cost price can't be negative." }),
   stock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }).optional(),
+  lowStockThreshold: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.coerce.number().int().min(0, { message: "Low stock trigger can't be negative." }).optional()
+  ),
   category: z.string().min(1, { message: "Please select a category." }),
   barcode: z.string().optional(),
   imageUrl: z.string().optional(),
@@ -158,6 +162,7 @@ export default function CataloguePage() {
       price: 0,
       costPrice: 0,
       stock: 0,
+      lowStockThreshold: undefined,
       category: '',
       barcode: '',
       imageUrl: '',
@@ -184,6 +189,7 @@ export default function CataloguePage() {
       const price = p.price || 0;
       const costPrice = p.costPrice || 0;
       const stock = p.stock || 0;
+      const lowStockThreshold = p.lowStockThreshold ?? undefined;
       const categoryName = typeof p.category === 'object' ? p.category.name : (p.category || '');
       const barcodeValue = p.barCode || p.barcode || '';
       const imageUrl = p.productImage || p.imageUrl || '';
@@ -193,6 +199,7 @@ export default function CataloguePage() {
       productForm.setValue('price', price);
       productForm.setValue('costPrice', costPrice);
       productForm.setValue('stock', stock);
+      productForm.setValue('lowStockThreshold', lowStockThreshold);
       productForm.setValue('category', categoryName);
       productForm.setValue('barcode', barcodeValue);
       productForm.setValue('imageUrl', imageUrl);
@@ -206,6 +213,7 @@ export default function CataloguePage() {
       productForm.setValue('price', 0);
       productForm.setValue('costPrice', 0);
       productForm.setValue('stock', 0);
+      productForm.setValue('lowStockThreshold', undefined);
       productForm.setValue('category', '');
       productForm.setValue('barcode', '');
       productForm.setValue('imageUrl', '');
@@ -227,6 +235,7 @@ export default function CataloguePage() {
         price: values.price,
         costPrice: values.costPrice,
         stock: values.stock || 0,
+        lowStockThreshold: values.lowStockThreshold,
         category: values.category,
         barCode: barCode,
         imageUrl: imageUrl,
@@ -245,6 +254,7 @@ export default function CataloguePage() {
             price: productData.price,
             costPrice: productData.costPrice,
             stock: productData.stock,
+            ...(productData.lowStockThreshold != null ? { lowStockThreshold: productData.lowStockThreshold } : {}),
             barCode: productData.barCode ?? null,
             productImage: productData.imageUrl ?? null,
             category: productData.category,
@@ -292,6 +302,7 @@ export default function CataloguePage() {
             price: productData.price,
             costPrice: productData.costPrice,
             stock: productData.stock ?? null,
+            ...(productData.lowStockThreshold != null ? { lowStockThreshold: productData.lowStockThreshold } : {}),
             barCode: productData.barCode ?? null,
             productImage: productData.imageUrl ?? null,
             categoryId: selectedCategory?.id ?? '',
@@ -623,6 +634,7 @@ export default function CataloguePage() {
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Price</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Cost Price</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Stock</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Low Stock Trigger</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -663,6 +675,7 @@ export default function CataloguePage() {
                       <TableCell>R{price.toFixed(2)}</TableCell>
                       <TableCell className="hidden md:table-cell">R{costPrice.toFixed(2)}</TableCell>
                       <TableCell className="hidden sm:table-cell">{p.stock}</TableCell>
+                      <TableCell className="hidden md:table-cell">{p.lowStockThreshold ?? '-'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -699,7 +712,7 @@ export default function CataloguePage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">No products yet. Click "Add Product" to create one.</TableCell>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">No products yet. Click "Add Product" to create one.</TableCell>
                   </TableRow>
                 )}
                 </TableBody>
@@ -866,7 +879,14 @@ export default function CataloguePage() {
                      <FormField control={productForm.control} name="stock" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Stock (Optional)</FormLabel>
-                            <FormControl><Input type="number" {...field} /></FormControl>
+                            <FormControl><Input type="number" min={0} step={1} {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={productForm.control} name="lowStockThreshold" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Low Stock Trigger (Optional)</FormLabel>
+                            <FormControl><Input type="number" min={0} step={1} {...field} value={field.value ?? ''} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
