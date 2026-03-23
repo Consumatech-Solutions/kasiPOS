@@ -788,13 +788,10 @@ export default function SettingsPage() {
                       <div id="credit-client" className="space-y-2 pt-4 scroll-mt-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2"><CreditCard className="w-5 h-5" /> Customer credit</h3>
                         <p className="text-sm text-muted-foreground">Allow sales on credit and set the credit limit and payment term. When enabled, the Credit payment option appears at checkout.</p>
-                        {settingsStoreId ? (
-                          <p className="text-xs text-muted-foreground font-mono">
-                            Configuring for: <span className="font-semibold text-foreground">{settingsStore?.id === settingsStoreId ? (settingsStore.name ?? 'Store') : 'Store (from your account)'}</span> — <span title={settingsStoreId}>{settingsStoreId}</span>
-                            {currentUser?.storeId === settingsStoreId && <span className="ml-1 text-muted-foreground">(JWT)</span>}
+                        {!settingsStoreId && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            No store linked. Load a store or use an account with a store so credit settings apply correctly at checkout.
                           </p>
-                        ) : (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">No store. Your account must have a store (storeId in JWT) or load a store so GET/PATCH /settings and checkout use the same store.</p>
                         )}
                       </div>
                       <div className={cn("space-y-4 p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
