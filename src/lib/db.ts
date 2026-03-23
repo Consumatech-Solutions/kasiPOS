@@ -59,6 +59,7 @@ export interface TransactionCacheRecord {
 export interface CategoryCacheRecord {
   id: string;
   name: string;
+  storeId?: string | number | null;
   createdAt?: string;
   updatedAt?: string;
 }

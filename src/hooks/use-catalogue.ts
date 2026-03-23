@@ -2,7 +2,19 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { catalogueApi } from '@/lib/api/catalogue';
 import { checkOfflineStatus } from '@/lib/offline-detector';
-import { getProductsFromDexie, saveProductsToDexie, getCategoriesFromDexie, saveCategoriesToDexie } from '@/lib/entity-cache';
+import {
+  pullAllProductsFromApi,
+  pullAllCategoriesFromApi,
+  parseProductsListResponse,
+  parseCategoriesListResponse,
+} from '@/lib/catalogue-network-hydrate';
+import {
+  getProductsFromDexie,
+  saveProductsToDexie,
+  getCategoriesFromDexie,
+  saveCategoriesToDexie,
+  deleteProductFromDexie,
+} from '@/lib/entity-cache';
 import type { ApiCategory, ApiProduct, CreateCategoryDto, UpdateCategoryDto, CreateProductDto, UpdateProductDto } from '@/types/catalogue';
 import type { PaginationMeta, PaginationParams } from '@/types/pagination';
 
@@ -23,23 +35,74 @@ export const productKeys = {
   detail: (id: string) => [...productKeys.details(), id] as const,
 };
 
-export function useCategories(initialPage: number = 1, initialLimit: number = 10) {
+export interface UseCategoriesOptions {
+  storeIdForOffline?: string | null;
+}
+
+export function useCategories(
+  initialPage: number = 1,
+  initialLimit: number = 10,
+  options?: UseCategoriesOptions
+) {
+  const storeIdForOffline = options?.storeIdForOffline;
   const queryClient = useQueryClient();
-  const queryKey = categoryKeys.list({ page: initialPage, limit: initialLimit });
+  const queryKey = categoryKeys.list({
+    page: initialPage,
+    limit: initialLimit,
+    storeIdForOffline: storeIdForOffline ?? undefined,
+  });
 
   const query = useQuery({
     queryKey,
     queryFn: async () => {
       const isOffline = await checkOfflineStatus();
-      if (isOffline) {
-        return getCategoriesFromDexie(initialPage, initialLimit);
+
+      if (!isOffline) {
+        try {
+          const params: PaginationParams = {
+            page: initialPage,
+            limit: initialLimit,
+            ...(storeIdForOffline ? { storeId: String(storeIdForOffline) } : {}),
+          };
+          let response = await catalogueApi.categories.getAll(params);
+          let parsed = parseCategoriesListResponse(response, initialPage, initialLimit);
+          if (parsed.data.length === 0 && storeIdForOffline) {
+            const retry = await catalogueApi.categories.getAll({
+              page: initialPage,
+              limit: initialLimit,
+            });
+            parsed = parseCategoriesListResponse(retry, initialPage, initialLimit);
+          }
+          if (parsed.data.length > 0) {
+            await saveCategoriesToDexie(parsed.data, storeIdForOffline ?? undefined);
+          }
+          if (parsed.data.length === 0) {
+            const dexieFallback = await getCategoriesFromDexie(initialPage, initialLimit, storeIdForOffline);
+            if (dexieFallback.meta.total > 0) return dexieFallback;
+          }
+          return parsed;
+        } catch (e) {
+          console.warn('[useCategories] API failed, using Dexie', e);
+        }
       }
-      // Online: read from local cache; cloud updates arrive via scheduled or manual pull.
-      return getCategoriesFromDexie(initialPage, initialLimit);
+
+      let result = await getCategoriesFromDexie(initialPage, initialLimit, storeIdForOffline);
+      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
+        try {
+          let n = await pullAllCategoriesFromApi(storeIdForOffline, { storeIdQueryParam: true });
+          if (n === 0) await pullAllCategoriesFromApi(storeIdForOffline, { storeIdQueryParam: false });
+          result = await getCategoriesFromDexie(initialPage, initialLimit, storeIdForOffline);
+        } catch (e) {
+          console.warn('[useCategories] Bulk hydrate failed', e);
+        }
+      }
+      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    networkMode: 'online',
+    placeholderData: (previousData) => previousData,
   });
 
   const createMutation = useMutation({
@@ -77,7 +140,7 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: (newCategory) => {
+    onSuccess: async (newCategory) => {
       // Replace optimistic update with real data
       queryClient.setQueryData<{ data: ApiCategory[]; meta: PaginationMeta }>(queryKey, (old) => {
         if (!old) return old;
@@ -86,6 +149,7 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
           data: old.data.map(cat => (String(cat?.id ?? '').startsWith('temp-') ? newCategory : cat)),
         };
       });
+      await saveCategoriesToDexie([newCategory], storeIdForOffline ?? undefined);
       // Defer invalidation to avoid unmount race (dialog/row closing)
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
@@ -116,7 +180,8 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: () => {
+    onSuccess: async (updatedCategory) => {
+      await saveCategoriesToDexie([updatedCategory], storeIdForOffline ?? undefined);
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
       });
@@ -173,9 +238,13 @@ export function useCategories(initialPage: number = 1, initialLimit: number = 10
     isDeleting: deleteMutation.isPending,
     refresh: () => query.refetch(),
     loadPage: (page: number) => {
-      // This would need to be handled by changing the query key, but for backward compatibility
-      // we'll just refetch with the new page
-      queryClient.invalidateQueries({ queryKey: categoryKeys.list({ page, limit: initialLimit }) });
+      queryClient.invalidateQueries({
+        queryKey: categoryKeys.list({
+          page,
+          limit: initialLimit,
+          storeIdForOffline: storeIdForOffline ?? undefined,
+        }),
+      });
     },
   };
 }
@@ -209,12 +278,63 @@ export function useProducts(
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      await checkOfflineStatus();
-      return getProductsFromDexie(currentPage, initialLimit, storeIdForOffline, dexieListFilters);
+      const isOffline = await checkOfflineStatus();
+
+      if (!isOffline) {
+        try {
+          const params: PaginationParams = {
+            page: currentPage,
+            limit: initialLimit,
+            ...(filters.search ? { search: filters.search } : {}),
+            ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+            ...(storeIdForOffline ? { storeId: String(storeIdForOffline) } : {}),
+          };
+          let response = await catalogueApi.products.getAll(params);
+          let parsed = parseProductsListResponse(response, currentPage, initialLimit);
+          if (parsed.data.length === 0 && storeIdForOffline) {
+            const retry = await catalogueApi.products.getAll({
+              page: currentPage,
+              limit: initialLimit,
+              ...(filters.search ? { search: filters.search } : {}),
+              ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+            });
+            parsed = parseProductsListResponse(retry, currentPage, initialLimit);
+          }
+          if (parsed.data.length > 0) {
+            await saveProductsToDexie(parsed.data, storeIdForOffline ?? undefined);
+          }
+          if (parsed.data.length === 0) {
+            const dexieFallback = await getProductsFromDexie(
+              currentPage,
+              initialLimit,
+              storeIdForOffline,
+              dexieListFilters
+            );
+            if (dexieFallback.meta.total > 0) return dexieFallback;
+          }
+          return parsed;
+        } catch (e) {
+          console.warn('[useProducts] API failed, using Dexie', e);
+        }
+      }
+
+      let result = await getProductsFromDexie(currentPage, initialLimit, storeIdForOffline, dexieListFilters);
+      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
+        try {
+          let n = await pullAllProductsFromApi(storeIdForOffline, { storeIdQueryParam: true });
+          if (n === 0) await pullAllProductsFromApi(storeIdForOffline, { storeIdQueryParam: false });
+          result = await getProductsFromDexie(currentPage, initialLimit, storeIdForOffline, dexieListFilters);
+        } catch (e) {
+          console.warn('[useProducts] Bulk hydrate failed', e);
+        }
+      }
+      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    networkMode: 'online',
+    placeholderData: (previousData) => previousData,
   });
 
   const createMutation = useMutation({
@@ -280,7 +400,7 @@ export function useProducts(
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: (newProduct) => {
+    onSuccess: async (newProduct) => {
       queryClient.setQueryData<{ data: ApiProduct[]; meta: PaginationMeta }>(queryKey, (old) => {
         if (!old) return old;
         return {
@@ -288,6 +408,7 @@ export function useProducts(
           data: old.data.map(prod => (String(prod?.id ?? '').startsWith('temp-') ? newProduct : prod)),
         };
       });
+      await saveProductsToDexie([newProduct], storeIdForOffline ?? undefined);
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
       });
@@ -344,7 +465,8 @@ export function useProducts(
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: () => {
+    onSuccess: async (updatedProduct) => {
+      await saveProductsToDexie([updatedProduct], storeIdForOffline ?? undefined);
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
       });
@@ -376,7 +498,8 @@ export function useProducts(
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_data, productId) => {
+      await deleteProductFromDexie(String(productId));
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
       });

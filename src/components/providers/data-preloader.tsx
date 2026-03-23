@@ -14,6 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
 import { checkOfflineStatus } from '@/lib/offline-detector';
 import { getPageRoutesToPreload } from '@/lib/page-routes';
+import { purgeUnscopedCatalogueCacheOnce } from '@/lib/entity-cache';
+import { productKeys, categoryKeys } from '@/hooks/use-catalogue';
 
 const PRELOAD_VERSION_KEY = 'kasipos-preload-version';
 const PRELOAD_TIMESTAMP_KEY = 'kasipos-preload-timestamp';
@@ -214,6 +216,15 @@ export function DataPreloader() {
 
     let cancelled = false;
     const storeId = settings?.currentStore?.id ?? undefined;
+
+    if (storeId) {
+      void purgeUnscopedCatalogueCacheOnce(String(storeId)).then((result) => {
+        if (!result || (result.productsRemoved === 0 && result.categoriesRemoved === 0)) return;
+        console.log('[DataPreloader] Purged unscoped catalogue cache rows', result);
+        void queryClient.invalidateQueries({ queryKey: productKeys.all });
+        void queryClient.invalidateQueries({ queryKey: categoryKeys.all });
+      });
+    }
 
     const tickScheduledSync = async () => {
       if (cancelled || !settings.isLoggedIn || syncBusyRef.current) return;

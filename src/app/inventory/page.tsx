@@ -1,7 +1,7 @@
 
 'use client';
 import Image from 'next/image';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -17,6 +17,7 @@ import { updateProductStockInDexie } from '@/lib/entity-cache';
 import { stockAdjustmentsApi } from '@/lib/api/stock-adjustments';
 import { catalogueApi } from '@/lib/api/catalogue';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Pagination } from '@/components/ui/pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,11 +48,21 @@ export default function InventoryPage() {
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
 
-  // Use API hooks for products and categories
-  const { products: apiProducts, loading: productsLoading, setFilters: setProductFilters, refresh: refreshProducts, updateProduct } = useProducts(1, 10, {
+  // Products: paginated from Dexie (same as catalogue); search/category applied via filters
+  const {
+    products: apiProducts,
+    pagination: productsPagination,
+    loading: productsLoading,
+    setFilters: setProductFilters,
+    refresh: refreshProducts,
+    updateProduct,
+    loadPage: loadProductsPage,
+  } = useProducts(1, 10, {
     storeIdForOffline: currentStore?.id ?? undefined,
   });
-  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 50, {
+    storeIdForOffline: currentStore?.id ?? undefined,
+  });
 
   const allProducts = apiProducts || [];
   const categories = apiCategories || [];
@@ -80,16 +91,50 @@ export default function InventoryPage() {
     defaultValues: { reason: undefined, quantityOrUpdated: undefined, note: '' },
   });
 
+  // Debounce name search into product query filters (Dexie-backed pagination)
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const q = searchTerm.trim();
+      setProductFilters((prev: { search?: string; categoryId?: string }) => ({
+        ...prev,
+        search: q ? q : undefined,
+      }));
+      loadProductsPage(1);
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps -- loadProductsPage/setProductFilters are stable
+
+  // Stable key so an empty `[]` from the hook each render does not re-fire the effect
+  const categoriesFingerprint = useMemo(
+    () => (apiCategories ?? []).map((c: { id: string; name: string }) => `${c.id}:${c.name}`).join('|'),
+    [apiCategories]
+  );
+
+  // Category filter uses categoryId so each page respects the filter
+  useEffect(() => {
+    const categoryId =
+      selectedCategory === 'all'
+        ? undefined
+        : (apiCategories ?? []).find((c: { name: string }) => c.name === selectedCategory)?.id;
+    setProductFilters((prev: { search?: string; categoryId?: string }) => ({
+      ...prev,
+      categoryId: categoryId ? String(categoryId) : undefined,
+    }));
+    loadProductsPage(1);
+  }, [selectedCategory, categoriesFingerprint]); // eslint-disable-line react-hooks/exhaustive-deps -- apiCategories read when fingerprint changes
+
+  useEffect(() => {
+    loadProductsPage(1);
+  }, [showLowStockOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const filteredProducts = useMemo(() => {
-    if (!allProducts) return [];
+    if (!allProducts?.length) return [];
+    if (!showLowStockOnly) return allProducts;
     return allProducts.filter((product: any) => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const categoryName = product.category?.name || product.category;
-      const matchesCategory = selectedCategory === 'all' || categoryName === selectedCategory;
-      const matchesLowStock = !showLowStockOnly || ((product.stock ?? 0) <= (product.lowStockThreshold || 0) && (product.lowStockThreshold || 0) > 0);
-      return matchesSearch && matchesCategory && matchesLowStock;
+      const t = product.lowStockThreshold || 0;
+      return (product.stock ?? 0) <= t && t > 0;
     });
-  }, [allProducts, searchTerm, selectedCategory, showLowStockOnly]);
+  }, [allProducts, showLowStockOnly]);
 
   const getStockBadgeVariant = (stock: number, threshold?: number) => {
     if (threshold !== undefined && threshold > 0 && stock <= threshold) return 'destructive';
@@ -431,6 +476,11 @@ export default function InventoryPage() {
             </TableBody>
           </Table>
           </div>
+          {productsPagination && productsPagination.total > 0 && (
+            <div className="mt-4 border-t pt-4">
+              <Pagination meta={productsPagination} onPageChange={loadProductsPage} />
+            </div>
+          )}
         </CardContent>
       </Card>
       
