@@ -2,7 +2,7 @@
  * Entity cache: persist API data to Dexie with cap, read when offline.
  */
 
-import { getDb } from '@/lib/db';
+import { getDb, type ProductCacheRecord } from '@/lib/db';
 import type { PaginationMeta } from '@/types/pagination';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import type { Customer, PurchaseOrder } from '@/types';
@@ -228,10 +228,39 @@ export async function updatePurchaseOrderStatusInDexie(
   await db.keyVal.put({ key: PURCHASE_ORDERS_KEY, value: JSON.stringify(updated) });
 }
 
+export type ProductDexieListFilters = {
+  search?: string;
+  categoryId?: string;
+};
+
+function filterProductsInMemory(
+  rows: ApiProduct[],
+  filters?: ProductDexieListFilters
+): ApiProduct[] {
+  if (!filters?.search?.trim() && !filters?.categoryId) {
+    return rows;
+  }
+  let out = rows;
+  if (filters.categoryId) {
+    const cid = String(filters.categoryId);
+    out = out.filter((p) => String(p.categoryId) === cid);
+  }
+  if (filters.search?.trim()) {
+    const q = filters.search.trim().toLowerCase();
+    out = out.filter((p) => {
+      const name = (p.name ?? '').toLowerCase();
+      const code = (p.barCode ?? '').toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  }
+  return out;
+}
+
 export async function getProductsFromDexie(
   page: number,
   limit: number,
-  storeIdForOffline?: string | null
+  storeIdForOffline?: string | null,
+  filters?: ProductDexieListFilters
 ): Promise<{ data: ApiProduct[]; meta: PaginationMeta }> {
   if (typeof window === 'undefined') {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
@@ -239,40 +268,46 @@ export async function getProductsFromDexie(
   const db = getDb();
   const categories = await db.categoryCache.toArray();
 
-  let rawData: unknown[];
-  let total: number;
+  let pool: ApiProduct[];
 
   if (storeIdForOffline != null && storeIdForOffline !== '') {
     const all = await db.productCache.orderBy('createdAt').reverse().toArray();
     const storeIdStr = String(storeIdForOffline);
-    const filtered = all.filter((p: { storeId?: string | number | null }) => {
+    const filtered = all.filter((p: ProductCacheRecord) => {
       const sid = p.storeId;
       if (sid == null || sid === '') return false;
       return String(sid) === storeIdStr;
     });
-    total = filtered.length;
-    const start = (page - 1) * limit;
-    rawData = filtered.slice(start, start + limit);
+    pool = filtered as unknown as ApiProduct[];
   } else {
-    total = await db.productCache.count();
-    rawData = await db.productCache
-      .orderBy('createdAt')
-      .reverse()
-      .offset((page - 1) * limit)
-      .limit(limit)
-      .toArray();
+    pool = (await db.productCache.orderBy('createdAt').reverse().toArray()) as unknown as ApiProduct[];
   }
 
-  const data = (rawData as unknown as ApiProduct[]).map((product) => {
-    const hasCategory = product.category != null && (typeof product.category === 'string' ? product.category.trim() !== '' : (product.category as { name?: string })?.name);
+  const withCategories = pool.map((product): ApiProduct => {
+    const cat = product.category;
+    const hasCategory =
+      cat != null &&
+      (typeof cat === 'object'
+        ? !!(cat as { name?: string }).name?.trim()
+        : String(cat).trim() !== '');
     if (product.categoryId && !hasCategory) {
       const category = categories.find((c) => String(c.id) === String(product.categoryId));
       if (category) {
-        return { ...product, category: (category as ApiCategory).name };
+        const ac = category as ApiCategory;
+        return {
+          ...(product as ApiProduct),
+          category: { id: ac.id, name: ac.name },
+        };
       }
     }
-    return product;
+    return product as ApiProduct;
   });
+
+  const filtered = filterProductsInMemory(withCategories, filters);
+  const total = filtered.length;
+  const start = (page - 1) * limit;
+  const data = filtered.slice(start, start + limit);
+
   return {
     data,
     meta: {

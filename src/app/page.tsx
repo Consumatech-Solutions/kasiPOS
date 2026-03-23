@@ -488,7 +488,7 @@ export default function PosPage() {
   return (
     <div className="w-full min-w-0 max-w-full min-h-[85vh] lg:h-full lg:min-h-0 lg:overflow-hidden lg:flex lg:flex-col overflow-x-hidden pb-4">
     <div className="flex-1 lg:min-h-0 lg:overflow-hidden py-4 px-2 sm:px-4 bg-muted">
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2 sm:gap-4 min-h-[80vh] lg:min-h-0 lg:h-full min-w-0 w-full">
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2 sm:gap-4 min-h-[80vh] lg:min-h-0 lg:h-full min-w-0 w-full">
       {/* Product Selection — first column: fixed height on desktop, product list scrolls independently */}
       <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[75vh] sm:max-h-[80vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-1">
         <div className="relative mb-4 shrink-0">
@@ -552,17 +552,18 @@ export default function PosPage() {
                 </div>
             </ScrollArea>
         ) : (
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full min-w-0">
             <p className="text-xs font-semibold text-gray-500 mb-2 uppercase shrink-0">Products</p>
-            <ScrollArea className="flex-1 min-h-0 pr-1">
-            <Table>
+            <ScrollArea className="flex-1 min-h-0 min-w-0 w-full pr-1">
+            <div className="w-full min-w-0">
+            <Table noScrollWrapper className="w-full table-fixed">
                 <TableHeader>
                 <TableRow>
-                    <TableHead className="w-[50px] hidden sm:table-cell">View</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="hidden md:table-cell">Stock</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="w-12 px-1 sm:px-2 hidden sm:table-cell">View</TableHead>
+                    <TableHead className="min-w-0">Product</TableHead>
+                    <TableHead className="hidden md:table-cell w-16 shrink-0">Stock</TableHead>
+                    <TableHead className="w-24 shrink-0">Price</TableHead>
+                    <TableHead className="text-right w-32 min-w-[7rem] shrink-0">Action</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -625,9 +626,9 @@ export default function PosPage() {
                         </DialogContent>
                         </Dialog>
                     </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex flex-col">
-                        <span>{product.name}</span>
+                    <TableCell className="font-medium min-w-0 align-top">
+                      <div className="flex flex-col min-w-0 max-w-full">
+                        <span className="break-words whitespace-normal">{product.name}</span>
                         <span className="text-xs text-muted-foreground md:hidden">Stock: {product.stock ?? '-'}</span>
                       </div>
                     </TableCell>
@@ -657,13 +658,14 @@ export default function PosPage() {
                 ))}
                 </TableBody>
             </Table>
+            </div>
             </ScrollArea>
           </div>
         )}
       </div>
 
       {/* Cart Section — second column: fixed height on desktop, cart items scroll independently */}
-      <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[65vh] sm:max-h-[70vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-2">
+      <div className="lg:col-span-1 xl:col-span-1 min-w-0 w-full min-h-[200px] max-h-[65vh] sm:max-h-[70vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-2">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 border-b pb-3 shrink-0">
             <div>
                 <h2 className="font-semibold text-base sm:text-lg">Sale #8822</h2>
@@ -732,8 +734,8 @@ export default function PosPage() {
             </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ScrollArea className="h-full pr-4">
+        <div className="flex-1 min-h-0 overflow-hidden w-full min-w-0">
+          <ScrollArea className="h-full w-full min-w-0 pr-4">
             {!isCartHydrated ? (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
                 <p>Loading cart…</p>
@@ -743,21 +745,21 @@ export default function PosPage() {
                 <p>Cart is empty</p>
               </div>
             ) : (
-              <div className="space-y-1">
-                {/* Column headers (invisible lines: no borders, left-aligned) */}
-                <div className="grid grid-cols-[1fr_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[1fr_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left">
-                  <span>Product</span>
-                  <span>Price</span>
-                  <span>Qty</span>
-                  <span>Total</span>
-                  <span aria-hidden className="w-9" />
+              <div className="space-y-1 w-full min-w-0">
+                {/* Column headers — product column grows to fill card width */}
+                <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left w-full min-w-0">
+                  <span className="min-w-0">Product</span>
+                  <span className="shrink-0">Price</span>
+                  <span className="shrink-0">Qty</span>
+                  <span className="shrink-0">Total</span>
+                  <span aria-hidden className="w-9 shrink-0" />
                 </div>
                 {cartItems.map(item => (
                   <div
                     key={item.productId}
-                    className="grid grid-cols-[1fr_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[1fr_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 min-w-0"
+                    className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-start p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 w-full min-w-0"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-start gap-2 w-full min-w-0">
                       {item.imageUrl && !item.imageUrl.startsWith('blob:') ? (
                         <div className="relative w-10 h-10 flex-shrink-0">
                           <Image 
@@ -784,13 +786,13 @@ export default function PosPage() {
                           {getProductInitials(item.productName)}
                         </div>
                       )}
-                      <div className="flex-grow min-w-0">
-                        <p className="font-medium text-xs sm:text-sm truncate">{item.productName}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs sm:text-sm break-words whitespace-normal hyphens-auto">{item.productName}</p>
                         <p className="text-xs text-muted-foreground sm:hidden">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
                       </div>
                     </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground text-left hidden sm:block">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
-                    <div className="flex items-center justify-start gap-1 sm:gap-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground text-left hidden sm:block self-center">R {(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(String(item.unitPrice)) || 0).toFixed(2)}</p>
+                    <div className="flex items-center justify-start gap-1 sm:gap-2 self-center">
                       <Button variant="outline" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0" onClick={() => updateQuantity(item.productId, item.quantity - 1)}><Minus className="h-3 w-3" /></Button>
                       <span className="font-bold text-sm w-6 sm:w-4 text-center">{item.quantity}</span>
                       <Button
@@ -810,8 +812,8 @@ export default function PosPage() {
                         }}
                       ><Plus className="h-3 w-3" /></Button>
                     </div>
-                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-left">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
+                    <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-left self-center">R{(typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(String(item.totalPrice)) || 0).toFixed(2)}</p>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target self-center" onClick={() => updateQuantity(item.productId, 0)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
               </div>

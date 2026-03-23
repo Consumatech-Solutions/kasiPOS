@@ -181,11 +181,7 @@ class MutationQueue {
           }
         }
       }
-      // After restore, if online and we have items, process
-      const isOfflineStatus = await checkOfflineStatus();
-      if (!isOfflineStatus && this.queue.length > 0) {
-        this.processQueue();
-      }
+      // Push to cloud runs on schedule (6h, 12h, 18h) and when the network comes back — not on every app open.
     } catch (error) {
       console.error('[MutationQueue] Failed to restore queue:', error);
     }
@@ -226,14 +222,7 @@ class MutationQueue {
     this.queryClient = queryClient;
     if (typeof window === 'undefined') return;
     this.restorePromise?.then(() => {
-      if (this.queue.length > 0) {
-        checkOfflineStatus(true).then((isOffline) => {
-          if (!isOffline) {
-            console.log('[MutationQueue] QueryClient set, processing restored queue');
-            this.processQueue();
-          }
-        });
-      }
+      // Scheduled / reconnect sync only — see cloud sync scheduler and setupOnlineListener.
     });
   }
 
@@ -254,18 +243,13 @@ class MutationQueue {
       this.currentStatus = 'idle';
     }
     this.notifyStatusChange();
-    
-    // Only process if online (using enhanced offline detection)
+
     if (typeof window !== 'undefined') {
       checkOfflineStatus().then((isOffline) => {
-        if (!isOffline) {
-          this.processQueue();
-        } else {
-          console.log('[MutationQueue] Offline - mutation queued for later sync');
+        if (isOffline) {
+          console.log('[MutationQueue] Offline - mutation queued for scheduled / reconnect sync');
         }
       });
-    } else {
-      console.log('[MutationQueue] Offline - mutation queued for later sync');
     }
   }
 
