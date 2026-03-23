@@ -17,6 +17,8 @@ export interface UpdateCategoryDto {
 
 export interface ApiProduct {
   id: string; // UUID
+  /** When present, scopes the product to a store (local cache + listings). */
+  storeId?: string | number | null;
   name: string;
   categoryId: string;
   category?: {

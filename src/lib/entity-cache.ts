@@ -2,7 +2,7 @@
  * Entity cache: persist API data to Dexie with cap, read when offline.
  */
 
-import { getDb, type ProductCacheRecord } from '@/lib/db';
+import { getDb, type ProductCacheRecord, type CategoryCacheRecord } from '@/lib/db';
 import type { PaginationMeta } from '@/types/pagination';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
 import type { Customer, PurchaseOrder } from '@/types';
@@ -33,18 +33,32 @@ export async function setLastSyncAt(entity: LastSyncEntity, isoDate: string): Pr
   await db.keyVal.put({ key: LAST_SYNC_KEYS[entity], value: isoDate });
 }
 
+/** Resolve store id for Dexie: prefer API payload (camelCase or snake_case), then explicit sync context. */
+function resolvedProductStoreId(
+  p: ApiProduct & { storeId?: string | number | null; store_id?: string | number | null },
+  fallback?: string | null
+): string | undefined {
+  const fromRow = p.storeId ?? p.store_id;
+  if (fromRow != null && fromRow !== '') return String(fromRow);
+  if (fallback != null && fallback !== '') return String(fallback);
+  return undefined;
+}
+
 export async function saveProductsToDexie(
   data: ApiProduct[],
   storeId?: string | null
 ): Promise<void> {
   if (typeof window === 'undefined' || !data.length) return;
   const db = getDb();
-  const records = data.map((p) => ({
-    ...p,
-    id: p.id,
-    createdAt: p.createdAt ?? new Date().toISOString(),
-    ...(storeId != null && storeId !== '' && { storeId }),
-  }));
+  const records = data.map((p) => {
+    const sid = resolvedProductStoreId(p as ApiProduct & { storeId?: string | number | null }, storeId);
+    return {
+      ...p,
+      id: p.id,
+      createdAt: p.createdAt ?? new Date().toISOString(),
+      ...(sid != null ? { storeId: sid } : {}),
+    };
+  });
   await db.productCache.bulkPut(records);
   const count = await db.productCache.count();
   if (count > ENTITY_CAP) {
@@ -108,12 +122,16 @@ export async function deleteProductFromDexie(productId: string): Promise<void> {
   await db.productCache.delete(productId);
 }
 
-export async function saveCategoriesToDexie(data: ApiCategory[]): Promise<void> {
+export async function saveCategoriesToDexie(
+  data: ApiCategory[],
+  storeId?: string | null
+): Promise<void> {
   if (typeof window === 'undefined' || !data.length) return;
   const db = getDb();
   const records = data.map((c) => ({
     id: c.id,
     name: c.name,
+    ...(storeId != null && storeId !== '' && { storeId: String(storeId) }),
     createdAt: c.createdAt ?? new Date().toISOString(),
     updatedAt: c.updatedAt ?? new Date().toISOString(),
   }));
@@ -128,19 +146,24 @@ export async function saveCategoriesToDexie(data: ApiCategory[]): Promise<void> 
 
 export async function getCategoriesFromDexie(
   page: number,
-  limit: number
+  limit: number,
+  storeIdForOffline?: string | null
 ): Promise<{ data: ApiCategory[]; meta: PaginationMeta }> {
   if (typeof window === 'undefined') {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
-  const total = await db.categoryCache.count();
-  const data = await db.categoryCache
-    .orderBy('createdAt')
-    .reverse()
-    .offset((page - 1) * limit)
-    .limit(limit)
-    .toArray();
+  const all = await db.categoryCache.orderBy('createdAt').reverse().toArray();
+  const scoped =
+    storeIdForOffline != null && storeIdForOffline !== ''
+      ? all.filter((c) => {
+          const sid = c.storeId;
+          if (sid == null || sid === '') return false;
+          return String(sid) === String(storeIdForOffline);
+        })
+      : all;
+  const total = scoped.length;
+  const data = scoped.slice((page - 1) * limit, (page - 1) * limit + limit);
   return {
     data: data as unknown as ApiCategory[],
     meta: {
@@ -165,6 +188,85 @@ export async function deleteCategoryFromDexie(categoryId: string): Promise<void>
   if (typeof window === 'undefined') return;
   const db = getDb();
   await db.categoryCache.delete(categoryId);
+}
+
+const PURGE_UNSCOPED_PRODUCTS_KEY_PREFIX = 'kasipos-purged-unscoped-products-v2';
+const PURGE_UNSCOPED_CATEGORIES_KEY_PREFIX = 'kasipos-purged-unscoped-categories-v2';
+
+export type PurgeUnscopedProductsResult = { removed: number };
+export type PurgeUnscopedCategoriesResult = { removed: number };
+
+/**
+ * One-time per browser + store: remove productCache rows with no storeId (not attributable to a store).
+ */
+export async function purgeUnscopedProductsCacheOnce(storeId: string): Promise<PurgeUnscopedProductsResult | null> {
+  if (typeof window === 'undefined' || !storeId) return null;
+  const key = `${PURGE_UNSCOPED_PRODUCTS_KEY_PREFIX}:${storeId}`;
+  try {
+    if (localStorage.getItem(key) === '1') {
+      return null;
+    }
+    const db = getDb();
+    const products = await db.productCache.toArray();
+    const productIds = products
+      .filter((p: ProductCacheRecord) => {
+        const sid = p.storeId;
+        return sid == null || sid === '';
+      })
+      .map((p) => p.id);
+
+    if (productIds.length > 0) {
+      await db.productCache.bulkDelete(productIds);
+    }
+    localStorage.setItem(key, '1');
+    return { removed: productIds.length };
+  } catch (e) {
+    console.error('[entity-cache] purgeUnscopedProductsCacheOnce failed:', e);
+    return null;
+  }
+}
+
+/**
+ * One-time per browser + store: remove categoryCache rows with no storeId.
+ */
+export async function purgeUnscopedCategoriesCacheOnce(storeId: string): Promise<PurgeUnscopedCategoriesResult | null> {
+  if (typeof window === 'undefined' || !storeId) return null;
+  const key = `${PURGE_UNSCOPED_CATEGORIES_KEY_PREFIX}:${storeId}`;
+  try {
+    if (localStorage.getItem(key) === '1') {
+      return null;
+    }
+    const db = getDb();
+    const categories = await db.categoryCache.toArray();
+    const categoryIds = categories
+      .filter((c: CategoryCacheRecord) => {
+        const sid = c.storeId;
+        return sid == null || sid === '';
+      })
+      .map((c) => c.id);
+
+    if (categoryIds.length > 0) {
+      await db.categoryCache.bulkDelete(categoryIds);
+    }
+    localStorage.setItem(key, '1');
+    return { removed: categoryIds.length };
+  } catch (e) {
+    console.error('[entity-cache] purgeUnscopedCategoriesCacheOnce failed:', e);
+    return null;
+  }
+}
+
+/** Runs both product and category unscoped purges (each has its own one-time flag). */
+export async function purgeUnscopedCatalogueCacheOnce(
+  storeId: string
+): Promise<{ productsRemoved: number; categoriesRemoved: number } | null> {
+  const p = await purgeUnscopedProductsCacheOnce(storeId);
+  const c = await purgeUnscopedCategoriesCacheOnce(storeId);
+  if (p === null && c === null) return null;
+  return {
+    productsRemoved: p?.removed ?? 0,
+    categoriesRemoved: c?.removed ?? 0,
+  };
 }
 
 export async function updateCustomerInDexie(customerId: string, updates: Partial<Customer>): Promise<void> {

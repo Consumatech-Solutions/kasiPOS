@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -102,12 +102,26 @@ export default function CataloguePage() {
 
   // Hooks for data with sync and pagination
   const { settings } = useSettings();
-  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10);
-  // Type assertion for callbacks
-  const typedCategories: ApiCategory[] = categories || [];
-  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10, {
+  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
+  // Type assertion for callbacks
+  const typedCategories: ApiCategory[] = categories || [];
+  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, setFilters: setProductFilters, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10, {
+    storeIdForOffline: settings?.currentStore?.id ?? undefined,
+  });
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [selectedProductCategoryId, setSelectedProductCategoryId] = useState<string>('all');
+  const [productNameSortOrder, setProductNameSortOrder] = useState<'asc' | 'desc'>('asc');
+  const sortedProducts = useMemo(() => {
+    const rows = [...(products ?? [])];
+    rows.sort((a, b) => {
+      const an = String(a.name ?? '').toLocaleLowerCase();
+      const bn = String(b.name ?? '').toLocaleLowerCase();
+      return productNameSortOrder === 'asc' ? an.localeCompare(bn) : bn.localeCompare(an);
+    });
+    return rows;
+  }, [products, productNameSortOrder]);
 
   // Auto-generate barcodes for products that don't have one (only once per product).
   // Depend only on product IDs + loading so we don't re-run when products array reference
@@ -122,6 +136,18 @@ export default function CataloguePage() {
     .filter(Boolean)
     .sort()
     .join(',');
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setProductFilters((prev) => ({
+        ...prev,
+        search: productSearchTerm.trim() || undefined,
+        categoryId: selectedProductCategoryId === 'all' ? undefined : selectedProductCategoryId,
+      }));
+      loadProductsPage(1);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [productSearchTerm, selectedProductCategoryId, setProductFilters, loadProductsPage]);
 
 
   // Form Hooks
@@ -281,16 +307,28 @@ export default function CataloguePage() {
               meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
             };
           });
-          queryClient.setQueryData(productKeys.list({ page: 1, limit: 10 }), (old: { data: any[]; meta: any } | undefined) => {
-            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
-            return {
-              ...old,
-              data: [optimisticProduct, ...old.data],
-              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
-            };
-          });
+          queryClient.setQueryData(
+            productKeys.list({
+              page: 1,
+              limit: 10,
+              storeIdForOffline: settings?.currentStore?.id ?? undefined,
+            }),
+            (old: { data: any[]; meta: any } | undefined) => {
+              if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+              return {
+                ...old,
+                data: [optimisticProduct, ...old.data],
+                meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
+              };
+            }
+          );
           const { getDb } = await import('@/lib/db');
-          await getDb().productCache.put({ ...optimisticProduct, createdAt: optimisticProduct.createdAt });
+          const sid = settings?.currentStore?.id;
+          await getDb().productCache.put({
+            ...optimisticProduct,
+            createdAt: optimisticProduct.createdAt,
+            ...(sid != null && sid !== '' ? { storeId: String(sid) } : {}),
+          });
           mutationQueue.add({
             mutationKey: ['products', 'create'],
             mutationFn: () => executeMutation(['products', 'create'], { ...productData, _tempId: tempId }),
@@ -372,13 +410,20 @@ export default function CataloguePage() {
               data: old.data.map(cat => (cat.id === editingCategory.id ? updatedCategory : cat)),
             };
           });
-          queryClient.setQueryData(categoryKeys.list({ page: 1, limit: 10 }), (old: { data: ApiCategory[]; meta: any } | undefined) => {
-            if (!old) return old;
-            return {
-              ...old,
-              data: old.data.map(cat => (cat.id === editingCategory.id ? updatedCategory : cat)),
-            };
-          });
+          queryClient.setQueryData(
+            categoryKeys.list({
+              page: 1,
+              limit: 10,
+              storeIdForOffline: settings?.currentStore?.id ?? undefined,
+            }),
+            (old: { data: ApiCategory[]; meta: any } | undefined) => {
+              if (!old) return old;
+              return {
+                ...old,
+                data: old.data.map(cat => (cat.id === editingCategory.id ? updatedCategory : cat)),
+              };
+            }
+          );
           await updateCategoryInDexie(String(editingCategory.id), values);
           mutationQueue.add({
             mutationKey: ['categories', 'update'],
@@ -416,15 +461,22 @@ export default function CataloguePage() {
               meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
             };
           });
-          queryClient.setQueryData(categoryKeys.list({ page: 1, limit: 10 }), (old: { data: ApiCategory[]; meta: any } | undefined) => {
-            if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
-            return {
-              ...old,
-              data: [...old.data, optimisticCategory],
-              meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
-            };
-          });
-          await saveCategoriesToDexie([optimisticCategory]);
+          queryClient.setQueryData(
+            categoryKeys.list({
+              page: 1,
+              limit: 10,
+              storeIdForOffline: settings?.currentStore?.id ?? undefined,
+            }),
+            (old: { data: ApiCategory[]; meta: any } | undefined) => {
+              if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+              return {
+                ...old,
+                data: [...old.data, optimisticCategory],
+                meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
+              };
+            }
+          );
+          await saveCategoriesToDexie([optimisticCategory], settings?.currentStore?.id ?? undefined);
           mutationQueue.add({
             mutationKey: ['categories', 'create'],
             mutationFn: () => catalogueApi.categories.create({ ...values, _tempId: tempId }),
@@ -458,14 +510,21 @@ export default function CataloguePage() {
             meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
           };
         });
-        queryClient.setQueryData(categoryKeys.list({ page: 1, limit: 10 }), (old: { data: ApiCategory[]; meta: any } | undefined) => {
-          if (!old) return old;
-          return {
-            ...old,
-            data: old.data.filter(cat => String(cat.id) !== idStr),
-            meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
-          };
-        });
+        queryClient.setQueryData(
+          categoryKeys.list({
+            page: 1,
+            limit: 10,
+            storeIdForOffline: settings?.currentStore?.id ?? undefined,
+          }),
+          (old: { data: ApiCategory[]; meta: any } | undefined) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: old.data.filter(cat => String(cat.id) !== idStr),
+              meta: { ...old.meta, total: Math.max(0, (old.meta?.total ?? 1) - 1) },
+            };
+          }
+        );
         await deleteCategoryFromDexie(String(id));
         mutationQueue.add({
           mutationKey: ['categories', 'delete'],
@@ -487,13 +546,13 @@ export default function CataloguePage() {
     <div className="p-2 sm:p-4 overflow-y-auto h-full">
       <Card>
         <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
-          <CardHeader className="pb-2">
+          <CardHeader className="space-y-1 p-4 pb-2 sm:p-6 sm:pb-2">
             <CardTitle className="text-lg sm:text-xl">Catalogue Management</CardTitle>
             <CardDescription className="text-sm">Manage your products and categories.</CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="px-4 pb-2 pt-0 sm:px-6 sm:pb-3">
             <Tabs value={activeCatalogueTab} onValueChange={setActiveCatalogueTab}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 sm:gap-3">
                 <TabsList>
                   <TabsTrigger value="products">Products</TabsTrigger>
                   <TabsTrigger value="categories">Categories</TabsTrigger>
@@ -522,10 +581,38 @@ export default function CataloguePage() {
             </Tabs>
           </CardContent>
         </div>
-        <CardContent className="relative z-0">
+        <CardContent className="relative z-0 px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
           <Tabs value={activeCatalogueTab} onValueChange={setActiveCatalogueTab}>
             {/* Products Tab */}
-            <TabsContent value="products" className="flex flex-col mt-0">
+            <TabsContent value="products" className="mt-0 flex flex-col gap-2 focus-visible:ring-0 focus-visible:ring-offset-0">
+              <div className="grid grid-cols-1 items-center gap-1.5 md:grid-cols-3 md:gap-2">
+                <Input
+                  className="h-10"
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
+                  placeholder="Search by product name"
+                />
+                <Select value={selectedProductCategoryId} onValueChange={setSelectedProductCategoryId}>
+                  <SelectTrigger className="h-10 min-h-10 bg-background">
+                    <SelectValue placeholder="Filter by category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {typedCategories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  className="h-10 w-full shrink-0 bg-background px-3 font-normal sm:font-medium"
+                  onClick={() => setProductNameSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                >
+                  Sort Name: {productNameSortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+                </Button>
+              </div>
               <div className="border rounded-md overflow-auto overscroll-contain relative z-0" style={{ maxHeight: 'calc(100vh - 320px)' }}>
                 <Table noScrollWrapper>
                   <TableHeader>
@@ -544,8 +631,8 @@ export default function CataloguePage() {
                   <TableRow>
                     <TableCell colSpan={8} className="text-center">Loading products...</TableCell>
                   </TableRow>
-                ) : products && products.length > 0 ? (
-                  products.map(p => {
+                ) : sortedProducts.length > 0 ? (
+                  sortedProducts.map(p => {
                     const price = typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0;
                     const costPrice = typeof p.costPrice === 'number' ? p.costPrice : parseFloat(String(p.costPrice)) || 0;
               

@@ -90,7 +90,15 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       persistOptions={{
         persister: createIDBPersister(),
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        buster: 'v1',
+        // Bump when persisted cache shape or catalogue behavior changes (avoids stale empty lists clobbering UI).
+        buster: 'v2',
+        dehydrateOptions: {
+          // Product/category lists are Dexie-backed + refetched often; persisting them caused "flash then empty" on rehydrate/refetch.
+          shouldDehydrateQuery: (query) => {
+            const root = query.queryKey[0];
+            return root !== 'products' && root !== 'categories';
+          },
+        },
       }}
     >
       {children}

@@ -23,6 +23,7 @@ export const catalogueApi = {
       if (params?.page) queryParams.append('page', params.page.toString());
       if (params?.limit) queryParams.append('limit', params.limit.toString());
       if (params?.updatedAtAfter) queryParams.append('updatedAtAfter', params.updatedAtAfter);
+      if (params?.storeId) queryParams.append('storeId', String(params.storeId));
 
       const url = `${API_BASE_PATH}/categories${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);
@@ -63,6 +64,7 @@ export const catalogueApi = {
       if (params?.search) queryParams.append('search', params.search);
       if (params?.categoryId) queryParams.append('categoryId', params.categoryId);
       if (params?.updatedAtAfter) queryParams.append('updatedAtAfter', params.updatedAtAfter);
+      if (params?.storeId) queryParams.append('storeId', String(params.storeId));
 
       const url = `${API_BASE_PATH}/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await api.get(url);

@@ -20,6 +20,7 @@ import {
   getCustomersFromDexie,
 } from '@/lib/entity-cache';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { pullAllProductsFromApi, pullAllCategoriesFromApi } from '@/lib/catalogue-network-hydrate';
 
 const productKeys = {
   all: ['products'] as const,
@@ -118,8 +119,12 @@ export async function runCloudDataPull(options: RunCloudDataPullOptions): Promis
   };
 
   const lastProducts = await getLastSyncAt('products');
-  const productParams: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 100 };
+  const productParams: { page: number; limit: number; updatedAtAfter?: string; storeId?: string } = {
+    page: 1,
+    limit: 100,
+  };
   if (lastProducts) productParams.updatedAtAfter = lastProducts;
+  if (storeId) productParams.storeId = String(storeId);
   const productResponse = await catalogueApi.products.getAll(productParams);
   const productDelta =
     'data' in productResponse && productResponse.data
@@ -128,6 +133,17 @@ export async function runCloudDataPull(options: RunCloudDataPullOptions): Promis
         ? productResponse
         : [];
   if (productDelta.length) await saveProductsToDexie(productDelta, storeId ?? undefined);
+  if (storeId) {
+    const productCountCheck = await getProductsFromDexie(1, 1, storeId, {});
+    if (productCountCheck.meta.total === 0) {
+      try {
+        let n = await pullAllProductsFromApi(storeId, { storeIdQueryParam: true });
+        if (n === 0) await pullAllProductsFromApi(storeId, { storeIdQueryParam: false });
+      } catch (e) {
+        console.warn('[cloud-data-pull] Full product hydrate after empty Dexie failed', e);
+      }
+    }
+  }
   await setLastSyncAt('products', new Date().toISOString());
   const productResult = lastProducts
     ? await getProductsFromDexie(1, 100, storeId ?? undefined)
@@ -142,8 +158,12 @@ export async function runCloudDataPull(options: RunCloudDataPullOptions): Promis
   bump();
 
   const lastCategories = await getLastSyncAt('categories');
-  const categoryParams: { page: number; limit: number; updatedAtAfter?: string } = { page: 1, limit: 50 };
+  const categoryParams: { page: number; limit: number; updatedAtAfter?: string; storeId?: string } = {
+    page: 1,
+    limit: 50,
+  };
   if (lastCategories) categoryParams.updatedAtAfter = lastCategories;
+  if (storeId) categoryParams.storeId = String(storeId);
   const categoryResponse = await catalogueApi.categories.getAll(categoryParams);
   const categoryDelta =
     'data' in categoryResponse && categoryResponse.data
@@ -151,10 +171,21 @@ export async function runCloudDataPull(options: RunCloudDataPullOptions): Promis
       : Array.isArray(categoryResponse)
         ? categoryResponse
         : [];
-  if (categoryDelta.length) await saveCategoriesToDexie(categoryDelta);
+  if (categoryDelta.length) await saveCategoriesToDexie(categoryDelta, storeId ?? undefined);
+  if (storeId) {
+    const categoryCountCheck = await getCategoriesFromDexie(1, 1, storeId);
+    if (categoryCountCheck.meta.total === 0) {
+      try {
+        let n = await pullAllCategoriesFromApi(storeId, { storeIdQueryParam: true });
+        if (n === 0) await pullAllCategoriesFromApi(storeId, { storeIdQueryParam: false });
+      } catch (e) {
+        console.warn('[cloud-data-pull] Full category hydrate after empty Dexie failed', e);
+      }
+    }
+  }
   await setLastSyncAt('categories', new Date().toISOString());
   const categoryResult = lastCategories
-    ? await getCategoriesFromDexie(1, 50)
+    ? await getCategoriesFromDexie(1, 50, storeId ?? undefined)
     : {
         data: categoryDelta,
         meta:

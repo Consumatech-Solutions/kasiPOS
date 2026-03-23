@@ -85,7 +85,9 @@ export default function PosPage() {
   };
 
   // API Hooks
-  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10);
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10, {
+    storeIdForOffline: settings?.currentStore?.id ?? undefined,
+  });
   const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 10, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
