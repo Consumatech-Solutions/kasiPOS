@@ -554,7 +554,7 @@ export default function CataloguePage() {
   };
 
   return (
-    <div className="h-full p-2 sm:p-4">
+    <div className="h-full p-2 sm:p-4 mb-16">
       <Card>
         <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="space-y-1 p-4 pb-2 sm:p-6 sm:pb-2">
@@ -865,7 +865,7 @@ export default function CataloguePage() {
                      <FormField control={productForm.control} name="price" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Price</FormLabel>
-                            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                            <FormControl><Input type="number" min={0} step="0.01" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />

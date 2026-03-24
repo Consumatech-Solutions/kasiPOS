@@ -6,7 +6,7 @@ import { useSyncStatus } from '@/hooks/use-sync-status';
 import { useSettings } from '@/components/settings-provider';
 import { useToast } from '@/hooks/use-toast';
 import { checkOfflineStatus } from '@/lib/offline-detector';
-import { runManualFullCloudSync, CLOUD_SYNC_LOCAL_HOURS } from '@/lib/cloud-data-pull';
+import { runManualFullCloudSync, runManualPushSync, CLOUD_SYNC_LOCAL_HOURS } from '@/lib/cloud-data-pull';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
   const { settings } = useSettings();
   const { toast } = useToast();
   const [isManualPulling, setIsManualPulling] = useState(false);
+  const [isManualPushing, setIsManualPushing] = useState(false);
 
   const scheduleLabel = CLOUD_SYNC_LOCAL_HOURS.map((h) => `${h}:00`).join(', ');
 
@@ -64,6 +65,39 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
       });
     } finally {
       setIsManualPulling(false);
+    }
+  };
+
+  const handleSyncToCloud = async () => {
+    setIsManualPushing(true);
+    try {
+      const result = await runManualPushSync();
+      if (result.initialPending === 0) {
+        toast({
+          title: 'Nothing to sync',
+          description: 'There are no queued local changes to upload right now.',
+        });
+      } else if (result.remainingPending === 0 && result.syncedCount > 0) {
+        toast({
+          title: 'Cloud sync complete',
+          description: `Uploaded ${result.syncedCount} queued change${result.syncedCount === 1 ? '' : 's'} to the backend.`,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Sync incomplete',
+          description: `${result.remainingPending} queued item${result.remainingPending === 1 ? '' : 's'} still pending (${result.stoppedReason.replace('_', ' ')}).`,
+        });
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Something went wrong.';
+      toast({
+        variant: 'destructive',
+        title: 'Sync failed',
+        description: message,
+      });
+    } finally {
+      setIsManualPushing(false);
     }
   };
 
@@ -124,9 +158,9 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
           <DialogDescription>
             {isPreloading
               ? 'Downloading essential data for offline use...'
-              : 'Uploads to the cloud run at ' +
+              : 'Cloud sync is scheduled at ' +
                 scheduleLabel +
-                ' (local time) and as soon as possible after you reconnect. Use the button below to pull updates from the cloud at any time.'}
+                ' (local time). If a slot is missed while offline, it runs on next connection. You can also pull updates manually anytime.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -134,8 +168,22 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
+              variant="default"
+              disabled={isManualPushing}
+              onClick={() => void handleSyncToCloud()}
+              className="gap-2"
+            >
+              {isManualPushing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Sync to cloud now
+            </Button>
+            <Button
+              type="button"
               variant="secondary"
-              disabled={isManualPulling}
+              disabled={isManualPulling || isManualPushing}
               onClick={() => void handleDownloadFromCloud()}
               className="gap-2"
             >

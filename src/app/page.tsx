@@ -561,85 +561,86 @@ export default function PosPage() {
             <Table noScrollWrapper className="w-full table-fixed">
                 <TableHeader>
                 <TableRow>
-                    <TableHead className="w-12 px-1 sm:px-2 hidden sm:table-cell">View</TableHead>
                     <TableHead className="min-w-0">Product</TableHead>
                     <TableHead className="hidden md:table-cell w-16 shrink-0">Stock</TableHead>
-                    <TableHead className="w-24 shrink-0">Price</TableHead>
-                    <TableHead className="text-right w-32 min-w-[7rem] shrink-0">Action</TableHead>
+                    <TableHead className="w-20 shrink-0">Price</TableHead>
+                    <TableHead className="text-center w-16 min-w-[4.5rem] shrink-0">Action</TableHead>
                 </TableRow>
                 </TableHeader>
                 <TableBody>
                 {productsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10">Loading products...</TableCell>
+                    <TableCell colSpan={4} className="text-center py-10">Loading products...</TableCell>
                   </TableRow>
                 ) : products?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">No products found.</TableCell>
+                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">No products found.</TableCell>
                   </TableRow>
                 ) : products?.map((product: any) => (
                     <TableRow key={product.id}>
-                    <TableCell className="hidden sm:table-cell">
+                    <TableCell className="font-medium min-w-0 align-top">
+                      <div className="flex items-center gap-2 min-w-0 max-w-full">
                         <Dialog>
-                        <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="touch-target">
-                            <Eye className="h-4 w-4" />
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 touch-target-sm" aria-label={`View ${product.name}`}>
+                              <Eye className="h-4 w-4" />
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
+                          </DialogTrigger>
+                          <DialogContent className="max-w-[95vw] sm:max-w-[425px]">
                             <DialogHeader>
-                            <DialogTitle>{product.name}</DialogTitle>
-                            <DialogDescription className="sr-only">Product details and image</DialogDescription>
+                              <DialogTitle>{product.name}</DialogTitle>
+                              <DialogDescription className="sr-only">Product details and image</DialogDescription>
                             </DialogHeader>
                             <div className="flex items-center justify-center">
-                            {(() => {
-                              const imgUrl = product.productImage || product.imageUrl;
-                              const useImage = imgUrl && !imgUrl.startsWith('blob:');
-                              return useImage ? (
-                              <img 
-                                src={imgUrl} 
-                                alt={product.name} 
-                                width={300} 
-                                height={300} 
-                                className="rounded-md object-cover max-w-full h-auto"
-                                data-ai-hint={product.imageHint}
-                                loading="lazy"
-                                decoding="async"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  const initialsDiv = target.nextElementSibling as HTMLElement;
-                                  if (initialsDiv) {
-                                    initialsDiv.style.display = 'flex';
-                                  }
-                                }}
-                              />
-                            ) : null;
-                            })()}
-                            <div 
-                              className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${(product.productImage || product.imageUrl) && !(product.productImage || product.imageUrl)?.startsWith('blob:') ? 'hidden' : ''}`}
-                              style={{ display: (product.productImage || product.imageUrl) && !(product.productImage || product.imageUrl)?.startsWith('blob:') ? 'none' : 'flex' }}
-                            >
-                              <span className="text-6xl font-bold text-primary">
-                                {getProductInitials(product.name)}
-                              </span>
+                              {(() => {
+                                const imgUrl = product.productImage || product.imageUrl;
+                                const useImage = imgUrl && !imgUrl.startsWith('blob:');
+                                return useImage ? (
+                                  <img
+                                    src={imgUrl}
+                                    alt={product.name}
+                                    width={300}
+                                    height={300}
+                                    className="rounded-md object-cover max-w-full h-auto"
+                                    data-ai-hint={product.imageHint}
+                                    loading="lazy"
+                                    decoding="async"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = 'none';
+                                      const initialsDiv = target.nextElementSibling as HTMLElement;
+                                      if (initialsDiv) {
+                                        initialsDiv.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null;
+                              })()}
+                              <div
+                                className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${(product.productImage || product.imageUrl) && !(product.productImage || product.imageUrl)?.startsWith('blob:') ? 'hidden' : ''}`}
+                                style={{ display: (product.productImage || product.imageUrl) && !(product.productImage || product.imageUrl)?.startsWith('blob:') ? 'none' : 'flex' }}
+                              >
+                                <span className="text-6xl font-bold text-primary">
+                                  {getProductInitials(product.name)}
+                                </span>
+                              </div>
                             </div>
-                            </div>
-                        </DialogContent>
+                          </DialogContent>
                         </Dialog>
-                    </TableCell>
-                    <TableCell className="font-medium min-w-0 align-top">
-                      <div className="flex flex-col min-w-0 max-w-full">
-                        <span className="break-words whitespace-normal">{product.name}</span>
-                        <span className="text-xs text-muted-foreground md:hidden">Stock: {product.stock ?? '-'}</span>
+                        <div className="flex flex-col min-w-0 w-full max-w-full flex-1">
+                          <span className="w-full min-w-0 whitespace-normal break-words leading-tight">{product.name}</span>
+                        <span className="mt-1 text-xs text-muted-foreground md:hidden leading-tight">Stock: {product.stock ?? '-'}</span>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{product.stock ?? '-'}</TableCell>
                     <TableCell>R{(typeof product.price === 'number' ? product.price : parseFloat(product.price || 0)).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center px-2">
                         <Button
-                          size="sm"
-                          className="min-h-[44px] touch-target"
+                          size="icon"
+                          className="mx-auto h-10 w-10 min-h-[44px] touch-target"
+                          aria-label={`Add ${product.name}`}
+                          title={`Add ${product.name}`}
                           onClick={() => {
                             const currentQty = cart.get(product.id)?.quantity ?? 0;
                             const stock = product.stock ?? null;
@@ -653,7 +654,7 @@ export default function PosPage() {
                             addToCart(product);
                           }}
                         >
-                        <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Add</span>
+                        <Plus className="h-4 w-4" />
                         </Button>
                     </TableCell>
                     </TableRow>

@@ -32,23 +32,25 @@ export default function CustomersPage() {
   const { settings } = useSettings();
   const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
-  const canDeleteCustomer = currentUser?.role === 'store_admin';
-  const showStoreColumn = currentUser?.role === 'admin' || (customers.length > 0 && customers.some((c) => c.storeId != null));
-
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
   
+    // Use the API hook. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
+  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
+    searchQuery: searchTerm,
+    storeIdForOffline: currentStore?.id ?? undefined,
+  });
+  const canDeleteCustomer = currentUser?.role === 'store_admin';
+  const showStoreColumn = currentUser?.role === 'admin' || (customers.length > 0 && customers.some((c) => c.storeId != null));
+
+
   // Dialog states
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  // Use the API hook. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
-  const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
-    searchQuery: searchTerm,
-    storeIdForOffline: currentStore?.id ?? undefined,
-  });
+
 
   // Get customer transactions (still using IndexedDB for transactions)
   const customerTransactions = useLiveQuery(() => {
