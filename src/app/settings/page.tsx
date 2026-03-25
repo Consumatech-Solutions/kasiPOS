@@ -662,6 +662,8 @@ export default function SettingsPage() {
     }
   };
 
+  const isBrowserOnline = navigator.onLine;
+
   return (
     <>
       <div className="space-y-6">
@@ -996,7 +998,7 @@ export default function SettingsPage() {
                               size="icon"
                               onClick={() => openTransferRoleDialog(user)}
                               title="Transfer store admin role to this staff user"
-                              disabled={!isOnline || isTransferringRole}
+                              disabled={!isBrowserOnline || isTransferringRole}
                             >
                               <Crown className="h-4 w-4 text-amber-600" />
                             </Button>
