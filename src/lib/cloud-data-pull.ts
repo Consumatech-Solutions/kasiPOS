@@ -18,6 +18,7 @@ import {
   getProductsFromDexie,
   getCategoriesFromDexie,
   getCustomersFromDexie,
+  purgeTempIdCatalogueRowsAfterCloudSync,
 } from '@/lib/entity-cache';
 import { mutationQueue } from '@/lib/mutation-queue';
 import { offlineDetector } from '@/lib/offline-detector';
@@ -237,6 +238,14 @@ export async function runCloudDataPull(options: RunCloudDataPullOptions): Promis
       };
   queryClient.setQueryData(customerKeys.list({ page: 1, limit: 50 }), customerResult);
   bump();
+
+  const purgeTemp = await purgeTempIdCatalogueRowsAfterCloudSync(storeId ?? undefined);
+  if (
+    process.env.NODE_ENV === 'development' &&
+    (purgeTemp.productsRemoved > 0 || purgeTemp.categoriesRemoved > 0 || purgeTemp.customersRemoved > 0)
+  ) {
+    console.log('[cloud-data-pull] Removed local temp-id catalogue rows after sync', purgeTemp);
+  }
 
   const voucherResponse = await vouchersApi.getAll({ page: 1, limit: 50, isActive: true });
   const voucherData = voucherResponse.data;

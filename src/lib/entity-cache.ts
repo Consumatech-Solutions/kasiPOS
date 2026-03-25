@@ -190,6 +190,70 @@ export async function deleteCategoryFromDexie(categoryId: string): Promise<void>
   await db.categoryCache.delete(categoryId);
 }
 
+const TEMP_ENTITY_ID_PREFIX = 'temp-';
+
+export function isTempEntityId(id: unknown): boolean {
+  return id != null && String(id).startsWith(TEMP_ENTITY_ID_PREFIX);
+}
+
+/** When syncStoreId is set, include rows with no storeId (legacy optimistic rows) or matching store. */
+function rowMatchesStoreScope(
+  rowStoreId: string | number | null | undefined,
+  syncStoreId: string | null | undefined
+): boolean {
+  if (syncStoreId == null || syncStoreId === '') return true;
+  if (rowStoreId == null || rowStoreId === '') return true;
+  return String(rowStoreId) === String(syncStoreId);
+}
+
+export type PurgeTempIdCatalogueResult = {
+  productsRemoved: number;
+  categoriesRemoved: number;
+  customersRemoved: number;
+};
+
+/**
+ * Remove optimistic offline rows (ids starting with "temp-") from Dexie after cloud catalogue sync
+ * so only server-backed products, categories, and customers remain locally.
+ * Call only after the mutation queue has flushed creates/updates and pull has merged server data.
+ */
+export async function purgeTempIdCatalogueRowsAfterCloudSync(
+  storeId?: string | null
+): Promise<PurgeTempIdCatalogueResult> {
+  if (typeof window === 'undefined') {
+    return { productsRemoved: 0, categoriesRemoved: 0, customersRemoved: 0 };
+  }
+  const db = getDb();
+
+  const products = await db.productCache.toArray();
+  const productIds = products
+    .filter((p) => isTempEntityId(p.id))
+    .filter((p) => rowMatchesStoreScope(p.storeId, storeId))
+    .map((p) => String(p.id));
+
+  const categories = await db.categoryCache.toArray();
+  const categoryIds = categories
+    .filter((c) => isTempEntityId(c.id))
+    .filter((c) => rowMatchesStoreScope(c.storeId, storeId))
+    .map((c) => String(c.id));
+
+  const customerRows = await db.customers.toArray();
+  const customerIds = customerRows
+    .filter((c) => isTempEntityId((c as Customer).id))
+    .filter((c) => rowMatchesStoreScope((c as Customer).storeId, storeId))
+    .map((c) => String((c as Customer).id));
+
+  if (productIds.length > 0) await db.productCache.bulkDelete(productIds);
+  if (categoryIds.length > 0) await db.categoryCache.bulkDelete(categoryIds);
+  if (customerIds.length > 0) await db.customers.bulkDelete(customerIds);
+
+  return {
+    productsRemoved: productIds.length,
+    categoriesRemoved: categoryIds.length,
+    customersRemoved: customerIds.length,
+  };
+}
+
 const PURGE_UNSCOPED_PRODUCTS_KEY_PREFIX = 'kasipos-purged-unscoped-products-v2';
 const PURGE_UNSCOPED_CATEGORIES_KEY_PREFIX = 'kasipos-purged-unscoped-categories-v2';
 
