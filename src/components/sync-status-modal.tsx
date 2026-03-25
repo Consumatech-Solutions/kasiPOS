@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSyncStatus } from '@/hooks/use-sync-status';
 import { useSettings } from '@/components/settings-provider';
 import { useToast } from '@/hooks/use-toast';
-import { checkOfflineStatus } from '@/lib/offline-detector';
+import { offlineDetector } from '@/lib/offline-detector';
 import { runManualFullCloudSync, runManualPushSync, CLOUD_SYNC_LOCAL_HOURS } from '@/lib/cloud-data-pull';
 import {
   Dialog,
@@ -37,12 +37,13 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
   const scheduleLabel = CLOUD_SYNC_LOCAL_HOURS.map((h) => `${h}:00`).join(', ');
 
   const handleDownloadFromCloud = async () => {
-    const offline = await checkOfflineStatus();
-    if (offline) {
+    const reachable = await offlineDetector.forceCheck();
+    if (!reachable) {
       toast({
         variant: 'destructive',
-        title: 'You are offline',
-        description: 'Connect to the internet, then try downloading from the cloud again.',
+        title: 'Server unreachable',
+        description:
+          'Check your network and that the app can reach the API server, then try downloading from the cloud again.',
       });
       return;
     }

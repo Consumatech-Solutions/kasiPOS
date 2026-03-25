@@ -3,17 +3,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { navItems as allNavItems } from '@/lib/nav-config';
+import { navItems as allNavItems, OFFLINE_FIRST_PATHS } from '@/lib/nav-config';
 import { Button } from '../ui/button';
 import { useSettings } from '../settings-provider';
-import { useNetworkStatus } from '@/hooks/use-network-status';
+import { useEffectiveOnline } from '@/hooks/use-effective-online';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { settings } = useSettings();
-  const { isOnline } = useNetworkStatus();
+  const { effectiveOnline } = useEffectiveOnline();
 
   const navItems = useMemo(() => {
     const userRole = settings.currentUser?.role;
@@ -38,7 +38,10 @@ export default function BottomNav() {
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
-            const isFeatureGreyed = item.featureFlag && !isOnline;
+            const offlineFirst = (OFFLINE_FIRST_PATHS as readonly string[]).includes(item.href);
+            const settingsPath = item.href === '/settings';
+            const needsCloud = !offlineFirst && !settingsPath;
+            const isGreyed = needsCloud && !effectiveOnline;
             return (
               <Button
                 key={item.label}
@@ -47,10 +50,10 @@ export default function BottomNav() {
                 className={cn(
                   'flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2',
                   isActive ? 'border-destructive' : 'border-transparent',
-                  isFeatureGreyed && 'opacity-50 pointer-events-none cursor-not-allowed'
+                  isGreyed && 'opacity-50 pointer-events-none cursor-not-allowed'
                 )}
               >
-                <Link href={item.href} aria-disabled={isFeatureGreyed}>
+                <Link href={item.href} aria-disabled={isGreyed}>
                   <Icon className="w-5 h-5 mb-1" />
                   <span>{item.label}</span>
                 </Link>
