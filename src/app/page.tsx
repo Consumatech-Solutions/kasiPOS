@@ -129,12 +129,6 @@ export default function PosPage() {
     if (!allCategories) return [];
     return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));
   }, [allCategories, categorySearch]);
-
-  console.log('filteredCategories', filteredCategories);
-  console.log('allCategories', allCategories);
-  console.log('categorySearch', categorySearch);
-
-  console.log('products', products);
   
   // Use API hook for customers
   const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
