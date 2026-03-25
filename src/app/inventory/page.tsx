@@ -163,6 +163,7 @@ export default function InventoryPage() {
       case 'New stock received':
         return currentStock + q;
       case 'Returns':
+        return currentStock + q;
       case 'Damages':
       case 'Expired':
         return Math.max(0, currentStock - q);
@@ -177,7 +178,7 @@ export default function InventoryPage() {
   const secondFieldLabel = useMemo(() => {
     switch (reason) {
       case 'New stock received': return 'Quantity Received';
-      case 'Returns': return 'Quantity returned (deducted from stock)';
+      case 'Returns': return 'Quantity Returned';
       case 'Shrinkage': return 'Updated Stock Quantity (must be less than the current stock amount)';
       case 'Expansion': return 'Updated Stock Quantity (must be more than the current stock amount)';
       case 'Damages': return 'Quantity Damaged';
@@ -211,6 +212,8 @@ export default function InventoryPage() {
         newStock = cur + q;
         break;
       case 'Returns':
+        newStock = cur + q;
+        break;
       case 'Damages':
       case 'Expired':
         newStock = Math.max(0, cur - q);
