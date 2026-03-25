@@ -93,8 +93,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         // Bump when persisted cache shape or catalogue behavior changes (avoids stale empty lists clobbering UI).
         buster: 'v2',
         dehydrateOptions: {
-          // Product/category lists are Dexie-backed + refetched often; persisting them caused "flash then empty" on rehydrate/refetch.
+          // Persist only successful queries. Pending/error queries can reject after hydration
+          // and trigger noisy dev warnings (e.g. vouchers list when offline).
           shouldDehydrateQuery: (query) => {
+            if (query.state.status !== 'success') return false;
             const root = query.queryKey[0];
             return root !== 'products' && root !== 'categories';
           },

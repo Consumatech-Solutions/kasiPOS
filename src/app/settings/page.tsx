@@ -7,7 +7,7 @@ import * as z from 'zod';
 import type { User } from '@/types';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer, CreditCard, Loader2 } from 'lucide-react';
+import { Moon, Sun, Languages, Info, PlusCircle, Edit, Trash2, Users, Key, RefreshCw, Wifi, WifiOff, Receipt, Printer, CreditCard, Loader2, Crown } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useSettings } from '@/components/settings-provider';
@@ -23,11 +23,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { feedback } from '@/lib/feedback';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { executeMutation } from '@/lib/mutation-registry';
 import { cn } from '@/lib/utils';
+import type { PatchSettingsBody } from '@/lib/api/settings';
 
 type Feature = 'campaigns' | 'marketplace' | 'boph' | 'buyStock';
 
@@ -51,10 +54,13 @@ const passwordSchema = z.object({
 });
 
 export default function SettingsPage() {
-  const { settings, setSetting } = useSettings();
+  const { settings, setSetting, logout } = useSettings();
   const { openHardwareSetup } = useHardwareSetup();
   const { currentUser, currentStore: settingsStore } = settings;
   const isAdmin = currentUser != null && String(currentUser.role ?? '').toLowerCase() === 'admin' || settingsStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin';
+  /** Store admin or platform super admin — both must fully sign out after a successful store role transfer. */
+  const canInitiateStoreRoleTransfer =
+    currentUser?.role === 'store_admin' || String(currentUser?.role ?? '').toLowerCase() === 'admin';
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -83,6 +89,10 @@ export default function SettingsPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userForPassword, setUserForPassword] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [transferTargetUser, setTransferTargetUser] = useState<User | null>(null);
+  const [deleteCurrentAdminOnTransfer, setDeleteCurrentAdminOnTransfer] = useState(false);
+  const [isTransferringRole, setIsTransferringRole] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const TABLE_LIMIT = 5;
@@ -142,14 +152,38 @@ export default function SettingsPage() {
   // StoreId for settings: prefer JWT (currentUser.storeId) so backend and frontend use the same store
   const settingsStoreId = currentUser?.storeId ?? settingsStore?.id ?? undefined;
 
-  // Load store settings (credit config) from GET /settings for admin/store_admin
+  // Load store settings (credit config): online from GET /settings; offline from cached currentStore (IndexedDB)
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== 'store_admin') return;
-    if (!isOnline) return;
     if (!settingsStoreId) {
       setLoadingSettings(false);
       return;
     }
+
+    if (!isOnline) {
+      setLoadingSettings(true);
+      const c = settingsStore?.credit;
+      const cc = c?.customerCredit;
+      if (cc) {
+        setStoreSettingsCredit({
+          creditLimit: Number(cc.creditLimit ?? 0),
+          termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+          term: cc.term != null ? Number(cc.term) : 7,
+        });
+        setCreditForm({
+          enabled: true,
+          creditLimit: Number(cc.creditLimit ?? 0),
+          termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+          term: cc.term != null ? Number(cc.term) : 7,
+        });
+      } else if (c === null) {
+        setStoreSettingsCredit(null);
+        setCreditForm((f) => ({ ...f, enabled: false }));
+      }
+      setLoadingSettings(false);
+      return;
+    }
+
     setLoadingSettings(true);
     settingsApi
       .get(settingsStoreId)
@@ -195,7 +229,7 @@ export default function SettingsPage() {
         }
       })
       .finally(() => setLoadingSettings(false));
-  }, [isAdmin, currentUser?.role, isOnline, settingsStoreId, settingsStore?.credit]);
+  }, [isAdmin, currentUser?.role, isOnline, settingsStoreId, settingsStore?.credit, settingsStore?.id]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -262,27 +296,75 @@ export default function SettingsPage() {
       feedback.error('No store', 'Load a store first or ensure your account has a store.', undefined, { code: 'CREDIT' });
       return;
     }
-    if (!isOnline) {
-      feedback.error('Offline', 'Connect to the internet to save credit settings.', undefined, { code: 'CREDIT' });
+    if (!settingsStore) {
+      feedback.error('No store', 'Load your store before saving credit settings.', undefined, { code: 'CREDIT' });
       return;
     }
+
+    const creditLimit = Math.max(0, Number(creditForm.creditLimit) || 0);
+    const termDays = creditForm.termType === 'fixed' ? Math.max(1, Number(creditForm.term) || 7) : undefined;
+    const body: PatchSettingsBody = creditForm.enabled
+      ? {
+          credit: {
+            customerCredit: {
+              creditLimit,
+              termType: creditForm.termType,
+              ...(creditForm.termType === 'fixed' && { term: termDays }),
+            },
+          },
+        }
+      : { credit: null };
+
+    const applyLocalCredit = async (normalizedCredit: typeof settingsStore.credit) => {
+      setSetting('currentStore', { ...settingsStore, credit: normalizedCredit });
+      await saveStorePermanently({ ...settingsStore, credit: normalizedCredit }, setSetting);
+      const cc =
+        normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
+          ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } })
+              .customerCredit
+          : null;
+      setStoreSettingsCredit(
+        cc
+          ? {
+              creditLimit: Number(cc.creditLimit ?? 0),
+              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+              term: cc.term,
+            }
+          : null
+      );
+      setCreditForm((f) =>
+        cc
+          ? {
+              ...f,
+              creditLimit: Number(cc.creditLimit ?? 0),
+              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+              term: cc.term ?? 7,
+            }
+          : { ...f, enabled: false }
+      );
+    };
+
     setSavingCredit(true);
     try {
-      const creditLimit = Math.max(0, Number(creditForm.creditLimit) || 0);
-      const termDays = creditForm.termType === 'fixed' ? Math.max(1, Number(creditForm.term) || 7) : undefined;
-      const body = creditForm.enabled
-        ? {
-            credit: {
-              customerCredit: {
-                creditLimit,
-                termType: creditForm.termType,
-                ...(creditForm.termType === 'fixed' && { term: termDays }),
-              },
-            },
-          }
-        : { credit: null };
+      if (!isOnline) {
+        const normalizedOffline: typeof settingsStore.credit = creditForm.enabled
+          ? (body.credit ?? null) as typeof settingsStore.credit
+          : null;
+        await applyLocalCredit(normalizedOffline);
+        const queueVars = { storeId: settingsStoreId, body };
+        mutationQueue.add({
+          mutationKey: ['settings', 'patch'],
+          mutationFn: () => executeMutation(['settings', 'patch'], queueVars),
+          variables: queueVars,
+        });
+        feedback.success(
+          'Credit saved locally',
+          'Checkout uses these settings on this device. They will sync to the server when you are online.'
+        );
+        return;
+      }
+
       await settingsApi.patch(body, settingsStoreId);
-      // Verify persistence with GET (same storeId as backend uses) so we know credit is available at checkout
       let updatedCredit: typeof settingsStore.credit = null;
       if (creditForm.enabled) {
         try {
@@ -293,35 +375,25 @@ export default function SettingsPage() {
             updatedCredit = verified as typeof settingsStore.credit;
           }
         } catch (_) {
-          // GET failed; we still update local state from what we sent, but user may see "not configured" at checkout
+          // GET failed; fall back to payload we sent
         }
       }
       if (updatedCredit == null && creditForm.enabled) {
         updatedCredit = (body.credit ?? null) as typeof settingsStore.credit;
       }
-      const normalizedCredit = updatedCredit;
-      if (settingsStore) {
-        setSetting('currentStore', { ...settingsStore, credit: normalizedCredit });
-        await saveStorePermanently({ ...settingsStore, credit: normalizedCredit }, setSetting);
-      }
-      const cc = normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
-        ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } }).customerCredit
-        : null;
-      setStoreSettingsCredit(
-        cc
-          ? {
-              creditLimit: Number(cc.creditLimit ?? 0),
-              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
-              term: cc.term,
-            }
-          : null
-      );
-      setCreditForm((f) => (cc ? { ...f, creditLimit: Number(cc.creditLimit ?? 0), termType: cc.termType === 'variable' ? 'variable' : 'fixed', term: cc.term ?? 7 } : f));
+      const normalizedCredit = creditForm.enabled ? updatedCredit : null;
+      await applyLocalCredit(normalizedCredit);
+
+      const cc =
+        normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
+          ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } })
+              .customerCredit
+          : null;
       if (creditForm.enabled && !cc) {
         feedback.error(
           'Saved but not confirmed on server',
           'Credit settings were sent, but the server did not return the stored config.',
-          'Check that store_settings has a row for store ' + settingsStoreId + ' with credit set. Then try a credit sale again.',
+          'Check store settings on the server, then try a credit sale again.',
           { code: 'CREDIT' }
         );
       } else {
@@ -480,6 +552,47 @@ export default function SettingsPage() {
     }
   };
 
+  const openTransferRoleDialog = (user: User) => {
+    setTransferTargetUser(user);
+    setDeleteCurrentAdminOnTransfer(false);
+    setTransferDialogOpen(true);
+  };
+
+  const confirmTransferRole = async () => {
+    if (!transferTargetUser?.id) return;
+    if (!isOnline) {
+      feedback.error(
+        'Cloud unavailable',
+        'Role transfer requires a cloud connection. Please reconnect and try again.'
+      );
+      return;
+    }
+    setIsTransferringRole(true);
+    try {
+      await storesApi.transferStoreRole({
+        newStoreAdminId: transferTargetUser.id,
+        oldStoreAdminState: deleteCurrentAdminOnTransfer ? 'deleted' : 'staff user',
+      });
+      feedback.success(
+        'Role transferred',
+        deleteCurrentAdminOnTransfer
+          ? 'You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in; your account is removed as selected.'
+          : 'You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in—you will be a staff user at this store.'
+      );
+      setTransferDialogOpen(false);
+      await logout();
+    } catch (error) {
+      console.error('Failed to transfer store admin role:', error);
+      feedback.fromError(
+        error,
+        'Failed to transfer role',
+        'Please verify the selected user is a staff member and try again.'
+      );
+    } finally {
+      setIsTransferringRole(false);
+    }
+  };
+
   const openPasswordDialog = (user: User) => {
     setUserForPassword(user);
     passwordForm.reset({ password: '', confirmPassword: '' });
@@ -548,6 +661,8 @@ export default function SettingsPage() {
       setIsUpdating(false);
     }
   };
+
+  const isBrowserOnline = navigator.onLine;
 
   return (
     <>
@@ -739,23 +854,25 @@ export default function SettingsPage() {
                       <div id="credit-client" className="space-y-2 pt-4 scroll-mt-4">
                         <h3 className="text-lg font-semibold flex items-center gap-2"><CreditCard className="w-5 h-5" /> Customer credit</h3>
                         <p className="text-sm text-muted-foreground">Allow sales on credit and set the credit limit and payment term. When enabled, the Credit payment option appears at checkout.</p>
-                        {settingsStoreId ? (
-                          <p className="text-xs text-muted-foreground font-mono">
-                            Configuring for: <span className="font-semibold text-foreground">{settingsStore?.id === settingsStoreId ? (settingsStore.name ?? 'Store') : 'Store (from your account)'}</span> — <span title={settingsStoreId}>{settingsStoreId}</span>
-                            {currentUser?.storeId === settingsStoreId && <span className="ml-1 text-muted-foreground">(JWT)</span>}
+                        {!settingsStoreId && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            No store linked. Load a store or use an account with a store so credit settings apply correctly at checkout.
                           </p>
-                        ) : (
-                          <p className="text-xs text-amber-600 dark:text-amber-500">No store. Your account must have a store (storeId in JWT) or load a store so GET/PATCH /settings and checkout use the same store.</p>
                         )}
                       </div>
-                      <div className={cn("space-y-4 p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+                      <div className="space-y-4 p-4 border rounded-lg">
+                        {!isOnline && (
+                          <p className="text-xs text-muted-foreground">
+                            Offline: changes apply on this device and sync to the server when you are online. Tap Save after editing.
+                          </p>
+                        )}
                         <div className="flex items-center justify-between">
                           <Label htmlFor="credit-enabled" className="font-semibold">Allow sales on credit</Label>
                           <Switch
                             id="credit-enabled"
                             checked={creditForm.enabled}
                             onCheckedChange={(enabled) => setCreditForm((f) => ({ ...f, enabled }))}
-                            disabled={!isOnline || loadingSettings}
+                            disabled={loadingSettings}
                           />
                         </div>
                         {creditForm.enabled && (
@@ -768,7 +885,6 @@ export default function SettingsPage() {
                                 min={0}
                                 value={creditForm.creditLimit}
                                 onChange={(e) => setCreditForm((f) => ({ ...f, creditLimit: Number(e.target.value) || 0 }))}
-                                disabled={!isOnline}
                               />
                             </div>
                             <div className="space-y-2">
@@ -776,7 +892,6 @@ export default function SettingsPage() {
                               <Select
                                 value={creditForm.termType}
                                 onValueChange={(v: 'fixed' | 'variable') => setCreditForm((f) => ({ ...f, termType: v }))}
-                                disabled={!isOnline}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
@@ -796,26 +911,26 @@ export default function SettingsPage() {
                                   min={0}
                                   value={creditForm.term}
                                   onChange={(e) => setCreditForm((f) => ({ ...f, term: Number(e.target.value) ?? 7 }))}
-                                  disabled={!isOnline}
                                 />
                               </div>
                             )}
-                            <Button
-                              onClick={saveCreditSettings}
-                              disabled={!isOnline || savingCredit}
-                              className="min-h-[44px] touch-target"
-                            >
-                              {savingCredit ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Saving...
-                                </>
-                              ) : (
-                                'Save credit settings'
-                              )}
-                            </Button>
                           </>
                         )}
+                        <Button
+                          type="button"
+                          onClick={() => void saveCreditSettings()}
+                          disabled={savingCredit || !settingsStoreId || loadingSettings}
+                          className="min-h-[44px] touch-target"
+                        >
+                          {savingCredit ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save credit settings'
+                          )}
+                        </Button>
                       </div>
                     </>
                   )}
@@ -877,6 +992,17 @@ export default function SettingsPage() {
                           <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(user)} title="Set password">
                             <Key className="h-4 w-4" />
                           </Button>
+                          {String(user.role ?? '').toLowerCase() === 'staff' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openTransferRoleDialog(user)}
+                              title="Transfer store admin role to this staff user"
+                              disabled={!isBrowserOnline || isTransferringRole}
+                            >
+                              <Crown className="h-4 w-4 text-amber-600" />
+                            </Button>
+                          )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id} title="Delete user">
@@ -1059,6 +1185,70 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={transferDialogOpen} onOpenChange={(open) => !isTransferringRole && setTransferDialogOpen(open)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Store Admin transfer</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  You are transferring Store Admin to{' '}
+                  <span className="font-semibold text-foreground">{transferTargetUser?.name ?? 'this user'}</span>.
+                  Please confirm below. This action cannot be undone.
+                </p>
+                <p>
+                  After you confirm, this app signs you out and the new store admin should be signed out as well
+                  (existing sessions may stay valid until the server ends them or they expire). When both of you sign
+                  in again, roles will match the server—the previous store admin is deleted only if you select that
+                  option in the checkbox.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border p-3 text-sm text-muted-foreground">
+              <p>New Store Admin: {transferTargetUser?.name ?? '-'}</p>
+              <p>Phone: {transferTargetUser?.phone ?? '-'}</p>
+              <p>Current Store Admin: {currentUser?.name ?? 'Current user'}</p>
+            </div>
+
+            <p className="text-sm font-medium text-foreground">
+              What should happen to the current Store Admin account (you)?
+            </p>
+            <div className="flex items-start space-x-2 rounded-md border p-3">
+              <Checkbox
+                id="delete-current-admin-on-transfer"
+                checked={deleteCurrentAdminOnTransfer}
+                onCheckedChange={(checked) => setDeleteCurrentAdminOnTransfer(checked === true)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label htmlFor="delete-current-admin-on-transfer" className="cursor-pointer font-normal">
+                  Delete the current Store Admin
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Unchecked:</span> keep the account and make them a staff
+                  user at this store. <span className="font-medium text-foreground">Checked:</span> remove or deactivate
+                  the current Store Admin per server rules.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="secondary" disabled={isTransferringRole}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button type="button" onClick={() => void confirmTransferRole()} disabled={isTransferringRole || !isOnline}>
+              {isTransferringRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirm Transfer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

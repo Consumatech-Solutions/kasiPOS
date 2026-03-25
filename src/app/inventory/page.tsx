@@ -161,6 +161,7 @@ export default function InventoryPage() {
     const q = Number(quantityOrUpdated);
     switch (reason) {
       case 'New stock received':
+        return currentStock + q;
       case 'Returns':
         return currentStock + q;
       case 'Damages':
@@ -208,6 +209,8 @@ export default function InventoryPage() {
     let newStock: number;
     switch (values.reason) {
       case 'New stock received':
+        newStock = cur + q;
+        break;
       case 'Returns':
         newStock = cur + q;
         break;

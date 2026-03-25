@@ -35,6 +35,8 @@ class OfflineDetector {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   /** Dev only: when true, report offline so you can test without cutting the network */
   private forceOffline = false;
+  /** Runtime flag: when true, app behaves offline-first even with network connectivity */
+  private offlineFirstActive = true;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -44,10 +46,10 @@ class OfflineDetector {
       window.addEventListener('online', this.handleOnline);
       window.addEventListener('offline', this.handleOffline);
 
-      // Run connectivity check every 10 seconds (backend reachability)
-      this.checkConnectivity(true);
+      // Run connectivity checks only when runtime is allowed online.
+      this.checkConnectivity(false);
       this.intervalId = setInterval(() => {
-        this.checkConnectivity(true);
+        this.checkConnectivity(false);
       }, CONNECTIVITY_CHECK_INTERVAL_MS);
     }
   }
@@ -56,7 +58,7 @@ class OfflineDetector {
     // Notify "online" immediately so UI and mutation queue can sync without waiting for the check
     this.setState(false);
     // Then verify with network test; if it fails, revert to offline
-    this.checkConnectivity(true).then((isOnline) => {
+    this.checkConnectivity(false).then((isOnline) => {
       if (!isOnline) this.setState(true);
     }).catch(() => {
       this.setState(true);
@@ -84,6 +86,7 @@ class OfflineDetector {
   /** Dev only: effective offline = forced offline (when dev) OR real offline */
   getEffectiveOffline(): boolean {
     if (this.forceOffline && isDevHost()) return true;
+    if (this.offlineFirstActive) return true;
     return this.state.isOffline;
   }
 
@@ -102,11 +105,21 @@ class OfflineDetector {
     this.notifyListeners();
   }
 
+  setOfflineFirstActive(value: boolean) {
+    if (this.offlineFirstActive === value) return;
+    this.offlineFirstActive = value;
+    this.notifyListeners();
+  }
+
+  getOfflineFirstActive(): boolean {
+    return this.offlineFirstActive;
+  }
+
   /**
    * Check connectivity by calling the backend URL. If the backend cannot be
    * reached, we are considered offline.
    */
-  private async checkConnectivity(force: boolean = false): Promise<boolean> {
+  private async checkConnectivity(force: boolean = false, bypassOfflineFirst: boolean = false): Promise<boolean> {
     if (this.checkPromise && !force) {
       return this.checkPromise;
     }
@@ -116,6 +129,13 @@ class OfflineDetector {
 
       try {
         if (this.forceOffline && isDevHost()) {
+          this.setState(true);
+          return false;
+        }
+
+        // In offline-first runtime, avoid backend probes unless explicitly bypassed
+        // by scheduled/manual sync windows.
+        if (this.offlineFirstActive && !bypassOfflineFirst) {
           this.setState(true);
           return false;
         }
@@ -168,6 +188,7 @@ class OfflineDetector {
    */
   async checkOfflineStatus(force: boolean = false): Promise<boolean> {
     if (this.forceOffline && isDevHost()) return true;
+    if (this.offlineFirstActive) return true;
     return !(await this.checkConnectivity(force));
   }
 
@@ -186,7 +207,7 @@ class OfflineDetector {
    * Force a fresh connectivity check
    */
   async forceCheck(): Promise<boolean> {
-    return await this.checkConnectivity(true);
+    return await this.checkConnectivity(true, true);
   }
 
   /**

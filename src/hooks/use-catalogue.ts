@@ -338,7 +338,7 @@ export function useProducts(
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: CreateProductDto | { name: string; price: number; costPrice: number; stock?: number; barCode?: string; productImage?: string; category: string }) => {
+    mutationFn: async (data: CreateProductDto | { name: string; price: number; costPrice: number; stock?: number; lowStockThreshold?: number; barCode?: string; productImage?: string; category: string }) => {
       let createDto: CreateProductDto;
 
       if ('categoryId' in data) {
@@ -358,6 +358,7 @@ export function useProducts(
           price: data.price,
           costPrice: data.costPrice,
           stock: data.stock,
+          lowStockThreshold: data.lowStockThreshold,
           barCode: data.barCode || (data as any).barcode,
           productImage: data.productImage || (data as any).imageUrl,
           categoryId: category.id,

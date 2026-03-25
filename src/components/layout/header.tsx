@@ -122,7 +122,7 @@ export default function Header() {
     markAllAsRead,
     removeNotification,
   } = useNotifications();
-  const { isOnline, wasOffline } = useNetworkStatus();
+  const { isOnline, wasOffline, hasInternet, cloudUnreachable } = useNetworkStatus();
   const { openHardwareSetup } = useHardwareSetup();
 
   // Get current page title
@@ -199,11 +199,21 @@ export default function Header() {
             variant="ghost" 
             size="icon" 
             className="h-9 w-9 sm:h-10 sm:w-10 touch-target"
-            title={isOnline ? 'Online' : 'Offline - Working in offline mode'}
+            title={
+              isOnline
+                ? 'Online'
+                : cloudUnreachable
+                  ? 'Internet connected, but cloud/backend is unreachable'
+                  : 'Offline - Working in offline mode'
+            }
           >
             <Wifi className={cn(
               "h-4 w-4 sm:h-5 sm:w-5",
-              isOnline ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+              isOnline
+                ? "text-green-600 dark:text-green-400"
+                : hasInternet
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-red-600 dark:text-red-400"
             )} />
           </Button>
           {wasOffline && (

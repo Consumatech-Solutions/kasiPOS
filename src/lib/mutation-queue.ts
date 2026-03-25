@@ -27,6 +27,13 @@ export interface SyncStatusData {
   };
 }
 
+export interface ProcessQueueResult {
+  initialPending: number;
+  syncedCount: number;
+  remainingPending: number;
+  stoppedReason: 'empty' | 'already_processing' | 'offline_first_blocked' | 'offline' | 'network_pause' | 'server_retry' | 'completed';
+}
+
 type StatusChangeCallback = (status: SyncStatusData) => void;
 
 const MAX_RETRIES = 3;
@@ -113,21 +120,19 @@ class MutationQueue {
 
   private setupOnlineListener() {
     if (typeof window !== 'undefined') {
-      // Primary: enhanced offline detector
-      const unsubscribe = offlineDetector.subscribe((isOffline) => {
-        if (!isOffline) {
-          console.log('[MutationQueue] Network online - processing queued mutations');
-          this.processQueue();
+      // Observe connectivity only; scheduled/manual sync triggers processing.
+      const unsubscribe = offlineDetector.subscribe((offline) => {
+        if (!offline && this.queue.length > 0) {
+          console.log('[MutationQueue] Online with pending queue; waiting for scheduled/manual sync');
         }
       });
 
-      // Fallback: native 'online' event – always try processQueue so sync runs without refresh
+      // Fallback native event: log only.
       const onNativeOnline = () => {
         window.setTimeout(() => {
           checkOfflineStatus(true).then((offline) => {
             if (!offline && this.queue.length > 0) {
-              console.log('[MutationQueue] Native online - processing queued mutations');
-              this.processQueue();
+              console.log('[MutationQueue] Native online with pending queue; waiting for scheduled/manual sync');
             }
           });
         }, 400);
@@ -253,17 +258,57 @@ class MutationQueue {
     }
   }
 
-  async processQueue() {
+  async processQueue(options?: { force?: boolean }): Promise<ProcessQueueResult> {
+    const force = options?.force === true;
+    const initialPending = this.queue.length;
+    let syncedCount = 0;
     if (this.processing || this.queue.length === 0) {
-      return;
+      return {
+        initialPending,
+        syncedCount,
+        remainingPending: this.queue.length,
+        stoppedReason: this.processing ? 'already_processing' : 'empty',
+      };
     }
 
-    // Check if we're online before processing (using enhanced offline detection)
+    // Processing window runs online; restore offline-first in finally.
+    offlineDetector.setOfflineFirstActive(false);
+
+    if (!force && offlineDetector.getOfflineFirstActive()) {
+      console.log('[MutationQueue] Offline-first mode active - skipping queue processing');
+      return {
+        initialPending,
+        syncedCount,
+        remainingPending: this.queue.length,
+        stoppedReason: 'offline_first_blocked',
+      };
+    }
+
+    // Check if we're online before processing.
+    // For forced sync windows, use a direct connectivity probe that bypasses offline-first gating.
     if (typeof window !== 'undefined') {
-      const isOfflineStatus = await checkOfflineStatus();
-      if (isOfflineStatus) {
-        console.log('[MutationQueue] Still offline - skipping queue processing');
-        return;
+      if (force) {
+        const hasConnectivity = await offlineDetector.forceCheck();
+        if (!hasConnectivity) {
+          console.log('[MutationQueue] No connectivity for forced sync - skipping queue processing');
+          return {
+            initialPending,
+            syncedCount,
+            remainingPending: this.queue.length,
+            stoppedReason: 'offline',
+          };
+        }
+      } else {
+        const isOfflineStatus = await checkOfflineStatus();
+        if (isOfflineStatus) {
+          console.log('[MutationQueue] Still offline - skipping queue processing');
+          return {
+            initialPending,
+            syncedCount,
+            remainingPending: this.queue.length,
+            stoppedReason: 'offline',
+          };
+        }
       }
     }
 
@@ -273,6 +318,7 @@ class MutationQueue {
     console.log(`[MutationQueue] Processing ${this.queue.length} queued mutations (sorted by dependency order)`);
     this.notifyStatusChange();
 
+    let stoppedReason: ProcessQueueResult['stoppedReason'] = 'completed';
     try {
     while (this.queue.length > 0) {
       // Re-check online status before each mutation (using enhanced offline detection)
@@ -286,6 +332,7 @@ class MutationQueue {
             this.currentStatus = 'idle';
             this.currentMutation = null;
             this.notifyStatusChange();
+            stoppedReason = 'network_pause';
             break;
           }
         }
@@ -301,6 +348,7 @@ class MutationQueue {
         // Success - remove from queue
         mutation.status = 'completed';
         this.queue.shift();
+        syncedCount++;
         this.currentMutation = null;
         await this.persistQueue();
         console.log(`[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join('/')}`);
@@ -335,6 +383,7 @@ class MutationQueue {
           this.currentMutation = null;
           this.currentStatus = 'idle';
           this.notifyStatusChange();
+          stoppedReason = 'network_pause';
           break;
         }
         
@@ -344,6 +393,7 @@ class MutationQueue {
           this.currentMutation = null;
           this.currentStatus = 'idle';
           this.notifyStatusChange();
+          stoppedReason = 'server_retry';
           break;
         }
         
@@ -382,8 +432,18 @@ class MutationQueue {
       if (this.queue.length === 0) {
         console.log('[MutationQueue] All mutations synced successfully');
       }
+      offlineDetector.setOfflineFirstActive(true);
       this.notifyStatusChange();
     }
+    if (stoppedReason === 'completed' && this.queue.length > 0) {
+      stoppedReason = 'network_pause';
+    }
+    return {
+      initialPending,
+      syncedCount,
+      remainingPending: this.queue.length,
+      stoppedReason,
+    };
   }
 
   getQueue() {
@@ -410,3 +470,4 @@ class MutationQueue {
 }
 
 export const mutationQueue = new MutationQueue();
+

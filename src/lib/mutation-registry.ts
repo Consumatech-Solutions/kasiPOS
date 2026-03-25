@@ -12,6 +12,7 @@ import { purchaseOrdersApi, type CreatePurchaseOrderDto } from '@/lib/api/purcha
 import { vouchersApi } from '@/lib/api/vouchers';
 import { parcelsApi } from '@/lib/api/parcels';
 import { usersApi } from '@/lib/api/users';
+import { settingsApi, type PatchSettingsBody } from '@/lib/api/settings';
 import { getDb } from '@/lib/db';
 
 const DELIVERY_FEE = 150;
@@ -210,6 +211,11 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
     case 'users/delete': {
       const { id } = variables as { id: string };
       return usersApi.remove(id);
+    }
+
+    case 'settings/patch': {
+      const v = variables as { storeId?: string | null; body: PatchSettingsBody };
+      return settingsApi.patch(v.body, v.storeId);
     }
 
     default:

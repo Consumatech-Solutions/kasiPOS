@@ -25,7 +25,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical, QrCode, Layers } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, RefreshCw, Loader2, MoreVertical, QrCode, Layers, ArrowDownAZ, ArrowUpAZ } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +53,10 @@ const productSchema = z.object({
   price: z.coerce.number().positive({ message: "Price must be a positive number." }),
   costPrice: z.coerce.number().min(0, { message: "Cost price can't be negative." }),
   stock: z.coerce.number().int().min(0, { message: "Stock can't be negative." }).optional(),
+  lowStockThreshold: z.preprocess(
+    (v) => (v === '' || v == null ? undefined : v),
+    z.coerce.number().int().min(0, { message: "Low stock trigger can't be negative." }).optional()
+  ),
   category: z.string().min(1, { message: "Please select a category." }),
   barcode: z.string().optional(),
   imageUrl: z.string().optional(),
@@ -158,6 +162,7 @@ export default function CataloguePage() {
       price: 0,
       costPrice: 0,
       stock: 0,
+      lowStockThreshold: undefined,
       category: '',
       barcode: '',
       imageUrl: '',
@@ -184,6 +189,7 @@ export default function CataloguePage() {
       const price = p.price || 0;
       const costPrice = p.costPrice || 0;
       const stock = p.stock || 0;
+      const lowStockThreshold = p.lowStockThreshold ?? undefined;
       const categoryName = typeof p.category === 'object' ? p.category.name : (p.category || '');
       const barcodeValue = p.barCode || p.barcode || '';
       const imageUrl = p.productImage || p.imageUrl || '';
@@ -193,6 +199,7 @@ export default function CataloguePage() {
       productForm.setValue('price', price);
       productForm.setValue('costPrice', costPrice);
       productForm.setValue('stock', stock);
+      productForm.setValue('lowStockThreshold', lowStockThreshold);
       productForm.setValue('category', categoryName);
       productForm.setValue('barcode', barcodeValue);
       productForm.setValue('imageUrl', imageUrl);
@@ -206,6 +213,7 @@ export default function CataloguePage() {
       productForm.setValue('price', 0);
       productForm.setValue('costPrice', 0);
       productForm.setValue('stock', 0);
+      productForm.setValue('lowStockThreshold', undefined);
       productForm.setValue('category', '');
       productForm.setValue('barcode', '');
       productForm.setValue('imageUrl', '');
@@ -227,6 +235,7 @@ export default function CataloguePage() {
         price: values.price,
         costPrice: values.costPrice,
         stock: values.stock || 0,
+        lowStockThreshold: values.lowStockThreshold,
         category: values.category,
         barCode: barCode,
         imageUrl: imageUrl,
@@ -245,6 +254,7 @@ export default function CataloguePage() {
             price: productData.price,
             costPrice: productData.costPrice,
             stock: productData.stock,
+            ...(productData.lowStockThreshold != null ? { lowStockThreshold: productData.lowStockThreshold } : {}),
             barCode: productData.barCode ?? null,
             productImage: productData.imageUrl ?? null,
             category: productData.category,
@@ -292,6 +302,7 @@ export default function CataloguePage() {
             price: productData.price,
             costPrice: productData.costPrice,
             stock: productData.stock ?? null,
+            ...(productData.lowStockThreshold != null ? { lowStockThreshold: productData.lowStockThreshold } : {}),
             barCode: productData.barCode ?? null,
             productImage: productData.imageUrl ?? null,
             categoryId: selectedCategory?.id ?? '',
@@ -543,14 +554,14 @@ export default function CataloguePage() {
   };
 
   return (
-    <div className="h-full p-2 sm:p-4">
+    <div className="h-full p-2 sm:p-4 mb-16">
       <Card>
         <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
-          <CardHeader className="space-y-1 p-4 pb-2 sm:p-6 sm:pb-2">
+          <CardHeader className="space-y-1 p-4 pb-5 sm:p-6 sm:pb-6">
             <CardTitle className="text-lg sm:text-xl">Catalogue Management</CardTitle>
             <CardDescription className="text-sm">Manage your products and categories.</CardDescription>
           </CardHeader>
-          <CardContent className="px-4 pb-2 pt-0 sm:px-6 sm:pb-3">
+          <CardContent className="px-4 pb-2 pt-1 sm:px-6 sm:pb-3 sm:pt-2">
             <Tabs value={activeCatalogueTab} onValueChange={setActiveCatalogueTab}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 sm:gap-3">
                 <TabsList>
@@ -581,11 +592,11 @@ export default function CataloguePage() {
             </Tabs>
           </CardContent>
         </div>
-        <CardContent className="relative z-0 px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+        <CardContent className="relative z-0 px-3 pb-3 pt-6 sm:px-4 sm:pb-4 sm:pt-8">
           <Tabs value={activeCatalogueTab} onValueChange={setActiveCatalogueTab}>
             {/* Products Tab */}
-            <TabsContent value="products" className="mt-0 flex flex-col gap-2 focus-visible:ring-0 focus-visible:ring-offset-0">
-              <div className="grid grid-cols-1 items-center gap-1.5 md:grid-cols-3 md:gap-2">
+            <TabsContent value="products" className="mt-0 flex flex-col gap-4 focus-visible:ring-0 focus-visible:ring-offset-0">
+              <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-2 md:gap-3">
                 <Input
                   className="h-10"
                   value={productSearchTerm}
@@ -605,24 +616,39 @@ export default function CataloguePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button
-                  variant="outline"
-                  className="h-10 w-full shrink-0 bg-background px-3 font-normal sm:font-medium"
-                  onClick={() => setProductNameSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-                >
-                  Sort Name: {productNameSortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-                </Button>
               </div>
               <div className="relative z-0 overflow-x-auto rounded-md border">
                 <Table noScrollWrapper>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Image</TableHead>
-                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Name</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">
+                        <button
+                          type="button"
+                          className="-mx-2 -my-1 inline-flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left font-medium hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                          onClick={() => setProductNameSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
+                        >
+                          <span>Name</span>
+                          <span className="inline-flex shrink-0 items-center gap-1 text-foreground" aria-hidden>
+                            {productNameSortOrder === 'asc' ? (
+                              <ArrowDownAZ className="h-4 w-4" />
+                            ) : (
+                              <ArrowUpAZ className="h-4 w-4" />
+                            )}
+                            <span className="text-xs font-semibold tracking-wide">
+                              {productNameSortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+                            </span>
+                          </span>
+                          <span className="sr-only">
+                            Sort by name, currently {productNameSortOrder === 'asc' ? 'A to Z' : 'Z to A'}. Click to reverse.
+                          </span>
+                        </button>
+                      </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Category</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">Price</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Cost Price</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">Stock</TableHead>
+                      <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">Low Stock Trigger</TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -663,6 +689,7 @@ export default function CataloguePage() {
                       <TableCell>R{price.toFixed(2)}</TableCell>
                       <TableCell className="hidden md:table-cell">R{costPrice.toFixed(2)}</TableCell>
                       <TableCell className="hidden sm:table-cell">{p.stock}</TableCell>
+                      <TableCell className="hidden md:table-cell">{p.lowStockThreshold ?? '-'}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -699,7 +726,7 @@ export default function CataloguePage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">No products yet. Click "Add Product" to create one.</TableCell>
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">No products yet. Click "Add Product" to create one.</TableCell>
                   </TableRow>
                 )}
                 </TableBody>
@@ -804,14 +831,15 @@ export default function CataloguePage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
-            <DialogHeader className="flex-shrink-0">
+        <DialogContent className="max-h-[90vh] w-full max-w-[95vw] flex flex-col sm:max-w-[425px]">
+            <DialogHeader className="flex-shrink-0 pr-8 sm:pr-10">
                 <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
                 <DialogDescription>
                     {editingProduct ? 'Update the product information below.' : 'Fill in the details to add a new product to your catalogue.'}
                 </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+            {/* pl/pr inside scroll so input borders + focus rings (ring-offset) are not clipped */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4">
               <Form {...productForm}>
                   <form onSubmit={productForm.handleSubmit(handleProductSubmit)} className="space-y-4">
                     <FormField control={productForm.control} name="name" render={({ field }) => (
@@ -852,7 +880,7 @@ export default function CataloguePage() {
                      <FormField control={productForm.control} name="price" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Price</FormLabel>
-                            <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                            <FormControl><Input type="number" min={0} step="0.01" {...field} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -866,7 +894,14 @@ export default function CataloguePage() {
                      <FormField control={productForm.control} name="stock" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Stock (Optional)</FormLabel>
-                            <FormControl><Input type="number" {...field} /></FormControl>
+                            <FormControl><Input type="number" min={0} step={1} {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                     <FormField control={productForm.control} name="lowStockThreshold" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Low Stock Trigger (Optional)</FormLabel>
+                            <FormControl><Input type="number" min={0} step={1} {...field} value={field.value ?? ''} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />

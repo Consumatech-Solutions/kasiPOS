@@ -20,6 +20,7 @@ import {
   getCustomersFromDexie,
 } from '@/lib/entity-cache';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { offlineDetector } from '@/lib/offline-detector';
 import { pullAllProductsFromApi, pullAllCategoriesFromApi } from '@/lib/catalogue-network-hydrate';
 
 const productKeys = {
@@ -78,20 +79,36 @@ function markSlotCompleted(slotId: string): void {
 }
 
 /**
- * When in a scheduled local hour (6, 12, or 18) and that slot has not completed successfully yet, returns the slot id.
- * Call {@link markScheduledSyncSlotComplete} only after push + pull succeed.
+ * Returns a due, uncompleted scheduled slot id (6, 12, 18 local time).
+ * Supports catch-up: if the app was offline at slot time, the slot remains due
+ * and will run at the next online opportunity.
  */
-export function getCurrentScheduledSyncSlotId(): string | null {
+export function getNextDueScheduledSyncSlotId(now: Date = new Date()): string | null {
   if (typeof window === 'undefined') return null;
-  const now = new Date();
-  const h = now.getHours();
-  if (!CLOUD_SYNC_LOCAL_HOURS.includes(h as (typeof CLOUD_SYNC_LOCAL_HOURS)[number])) {
-    return null;
+  const completed = readCompletedSlots();
+
+  // Check yesterday + today to catch up overnight/offline slots.
+  for (const dayOffset of [1, 0]) {
+    const day = new Date(now);
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() - dayOffset);
+    const dayKey = `${day.getFullYear()}-${day.getMonth() + 1}-${day.getDate()}`;
+
+    for (const h of CLOUD_SYNC_LOCAL_HOURS) {
+      const slotTime = new Date(day);
+      slotTime.setHours(h, 0, 0, 0);
+      if (slotTime > now) continue;
+      const slotId = `${dayKey}-${h}`;
+      if (!completed[slotId]) return slotId;
+    }
   }
-  const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
-  const slotId = `${dayKey}-${h}`;
-  if (readCompletedSlots()[slotId]) return null;
-  return slotId;
+
+  return null;
+}
+
+/** Backward-compatible alias. */
+export function getCurrentScheduledSyncSlotId(): string | null {
+  return getNextDueScheduledSyncSlotId();
 }
 
 export function markScheduledSyncSlotComplete(slotId: string): void {
@@ -253,6 +270,24 @@ export async function needsInitialCloudHydration(): Promise<boolean> {
 
 /** Upload queued changes, then download catalogue data (manual / UI). */
 export async function runManualFullCloudSync(options: RunCloudDataPullOptions): Promise<void> {
-  await mutationQueue.processQueue();
-  await runCloudDataPull(options);
+  const hasConnectivity = await offlineDetector.forceCheck();
+  if (!hasConnectivity) {
+    throw new Error('No internet connection available for cloud sync.');
+  }
+  offlineDetector.setOfflineFirstActive(false);
+  try {
+    await mutationQueue.processQueue({ force: true });
+    await runCloudDataPull(options);
+  } finally {
+    offlineDetector.setOfflineFirstActive(true);
+  }
+}
+
+/** Upload queued changes only (manual push), without toggling offline-first mode. */
+export async function runManualPushSync() {
+  const hasConnectivity = await offlineDetector.forceCheck();
+  if (!hasConnectivity) {
+    throw new Error('No internet connection available for cloud sync.');
+  }
+  return await mutationQueue.processQueue({ force: true });
 }

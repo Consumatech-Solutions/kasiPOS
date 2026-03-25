@@ -10,14 +10,16 @@ import { WifiOff } from 'lucide-react';
  * on the page directly or were already on it when going offline.
  */
 export function RequireOnlineBanner() {
-  const { isOnline } = useNetworkStatus();
+  const { isOnline, hasInternet } = useNetworkStatus();
   if (isOnline) return null;
   return (
     <Alert variant="default" className="mb-4 border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-200 dark:bg-amber-500/10 dark:border-amber-400/50">
       <WifiOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-      <AlertTitle>Offline</AlertTitle>
+      <AlertTitle>{hasInternet ? 'Cloud unavailable' : 'Offline'}</AlertTitle>
       <AlertDescription>
-        This section requires an internet connection. It is disabled while you are offline. Reconnect to use it.
+        {hasInternet
+          ? 'Internet is available, but the cloud/backend is unreachable. This section is temporarily disabled.'
+          : 'This section requires an internet connection. It is disabled while you are offline. Reconnect to use it.'}
       </AlertDescription>
     </Alert>
   );

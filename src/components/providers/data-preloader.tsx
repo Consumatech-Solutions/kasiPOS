@@ -5,14 +5,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { mutationQueue } from '@/lib/mutation-queue';
 import {
   runCloudDataPull,
-  needsInitialCloudHydration,
-  getCurrentScheduledSyncSlotId,
+  getNextDueScheduledSyncSlotId,
   markScheduledSyncSlotComplete,
   CLOUD_SYNC_LOCAL_HOURS,
 } from '@/lib/cloud-data-pull';
 import { useToast } from '@/hooks/use-toast';
 import { useSettings } from '@/components/settings-provider';
-import { checkOfflineStatus } from '@/lib/offline-detector';
+import { offlineDetector } from '@/lib/offline-detector';
 import { getPageRoutesToPreload } from '@/lib/page-routes';
 import { purgeUnscopedCatalogueCacheOnce } from '@/lib/entity-cache';
 import { productKeys, categoryKeys } from '@/hooks/use-catalogue';
@@ -194,8 +193,8 @@ async function verifyServiceWorkerCache(maxRetries: number = 5, retryDelay: numb
 /**
  * DataPreloader — offline shell + cloud sync scheduling
  *
- * - First-time cloud hydration runs once when online (upload queue, then download catalogue data).
- * - Further uploads run at local hours 6, 12, and 18 (and as soon as possible after reconnecting).
+ * - Cloud push/pull runs only on schedule: local hours 6, 12, and 18.
+ * - Missed slots (offline at schedule time) are executed at the next online opportunity.
  * - Downloads from the cloud run on the same schedule, or anytime via the sync modal (manual pull).
  */
 export function DataPreloader() {
@@ -228,13 +227,14 @@ export function DataPreloader() {
 
     const tickScheduledSync = async () => {
       if (cancelled || !settings.isLoggedIn || syncBusyRef.current) return;
-      const offline = await checkOfflineStatus();
-      if (offline) return;
-      const slotId = getCurrentScheduledSyncSlotId();
+      const slotId = getNextDueScheduledSyncSlotId();
       if (!slotId) return;
+      const hasConnectivity = await offlineDetector.forceCheck();
+      if (!hasConnectivity) return;
       syncBusyRef.current = true;
       try {
-        await mutationQueue.processQueue();
+        offlineDetector.setOfflineFirstActive(false);
+        await mutationQueue.processQueue({ force: true });
         await runCloudDataPull({
           queryClient,
           storeId,
@@ -244,6 +244,7 @@ export function DataPreloader() {
       } catch (e) {
         console.error('[DataPreloader] Scheduled cloud sync failed:', e);
       } finally {
+        offlineDetector.setOfflineFirstActive(true);
         syncBusyRef.current = false;
       }
     };
@@ -251,16 +252,13 @@ export function DataPreloader() {
     const intervalId = window.setInterval(() => {
       void tickScheduledSync();
     }, 45_000);
-    void tickScheduledSync();
 
-    checkOfflineStatus().then((isOffline) => {
-      if (isOffline || cancelled) {
-        console.log('[DataPreloader] Offline - skipping bootstrap preload');
-        return;
-      }
+    // Keep runtime strictly offline-first by default; scheduled/manual sync opens temporary online windows.
+    offlineDetector.setOfflineFirstActive(true);
 
+    if (!cancelled) {
       void startPreloading();
-    });
+    }
 
     async function startPreloading() {
       const cacheVerified = await verifyServiceWorkerCache();
@@ -275,9 +273,7 @@ export function DataPreloader() {
 
       const pagesToPreload = getPageRoutesToPreload(settings.isLoggedIn);
       const pagePreloadCount = needsFullPreload ? pagesToPreload.length : 0;
-      const needsFirstCloudPull = await needsInitialCloudHydration();
-      const cloudStepCount = needsFirstCloudPull ? 1 : 0;
-      const totalItems = cloudStepCount + pagePreloadCount;
+      const totalItems = pagePreloadCount;
 
       let completed = 0;
       if (totalItems > 0) {
@@ -367,23 +363,6 @@ export function DataPreloader() {
         }
       }
 
-      if (needsFirstCloudPull) {
-        syncBusyRef.current = true;
-        try {
-          await mutationQueue.processQueue();
-          await runCloudDataPull({ queryClient, storeId });
-          const slotAfterInitial = getCurrentScheduledSyncSlotId();
-          if (slotAfterInitial) {
-            markScheduledSyncSlotComplete(slotAfterInitial);
-          }
-        } catch (e) {
-          console.error('[DataPreloader] Initial cloud hydration failed:', e);
-        } finally {
-          syncBusyRef.current = false;
-        }
-        await updateProgress();
-      }
-
       if (needsFullPreload && pagesToPreload.length > 0) {
         setTimeout(async () => {
           if (cancelled) return;
@@ -394,7 +373,7 @@ export function DataPreloader() {
             navigator.serviceWorker.controller.postMessage({ type: 'PRECACHE_URLS', urls: pagesToPreload });
           }
         }, 1000);
-      } else if (totalItems === 0) {
+      } else {
         mutationQueue.setPreloadProgress(0, 0);
       }
     }

@@ -28,6 +28,7 @@ export interface ApiProduct {
   price: number; // decimal(10,2)
   costPrice: number; // decimal(10,2)
   stock: number | null;
+  lowStockThreshold?: number | null;
   barCode: string | null;
   productImage: string | null; // URL
   createdAt: string; // ISO date string
@@ -40,6 +41,7 @@ export interface CreateProductDto {
   price: number;
   costPrice: number;
   stock?: number;
+  lowStockThreshold?: number;
   barCode?: string;
   productImage?: string;
 }
@@ -50,6 +52,7 @@ export interface UpdateProductDto {
   price?: number;
   costPrice?: number;
   stock?: number;
+  lowStockThreshold?: number;
   barCode?: string;
   productImage?: string;
 }
