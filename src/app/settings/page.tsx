@@ -28,7 +28,9 @@ import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
 import { mutationQueue } from '@/lib/mutation-queue';
+import { executeMutation } from '@/lib/mutation-registry';
 import { cn } from '@/lib/utils';
+import type { PatchSettingsBody } from '@/lib/api/settings';
 
 type Feature = 'campaigns' | 'marketplace' | 'boph' | 'buyStock';
 
@@ -150,14 +152,38 @@ export default function SettingsPage() {
   // StoreId for settings: prefer JWT (currentUser.storeId) so backend and frontend use the same store
   const settingsStoreId = currentUser?.storeId ?? settingsStore?.id ?? undefined;
 
-  // Load store settings (credit config) from GET /settings for admin/store_admin
+  // Load store settings (credit config): online from GET /settings; offline from cached currentStore (IndexedDB)
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== 'store_admin') return;
-    if (!isOnline) return;
     if (!settingsStoreId) {
       setLoadingSettings(false);
       return;
     }
+
+    if (!isOnline) {
+      setLoadingSettings(true);
+      const c = settingsStore?.credit;
+      const cc = c?.customerCredit;
+      if (cc) {
+        setStoreSettingsCredit({
+          creditLimit: Number(cc.creditLimit ?? 0),
+          termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+          term: cc.term != null ? Number(cc.term) : 7,
+        });
+        setCreditForm({
+          enabled: true,
+          creditLimit: Number(cc.creditLimit ?? 0),
+          termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+          term: cc.term != null ? Number(cc.term) : 7,
+        });
+      } else if (c === null) {
+        setStoreSettingsCredit(null);
+        setCreditForm((f) => ({ ...f, enabled: false }));
+      }
+      setLoadingSettings(false);
+      return;
+    }
+
     setLoadingSettings(true);
     settingsApi
       .get(settingsStoreId)
@@ -203,7 +229,7 @@ export default function SettingsPage() {
         }
       })
       .finally(() => setLoadingSettings(false));
-  }, [isAdmin, currentUser?.role, isOnline, settingsStoreId, settingsStore?.credit]);
+  }, [isAdmin, currentUser?.role, isOnline, settingsStoreId, settingsStore?.credit, settingsStore?.id]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -270,27 +296,75 @@ export default function SettingsPage() {
       feedback.error('No store', 'Load a store first or ensure your account has a store.', undefined, { code: 'CREDIT' });
       return;
     }
-    if (!isOnline) {
-      feedback.error('Offline', 'Connect to the internet to save credit settings.', undefined, { code: 'CREDIT' });
+    if (!settingsStore) {
+      feedback.error('No store', 'Load your store before saving credit settings.', undefined, { code: 'CREDIT' });
       return;
     }
+
+    const creditLimit = Math.max(0, Number(creditForm.creditLimit) || 0);
+    const termDays = creditForm.termType === 'fixed' ? Math.max(1, Number(creditForm.term) || 7) : undefined;
+    const body: PatchSettingsBody = creditForm.enabled
+      ? {
+          credit: {
+            customerCredit: {
+              creditLimit,
+              termType: creditForm.termType,
+              ...(creditForm.termType === 'fixed' && { term: termDays }),
+            },
+          },
+        }
+      : { credit: null };
+
+    const applyLocalCredit = async (normalizedCredit: typeof settingsStore.credit) => {
+      setSetting('currentStore', { ...settingsStore, credit: normalizedCredit });
+      await saveStorePermanently({ ...settingsStore, credit: normalizedCredit }, setSetting);
+      const cc =
+        normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
+          ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } })
+              .customerCredit
+          : null;
+      setStoreSettingsCredit(
+        cc
+          ? {
+              creditLimit: Number(cc.creditLimit ?? 0),
+              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+              term: cc.term,
+            }
+          : null
+      );
+      setCreditForm((f) =>
+        cc
+          ? {
+              ...f,
+              creditLimit: Number(cc.creditLimit ?? 0),
+              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
+              term: cc.term ?? 7,
+            }
+          : { ...f, enabled: false }
+      );
+    };
+
     setSavingCredit(true);
     try {
-      const creditLimit = Math.max(0, Number(creditForm.creditLimit) || 0);
-      const termDays = creditForm.termType === 'fixed' ? Math.max(1, Number(creditForm.term) || 7) : undefined;
-      const body = creditForm.enabled
-        ? {
-            credit: {
-              customerCredit: {
-                creditLimit,
-                termType: creditForm.termType,
-                ...(creditForm.termType === 'fixed' && { term: termDays }),
-              },
-            },
-          }
-        : { credit: null };
+      if (!isOnline) {
+        const normalizedOffline: typeof settingsStore.credit = creditForm.enabled
+          ? (body.credit ?? null) as typeof settingsStore.credit
+          : null;
+        await applyLocalCredit(normalizedOffline);
+        const queueVars = { storeId: settingsStoreId, body };
+        mutationQueue.add({
+          mutationKey: ['settings', 'patch'],
+          mutationFn: () => executeMutation(['settings', 'patch'], queueVars),
+          variables: queueVars,
+        });
+        feedback.success(
+          'Credit saved locally',
+          'Checkout uses these settings on this device. They will sync to the server when you are online.'
+        );
+        return;
+      }
+
       await settingsApi.patch(body, settingsStoreId);
-      // Verify persistence with GET (same storeId as backend uses) so we know credit is available at checkout
       let updatedCredit: typeof settingsStore.credit = null;
       if (creditForm.enabled) {
         try {
@@ -301,35 +375,25 @@ export default function SettingsPage() {
             updatedCredit = verified as typeof settingsStore.credit;
           }
         } catch (_) {
-          // GET failed; we still update local state from what we sent, but user may see "not configured" at checkout
+          // GET failed; fall back to payload we sent
         }
       }
       if (updatedCredit == null && creditForm.enabled) {
         updatedCredit = (body.credit ?? null) as typeof settingsStore.credit;
       }
-      const normalizedCredit = updatedCredit;
-      if (settingsStore) {
-        setSetting('currentStore', { ...settingsStore, credit: normalizedCredit });
-        await saveStorePermanently({ ...settingsStore, credit: normalizedCredit }, setSetting);
-      }
-      const cc = normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
-        ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } }).customerCredit
-        : null;
-      setStoreSettingsCredit(
-        cc
-          ? {
-              creditLimit: Number(cc.creditLimit ?? 0),
-              termType: cc.termType === 'variable' ? 'variable' : 'fixed',
-              term: cc.term,
-            }
-          : null
-      );
-      setCreditForm((f) => (cc ? { ...f, creditLimit: Number(cc.creditLimit ?? 0), termType: cc.termType === 'variable' ? 'variable' : 'fixed', term: cc.term ?? 7 } : f));
+      const normalizedCredit = creditForm.enabled ? updatedCredit : null;
+      await applyLocalCredit(normalizedCredit);
+
+      const cc =
+        normalizedCredit && typeof normalizedCredit === 'object' && 'customerCredit' in normalizedCredit
+          ? (normalizedCredit as { customerCredit: { creditLimit?: number; termType?: string; term?: number } })
+              .customerCredit
+          : null;
       if (creditForm.enabled && !cc) {
         feedback.error(
           'Saved but not confirmed on server',
           'Credit settings were sent, but the server did not return the stored config.',
-          'Check that store_settings has a row for store ' + settingsStoreId + ' with credit set. Then try a credit sale again.',
+          'Check store settings on the server, then try a credit sale again.',
           { code: 'CREDIT' }
         );
       } else {
@@ -794,14 +858,19 @@ export default function SettingsPage() {
                           </p>
                         )}
                       </div>
-                      <div className={cn("space-y-4 p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+                      <div className="space-y-4 p-4 border rounded-lg">
+                        {!isOnline && (
+                          <p className="text-xs text-muted-foreground">
+                            Offline: changes apply on this device and sync to the server when you are online. Tap Save after editing.
+                          </p>
+                        )}
                         <div className="flex items-center justify-between">
                           <Label htmlFor="credit-enabled" className="font-semibold">Allow sales on credit</Label>
                           <Switch
                             id="credit-enabled"
                             checked={creditForm.enabled}
                             onCheckedChange={(enabled) => setCreditForm((f) => ({ ...f, enabled }))}
-                            disabled={!isOnline || loadingSettings}
+                            disabled={loadingSettings}
                           />
                         </div>
                         {creditForm.enabled && (
@@ -814,7 +883,6 @@ export default function SettingsPage() {
                                 min={0}
                                 value={creditForm.creditLimit}
                                 onChange={(e) => setCreditForm((f) => ({ ...f, creditLimit: Number(e.target.value) || 0 }))}
-                                disabled={!isOnline}
                               />
                             </div>
                             <div className="space-y-2">
@@ -822,7 +890,6 @@ export default function SettingsPage() {
                               <Select
                                 value={creditForm.termType}
                                 onValueChange={(v: 'fixed' | 'variable') => setCreditForm((f) => ({ ...f, termType: v }))}
-                                disabled={!isOnline}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
@@ -842,26 +909,26 @@ export default function SettingsPage() {
                                   min={0}
                                   value={creditForm.term}
                                   onChange={(e) => setCreditForm((f) => ({ ...f, term: Number(e.target.value) ?? 7 }))}
-                                  disabled={!isOnline}
                                 />
                               </div>
                             )}
-                            <Button
-                              onClick={saveCreditSettings}
-                              disabled={!isOnline || savingCredit}
-                              className="min-h-[44px] touch-target"
-                            >
-                              {savingCredit ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Saving...
-                                </>
-                              ) : (
-                                'Save credit settings'
-                              )}
-                            </Button>
                           </>
                         )}
+                        <Button
+                          type="button"
+                          onClick={() => void saveCreditSettings()}
+                          disabled={savingCredit || !settingsStoreId || loadingSettings}
+                          className="min-h-[44px] touch-target"
+                        >
+                          {savingCredit ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            'Save credit settings'
+                          )}
+                        </Button>
                       </div>
                     </>
                   )}
