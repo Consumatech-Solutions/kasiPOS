@@ -817,14 +817,15 @@ export default function CataloguePage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col">
-            <DialogHeader className="flex-shrink-0">
+        <DialogContent className="max-h-[90vh] w-full max-w-[95vw] flex flex-col sm:max-w-[425px]">
+            <DialogHeader className="flex-shrink-0 pr-8 sm:pr-10">
                 <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
                 <DialogDescription>
                     {editingProduct ? 'Update the product information below.' : 'Fill in the details to add a new product to your catalogue.'}
                 </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+            {/* pl/pr inside scroll so input borders + focus rings (ring-offset) are not clipped */}
+            <div className="flex-1 min-h-0 overflow-y-auto px-2 sm:px-4">
               <Form {...productForm}>
                   <form onSubmit={productForm.handleSubmit(handleProductSubmit)} className="space-y-4">
                     <FormField control={productForm.control} name="name" render={({ field }) => (
