@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { AppSettings, User } from '@/types';
 
+/** Routes that remain fully usable without backend reachability (browser + API probe). */
+export const OFFLINE_FIRST_PATHS = ['/', '/catalogue', '/inventory', '/customers'] as const;
+
 type NavItem = {
   href: string;
   label: string;

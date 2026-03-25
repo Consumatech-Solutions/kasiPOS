@@ -124,6 +124,7 @@ export default function PosPage() {
     return apiCategories.map(c => c.name);
   }, [apiCategories]);
 
+
   const filteredCategories = useMemo(() => {
     if (!allCategories) return [];
     return allCategories.filter(c => c.toLowerCase().includes(categorySearch.toLowerCase()));

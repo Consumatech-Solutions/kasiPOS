@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -24,11 +24,10 @@ import { Input } from '@/components/ui/input';
 import { feedback } from '@/lib/feedback';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useNetworkStatus } from '@/hooks/use-network-status';
+import { useEffectiveOnline } from '@/hooks/use-effective-online';
 import { useEnsureStore } from '@/hooks/use-ensure-store';
 import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
-import { mutationQueue } from '@/lib/mutation-queue';
-import { executeMutation } from '@/lib/mutation-registry';
+import { readStaffPageCache, writeStaffPageCache } from '@/lib/settings-staff-cache';
 import { cn } from '@/lib/utils';
 import type { PatchSettingsBody } from '@/lib/api/settings';
 
@@ -62,7 +61,7 @@ export default function SettingsPage() {
   const canInitiateStoreRoleTransfer =
     currentUser?.role === 'store_admin' || String(currentUser?.role ?? '').toLowerCase() === 'admin';
   const { ensureStore } = useEnsureStore();
-  const { isOnline } = useNetworkStatus();
+  const { effectiveOnline, refreshEffectiveOnline } = useEffectiveOnline();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingModules, setIsUpdatingModules] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
@@ -125,29 +124,41 @@ export default function SettingsPage() {
     }
   }, [isAdmin, currentUser?.role, userManagementStoreId]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!userManagementStoreId) {
       setUsers([]);
       setTotalPages(0);
       return;
     }
-    try {
-        const response = await usersApi.findAll(userManagementStoreId, page, TABLE_LIMIT);
-        const body = response.data;
-        const list = Array.isArray(body?.data) ? body.data : [];
-        const totalPages = typeof body?.meta?.totalPages === 'number' ? body.meta.totalPages : 0;
-        setUsers(list as User[]);
-        setTotalPages(totalPages);
-    } catch (error) {
-        console.error('Failed to fetch users:', error);
+    if (!effectiveOnline) {
+      const cached = await readStaffPageCache(userManagementStoreId, page);
+      if (cached) {
+        setUsers(cached.users);
+        setTotalPages(cached.totalPages);
+      } else {
         setUsers([]);
-        setTotalPages(0);
+        setTotalPages(1);
+      }
+      return;
     }
-  };
+    try {
+      const response = await usersApi.findAll(userManagementStoreId, page, TABLE_LIMIT);
+      const body = response.data;
+      const list = Array.isArray(body?.data) ? body.data : [];
+      const totalPages = typeof body?.meta?.totalPages === 'number' ? body.meta.totalPages : 0;
+      setUsers(list as User[]);
+      setTotalPages(totalPages);
+      await writeStaffPageCache(userManagementStoreId, page, list as User[], totalPages);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      setUsers([]);
+      setTotalPages(0);
+    }
+  }, [userManagementStoreId, page, effectiveOnline]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [userManagementStoreId, page]);
+    void fetchUsers();
+  }, [fetchUsers]);
 
   // StoreId for settings: prefer JWT (currentUser.storeId) so backend and frontend use the same store
   const settingsStoreId = currentUser?.storeId ?? settingsStore?.id ?? undefined;
@@ -160,7 +171,7 @@ export default function SettingsPage() {
       return;
     }
 
-    if (!isOnline) {
+    if (!effectiveOnline) {
       setLoadingSettings(true);
       const c = settingsStore?.credit;
       const cc = c?.customerCredit;
@@ -229,7 +240,7 @@ export default function SettingsPage() {
         }
       })
       .finally(() => setLoadingSettings(false));
-  }, [isAdmin, currentUser?.role, isOnline, settingsStoreId, settingsStore?.credit, settingsStore?.id]);
+  }, [isAdmin, currentUser?.role, effectiveOnline, settingsStoreId, settingsStore?.credit, settingsStore?.id]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
     resolver: zodResolver(userManagementSchema),
@@ -344,26 +355,18 @@ export default function SettingsPage() {
       );
     };
 
+    if (!effectiveOnline) {
+      feedback.error(
+        'Server unavailable',
+        'Connect to the internet and ensure the server is reachable to save credit settings.',
+        undefined,
+        { code: 'CREDIT' }
+      );
+      return;
+    }
+
     setSavingCredit(true);
     try {
-      if (!isOnline) {
-        const normalizedOffline: typeof settingsStore.credit = creditForm.enabled
-          ? (body.credit ?? null) as typeof settingsStore.credit
-          : null;
-        await applyLocalCredit(normalizedOffline);
-        const queueVars = { storeId: settingsStoreId, body };
-        mutationQueue.add({
-          mutationKey: ['settings', 'patch'],
-          mutationFn: () => executeMutation(['settings', 'patch'], queueVars),
-          variables: queueVars,
-        });
-        feedback.success(
-          'Credit saved locally',
-          'Checkout uses these settings on this device. They will sync to the server when you are online.'
-        );
-        return;
-      }
-
       await settingsApi.patch(body, settingsStoreId);
       let updatedCredit: typeof settingsStore.credit = null;
       if (creditForm.enabled) {
@@ -463,6 +466,15 @@ export default function SettingsPage() {
   };
 
   const handleUserSubmit = async (values: z.infer<typeof userManagementSchema>) => {
+    if (!effectiveOnline) {
+      feedback.error(
+        'Server unavailable',
+        'Staff changes require a working connection to the server. Reconnect and try again.',
+        undefined,
+        { code: 'USER' }
+      );
+      return;
+    }
     const storeId = userManagementStoreId ?? (await ensureStore())?.id ?? currentUser?.storeId;
     if (!storeId) {
       feedback.error('No store', 'Cannot add staff without a store. Open the app and ensure a store is loaded.', undefined, { code: 'USER' });
@@ -470,21 +482,10 @@ export default function SettingsPage() {
     }
     try {
       if (editingUser) {
-        // Update existing user
         const updateData = { name: values.name, email: values.email.trim(), phone: values.phone };
-        if (isOnline) {
-          await usersApi.update(editingUser.id!, updateData);
-          feedback.success('User updated', 'User updated successfully.');
-        } else {
-          mutationQueue.add({
-            mutationKey: ['users', 'update'],
-            mutationFn: () => usersApi.update(editingUser.id!, updateData),
-            variables: { id: editingUser.id, data: updateData },
-          });
-          feedback.success('Queued', 'User update queued. Will sync when online.');
-        }
+        await usersApi.update(editingUser.id!, updateData);
+        feedback.success('User updated', 'User updated successfully.');
       } else {
-        // Add new staff user for this store only (POST /users)
         const phone = normalizePhone(values.phone);
         if (phone.length < 10) {
           feedback.error('Invalid number', 'Please enter at least 10 digits.', undefined, { code: 'USER' });
@@ -497,20 +498,11 @@ export default function SettingsPage() {
           role: 'staff',
           storeId,
         };
-        if (isOnline) {
-          await usersApi.create(createData);
-          feedback.success('Staff user added', 'They will receive an SMS to set up their password. They are assigned to this store only.');
-        } else {
-          mutationQueue.add({
-            mutationKey: ['users', 'create'],
-            mutationFn: () => usersApi.create(createData),
-            variables: createData,
-          });
-          feedback.success('Queued', 'Staff queued. Will sync when online.');
-        }
+        await usersApi.create(createData);
+        feedback.success('Staff user added', 'They will receive an SMS to set up their password. They are assigned to this store only.');
       }
       setUserDialogOpen(false);
-      fetchUsers(); // Refresh list
+      void fetchUsers();
     } catch (error: any) {
       console.error("Failed to save user:", error);
       if (!editingUser && isDuplicatePhoneError(error)) {
@@ -528,24 +520,24 @@ export default function SettingsPage() {
     setTimeout(() => setUserDialogOpen(true), 0);
   };
 
-  const deleteUser = async (id: string) => { // ID is uuid string now
+  const deleteUser = async (id: string) => {
+    if (!effectiveOnline) {
+      feedback.error(
+        'Server unavailable',
+        'Deleting staff requires a working connection to the server.',
+        undefined,
+        { code: 'USER' }
+      );
+      return;
+    }
     try {
       if (id === currentUser?.id) {
         feedback.error('Cannot delete', 'You cannot delete your own account.', 'Ask another admin to remove you.');
         return;
       }
-      if (isOnline) {
-        await usersApi.remove(id);
-        feedback.success('User deleted', 'User deleted successfully.');
-      } else {
-        mutationQueue.add({
-          mutationKey: ['users', 'delete'],
-          mutationFn: () => usersApi.remove(id),
-          variables: { id },
-        });
-        feedback.success('Queued', 'User deletion queued. Will sync when online.');
-      }
-      fetchUsers(); // Refresh list
+      await usersApi.remove(id);
+      feedback.success('User deleted', 'User deleted successfully.');
+      void fetchUsers();
     } catch (error) {
       console.error("Failed to delete user:", error);
       feedback.fromError(error, 'Failed to delete user', 'Check your connection and try again.');
@@ -560,10 +552,11 @@ export default function SettingsPage() {
 
   const confirmTransferRole = async () => {
     if (!transferTargetUser?.id) return;
-    if (!isOnline) {
+    const ok = await refreshEffectiveOnline();
+    if (!ok) {
       feedback.error(
-        'Cloud unavailable',
-        'Role transfer requires a cloud connection. Please reconnect and try again.'
+        'Server unavailable',
+        'Role transfer requires a working connection to the server. Please reconnect and try again.'
       );
       return;
     }
@@ -601,7 +594,15 @@ export default function SettingsPage() {
 
   const handlePasswordSubmit = async (values: z.infer<typeof passwordSchema>) => {
     if (!userForPassword?.id) return;
-    
+    if (!effectiveOnline) {
+      feedback.error(
+        'Server unavailable',
+        'Setting a password requires a working connection to the server.',
+        undefined,
+        { code: 'USER' }
+      );
+      return;
+    }
     try {
       await usersApi.update(userForPassword.id, { password: values.password });
       feedback.success('Password updated', 'Password updated successfully.');
@@ -617,8 +618,12 @@ export default function SettingsPage() {
   const featureDetails = getFeatureDetails(selectedFeature);
 
   const handleUpdateApp = async () => {
-    if (!isOnline) {
-      feedback.error('Offline', 'Please connect to the internet to update the app.', 'Connect to Wi‑Fi or mobile data and try again.');
+    if (!effectiveOnline) {
+      feedback.error(
+        'Server unavailable',
+        'Connect to the internet and ensure the server is reachable to update the app.',
+        'Connect to Wi‑Fi or mobile data and try again.'
+      );
       return;
     }
 
@@ -661,8 +666,6 @@ export default function SettingsPage() {
       setIsUpdating(false);
     }
   };
-
-  const isBrowserOnline = navigator.onLine;
 
   return (
     <>
@@ -725,7 +728,7 @@ export default function SettingsPage() {
               <Button
                 id="update-app"
                 onClick={handleUpdateApp}
-                disabled={!isOnline || isUpdating}
+                disabled={!effectiveOnline || isUpdating}
                 variant="outline"
                 className="min-h-[44px] touch-target"
               >
@@ -736,7 +739,7 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   <>
-                    {isOnline ? (
+                    {effectiveOnline ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4" />
                         Update
@@ -773,12 +776,12 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-              <div className={cn("space-y-2 pt-4 transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+              <div className={cn("space-y-2 pt-4 transition-opacity", !effectiveOnline && "opacity-60 pointer-events-none")}>
                   <h3 className="text-lg font-semibold">Feature Management</h3>
                   <p className="text-sm text-muted-foreground">Enable or disable optional features. Requires internet connection.</p>
               </div>
 
-              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !effectiveOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="campaigns-toggle" className="font-semibold">Campaigns</Label>
                   <p className="text-sm text-muted-foreground">Enable to create and participate in loyalty and reward programmes.</p>
@@ -787,11 +790,11 @@ export default function SettingsPage() {
                   id="campaigns-toggle"
                   checked={settings.campaigns}
                   onCheckedChange={(checked) => handleToggle('campaigns', checked)}
-                  disabled={!isOnline || isUpdatingModules}
+                  disabled={!effectiveOnline || isUpdatingModules}
                   />
               </div>
 
-              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !effectiveOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="marketplace-toggle" className="font-semibold">Marketplace</Label>
                   <p className="text-sm text-muted-foreground">Enable ordering from third-party stores.</p>
@@ -800,11 +803,11 @@ export default function SettingsPage() {
                   id="marketplace-toggle"
                   checked={settings.marketplace}
                   onCheckedChange={(checked) => handleToggle('marketplace', checked)}
-                  disabled={!isOnline || isUpdatingModules}
+                  disabled={!effectiveOnline || isUpdatingModules}
                   />
               </div>
 
-              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !effectiveOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="boph-toggle" className="font-semibold">Buy Online, Pickup Here (BOPH)</Label>
                   <p className="text-sm text-muted-foreground">Enable parcel pickup point services.</p>
@@ -813,11 +816,11 @@ export default function SettingsPage() {
                   id="boph-toggle"
                   checked={settings.boph}
                   onCheckedChange={(checked) => handleToggle('boph', checked)}
-                  disabled={!isOnline || isUpdatingModules}
+                  disabled={!effectiveOnline || isUpdatingModules}
                   />
               </div>
 
-              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !isOnline && "opacity-60 pointer-events-none")}>
+              <div className={cn("flex items-center justify-between p-4 border rounded-lg transition-opacity", !effectiveOnline && "opacity-60 pointer-events-none")}>
                   <div>
                   <Label htmlFor="buy-stock-toggle" className="font-semibold">Buy Stock</Label>
                   <p className="text-sm text-muted-foreground">Enable ordering inventory and managing purchase orders.</p>
@@ -826,7 +829,7 @@ export default function SettingsPage() {
                   id="buy-stock-toggle"
                   checked={settings.buyStock}
                   onCheckedChange={(checked) => handleToggle('buyStock', checked)}
-                  disabled={!isOnline || isUpdatingModules}
+                  disabled={!effectiveOnline || isUpdatingModules}
                   />
               </div>
 
@@ -845,7 +848,7 @@ export default function SettingsPage() {
                       id="show-vat-toggle"
                       checked={settings.showVatInCheckout !== false}
                       onCheckedChange={(checked) => updateShowVatInCheckout(checked)}
-                      disabled={isUpdatingModules}
+                      disabled={!effectiveOnline || isUpdatingModules}
                     />
                   </div>
 
@@ -861,9 +864,9 @@ export default function SettingsPage() {
                         )}
                       </div>
                       <div className="space-y-4 p-4 border rounded-lg">
-                        {!isOnline && (
+                        {!effectiveOnline && (
                           <p className="text-xs text-muted-foreground">
-                            Offline: changes apply on this device and sync to the server when you are online. Tap Save after editing.
+                            Server unreachable: you can review credit options below. Saving requires a working connection to the server.
                           </p>
                         )}
                         <div className="flex items-center justify-between">
@@ -919,7 +922,7 @@ export default function SettingsPage() {
                         <Button
                           type="button"
                           onClick={() => void saveCreditSettings()}
-                          disabled={savingCredit || !settingsStoreId || loadingSettings}
+                          disabled={savingCredit || !settingsStoreId || loadingSettings || !effectiveOnline}
                           className="min-h-[44px] touch-target"
                         >
                           {savingCredit ? (
@@ -955,9 +958,15 @@ export default function SettingsPage() {
               <div className="flex justify-end mb-4">
                 <Button
                   type="button"
-                  disabled={!userManagementStoreId}
+                  disabled={!userManagementStoreId || !effectiveOnline}
                   onClick={(e) => { e.stopPropagation(); openUserDialog(); }}
-                  title={!userManagementStoreId ? 'Select or load a store first' : 'Add staff to this store'}
+                  title={
+                    !userManagementStoreId
+                      ? 'Select or load a store first'
+                      : !effectiveOnline
+                        ? 'Server must be reachable to add or change staff'
+                        : 'Add staff to this store'
+                  }
                 >
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Staff
                 </Button>
@@ -975,7 +984,9 @@ export default function SettingsPage() {
                   {users?.length === 0 && (
                       <TableRow>
                           <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                              No staff members found. Add one above!
+                            {effectiveOnline
+                              ? 'No staff members found. Add one above!'
+                              : 'No cached staff list for this page. Open Settings while the server is reachable to load staff, then you can view the list offline.'}
                           </TableCell>
                       </TableRow>
                   )}
@@ -986,10 +997,10 @@ export default function SettingsPage() {
                       <TableCell><Badge variant={user.role === 'admin' || user.storeId === settingsStore?.id  || user.role === 'store_admin' ? 'default' : 'secondary'} className="capitalize">{user.role}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openUserDialog(user)} title="Edit user">
+                          <Button variant="ghost" size="icon" onClick={() => openUserDialog(user)} title="Edit user" disabled={!effectiveOnline}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(user)} title="Set password">
+                          <Button variant="ghost" size="icon" onClick={() => openPasswordDialog(user)} title="Set password" disabled={!effectiveOnline}>
                             <Key className="h-4 w-4" />
                           </Button>
                           {String(user.role ?? '').toLowerCase() === 'staff' && (
@@ -998,14 +1009,14 @@ export default function SettingsPage() {
                               size="icon"
                               onClick={() => openTransferRoleDialog(user)}
                               title="Transfer store admin role to this staff user"
-                              disabled={!isBrowserOnline || isTransferringRole}
+                              disabled={!effectiveOnline || isTransferringRole}
                             >
                               <Crown className="h-4 w-4 text-amber-600" />
                             </Button>
                           )}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id} title="Delete user">
+                              <Button variant="ghost" size="icon" disabled={user.id === currentUser?.id || !effectiveOnline} title="Delete user">
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </AlertDialogTrigger>
@@ -1114,7 +1125,7 @@ export default function SettingsPage() {
               />
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={!effectiveOnline}>Save</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -1163,7 +1174,7 @@ export default function SettingsPage() {
                   <DialogClose asChild>
                     <Button type="button" variant="secondary">Cancel</Button>
                   </DialogClose>
-                  <Button type="submit">Set Password</Button>
+                  <Button type="submit" disabled={!effectiveOnline}>Set Password</Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -1242,7 +1253,7 @@ export default function SettingsPage() {
                 Cancel
               </Button>
             </DialogClose>
-            <Button type="button" onClick={() => void confirmTransferRole()} disabled={isTransferringRole || !isOnline}>
+            <Button type="button" onClick={() => void confirmTransferRole()} disabled={isTransferringRole || !effectiveOnline}>
               {isTransferringRole && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm Transfer
             </Button>
