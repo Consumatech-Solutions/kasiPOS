@@ -202,9 +202,7 @@ export default function Header() {
             title={
               isOnline
                 ? 'Online'
-                : cloudUnreachable
-                  ? 'Internet connected, but cloud/backend is unreachable'
-                  : 'Offline - Working in offline mode'
+                  : 'Offline - Working in offline mode, syncing will be performed at 6:00 AM, 12:00 PM, and 6:00 PM'
             }
           >
             <Wifi className={cn(
