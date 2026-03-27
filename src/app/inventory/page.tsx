@@ -57,10 +57,10 @@ export default function InventoryPage() {
     refresh: refreshProducts,
     updateProduct,
     loadPage: loadProductsPage,
-  } = useProducts(1, 10, {
+  } = useProducts(1, 1000, {
     storeIdForOffline: currentStore?.id ?? undefined,
   });
-  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 50, {
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 1000, {
     storeIdForOffline: currentStore?.id ?? undefined,
   });
 
