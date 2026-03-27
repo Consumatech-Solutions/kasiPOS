@@ -10,6 +10,31 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /*
+   * Radix Select scrolls inside the viewport, not on [data-radix-select-content].
+   * Strong, persistent scrollbar so long category lists are obviously scrollable.
+   */
+  .select-viewport-scrollbar {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.55) hsl(var(--muted) / 0.45);
+  }
+  .select-viewport-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+  .select-viewport-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.55);
+    border-radius: 6px;
+  }
+  .select-viewport-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.45);
+    border-radius: 6px;
+    border: 2px solid hsl(var(--muted) / 0.55);
+  }
+  .select-viewport-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.65);
+  }
 }
 
 @layer base {
