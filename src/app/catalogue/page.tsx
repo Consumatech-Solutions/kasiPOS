@@ -106,12 +106,12 @@ export default function CataloguePage() {
 
   // Hooks for data with sync and pagination
   const { settings } = useSettings();
-  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 10, {
+  const { categories, pagination: categoriesPagination, loading: categoriesLoading, createCategory, updateCategory, deleteCategory: deleteCategoryHook, loadPage: loadCategoriesPage, refresh: refreshCategories, isCreating: isCreatingCategory, isUpdating: isUpdatingCategory, isDeleting: isDeletingCategory } = useCategories(1, 1000, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
   // Type assertion for callbacks
   const typedCategories: ApiCategory[] = categories || [];
-  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, setFilters: setProductFilters, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 10, {
+  const { products, pagination: productsPagination, loading: productsLoading, createProduct, updateProduct, deleteProduct: deleteProductHook, loadPage: loadProductsPage, setFilters: setProductFilters, refresh: refreshProducts, isCreating: isCreatingProduct, isUpdating: isUpdatingProduct, isDeleting: isDeletingProduct } = useProducts(1, 1000, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
   const [productSearchTerm, setProductSearchTerm] = useState('');
@@ -311,7 +311,7 @@ export default function CataloguePage() {
             updatedAt: new Date().toISOString(),
           };
           queryClient.setQueryData(productKeys.lists(), (old: { data: any[]; meta: any } | undefined) => {
-            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+            if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 1000, totalPages: 1 } };
             return {
               ...old,
               data: [optimisticProduct, ...old.data],
@@ -321,11 +321,11 @@ export default function CataloguePage() {
           queryClient.setQueryData(
             productKeys.list({
               page: 1,
-              limit: 10,
+              limit: 1000,
               storeIdForOffline: settings?.currentStore?.id ?? undefined,
             }),
             (old: { data: any[]; meta: any } | undefined) => {
-              if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+              if (!old) return { data: [optimisticProduct], meta: { total: 1, page: 1, limit: 1000, totalPages: 1 } };
               return {
                 ...old,
                 data: [optimisticProduct, ...old.data],
@@ -424,7 +424,7 @@ export default function CataloguePage() {
           queryClient.setQueryData(
             categoryKeys.list({
               page: 1,
-              limit: 10,
+              limit: 1000,
               storeIdForOffline: settings?.currentStore?.id ?? undefined,
             }),
             (old: { data: ApiCategory[]; meta: any } | undefined) => {
@@ -465,7 +465,7 @@ export default function CataloguePage() {
             updatedAt: new Date().toISOString(),
           };
           queryClient.setQueryData(categoryKeys.lists(), (old: { data: ApiCategory[]; meta: any } | undefined) => {
-            if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+            if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 1000, totalPages: 1 } };
             return {
               ...old,
               data: [...old.data, optimisticCategory],
@@ -475,11 +475,11 @@ export default function CataloguePage() {
           queryClient.setQueryData(
             categoryKeys.list({
               page: 1,
-              limit: 10,
+              limit: 1000,
               storeIdForOffline: settings?.currentStore?.id ?? undefined,
             }),
             (old: { data: ApiCategory[]; meta: any } | undefined) => {
-              if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 10, totalPages: 1 } };
+              if (!old) return { data: [optimisticCategory], meta: { total: 1, page: 1, limit: 1000, totalPages: 1 } };
               return {
                 ...old,
                 data: [...old.data, optimisticCategory],
@@ -524,7 +524,7 @@ export default function CataloguePage() {
         queryClient.setQueryData(
           categoryKeys.list({
             page: 1,
-            limit: 10,
+            limit: 1000,
             storeIdForOffline: settings?.currentStore?.id ?? undefined,
           }),
           (old: { data: ApiCategory[]; meta: any } | undefined) => {

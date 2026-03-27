@@ -53,7 +53,7 @@ export default function CreditSaleModal({
 
   const { customers, loading: customersLoading } = useCustomers({
     searchQuery: customerSearch,
-    initialLimit: 50,
+    initialLimit: 1000,
   });
 
   const filteredCustomers = useMemo(() => {

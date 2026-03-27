@@ -44,7 +44,7 @@ export default function TransactionsPage() {
     storeIdForOffline: currentStore?.id ?? undefined,
   });
 
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
   const customers = allCustomersList || [];
 
   const getCustomerName = (customerId: string | undefined | null) => {

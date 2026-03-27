@@ -85,10 +85,10 @@ export default function PosPage() {
   };
 
   // API Hooks
-  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 10, {
+  const { categories: apiCategories, loading: categoriesLoading } = useCategories(1, 1000, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
-  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 10, {
+  const { products: apiProducts, loading: productsLoading, setFilters } = useProducts(1, 1000, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
 
@@ -131,7 +131,7 @@ export default function PosPage() {
   }, [allCategories, categorySearch]);
   
   // Use API hook for customers
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
   
   const customers = allCustomersList || [];
 
