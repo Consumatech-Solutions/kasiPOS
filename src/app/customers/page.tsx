@@ -39,6 +39,7 @@ export default function CustomersPage() {
   const { customers, pagination, loading, error, createCustomer, updateCustomer, deleteCustomer, loadPage, isCreating, isUpdating, isDeleting } = useCustomers({
     searchQuery: searchTerm,
     storeIdForOffline: currentStore?.id ?? undefined,
+    initialLimit: 1000,
   });
   const canDeleteCustomer = currentUser?.role === 'store_admin';
   const showStoreColumn = currentUser?.role === 'admin' || (customers.length > 0 && customers.some((c) => c.storeId != null));
@@ -141,7 +142,7 @@ export default function CustomersPage() {
             } else {
               queryClient.setQueryData(queryKey, {
                 data: [optimisticCustomer],
-                meta: { total: 1, page: 1, limit: 10, totalPages: 1 },
+                meta: { total: 1, page: 1, limit: 1000, totalPages: 1 },
               });
             }
           });

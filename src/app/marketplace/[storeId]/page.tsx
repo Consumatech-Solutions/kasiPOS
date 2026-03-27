@@ -111,12 +111,12 @@ export default function StorePosPage(props: PageProps) {
 
   // API Hooks
   const { categories: apiCategories, loading: categoriesLoading } =
-    useCategories(1, 10);
+    useCategories(1, 1000);
   const {
     products: apiProducts,
     loading: productsLoading,
     setFilters,
-  } = useProducts(1, 10);
+  } = useProducts(1, 1000);
   const { createOrder, loading: orderLoading, isCreating } = useMarketplaceOrders({
     autoLoad: false,
   });
@@ -150,7 +150,7 @@ export default function StorePosPage(props: PageProps) {
   }, [allCategories, categorySearch]);
 
   // Use API hook for customers
-  const { customers: allCustomersList } = useCustomers({ initialLimit: 10 });
+  const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
   const allCustomers = allCustomersList || [];
 
   const selectedCustomer = useMemo(() => {
