@@ -320,130 +320,131 @@ class MutationQueue {
 
     let stoppedReason: ProcessQueueResult['stoppedReason'] = 'completed';
     try {
-    while (this.queue.length > 0) {
-      // Re-check online status before each mutation (using enhanced offline detection)
-      if (typeof window !== 'undefined') {
-        const isOfflineStatus = isOffline(); // Use cached value for quick check
-        if (isOfflineStatus) {
-          // Verify with fresh check
-          const verifiedOffline = await checkOfflineStatus(true);
-          if (verifiedOffline) {
-            console.log('[MutationQueue] Went offline during processing - pausing');
-            this.currentStatus = 'idle';
+      while (this.queue.length > 0) {
+        // Re-check online status before each mutation (using enhanced offline detection)
+        if (typeof window !== 'undefined') {
+          const isOfflineStatus = isOffline(); // Use cached value for quick check
+          if (isOfflineStatus) {
+            // Verify with fresh check
+            const verifiedOffline = await checkOfflineStatus(true);
+            if (verifiedOffline) {
+              console.log('[MutationQueue] Went offline during processing - pausing');
+              this.currentStatus = 'idle';
+              this.currentMutation = null;
+              this.notifyStatusChange();
+              stoppedReason = 'network_pause';
+              break;
+            }
+          }
+        }
+
+        const mutation = this.queue[0];
+        this.currentMutation = mutation;
+        mutation.status = 'syncing';
+        this.notifyStatusChange();
+
+        try {
+          console.log(mutation.variables, mutation.mutationKey);
+          await mutation.mutationFn();
+          // Success - remove from queue
+          mutation.status = 'completed';
+          this.queue.shift();
+          syncedCount++;
+          this.currentMutation = null;
+          await this.persistQueue();
+          console.log(`[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join('/')}`);
+          
+          // Defer invalidation to avoid re-entering React/query updates during callback (prevents crashes)
+          if (this.queryClient && mutation.mutationKey.length > 0) {
+            const key = mutation.mutationKey[0];
+            queueMicrotask(() => {
+              this.queryClient?.invalidateQueries({ queryKey: [key], refetchType: 'all' });
+            });
+          }
+
+          this.notifyStatusChange();
+        } catch (error: any) {
+          const status = error?.response?.status;
+          const is5xx = typeof status === 'number' && status >= 500 && status < 600;
+          const isOfflineStatus = isOffline();
+          const msg = (error?.message ?? '').toLowerCase();
+          const isNetworkError = isOfflineStatus ||
+            error?.code === 'ECONNABORTED' ||
+            error?.code === 'ERR_CONNECTION_REFUSED' ||
+            error?.message?.includes('Network Error') ||
+            msg.includes('failed to fetch') ||
+            msg.includes('load failed') ||
+            msg.includes('connection refused') ||
+            error?.isOffline ||
+            error?.isNetworkError;
+
+          if (isNetworkError) {
+            console.log('[MutationQueue] Network error - will retry when online');
+            mutation.status = 'pending';
             this.currentMutation = null;
+            this.currentStatus = 'idle';
             this.notifyStatusChange();
             stoppedReason = 'network_pause';
             break;
           }
+          
+          if (is5xx) {
+            console.log('[MutationQueue] Server error (5xx) - will retry');
+            mutation.status = 'pending';
+            this.currentMutation = null;
+            this.currentStatus = 'idle';
+            this.notifyStatusChange();
+            stoppedReason = 'server_retry';
+            break;
+          }
+          
+          // Check if we should retry
+          if (mutation.retries < MAX_RETRIES) {
+            mutation.retries++;
+            mutation.status = 'pending';
+            console.log(`[MutationQueue] Retrying mutation (attempt ${mutation.retries}/${MAX_RETRIES})`);
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * mutation.retries));
+            // Try again (mutation stays at front of queue)
+          } else {
+            // Max retries reached - remove from queue; show user-visible error
+            mutation.status = 'failed';
+            const logId = genLogId();
+            console.error('[MutationQueue] Mutation failed after max retries:', mutation.mutationKey, error, logId);
+            const userMessage = error?.message ?? 'Changes could not be synced to the server.';
+            feedback.error(
+              'Sync failed',
+              userMessage,
+              'Your data is saved locally. Check your connection and try again.',
+              { logId, code: error?.code }
+            );
+            this.queue.shift();
+            this.currentMutation = null;
+            await this.persistQueue();
+            this.notifyStatusChange();
+          }
         }
       }
 
-      const mutation = this.queue[0];
-      this.currentMutation = mutation;
-      mutation.status = 'syncing';
-      this.notifyStatusChange();
-
-      try {
-        await mutation.mutationFn();
-        // Success - remove from queue
-        mutation.status = 'completed';
-        this.queue.shift();
-        syncedCount++;
+      } finally {
+        this.processing = false;
+        this.currentStatus = 'idle';
         this.currentMutation = null;
-        await this.persistQueue();
-        console.log(`[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join('/')}`);
-        
-        // Defer invalidation to avoid re-entering React/query updates during callback (prevents crashes)
-        if (this.queryClient && mutation.mutationKey.length > 0) {
-          const key = mutation.mutationKey[0];
-          queueMicrotask(() => {
-            this.queryClient?.invalidateQueries({ queryKey: [key], refetchType: 'all' });
-          });
+        if (this.queue.length === 0) {
+          console.log('[MutationQueue] All mutations synced successfully');
         }
-
+        offlineDetector.setOfflineFirstActive(true);
         this.notifyStatusChange();
-      } catch (error: any) {
-        const status = error?.response?.status;
-        const is5xx = typeof status === 'number' && status >= 500 && status < 600;
-        const isOfflineStatus = isOffline();
-        const msg = (error?.message ?? '').toLowerCase();
-        const isNetworkError = isOfflineStatus ||
-          error?.code === 'ECONNABORTED' ||
-          error?.code === 'ERR_CONNECTION_REFUSED' ||
-          error?.message?.includes('Network Error') ||
-          msg.includes('failed to fetch') ||
-          msg.includes('load failed') ||
-          msg.includes('connection refused') ||
-          error?.isOffline ||
-          error?.isNetworkError;
-
-        if (isNetworkError) {
-          console.log('[MutationQueue] Network error - will retry when online');
-          mutation.status = 'pending';
-          this.currentMutation = null;
-          this.currentStatus = 'idle';
-          this.notifyStatusChange();
-          stoppedReason = 'network_pause';
-          break;
-        }
-        
-        if (is5xx) {
-          console.log('[MutationQueue] Server error (5xx) - will retry');
-          mutation.status = 'pending';
-          this.currentMutation = null;
-          this.currentStatus = 'idle';
-          this.notifyStatusChange();
-          stoppedReason = 'server_retry';
-          break;
-        }
-        
-        // Check if we should retry
-        if (mutation.retries < MAX_RETRIES) {
-          mutation.retries++;
-          mutation.status = 'pending';
-          console.log(`[MutationQueue] Retrying mutation (attempt ${mutation.retries}/${MAX_RETRIES})`);
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * mutation.retries));
-          // Try again (mutation stays at front of queue)
-        } else {
-          // Max retries reached - remove from queue; show user-visible error
-          mutation.status = 'failed';
-          const logId = genLogId();
-          console.error('[MutationQueue] Mutation failed after max retries:', mutation.mutationKey, error, logId);
-          const userMessage = error?.message ?? 'Changes could not be synced to the server.';
-          feedback.error(
-            'Sync failed',
-            userMessage,
-            'Your data is saved locally. Check your connection and try again.',
-            { logId, code: error?.code }
-          );
-          this.queue.shift();
-          this.currentMutation = null;
-          await this.persistQueue();
-          this.notifyStatusChange();
-        }
       }
-    }
-
-    } finally {
-      this.processing = false;
-      this.currentStatus = 'idle';
-      this.currentMutation = null;
-      if (this.queue.length === 0) {
-        console.log('[MutationQueue] All mutations synced successfully');
+      if (stoppedReason === 'completed' && this.queue.length > 0) {
+        stoppedReason = 'network_pause';
       }
-      offlineDetector.setOfflineFirstActive(true);
-      this.notifyStatusChange();
-    }
-    if (stoppedReason === 'completed' && this.queue.length > 0) {
-      stoppedReason = 'network_pause';
-    }
-    return {
-      initialPending,
-      syncedCount,
-      remainingPending: this.queue.length,
-      stoppedReason,
-    };
+      return {
+        initialPending,
+        syncedCount,
+        remainingPending: this.queue.length,
+        stoppedReason,
+      };
   }
 
   getQueue() {

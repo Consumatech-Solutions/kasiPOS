@@ -51,14 +51,7 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
       const raw = variables as Parameters<typeof toCreateTransactionDto>[0] & { items?: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string }>; customerId?: string };
       const mappings = await getDb().syncIdMapping.toArray();
       const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
-      const unresolvedProductIds = (raw.items ?? [])
-        .map((item) => String(item.productId))
-        .filter((id) => id.startsWith('temp-') && !map.has(id));
-      if (unresolvedProductIds.length > 0) {
-        throw new Error(
-          `Cannot sync transaction: products ${unresolvedProductIds.join(', ')} have not finished syncing. Will retry.`
-        );
-      }
+
       const resolvedItems: CreateTransactionItemDto[] | undefined = raw.items?.map((item) => ({
         productId: map.get(String(item.productId)) ?? String(item.productId),
         productName: item.productName,
@@ -133,6 +126,7 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
         contact: custData.contact,
         ...(custData.loyaltyPoints != null && { loyaltyPoints: custData.loyaltyPoints }),
         ...(custData.storeId != null && custData.storeId !== '' && { storeId: custData.storeId }),
+        ...(_tempId && { _tempId }),
       };
       const result = await customersApi.create(payload);
       if (_tempId && result?.data?.id) {
