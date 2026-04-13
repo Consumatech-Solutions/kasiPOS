@@ -9,6 +9,16 @@ import type { Customer, PurchaseOrder } from '@/types';
 import type { Transaction } from '@/types';
 
 const ENTITY_CAP = 10000;
+
+/** Lower cap in Vitest via KASIPOS_TEST_ENTITY_CAP (see entity-cache tests). */
+function entityCap(): number {
+  if (typeof process !== 'undefined' && process.env.KASIPOS_TEST_ENTITY_CAP !== undefined) {
+    const n = Number(process.env.KASIPOS_TEST_ENTITY_CAP);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return ENTITY_CAP;
+}
+
 const PURCHASE_ORDERS_KEY = 'purchaseOrders';
 const PURCHASE_ORDER_CAP = 1000;
 
@@ -61,8 +71,9 @@ export async function saveProductsToDexie(
   });
   await db.productCache.bulkPut(records);
   const count = await db.productCache.count();
-  if (count > ENTITY_CAP) {
-    const toRemove = count - ENTITY_CAP;
+  const cap = entityCap();
+  if (count > cap) {
+    const toRemove = count - cap;
     const oldest = await db.productCache.orderBy('createdAt').limit(toRemove).toArray();
     await db.productCache.bulkDelete(oldest.map((r) => r.id));
   }
@@ -73,10 +84,11 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
   const db = getDb();
   await db.customers.bulkPut(data);
   const count = await db.customers.count();
-  if (count > ENTITY_CAP) {
+  const cap = entityCap();
+  if (count > cap) {
     const allCust = await db.customers.toArray();
     allCust.sort((a, b) => ((a as Customer).updatedAt ?? '').localeCompare((b as Customer).updatedAt ?? ''));
-    const toDelete = allCust.slice(0, count - ENTITY_CAP).map((r) => r.id);
+    const toDelete = allCust.slice(0, count - cap).map((r) => r.id);
     await db.customers.bulkDelete(toDelete);
   }
 }
@@ -91,8 +103,9 @@ export async function saveTransactionsToDexie(data: Transaction[]): Promise<void
   }));
   await db.transactionCache.bulkPut(records as { id: string; date?: string; [k: string]: unknown }[]);
   const count = await db.transactionCache.count();
-  if (count > ENTITY_CAP) {
-    const toRemove = count - ENTITY_CAP;
+  const cap = entityCap();
+  if (count > cap) {
+    const toRemove = count - cap;
     const oldest = await db.transactionCache.orderBy('date').limit(toRemove).toArray();
     await db.transactionCache.bulkDelete(oldest.map((r) => r.id));
   }
@@ -137,8 +150,9 @@ export async function saveCategoriesToDexie(
   }));
   await db.categoryCache.bulkPut(records);
   const count = await db.categoryCache.count();
-  if (count > ENTITY_CAP) {
-    const toRemove = count - ENTITY_CAP;
+  const cap = entityCap();
+  if (count > cap) {
+    const toRemove = count - cap;
     const oldest = await db.categoryCache.orderBy('createdAt').limit(toRemove).toArray();
     await db.categoryCache.bulkDelete(oldest.map((r) => r.id));
   }
@@ -228,7 +242,9 @@ export async function purgeTempIdCatalogueRowsAfterCloudSync(
   const products = await db.productCache.toArray();
   const productIds = products
     .filter((p) => isTempEntityId(p.id))
-    .filter((p) => rowMatchesStoreScope(p.storeId, storeId))
+    .filter((p) =>
+      rowMatchesStoreScope((p as { storeId?: string | number | null }).storeId, storeId)
+    )
     .map((p) => String(p.id));
 
   const categories = await db.categoryCache.toArray();
@@ -536,7 +552,9 @@ export async function getTransactionsFromDexie(
   const db = getDb();
   let all = await db.transactionCache.toArray();
   if (storeId != null && storeId !== '') {
-    all = all.filter((t) => (t as Transaction & { storeId?: string }).storeId === storeId);
+    all = all.filter(
+      (t) => (t as unknown as Transaction & { storeId?: string }).storeId === storeId
+    );
   }
   const sorted = (all as { date?: string }[]).sort((a, b) =>
     (b.date ?? '').localeCompare(a.date ?? '')
