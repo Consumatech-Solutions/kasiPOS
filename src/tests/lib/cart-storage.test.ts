@@ -89,7 +89,7 @@ describe('cart-storage', () => {
 
     it('falls back to localStorage when keyVal has no cart', async () => {
       const cart = new Map([['b', sampleItem({ productId: 'b' })]]);
-      window.localStorage.setItem(CART_STORAGE_KEY, cartToStorage(cart));
+      globalThis.localStorage.setItem(CART_STORAGE_KEY, cartToStorage(cart));
       const loaded = await loadCartFromSessionStorageAsync();
       expect(loaded.get('b')?.productName).toBe('Item');
     });

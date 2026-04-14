@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { resetDbInstanceForTests } from '@/lib/db';
 
 const mocks = vi.hoisted(() => ({
   transactionsCreate: vi.fn(async (..._args: unknown[]) => ({ id: 'tx' })),
@@ -92,8 +91,8 @@ vi.mock('@/lib/api/settings', () => ({
   },
 }));
 
+import { getDb, resetDbInstanceForTests } from '@/lib/db';
 import { executeMutation } from '@/lib/mutation-registry';
-import { getDb } from '@/lib/db';
 
 describe('executeMutation', () => {
   beforeEach(async () => {

@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { getDb, resetDbInstanceForTests } from '@/lib/db';
 import type { ApiProduct, ApiCategory } from '@/types/catalogue';
-import type { Customer, PurchaseOrder } from '@/types';
-import type { Transaction } from '@/types';
+import type { Customer, PurchaseOrder, Transaction } from '@/types';
 import {
   saveProductsToDexie,
   getProductsFromDexie,
@@ -39,7 +38,7 @@ function product(i: number, createdAt: string, storeId?: string): ApiProduct {
     productImage: null,
     createdAt,
     updatedAt: createdAt,
-    ...(storeId != null ? { storeId } : {}),
+    ...(storeId === undefined ? {} : { storeId }),
   };
 }
 
@@ -60,7 +59,7 @@ function customer(id: string, updatedAt: string, storeId?: string): Customer {
     loyaltyPoints: 0,
     createdAt: updatedAt,
     updatedAt,
-    ...(storeId != null ? { storeId } : {}),
+    ...(storeId === undefined ? {} : { storeId }),
   };
 }
 
@@ -94,7 +93,7 @@ describe('entity-cache', () => {
     expect(p1.meta.total).toBe(2);
     expect(p1.data).toHaveLength(1);
     const p2 = await getCategoriesFromDexie(1, 10, 'store-a');
-    expect(p2.data.map((c) => c.id).sort()).toEqual(['cid-1', 'cid-2']);
+    expect(p2.data.map((c) => c.id).sort((a, b) => a.localeCompare(b))).toEqual(['cid-1', 'cid-2']);
   });
 
   it('getProductsFromDexie paginates, filters by store, search and categoryId', async () => {
@@ -164,7 +163,7 @@ describe('entity-cache', () => {
     const st1 = await getCustomersFromDexie(1, 10, undefined, 'st1');
     expect(st1.meta.total).toBe(2);
 
-    const search = await getCustomersFromDexie(1, 10, 'User 1', undefined);
+    const search = await getCustomersFromDexie(1, 10, 'User 1');
     expect(search.data.some((c) => c.id === '1')).toBe(true);
   });
 
@@ -256,7 +255,7 @@ describe('entity-cache', () => {
       customer('b', '2019-01-01T00:00:00.000Z'),
       customer('c', '2020-01-01T00:00:00.000Z'),
     ]);
-    const ids = (await getDb().customers.toArray()).map((c) => c.id).sort();
+    const ids = (await getDb().customers.toArray()).map((c) => c.id).sort((a, b) => a.localeCompare(b));
     expect(ids).toEqual(['b', 'c']);
   });
 

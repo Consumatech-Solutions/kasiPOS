@@ -15,7 +15,7 @@ vi.mock('@/lib/api/settings', () => ({
   },
 }));
 
-import { resetDbInstanceForTests } from '@/lib/db';
+import { getDb, resetDbInstanceForTests } from '@/lib/db';
 import {
   saveStorePermanently,
   loadStoreFromIndexedDB,
@@ -38,7 +38,7 @@ const baseStore: Store = {
 
 describe('store-persistence', () => {
   beforeEach(async () => {
-    window.localStorage.clear();
+    globalThis.localStorage.clear();
     await resetDbInstanceForTests();
     getMyStoreMock.mockReset();
     settingsGetMock.mockReset();
@@ -57,7 +57,6 @@ describe('store-persistence', () => {
     const setSetting = vi.fn();
     await saveStorePermanently(baseStore, setSetting);
     expect(setSetting).toHaveBeenCalledWith('currentStore', baseStore);
-    const { getDb } = await import('@/lib/db');
     const row = await getDb().stores.get(baseStore.id);
     expect(row?.synced).toBe(true);
     expect(row?.lastSyncedAt).toBeDefined();
@@ -66,7 +65,7 @@ describe('store-persistence', () => {
 
   it('saveStorePermanently falls back to localStorage when setSetting omitted', async () => {
     await saveStorePermanently(baseStore);
-    const raw = window.localStorage.getItem('kasi-pos-settings');
+    const raw = globalThis.localStorage.getItem('kasi-pos-settings');
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw!);
     expect(parsed.currentStore?.id).toBe(baseStore.id);

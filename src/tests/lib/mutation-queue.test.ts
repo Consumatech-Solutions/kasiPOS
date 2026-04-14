@@ -1,47 +1,54 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+type MqRow = {
+  id?: number;
+  mutationKey: string;
+  variables: unknown;
+  timestamp: number;
+  retries: number;
+  status?: string;
+};
+
 const hoisted = vi.hoisted(() => ({
   offlineFirst: true,
   executeMutationImpl: vi.fn(async (_key: string[], _variables: unknown) => ({ ok: true })),
   checkOffline: vi.fn(() => Promise.resolve(false)),
   isOfflineFn: vi.fn(() => false),
-  mqRows: [] as Array<{
-    id?: number;
-    mutationKey: string;
-    variables: unknown;
-    timestamp: number;
-    retries: number;
-    status?: string;
-  }>,
+  mqRows: [] as MqRow[],
 }));
+
+function persistedMqRecords(): Array<MqRow & { id: number }> {
+  return hoisted.mqRows.map((r, i) => ({
+    ...r,
+    id: i + 1,
+  }));
+}
+
+function mutationQueueTableToArray(): Promise<Array<MqRow & { id: number }>> {
+  return Promise.resolve(persistedMqRecords());
+}
+
+function createMockMutationQueueTable() {
+  return {
+    orderBy() {
+      return {
+        toArray: mutationQueueTableToArray,
+      };
+    },
+    clear: async () => {
+      hoisted.mqRows.length = 0;
+    },
+    bulkAdd: async (rows: MqRow[]) => {
+      for (const r of rows) {
+        hoisted.mqRows.push(r);
+      }
+    },
+  };
+}
 
 vi.mock('@/lib/db', () => ({
   getDb: () => ({
-    mutationQueue: {
-      orderBy: () => ({
-        toArray: () =>
-          Promise.resolve(
-            hoisted.mqRows.map((r, i) => ({
-              ...r,
-              id: i + 1,
-            }))
-          ),
-      }),
-      clear: async () => {
-        hoisted.mqRows.length = 0;
-      },
-      bulkAdd: async (
-        rows: Array<{
-          mutationKey: string;
-          variables: unknown;
-          timestamp: number;
-          retries: number;
-          status?: string;
-        }>
-      ) => {
-        for (const r of rows) hoisted.mqRows.push(r);
-      },
-    },
+    mutationQueue: createMockMutationQueueTable(),
   }),
 }));
 
@@ -50,16 +57,24 @@ vi.mock('@/lib/mutation-registry', () => ({
     hoisted.executeMutationImpl(key, variables),
 }));
 
+function setOfflineFirst(v: boolean) {
+  hoisted.offlineFirst = v;
+}
+
+function getOfflineFirst() {
+  return hoisted.offlineFirst;
+}
+
+function noopUnsubscribe() {
+  return () => {};
+}
+
 vi.mock('@/lib/offline-detector', () => ({
   offlineDetector: {
-    setOfflineFirstActive(v: boolean) {
-      hoisted.offlineFirst = v;
-    },
-    getOfflineFirstActive() {
-      return hoisted.offlineFirst;
-    },
+    setOfflineFirstActive: setOfflineFirst,
+    getOfflineFirstActive: getOfflineFirst,
     forceCheck: () => Promise.resolve(true),
-    subscribe: () => () => {},
+    subscribe: noopUnsubscribe,
   },
   isOffline: () => hoisted.isOfflineFn(),
   checkOfflineStatus: () => hoisted.checkOffline(),
@@ -72,6 +87,24 @@ vi.mock('@/lib/feedback', () => ({
 
 import { feedback } from '@/lib/feedback';
 import { mutationQueue } from '@/lib/mutation-queue';
+
+function addQueuedMutation(mutationKey: string[]) {
+  mutationQueue.add({
+    mutationKey,
+    mutationFn: () => hoisted.executeMutationImpl(mutationKey, {}),
+    variables: {},
+  });
+}
+
+async function runMaxRetriesFailureTest() {
+  hoisted.executeMutationImpl.mockRejectedValue(new Error('Server says no'));
+  addQueuedMutation(['categories', 'create']);
+  const done = mutationQueue.processQueue({ force: true });
+  await vi.runAllTimersAsync();
+  await done;
+  expect(mutationQueue.getPendingCount()).toBe(0);
+  expect(feedback.error).toHaveBeenCalled();
+}
 
 describe('mutationQueue', () => {
   beforeEach(() => {
@@ -124,37 +157,17 @@ describe('mutationQueue', () => {
       order.push(`${key[0]}/${key[1]}`);
       return { ok: true };
     });
-    mutationQueue.add({
-      mutationKey: ['transactions', 'create'],
-      mutationFn: () => hoisted.executeMutationImpl(['transactions', 'create'], {}),
-      variables: {},
-    });
-    mutationQueue.add({
-      mutationKey: ['categories', 'create'],
-      mutationFn: () => hoisted.executeMutationImpl(['categories', 'create'], {}),
-      variables: {},
-    });
-    mutationQueue.add({
-      mutationKey: ['customers', 'create'],
-      mutationFn: () => hoisted.executeMutationImpl(['customers', 'create'], {}),
-      variables: {},
-    });
-    mutationQueue.add({
-      mutationKey: ['products', 'create'],
-      mutationFn: () => hoisted.executeMutationImpl(['products', 'create'], {}),
-      variables: {},
-    });
+    addQueuedMutation(['transactions', 'create']);
+    addQueuedMutation(['categories', 'create']);
+    addQueuedMutation(['customers', 'create']);
+    addQueuedMutation(['products', 'create']);
     await mutationQueue.processQueue({ force: true });
     expect(order).toEqual(['categories/create', 'products/create', 'customers/create', 'transactions/create']);
   });
 
   it('processQueue pauses on network error and keeps mutation on queue', async () => {
     hoisted.executeMutationImpl.mockRejectedValueOnce(new Error('Network Error'));
-    mutationQueue.add({
-      mutationKey: ['categories', 'create'],
-      mutationFn: () => hoisted.executeMutationImpl(['categories', 'create'], {}),
-      variables: {},
-    });
+    addQueuedMutation(['categories', 'create']);
     const result = await mutationQueue.processQueue({ force: true });
     expect(result.stoppedReason).toBe('network_pause');
     expect(mutationQueue.getPendingCount()).toBe(1);
@@ -164,17 +177,7 @@ describe('mutationQueue', () => {
     vi.useFakeTimers();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      hoisted.executeMutationImpl.mockRejectedValue(new Error('Server says no'));
-      mutationQueue.add({
-        mutationKey: ['categories', 'create'],
-        mutationFn: () => hoisted.executeMutationImpl(['categories', 'create'], {}),
-        variables: {},
-      });
-      const done = mutationQueue.processQueue({ force: true });
-      await vi.runAllTimersAsync();
-      await done;
-      expect(mutationQueue.getPendingCount()).toBe(0);
-      expect(feedback.error).toHaveBeenCalled();
+      await runMaxRetriesFailureTest();
     } finally {
       errorSpy.mockRestore();
       vi.useRealTimers();
