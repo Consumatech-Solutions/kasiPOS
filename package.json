@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "husky",
     "dev": "next dev -p 9002",
     "dev:turbo": "next dev -p 9002 --turbo",
     "dev:webpack": "next dev -p 9002",
@@ -15,7 +16,17 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "cy:run": "cypress run",
+    "test:e2e": "start-server-and-test dev http://localhost:9002 cy:run"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write",
+      "vitest related --run"
+    ]
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
@@ -75,14 +86,27 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
+    "@vitest/coverage-v8": "^2.1.0",
     "cross-env": "^10.1.0",
+    "cypress": "^14.0.0",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "15.5.9",
+    "eslint-plugin-cypress": "^4.1.0",
+    "fake-indexeddb": "^6.2.5",
     "genkit-cli": "^1.20.0",
+    "husky": "^9.1.0",
     "jsdom": "^25.0.0",
+    "lint-staged": "^15.4.0",
     "postcss": "^8",
+    "prettier": "^3.4.2",
+    "start-server-and-test": "^2.0.10",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
     "vitest": "^2.1.0"
