@@ -1,6 +1,12 @@
 import Dexie, { type Table } from 'dexie';
 import type { Product, Customer, Transaction, Voucher, Category, StockAdjustment, Parcel, PurchaseOrder, User, Store } from '@/types';
 
+/** Isolated DB name in Vitest (see vitest.config.ts env) so dev data is not touched. */
+export const KASIPOS_INDEXEDDB_NAME =
+  typeof process !== 'undefined' && process.env.KASIPOS_TEST_DB === '1'
+    ? 'kasiPosDatabaseTest'
+    : 'kasiPosDatabase';
+
 export interface ProductImageRecord {
   id: string;
   productId: string; // Always stored as string to avoid IndexedDB type issues
@@ -84,7 +90,7 @@ export class KasiPosDexie extends Dexie {
   categoryCache!: Table<CategoryCacheRecord>;
 
   constructor() {
-    super('kasiPosDatabase');
+    super(KASIPOS_INDEXEDDB_NAME);
     this.version(16).stores({
       stores: '++id, name, ownerId',
       products: '++id, name, category, barcode, storeId',
@@ -328,6 +334,28 @@ export class KasiPosDexie extends Dexie {
 
 // Singleton database instance
 let dbInstance: KasiPosDexie | null = null;
+
+/** Clears the singleton so the next getDb() opens a fresh connection (Vitest only). */
+export function resetKasiPosDbSingleton(): void {
+  dbInstance = null;
+}
+
+/**
+ * Close singleton and delete the IndexedDB database (Vitest isolation).
+ * Prefer this over resetKasiPosDbSingleton alone when tests need a clean schema.
+ */
+export async function resetDbInstanceForTests(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch {
+      // ignore
+    }
+    dbInstance = null;
+  }
+  await Dexie.delete(KASIPOS_INDEXEDDB_NAME);
+}
 
 /**
  * Get the database instance. Must be called on the client (browser) only.

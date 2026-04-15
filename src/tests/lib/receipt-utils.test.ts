@@ -47,8 +47,8 @@ describe('Receipt generation and content accuracy', () => {
   });
 
   it('when showVat is true, total equals subtotal + VAT (VAT added on top) and validation passes', () => {
-    const subtotal = 98; // ex-VAT
-    const total = subtotal * 1.15; // VAT added
+    const subtotal = 98;
+    const total = subtotal * 1.15;
     const data = buildReceiptData({
       storeName: 'Test Store',
       saleId: 'TXN-VAT',
@@ -137,7 +137,7 @@ describe('Receipt generation and content accuracy', () => {
       paymentMethod: 'Cash',
       showVat: false,
     });
-    const invalidData = { ...data, paymentMethod: 'Invalid' as any };
+    const invalidData = { ...data, paymentMethod: 'Invalid' as never };
     const errors = validateReceiptContent(invalidData);
     expect(errors.some((e) => e.includes('payment method'))).toBe(true);
   });
