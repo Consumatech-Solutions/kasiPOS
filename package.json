@@ -86,9 +86,12 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
     "@commitlint/cli": "^19.6.0",
     "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/eslintrc": "^3.3.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
     "@types/react": "^19.2.1",
@@ -102,6 +105,7 @@
     "fake-indexeddb": "^6.2.5",
     "genkit-cli": "^1.20.0",
     "husky": "^9.1.0",
+    "jest": "^30.3.0",
     "jsdom": "^25.0.0",
     "lint-staged": "^15.4.0",
     "postcss": "^8",

@@ -1,44 +1,56 @@
-import { describe, it, expect } from 'vitest';
-import { buildReceiptData, validateReceiptContent } from '@/lib/receipt-utils';
-import type { TransactionItem } from '@/types';
+import { describe, it, expect } from "vitest";
+import { buildReceiptData, validateReceiptContent } from "@/lib/receipt-utils";
+import type { TransactionItem } from "@/types";
 
 const sampleItems: TransactionItem[] = [
-  { productId: 'p1', productName: 'Product A', quantity: 2, unitPrice: 10, totalPrice: 20 },
-  { productId: 'p2', productName: 'Product B', quantity: 1, unitPrice: 78, totalPrice: 78 },
+  {
+    productId: "p1",
+    productName: "Product A",
+    quantity: 2,
+    unitPrice: 10,
+    totalPrice: 20,
+  },
+  {
+    productId: "p2",
+    productName: "Product B",
+    quantity: 1,
+    unitPrice: 78,
+    totalPrice: 78,
+  },
 ];
 
-describe('Receipt generation and content accuracy', () => {
-  it('builds receipt with correct items, quantities, and totals', () => {
+describe("Receipt generation and content accuracy", () => {
+  it("builds receipt with correct items, quantities, and totals", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-123',
+      storeName: "Test Store",
+      saleId: "TXN-123",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 0,
       total: 98,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: false,
     });
     expect(data.items).toHaveLength(2);
-    expect(data.items[0].productName).toBe('Product A');
+    expect(data.items[0].productName).toBe("Product A");
     expect(data.items[0].quantity).toBe(2);
     expect(data.items[0].totalPrice).toBe(20);
     expect(data.subtotal).toBe(98);
     expect(data.total).toBe(98);
-    expect(data.saleId).toBe('TXN-123');
-    expect(data.paymentMethod).toBe('Cash');
+    expect(data.saleId).toBe("TXN-123");
+    expect(data.paymentMethod).toBe("Cash");
     expect(data.timestamp).toBeInstanceOf(Date);
   });
 
-  it('includes VAT amount when showVat is true', () => {
+  it("includes VAT amount when showVat is true", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-456',
+      storeName: "Test Store",
+      saleId: "TXN-456",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 0,
       total: 98,
-      paymentMethod: 'Card',
+      paymentMethod: "Card",
       showVat: true,
     });
     expect(data.showVat).toBe(true);
@@ -46,17 +58,17 @@ describe('Receipt generation and content accuracy', () => {
     expect(Math.abs(data.vatAmount - expectedVat)).toBeLessThan(0.02);
   });
 
-  it('when showVat is true, total equals subtotal + VAT (VAT added on top) and validation passes', () => {
-    const subtotal = 98; // ex-VAT
-    const total = subtotal * 1.15; // VAT added
+  it("when showVat is true, total equals subtotal + VAT (VAT added on top) and validation passes", () => {
+    const subtotal = 98;
+    const total = subtotal * 1.15;
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-VAT',
+      storeName: "Test Store",
+      saleId: "TXN-VAT",
       items: sampleItems,
       subtotal,
       discountAmount: 0,
       total,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: true,
     });
     expect(data.subtotal + data.vatAmount).toBeCloseTo(data.total, 2);
@@ -64,93 +76,93 @@ describe('Receipt generation and content accuracy', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('omits VAT amount when showVat is false', () => {
+  it("omits VAT amount when showVat is false", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-789',
+      storeName: "Test Store",
+      saleId: "TXN-789",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 0,
       total: 98,
-      paymentMethod: 'Mobile Money',
+      paymentMethod: "Mobile Money",
       showVat: false,
     });
     expect(data.showVat).toBe(false);
     expect(data.vatAmount).toBeGreaterThanOrEqual(0);
   });
 
-  it('includes discount and voucher code when present', () => {
+  it("includes discount and voucher code when present", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-999',
+      storeName: "Test Store",
+      saleId: "TXN-999",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 10,
       total: 88,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: false,
-      voucherCode: 'SAVE10',
+      voucherCode: "SAVE10",
     });
     expect(data.discountAmount).toBe(10);
-    expect(data.voucherCode).toBe('SAVE10');
+    expect(data.voucherCode).toBe("SAVE10");
     expect(data.total).toBe(88);
   });
 
-  it('validateReceiptContent passes for valid receipt', () => {
+  it("validateReceiptContent passes for valid receipt", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-1',
+      storeName: "Test Store",
+      saleId: "TXN-1",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 0,
       total: 98,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: false,
     });
     const errors = validateReceiptContent(data);
     expect(errors).toHaveLength(0);
   });
 
-  it('validateReceiptContent fails when items total does not match subtotal', () => {
+  it("validateReceiptContent fails when items total does not match subtotal", () => {
     const badData = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-1',
+      storeName: "Test Store",
+      saleId: "TXN-1",
       items: sampleItems,
       subtotal: 99,
       discountAmount: 0,
       total: 99,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: false,
     });
     const errors = validateReceiptContent(badData);
-    expect(errors.some((e) => e.includes('subtotal'))).toBe(true);
+    expect(errors.some((e) => e.includes("subtotal"))).toBe(true);
   });
 
-  it('validateReceiptContent fails when payment method is invalid', () => {
+  it("validateReceiptContent fails when payment method is invalid", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-1',
+      storeName: "Test Store",
+      saleId: "TXN-1",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 0,
       total: 98,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: false,
     });
-    const invalidData = { ...data, paymentMethod: 'Invalid' as any };
+    const invalidData = { ...data, paymentMethod: "Invalid" as never };
     const errors = validateReceiptContent(invalidData);
-    expect(errors.some((e) => e.includes('payment method'))).toBe(true);
+    expect(errors.some((e) => e.includes("payment method"))).toBe(true);
   });
 
-  it('timestamp is set and is a valid Date', () => {
+  it("timestamp is set and is a valid Date", () => {
     const data = buildReceiptData({
-      storeName: 'Test Store',
-      saleId: 'TXN-1',
+      storeName: "Test Store",
+      saleId: "TXN-1",
       items: sampleItems,
       subtotal: 98,
       discountAmount: 0,
       total: 98,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
       showVat: false,
     });
     expect(data.timestamp).toBeInstanceOf(Date);
