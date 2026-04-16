@@ -120,6 +120,10 @@ describe('Catalogue', () => {
     cy.contains('td', /dairy/i, { timeout: 20_000 }).should('be.visible');
 
     clickRowAction(/home care/i, 'Edit');
+    cy.waitUntil(() => Cypress.$(CataloguePage.categoryDialogSelector).length > 0, {
+      timeout: 15_000,
+      errorMsg: 'Category edit dialog did not open',
+    });
     CataloguePage.getActiveDialog(CataloguePage.categoryDialogSelector)
       .find('input[name="name"]')
       .clear()
@@ -147,15 +151,19 @@ describe('Catalogue', () => {
     cy.wait('@createCategory');
 
     clickRowAction(/temporary category/i, 'Delete');
-    cy.findByRole('alertdialog', { timeout: 15_000 }).within(() => {
-      cy.get('button').then(($buttons) => {
-        const destructive = $buttons.filter((_, el) => (el.className || '').toString().includes('destructive'));
-        if (destructive.length > 0) {
-          cy.wrap(destructive.last()).click({ force: true });
-          return;
-        }
-        cy.contains('button', /^delete$/i).click({ force: true });
-      });
+    cy.get('[role="alertdialog"]', { timeout: 15_000 }).should('exist');
+    cy.get('body').then(($body) => {
+      const $dialog = $body.find('[role="alertdialog"]').last();
+      const $destructive = $dialog.find('button[class*="destructive"]');
+      if ($destructive.length > 0) {
+        cy.wrap($destructive.last()).click({ force: true });
+        return;
+      }
+      const $deleteButton = $dialog
+        .find('button')
+        .filter((_, el) => /^delete$/i.test((el.textContent ?? '').trim()))
+        .last();
+      cy.wrap($deleteButton).click({ force: true });
     });
     cy.wait('@deleteCategory').its('response.statusCode').should('be.oneOf', [200, 204]);
     cy.contains('td', /temporary category/i, { timeout: 20_000 }).should('not.exist');

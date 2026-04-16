@@ -48,12 +48,21 @@ export const CataloguePage = {
   },
 
   openAddCategoryDialog() {
-    cy.get('[data-testid="catalogue-add-category-button"]').should('be.visible').click({ force: true });
+    const clickAddCategory = () =>
+      cy.get('[data-testid="catalogue-add-category-button"]').should('be.visible').click({ force: true });
+
+    clickAddCategory();
+    cy.wait(150);
+    cy.get('body').then(($body) => {
+      if ($body.find(this.categoryDialogSelector).length === 0) {
+        clickAddCategory();
+      }
+    });
     cy.waitUntil(() => Cypress.$(this.categoryDialogSelector).length > 0, {
       timeout: 15_000,
       errorMsg: 'Add Category dialog did not open',
     });
-    this.getActiveDialog(this.categoryDialogSelector).find('input[name="name"]').should('exist');
+    this.getActiveDialog(this.categoryDialogSelector).find('input[name="name"]').should('be.visible');
     return this;
   },
 };

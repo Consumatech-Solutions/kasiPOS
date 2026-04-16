@@ -84,7 +84,21 @@ export const PosPage = {
       Card: /^CARD$/i,
       'Mobile Money': /^MOBILE$/i,
     };
-    cy.findByRole('button', { name: map[method] }).click({ force: true });
+    if (method === 'Cash') {
+      cy.get('body').then(($body) => {
+        // If cash modal is already open, avoid re-clicking detached checkout buttons.
+        if ($body.find('#tendered').length > 0) return;
+        cy.contains('button', map[method], { timeout: 15_000 })
+          .should('be.visible')
+          .and('not.be.disabled')
+          .click({ force: true });
+      });
+      return this;
+    }
+    cy.contains('button', map[method], { timeout: 15_000 })
+      .should('be.visible')
+      .and('not.be.disabled')
+      .click({ force: true });
     return this;
   },
 };

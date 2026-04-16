@@ -67,6 +67,11 @@ describe('Customers', () => {
     PosPage.selectCustomerFromDialog('Alice Mokoena');
     cy.findByRole('button', { name: /alice mokoena/i, timeout: 15_000 }).should('be.visible');
     PosPage.choosePaymentMethod('Cash');
+    cy.get('body').then(($body) => {
+      if ($body.find('#tendered').length === 0) {
+        PosPage.choosePaymentMethod('Cash');
+      }
+    });
     cy.get('#tendered', { timeout: 15_000 }).should('be.visible');
     cy.contains('h2, [role="heading"]', /^cash payment$/i, { timeout: 15_000 })
       .closest('[role="dialog"]')
