@@ -172,6 +172,48 @@ describe("mutationQueue", () => {
     ]);
   });
 
+  it("does not run products until all queued category mutations for that phase have completed", async () => {
+    let categoriesCompleted = 0;
+    hoisted.executeMutationImpl.mockImplementation(async (key: string[]) => {
+      if (key[0] === "categories") {
+        categoriesCompleted += 1;
+        return { ok: true };
+      }
+      if (key[0] === "products") {
+        expect(categoriesCompleted).toBeGreaterThanOrEqual(2);
+        return { ok: true };
+      }
+      return { ok: true };
+    });
+    addQueuedMutation(["products", "create"]);
+    addQueuedMutation(["categories", "create"]);
+    addQueuedMutation(["customers", "create"]);
+    addQueuedMutation(["categories", "create"]);
+    addQueuedMutation(["products", "create"]);
+    await mutationQueue.processQueue({ force: true });
+    expect(mutationQueue.getPendingCount()).toBe(0);
+  });
+
+  it("runs up to three product mutations concurrently (batch cap)", async () => {
+    let concurrent = 0;
+    let maxConcurrent = 0;
+    hoisted.executeMutationImpl.mockImplementation(async (key: string[]) => {
+      if (key[0] !== "products") {
+        return { ok: true };
+      }
+      concurrent += 1;
+      maxConcurrent = Math.max(maxConcurrent, concurrent);
+      await new Promise((r) => setTimeout(r, 50));
+      concurrent -= 1;
+      return { ok: true };
+    });
+    for (let i = 0; i < 4; i++) {
+      addQueuedMutation(["products", "create"]);
+    }
+    await mutationQueue.processQueue({ force: true });
+    expect(maxConcurrent).toBe(3);
+  });
+
   it("processQueue pauses on network error and keeps mutation on queue", async () => {
     hoisted.executeMutationImpl.mockRejectedValueOnce(
       new Error("Network Error"),
