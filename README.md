@@ -1,5 +1,7 @@
 # KasiPOS - Modern Point of Sale
 
+[![Coverage](https://img.shields.io/endpoint?url=https://%3Cyour_codecov_endpoint%3E)](https://about.codecov.io/)
+
 **Note:** This application is intended for **store admins** only. It is the store-side app used to run the point of sale, manage catalogue, inventory, and optional modules (campaigns, buy stock, BOPH, marketplace).
 
 KasiPOS is a modern, offline-first Point of Sale (POS) application designed for small businesses. It's built with a focus on usability, performance, and providing powerful features to streamline retail operations.
