@@ -123,6 +123,8 @@ export interface Transaction {
   customerId?: string | null;
   date?: Date; // For backward compatibility
   createdAt?: string; // ISO date string from backend
+  /** Client-only: sent as Idempotency-Key on POST /transactions (offline queue + dedupe) */
+  idempotencyKey?: string;
   items: TransactionItem[];
   total: number;
   paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';

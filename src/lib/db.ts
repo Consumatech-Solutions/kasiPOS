@@ -42,6 +42,8 @@ export interface MutationQueueRecord {
   timestamp: number;
   retries: number;
   status?: string;
+  /** Stable per offline/queued sale; required for transaction dedupe and server Idempotency-Key */
+  idempotencyKey?: string;
 }
 
 export interface SyncIdMappingRecord {
@@ -91,6 +93,25 @@ export class KasiPosDexie extends Dexie {
 
   constructor() {
     super(KASIPOS_INDEXEDDB_NAME);
+    this.version(17).stores({
+      stores: '++id, name, ownerId',
+      products: '++id, name, category, barcode, storeId',
+      customers: 'id, name, contact, synced, lastSyncedAt, storeId',
+      transactions: '++id, customerId, date, storeId',
+      vouchers: '++id, code, isActive, storeId',
+      categories: '++id, name, storeId',
+      stockAdjustments: '++id, productId, date, storeId',
+      parcels: '++id, deliveryNumber, collectionCode, status, storeId',
+      purchaseOrders: '++id, orderCode, date, storeId',
+      users: '++id, &phone, role, storeId',
+      productImages: 'id, productId, synced, createdAt',
+      keyVal: 'key',
+      mutationQueue: '++id, timestamp',
+      syncIdMapping: 'tempId, createdAt',
+      productCache: 'id, createdAt',
+      transactionCache: 'id, date',
+      categoryCache: 'id, createdAt',
+    });
     this.version(16).stores({
       stores: '++id, name, ownerId',
       products: '++id, name, category, barcode, storeId',

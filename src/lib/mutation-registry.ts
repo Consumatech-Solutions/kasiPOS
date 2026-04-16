@@ -48,7 +48,7 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
 
   switch (`${type}/${action}`) {
     case 'transactions/create': {
-      const raw = variables as Parameters<typeof toCreateTransactionDto>[0] & { items?: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string }>; customerId?: string };
+      const raw = variables as Parameters<typeof toCreateTransactionDto>[0] & { items?: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number; imageUrl?: string }>; customerId?: string; idempotencyKey?: string };
       const mappings = await getDb().syncIdMapping.toArray();
       const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
 
@@ -67,8 +67,11 @@ export async function executeMutation(mutationKey: string[], variables: unknown)
         ? { ...raw, items: resolvedItems, customerId: resolvedCustomerId }
         : { ...raw, customerId: resolvedCustomerId };
       const dto = toCreateTransactionDto(resolved as Parameters<typeof toCreateTransactionDto>[0]);
+      const idempotencyKey = raw.idempotencyKey;
       // Cast: toCreateTransactionDto return type can be inferred as unknown[] for items by TS in some configs
-      return transactionsApi.create(dto as unknown as CreateTransactionDto);
+      return transactionsApi.create(dto as unknown as CreateTransactionDto, {
+        idempotencyKey,
+      });
     }
 
     case 'products/create': {

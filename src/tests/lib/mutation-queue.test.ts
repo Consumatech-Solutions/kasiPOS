@@ -7,6 +7,7 @@ type MqRow = {
   timestamp: number;
   retries: number;
   status?: string;
+  idempotencyKey?: string;
 };
 
 const hoisted = vi.hoisted(() => ({
@@ -149,6 +150,24 @@ describe('mutationQueue', () => {
     const result = await mutationQueue.processQueue({ force: false });
     expect(result.stoppedReason).toBe('offline');
     expect(result.syncedCount).toBe(0);
+  });
+
+  it('dedupes transactions/create when idempotencyKey matches an item already in queue', () => {
+    const idem = '550e8400-e29b-41d4-a716-446655440000';
+    const base = {
+      mutationKey: ['transactions', 'create'] as const,
+      mutationFn: () => Promise.resolve(),
+      variables: {
+        idempotencyKey: idem,
+        storeId: 's',
+        items: [],
+        total: 1,
+        paymentMethod: 'Cash' as const,
+      },
+    };
+    mutationQueue.add(base);
+    mutationQueue.add(base);
+    expect(mutationQueue.getPendingCount()).toBe(1);
   });
 
   it('processQueue runs mutations in dependency order', async () => {

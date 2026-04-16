@@ -131,6 +131,28 @@ describe('transactionsApi.create', () => {
       paymentMethod: 'Cash',
     });
     await transactionsApi.create(body);
-    expect(api.post).toHaveBeenCalledWith('/transactions', body);
+    expect(api.post).toHaveBeenCalledWith('/transactions', body, undefined);
+  });
+
+  it('sends Idempotency-Key header when idempotencyKey is provided', async () => {
+    const body = toCreateTransactionDto({
+      storeId: 's',
+      items: [
+        {
+          productId: 'p',
+          productName: 'A',
+          quantity: 1,
+          unitPrice: 1,
+          totalPrice: 1,
+        },
+      ],
+      total: 1,
+      paymentMethod: 'Cash',
+    });
+    const idem = '550e8400-e29b-41d4-a716-446655440000';
+    await transactionsApi.create(body, { idempotencyKey: idem });
+    expect(api.post).toHaveBeenCalledWith('/transactions', body, {
+      headers: { 'Idempotency-Key': idem },
+    });
   });
 });

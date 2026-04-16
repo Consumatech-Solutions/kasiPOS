@@ -12,6 +12,8 @@ export interface QueuedMutation {
   timestamp: number;
   retries: number;
   status?: 'pending' | 'syncing' | 'completed' | 'failed';
+  /** Same sale / same Idempotency-Key as sent to POST /transactions */
+  idempotencyKey?: string;
 }
 
 export type SyncStatus = 'idle' | 'syncing' | 'preloading';
@@ -162,6 +164,7 @@ class MutationQueue {
             timestamp: m.timestamp,
             retries: m.retries ?? 0,
             status: 'pending',
+            idempotencyKey: m.idempotencyKey,
             mutationFn: () => executeMutation(mutationKey, m.variables),
           });
         }
@@ -215,6 +218,7 @@ class MutationQueue {
             timestamp: m.timestamp,
             retries: m.retries,
             status: m.status ?? 'pending',
+            idempotencyKey: m.idempotencyKey,
           }))
         );
       }
@@ -232,12 +236,45 @@ class MutationQueue {
   }
 
   add(mutation: Omit<QueuedMutation, 'id' | 'timestamp' | 'retries' | 'status'>) {
+    const [type, action] = mutation.mutationKey;
+    const inferredKey =
+      mutation.idempotencyKey ??
+      (mutation.variables &&
+      typeof mutation.variables === 'object' &&
+      'idempotencyKey' in mutation.variables &&
+      typeof (mutation.variables as { idempotencyKey?: unknown }).idempotencyKey === 'string'
+        ? (mutation.variables as { idempotencyKey: string }).idempotencyKey
+        : undefined);
+
+    if (
+      type === 'transactions' &&
+      action === 'create' &&
+      inferredKey !== undefined &&
+      inferredKey !== ''
+    ) {
+      const hasDuplicate = this.queue.some(
+        (m) =>
+          m.mutationKey[0] === 'transactions' &&
+          m.mutationKey[1] === 'create' &&
+          (m.idempotencyKey ?? (typeof m.variables === 'object' && m.variables && 'idempotencyKey' in m.variables
+            ? String((m.variables as { idempotencyKey?: string }).idempotencyKey ?? '')
+            : '')) === inferredKey
+      );
+      if (hasDuplicate) {
+        console.log('[MutationQueue] Skipping duplicate transactions/create (same idempotency key)');
+        return;
+      }
+    }
+
     const queuedMutation: QueuedMutation = {
       ...mutation,
       id: `mutation-${Date.now()}-${Math.random()}`,
       timestamp: Date.now(),
       retries: 0,
       status: 'pending',
+      ...(inferredKey !== undefined && inferredKey !== ''
+        ? { idempotencyKey: inferredKey }
+        : {}),
     };
 
     this.queue.push(queuedMutation);

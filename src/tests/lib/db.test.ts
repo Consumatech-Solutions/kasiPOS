@@ -36,7 +36,7 @@ describe('KasiPosDexie (client)', () => {
     expect(a).toBe(b);
   });
 
-  it('exposes v16 schema tables', async () => {
+  it('exposes v17 schema tables', async () => {
     const db = getDb();
     await db.open();
     const names = db.tables.map((t) => t.name).sort();

@@ -292,6 +292,7 @@ export default function PosPage() {
     if (process.env.NODE_ENV === 'development') {
       console.log('[Complete Sale] Store resolved', { storeId: currentStore.id, isOnline: isOnline });
     }
+    const idempotencyKey = crypto.randomUUID();
     const newTransaction: Omit<Transaction, 'id'> = {
       ...transactionDetails,
       date: new Date(),
@@ -301,6 +302,7 @@ export default function PosPage() {
       discount: manualDiscount ?? undefined,
       total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
       storeId: currentStore.id!,
+      idempotencyKey,
     };
     
     const toReceiptData = (saleId: string): ReceiptData =>
@@ -348,7 +350,7 @@ export default function PosPage() {
         const payload = toCreateTransactionDto(resolvedTx as Omit<Transaction, 'id'> & {
           items: Array<TransactionItem & { [k: string]: unknown }>;
         });
-        const response = await transactionsApi.create(payload);
+        const response = await transactionsApi.create(payload, { idempotencyKey });
 
         const resData = response.data as { id?: string; data?: { id?: string } } | undefined;
         const createdId = resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
@@ -447,9 +449,13 @@ export default function PosPage() {
         // 3. Queue the transaction for sync when back online
         mutationQueue.add({
           mutationKey: ['transactions', 'create'],
-          mutationFn: () => transactionsApi.create(toCreateTransactionDto(newTransaction as Omit<Transaction, 'id'> & {
-            items: Array<TransactionItem & { [k: string]: unknown }>;
-          })),
+          mutationFn: () =>
+            transactionsApi.create(
+              toCreateTransactionDto(newTransaction as Omit<Transaction, 'id'> & {
+                items: Array<TransactionItem & { [k: string]: unknown }>;
+              }),
+              { idempotencyKey }
+            ),
           variables: newTransaction,
         });
 
