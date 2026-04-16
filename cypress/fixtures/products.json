@@ -1,0 +1,58 @@
+[
+  {
+    "id": "prod-cola-001",
+    "name": "Cola 330ml",
+    "price": 12.5,
+    "costPrice": 8,
+    "stock": 30,
+    "category": "Beverages",
+    "barcode": "6001001001001",
+    "imageUrl": "",
+    "lowStockThreshold": 5,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "prod-water-001",
+    "name": "Still Water 500ml",
+    "price": 10,
+    "costPrice": 6,
+    "stock": 8,
+    "category": "Beverages",
+    "barcode": "6001001001002",
+    "imageUrl": "",
+    "lowStockThreshold": 10,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "prod-chips-001",
+    "name": "Salted Chips",
+    "price": 18,
+    "costPrice": 12,
+    "stock": 24,
+    "category": "Snacks",
+    "barcode": "6001001001003",
+    "imageUrl": "",
+    "lowStockThreshold": 6,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "prod-soap-001",
+    "name": "Hand Soap",
+    "price": 22,
+    "costPrice": 14,
+    "stock": 4,
+    "category": "Home Care",
+    "barcode": "6001001001004",
+    "imageUrl": "",
+    "lowStockThreshold": 5,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  }
+]

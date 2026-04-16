@@ -202,6 +202,7 @@ export function DataPreloader() {
   const { toast } = useToast();
   const { settings } = useSettings();
   const syncBusyRef = useRef(false);
+  const isCypressRuntime = typeof window !== 'undefined' && Boolean((window as Window & { Cypress?: unknown }).Cypress);
 
   useEffect(() => {
     if (!settings.isLoggedIn) {
@@ -244,7 +245,9 @@ export function DataPreloader() {
       } catch (e) {
         console.error('[DataPreloader] Scheduled cloud sync failed:', e);
       } finally {
-        offlineDetector.setOfflineFirstActive(true);
+        if (!isCypressRuntime) {
+          offlineDetector.setOfflineFirstActive(true);
+        }
         syncBusyRef.current = false;
       }
     };
@@ -254,7 +257,9 @@ export function DataPreloader() {
     }, 45_000);
 
     // Keep runtime strictly offline-first by default; scheduled/manual sync opens temporary online windows.
-    offlineDetector.setOfflineFirstActive(true);
+    if (!isCypressRuntime) {
+      offlineDetector.setOfflineFirstActive(true);
+    }
 
     if (!cancelled) {
       void startPreloading();

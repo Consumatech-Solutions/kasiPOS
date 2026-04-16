@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import { AppShell } from '@/components/layout/app-shell';
 import { Toaster } from '@/components/ui/toaster';
@@ -12,6 +13,30 @@ import { SyncStatusIndicator } from '@/components/sync-status-indicator';
 import { HardwareSetupProvider } from '@/components/hardware-setup/HardwareSetupProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const chunkRecoveryScript = `(function() {
+  var RELOAD_KEY = 'kasiPOS_chunkReload';
+  function isChunkLoadError(msg) {
+    if (msg == null) return false;
+    var s = String(typeof msg === 'object' && msg.message != null ? msg.message : msg);
+    return s.indexOf('Loading chunk') !== -1 || s.indexOf('ChunkLoadError') !== -1 || s.indexOf('Loading CSS chunk') !== -1;
+  }
+  function tryReload() {
+    try {
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RELOAD_KEY) === '1') return;
+      sessionStorage.setItem(RELOAD_KEY, '1');
+      window.location.reload();
+    } catch (e) {}
+  }
+  function onChunkError(e) {
+    var msg = e && (e.message || (e.reason && (e.reason.message || e.reason)));
+    if (isChunkLoadError(msg)) { e.preventDefault && e.preventDefault(); tryReload(); }
+  }
+  window.addEventListener('error', function(e) { onChunkError(e); });
+  window.addEventListener('unhandledrejection', function(e) { onChunkError(e.reason || e); });
+  window.addEventListener('load', function() {
+    try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+  });
+})();`;
 
 export const metadata: Metadata = {
   title: 'KasiPOS',
@@ -39,36 +64,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-(function() {
-  var RELOAD_KEY = 'kasiPOS_chunkReload';
-  function isChunkLoadError(msg) {
-    if (msg == null) return false;
-    var s = String(typeof msg === 'object' && msg.message != null ? msg.message : msg);
-    return s.indexOf('Loading chunk') !== -1 || s.indexOf('ChunkLoadError') !== -1 || s.indexOf('Loading CSS chunk') !== -1;
-  }
-  function tryReload() {
-    try {
-      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RELOAD_KEY) === '1') return;
-      sessionStorage.setItem(RELOAD_KEY, '1');
-      window.location.reload();
-    } catch (e) {}
-  }
-  function onChunkError(e) {
-    var msg = e && (e.message || (e.reason && (e.reason.message || e.reason)));
-    if (isChunkLoadError(msg)) { e.preventDefault && e.preventDefault(); tryReload(); }
-  }
-  window.addEventListener('error', function(e) { onChunkError(e); });
-  window.addEventListener('unhandledrejection', function(e) { onChunkError(e.reason || e); });
-  window.addEventListener('load', function() {
-    try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
-  });
-})();
-`,
-          }}
-        />
+        {process.env.NODE_ENV === 'production' ? (
+          <Script id="chunk-recovery" strategy="beforeInteractive">
+            {chunkRecoveryScript}
+          </Script>
+        ) : null}
       </head>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
         <QueryProvider>

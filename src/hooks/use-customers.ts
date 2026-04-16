@@ -3,9 +3,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi } from '@/lib/api/customers';
 import { checkOfflineStatus } from '@/lib/offline-detector';
-import { getCustomersFromDexie } from '@/lib/entity-cache';
+import { getCustomersFromDexie, saveCustomersToDexie } from '@/lib/entity-cache';
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types';
-import type { PaginationMeta } from '@/types/pagination';
+import type { PaginationMeta, PaginationParams, PaginatedResponse } from '@/types/pagination';
 
 interface UseCustomersOptions {
   initialPage?: number;
@@ -50,16 +50,58 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           storeIdForOffline ?? undefined
         );
       }
-      return getCustomersFromDexie(
-        initialPage,
-        initialLimit,
-        searchQuery?.trim() || undefined,
-        storeIdForOffline ?? undefined
-      );
+
+      try {
+        const requestParams: PaginationParams = {
+          page: initialPage,
+          limit: initialLimit,
+          ...(searchQuery?.trim() ? { search: searchQuery.trim() } : {}),
+          ...(storeId != null && storeId !== '' ? { storeId } : {}),
+        };
+        const response = await customersApi.getAll(requestParams);
+        const body = response.data as PaginatedResponse<Customer> | Customer[];
+
+        let data: Customer[];
+        let meta: PaginationMeta;
+
+        if (Array.isArray(body)) {
+          data = body;
+          meta = {
+            total: body.length,
+            page: initialPage,
+            limit: initialLimit,
+            totalPages: Math.max(1, Math.ceil(body.length / initialLimit)),
+          };
+        } else {
+          data = body?.data ?? [];
+          meta =
+            body?.meta ?? {
+              total: data.length,
+              page: initialPage,
+              limit: initialLimit,
+              totalPages: Math.max(1, Math.ceil((data.length || 1) / initialLimit)),
+            };
+        }
+
+        if (data.length > 0) {
+          await saveCustomersToDexie(data);
+        }
+
+        return { data, meta };
+      } catch (e) {
+        console.warn('[useCustomers] API failed, using Dexie', e);
+        return getCustomersFromDexie(
+          initialPage,
+          initialLimit,
+          searchQuery?.trim() || undefined,
+          storeIdForOffline ?? undefined
+        );
+      }
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
+    networkMode: 'online',
   });
 
   const createMutation = useMutation({

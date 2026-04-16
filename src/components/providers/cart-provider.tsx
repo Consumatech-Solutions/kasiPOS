@@ -29,6 +29,9 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
+/** Set in Cypress `visitApp('/')` `onBeforeLoad` so POS mounts with a clean cart for each navigation. */
+const E2E_RESET_CART_FLAG = '__kasi_pos_e2e_reset_cart';
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   // Always start with empty cart so server and client render the same (avoids hydration mismatch in production).
   // Cart is restored from storage only in useLayoutEffect (client-only).
@@ -37,7 +40,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   useLayoutEffect(() => {
     if (typeof window === 'undefined') return;
+    if (window.sessionStorage.getItem('__kasi_pos_e2e') === '1' && window.sessionStorage.getItem(E2E_RESET_CART_FLAG) === '1') {
+      window.sessionStorage.removeItem(E2E_RESET_CART_FLAG);
+      cartMemoryCache = new Map();
+      setCartState(new Map());
+      setHydrated(true);
+      return;
+    }
     if (cartMemoryCache && cartMemoryCache.size > 0) {
+      setCartState(new Map(cartMemoryCache));
+      setHydrated(true);
+      return;
+    }
+    // Empty sentinel map: Cypress reset path above — skip Dexie restore (avoids Strict Mode re-read race).
+    if (cartMemoryCache && cartMemoryCache.size === 0) {
       setCartState(new Map(cartMemoryCache));
       setHydrated(true);
       return;
@@ -55,7 +71,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (cart.size > 0) {
       cartMemoryCache = new Map(cart);
     } else {
-      cartMemoryCache = null;
+      const emptySentinel = cartMemoryCache !== null && cartMemoryCache.size === 0;
+      if (!emptySentinel) cartMemoryCache = null;
     }
   }, [cart, hydrated]);
 

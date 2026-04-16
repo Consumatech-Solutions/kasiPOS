@@ -570,11 +570,19 @@ export default function CataloguePage() {
                 </TabsList>
                 <div className="flex flex-wrap items-center gap-2 order-first sm:order-none">
                   {activeCatalogueTab === 'products' ? (
-                    <Button onClick={() => openProductDialog()} className="min-h-[44px] touch-target">
+                    <Button
+                      data-testid="catalogue-add-product-button"
+                      onClick={() => openProductDialog()}
+                      className="min-h-[44px] touch-target"
+                    >
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Product
                     </Button>
                   ) : (
-                    <Button onClick={() => openCategoryDialog()} className="min-h-[44px] touch-target">
+                    <Button
+                      data-testid="catalogue-add-category-button"
+                      onClick={() => openCategoryDialog()}
+                      className="min-h-[44px] touch-target"
+                    >
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Category
                     </Button>
                   )}
@@ -831,7 +839,28 @@ export default function CataloguePage() {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] w-full max-w-[95vw] flex flex-col sm:max-w-[425px]">
+        <DialogContent
+          data-testid="catalogue-product-dialog"
+          className="max-h-[90vh] w-full max-w-[95vw] flex flex-col sm:max-w-[425px]"
+          onInteractOutside={(event) => {
+            const target = event.target as HTMLElement | null;
+            if (!target) return;
+            // Select content is portaled outside the dialog; without this, choosing a category dismisses the modal.
+            if (
+              target.closest('[data-radix-select-viewport]') ||
+              target.closest('[role="listbox"]') ||
+              target.closest('[data-radix-popper-content-wrapper]') ||
+              target.closest('[data-state="open"][role="option"]') ||
+              target.closest('[data-state="open"][role="listbox"]') ||
+              target.closest('[role="presentation"]') ||
+              target.getAttribute('role') === 'option' ||
+              target.getAttribute('role') === 'listbox' ||
+              target.getAttribute('role') === 'presentation'
+            ) {
+              event.preventDefault();
+            }
+          }}
+        >
             <DialogHeader className="flex-shrink-0 pr-8 sm:pr-10">
                 <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
                 <DialogDescription>
@@ -983,7 +1012,10 @@ export default function CataloguePage() {
         if (!open) setEditingCategory(null);
       }}
     >
-        <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
+        <DialogContent
+          data-testid="catalogue-category-dialog"
+          className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6"
+        >
             <DialogHeader>
                 <DialogTitle className="text-lg sm:text-xl">{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
                 <DialogDescription className="text-sm">

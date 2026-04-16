@@ -558,7 +558,7 @@ export default function PosPage() {
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full min-w-0">
             <p className="text-xs font-semibold text-gray-500 mb-2 uppercase shrink-0">Products</p>
             <ScrollArea className="flex-1 min-h-0 min-w-0 w-full pr-1">
-            <div className="w-full min-w-0">
+            <div className="w-full min-w-0" data-testid="pos-product-table">
             <Table noScrollWrapper className="w-full table-fixed">
                 <TableHeader>
                 <TableRow>
@@ -726,11 +726,20 @@ export default function PosPage() {
                         </ScrollArea>
                     </DialogContent>
                 </Dialog>
-                {settings?.campaigns &&<Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={handleOpenVoucherModal}>
-                    <Ticket className="mr-1 sm:mr-2 h-4 w-4"/>
+                {settings?.campaigns && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-[44px] touch-target text-xs sm:text-sm"
+                    aria-label="Redeem voucher"
+                    onClick={handleOpenVoucherModal}
+                  >
+                    <Ticket className="mr-1 sm:mr-2 h-4 w-4" />
                     <span className="hidden sm:inline">Redeem Voucher</span>
                     <span className="sm:hidden">Voucher</span>
-                </Button>}
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" className="min-h-[44px] touch-target text-xs sm:text-sm" onClick={() => cartItems.length > 0 && setIsApplyDiscountModalOpen(true)} disabled={cartItems.length === 0}>
                   <Percent className="mr-1 sm:mr-2 h-4 w-4"/>
                   <span>Discount</span>
@@ -761,6 +770,8 @@ export default function PosPage() {
                 {cartItems.map(item => (
                   <div
                     key={item.productId}
+                    data-testid="pos-cart-line"
+                    data-product-name={item.productName}
                     className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-start p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 w-full min-w-0"
                   >
                     <div className="flex items-start gap-2 w-full min-w-0">

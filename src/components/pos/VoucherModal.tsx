@@ -80,7 +80,12 @@ export default function VoucherModal({ isOpen, onClose, onApplyVoucher, cartTota
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+    >
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Ticket /> Redeem Voucher</DialogTitle>

@@ -1,7 +1,14 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { vouchersApi, type CreateVoucherDto, type UpdateVoucherDto, type GetVouchersParams, type ValidateVoucherDto } from '@/lib/api/vouchers';
+import {
+  vouchersApi,
+  type CreateVoucherDto,
+  type UpdateVoucherDto,
+  type GetVouchersParams,
+  type ValidateVoucherDto,
+  type ValidateVoucherResponse,
+} from '@/lib/api/vouchers';
 import type { Voucher } from '@/types';
 import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
 
@@ -168,7 +175,10 @@ export function useVouchers(options: UseVouchersOptions = {}) {
   });
 
   const validateMutation = useMutation({
-    mutationFn: (data: ValidateVoucherDto) => vouchersApi.validate(data),
+    mutationFn: async (data: ValidateVoucherDto): Promise<ValidateVoucherResponse> => {
+      const response = await vouchersApi.validate(data);
+      return response.data;
+    },
   });
 
   return {
