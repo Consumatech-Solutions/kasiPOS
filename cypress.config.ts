@@ -80,7 +80,8 @@ function buildSeedAuthSession(input: SeedAuthSessionInput = {}) {
   };
 
   return {
-    token: "e2e-fake-jwt-token",
+    token:
+      process.env.CYPRESS_E2E_AUTH_STUB ?? "kasi-pos-e2e-local-auth-stub",
     user,
     store,
     settings: {

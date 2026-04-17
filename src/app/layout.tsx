@@ -14,7 +14,7 @@ import { HardwareSetupProvider } from '@/components/hardware-setup/HardwareSetup
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const chunkRecoveryScript = `(function() {
-  var RELOAD_KEY = 'kasiPOS_chunkReload';
+  var chunkReloadStorageId = 'kasiPOS_chunkReload';
   function isChunkLoadError(msg) {
     if (msg == null) return false;
     var s = String(typeof msg === 'object' && msg.message != null ? msg.message : msg);
@@ -22,8 +22,8 @@ const chunkRecoveryScript = `(function() {
   }
   function tryReload() {
     try {
-      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RELOAD_KEY) === '1') return;
-      sessionStorage.setItem(RELOAD_KEY, '1');
+      if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(chunkReloadStorageId) === '1') return;
+      sessionStorage.setItem(chunkReloadStorageId, '1');
       window.location.reload();
     } catch (e) {}
   }
@@ -34,7 +34,7 @@ const chunkRecoveryScript = `(function() {
   window.addEventListener('error', function(e) { onChunkError(e); });
   window.addEventListener('unhandledrejection', function(e) { onChunkError(e.reason || e); });
   window.addEventListener('load', function() {
-    try { sessionStorage.removeItem(RELOAD_KEY); } catch (e) {}
+    try { sessionStorage.removeItem(chunkReloadStorageId); } catch (e) {}
   });
 })();`;
 
