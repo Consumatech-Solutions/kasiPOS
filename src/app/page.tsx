@@ -400,6 +400,7 @@ export default function PosPage() {
         isOnline: isOnline,
       });
     }
+    const idempotencyKey = crypto.randomUUID();
     const newTransaction: Omit<Transaction, "id"> = {
       ...transactionDetails,
       date: new Date(),
@@ -409,6 +410,7 @@ export default function PosPage() {
       discount: manualDiscount ?? undefined,
       total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
       storeId: currentStore.id!,
+      idempotencyKey,
     };
 
     const toReceiptData = (saleId: string): ReceiptData =>
@@ -461,7 +463,9 @@ export default function PosPage() {
             items: Array<TransactionItem & { [k: string]: unknown }>;
           },
         );
-        const response = await transactionsApi.create(payload);
+        const response = await transactionsApi.create(payload, {
+          idempotencyKey,
+        });
 
         const resData = response.data as
           | { id?: string; data?: { id?: string } }
@@ -640,6 +644,7 @@ export default function PosPage() {
                   items: Array<TransactionItem & { [k: string]: unknown }>;
                 },
               ),
+              { idempotencyKey },
             ),
           variables: newTransaction,
         });
@@ -761,7 +766,6 @@ export default function PosPage() {
                 <QrCode className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
               </button>
             </div>
-
             <div className="flex justify-between items-center mb-2 shrink-0">
               <p className="text-xs font-semibold text-gray-500 uppercase">
                 Categories
@@ -783,7 +787,6 @@ export default function PosPage() {
                 )}
               </Button>
             </div>
-
             {categoryView === "carousel" ? (
               <Carousel
                 opts={{ align: "start", slidesToScroll: "auto" }}
@@ -850,7 +853,10 @@ export default function PosPage() {
                   Products
                 </p>
                 <ScrollArea className="flex-1 min-h-0 min-w-0 w-full pr-1">
-                  <div className="w-full min-w-0">
+                  <div
+                    className="w-full min-w-0"
+                    data-testid="pos-product-table"
+                  >
                     <Table noScrollWrapper className="w-full table-fixed">
                       <TableHeader>
                         <TableRow>

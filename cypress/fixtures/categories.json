@@ -1,0 +1,23 @@
+[
+  {
+    "id": "cat-bev",
+    "name": "Beverages",
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "cat-snack",
+    "name": "Snacks",
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "cat-home",
+    "name": "Home Care",
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  }
+]

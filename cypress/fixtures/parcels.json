@@ -1,0 +1,50 @@
+[
+  {
+    "id": "parcel-001",
+    "storeId": "store-e2e-001",
+    "deliveryNumber": "DEL-1001",
+    "customerName": "Alice Mokoena",
+    "status": "Incoming",
+    "collectionCode": null,
+    "receiptCode": null,
+    "dateReceived": null,
+    "dateCollected": null,
+    "collectingPersonName": null,
+    "collectingPersonPhone": null,
+    "collectingPersonId": null,
+    "createdAt": "2026-04-14T11:00:00.000Z",
+    "updatedAt": "2026-04-14T11:00:00.000Z"
+  },
+  {
+    "id": "parcel-002",
+    "storeId": "store-e2e-001",
+    "deliveryNumber": "DEL-1002",
+    "customerName": "Brian Nkosi",
+    "status": "Received",
+    "collectionCode": "COLL-7788",
+    "receiptCode": "RCP-4455",
+    "dateReceived": "2026-04-14T11:40:00.000Z",
+    "dateCollected": null,
+    "collectingPersonName": null,
+    "collectingPersonPhone": null,
+    "collectingPersonId": null,
+    "createdAt": "2026-04-14T11:20:00.000Z",
+    "updatedAt": "2026-04-14T11:40:00.000Z"
+  },
+  {
+    "id": "parcel-003",
+    "storeId": "store-e2e-001",
+    "deliveryNumber": "DEL-1003",
+    "customerName": "Cindy Naidoo",
+    "status": "Collected",
+    "collectionCode": "COLL-9900",
+    "receiptCode": "RCP-8899",
+    "dateReceived": "2026-04-14T08:00:00.000Z",
+    "dateCollected": "2026-04-14T15:00:00.000Z",
+    "collectingPersonName": "Cindy Naidoo",
+    "collectingPersonPhone": "0821000003",
+    "collectingPersonId": "8901011234080",
+    "createdAt": "2026-04-14T07:30:00.000Z",
+    "updatedAt": "2026-04-14T15:00:00.000Z"
+  }
+]

@@ -1,4 +1,3 @@
-
 /** Store-level feature flags; used for nav and settings (synced with backend enabledModules/enabledFeatures). */
 export interface StoreEnabledModules {
   boph?: boolean;
@@ -13,7 +12,7 @@ export interface StoreEnabledModules {
 export interface StoreCreditSetting {
   customerCredit: {
     creditLimit: number;
-    termType: 'fixed' | 'variable';
+    termType: "fixed" | "variable";
     term?: number; // required when termType === 'fixed' (days)
   };
 }
@@ -107,7 +106,7 @@ export interface TransactionItem {
 
 /** Structured discount on a transaction (manual discount from "Apply discount" modal). */
 export interface TransactionDiscount {
-  discountType: 'amount' | 'percentage';
+  discountType: "amount" | "percentage";
   discountAmount: number;
   discountReason: string;
 }
@@ -123,9 +122,11 @@ export interface Transaction {
   customerId?: string | null;
   date?: Date; // For backward compatibility
   createdAt?: string; // ISO date string from backend
+  /** Client-only: sent as Idempotency-Key on POST /transactions (offline queue + dedupe) */
+  idempotencyKey?: string;
   items: TransactionItem[];
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
+  paymentMethod: "Cash" | "Card" | "Mobile Money" | "Credit";
   voucherCode?: string | null;
   /** @deprecated Use discount.discountAmount when discount object is present. */
   discountAmount?: number | null;
@@ -140,7 +141,7 @@ export interface Transaction {
 export interface Voucher {
   id?: string; // UUID (backend)
   code: string;
-  type: 'percentage' | 'fixed';
+  type: "percentage" | "fixed";
   value: number;
   minPurchase: number;
   isActive: boolean;
@@ -158,10 +159,15 @@ export interface Category {
   id?: number;
   name: string;
   storeId?: string; // Optional for backward compatibility, but not used for filtering
-
 }
 
-export type StockAdjustmentReason = 'New stock received' | 'Returns' | 'Shrinkage' | 'Expansion' | 'Damages' | 'Expired';
+export type StockAdjustmentReason =
+  | "New stock received"
+  | "Returns"
+  | "Shrinkage"
+  | "Expansion"
+  | "Damages"
+  | "Expired";
 
 export interface StockAdjustment {
   id?: string; // UUID (backend)
@@ -176,7 +182,7 @@ export interface StockAdjustment {
   storeId: string;
 }
 
-export type ParcelStatus = 'Incoming' | 'Received' | 'Collected';
+export type ParcelStatus = "Incoming" | "Received" | "Collected";
 
 export interface Parcel {
   id?: string; // UUID (backend)
@@ -213,13 +219,13 @@ export interface PurchaseOrder {
   subtotal: number;
   deliveryFee: number;
   total: number;
-  deliveryMethod: 'delivery' | 'collection';
-  status: 'pending' | 'completed' | 'cancelled';
+  deliveryMethod: "delivery" | "collection";
+  status: "pending" | "completed" | "cancelled";
   storeId: string;
 }
 
 /** User roles: admin (back-office), staff (store staff), store_admin (store owner from assign-store). */
-export type UserRole = 'admin' | 'staff' | 'store_admin';
+export type UserRole = "admin" | "staff" | "store_admin";
 
 export interface User {
   id: string;
@@ -239,8 +245,8 @@ export interface UpdateProfileDto {
 }
 
 export interface AppSettings {
-  theme: 'light' | 'dark';
-  language: 'en' | 'fr' | 'sw' | 'zu' | 'so' | 'am';
+  theme: "light" | "dark";
+  language: "en" | "fr" | "sw" | "zu" | "so" | "am";
   campaigns: boolean;
   marketplace: boolean;
   boph: boolean;

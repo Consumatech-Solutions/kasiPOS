@@ -34,7 +34,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/api/transactions", () => ({
   transactionsApi: {
-    create: (data: unknown) => mocks.transactionsCreate(data),
+    create: (data: unknown, opts?: { idempotencyKey?: string }) =>
+      mocks.transactionsCreate(data, opts),
   },
   toCreateTransactionDto: (x: unknown) => x,
 }));
@@ -147,7 +148,29 @@ describe("executeMutation", () => {
         ]),
         customerId: "real-cust",
       }),
+      expect.objectContaining({ idempotencyKey: undefined }),
     );
+  });
+
+  it("transactions/create passes idempotencyKey to API", async () => {
+    await executeMutation(["transactions", "create"], {
+      storeId: "store-1",
+      idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
+      items: [
+        {
+          productId: "p1",
+          productName: "X",
+          quantity: 1,
+          unitPrice: 5,
+          totalPrice: 5,
+        },
+      ],
+      total: 5,
+      paymentMethod: "Cash",
+    });
+    expect(mocks.transactionsCreate).toHaveBeenCalledWith(expect.anything(), {
+      idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
+    });
   });
 
   it("products/create uses categoryId and syncIdMapping for _tempId", async () => {

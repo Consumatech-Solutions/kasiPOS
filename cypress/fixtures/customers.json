@@ -1,0 +1,29 @@
+[
+  {
+    "id": "cust-001",
+    "name": "Alice Mokoena",
+    "contact": "0821000001",
+    "loyaltyPoints": 12,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "cust-002",
+    "name": "Brian Nkosi",
+    "contact": "0821000002",
+    "loyaltyPoints": 0,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "cust-003",
+    "name": "Cindy Naidoo",
+    "contact": "cindy@example.com",
+    "loyaltyPoints": 41,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  }
+]
