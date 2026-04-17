@@ -1,9 +1,21 @@
-'use client';
+"use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import type { TransactionItem } from '@/types';
-import type { Product } from '@/types';
-import { loadCartFromSessionStorageAsync, saveCartToSessionStorage } from '@/lib/cart-storage';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
+import type { TransactionItem } from "@/types";
+import type { Product } from "@/types";
+import {
+  loadCartFromSessionStorageAsync,
+  saveCartToSessionStorage,
+} from "@/lib/cart-storage";
+import { feedback } from "@/lib/feedback";
 
 /**
  * Cart state is persisted in localStorage so the payment cart stays operational
@@ -15,6 +27,11 @@ type CartMap = Map<string, TransactionItem>;
 
 /** Cache persisting across CartProvider remounts (same tab). */
 let cartMemoryCache: CartMap | null = null;
+
+/** Clears the in-memory cart cache (used by Vitest so cases do not leak state). */
+export function resetCartMemoryCacheForTests(): void {
+  cartMemoryCache = null;
+}
 
 interface CartContextValue {
   cart: CartMap;
@@ -78,7 +95,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const setCart = useCallback((action: React.SetStateAction<CartMap>) => {
     setCartState((prev) => {
-      const next = typeof action === 'function' ? action(prev) : action;
+      const next = typeof action === "function" ? action(prev) : action;
       return new Map(next);
     });
   }, []);
@@ -86,13 +103,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addToCart = useCallback((product: Product) => {
     const productId = product.id;
     if (!productId) return;
-    const unitPrice = typeof product.price === 'number' ? product.price : parseFloat(String(product.price)) || 0;
+    const unitPrice =
+      typeof product.price === "number"
+        ? product.price
+        : parseFloat(String(product.price)) || 0;
+    const maxStock = product.stock;
     setCartState((prev) => {
       const newCart = new Map(prev);
       const existingItem = newCart.get(productId);
+      const nextQty = (existingItem?.quantity ?? 0) + 1;
+      if (
+        typeof maxStock === "number" &&
+        Number.isFinite(maxStock) &&
+        nextQty > maxStock
+      ) {
+        queueMicrotask(() => {
+          feedback.error(
+            "Insufficient stock",
+            `Only ${maxStock} available for this product.`,
+            "Reduce the quantity or restock before adding more.",
+          );
+        });
+        return prev;
+      }
       if (existingItem) {
         existingItem.quantity += 1;
-        existingItem.totalPrice = existingItem.quantity * existingItem.unitPrice;
+        existingItem.totalPrice =
+          existingItem.quantity * existingItem.unitPrice;
       } else {
         newCart.set(productId, {
           productId: productId,
@@ -100,7 +137,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           quantity: 1,
           unitPrice: unitPrice,
           totalPrice: unitPrice,
-          imageUrl: (product as Product & { productImage?: string }).productImage ?? product.imageUrl,
+          imageUrl:
+            (product as Product & { productImage?: string }).productImage ??
+            product.imageUrl,
           stock: product.stock,
         });
       }
@@ -108,21 +147,39 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const updateQuantity = useCallback((productId: string, newQuantity: number) => {
-    setCartState((prev) => {
-      const newCart = new Map(prev);
-      const item = newCart.get(productId);
-      if (item) {
-        if (newQuantity <= 0) {
-          newCart.delete(productId);
-        } else {
-          item.quantity = newQuantity;
-          item.totalPrice = item.quantity * item.unitPrice;
+  const updateQuantity = useCallback(
+    (productId: string, newQuantity: number) => {
+      setCartState((prev) => {
+        const newCart = new Map(prev);
+        const item = newCart.get(productId);
+        if (item) {
+          if (newQuantity <= 0) {
+            newCart.delete(productId);
+          } else {
+            const maxStock = item.stock;
+            if (
+              typeof maxStock === "number" &&
+              Number.isFinite(maxStock) &&
+              newQuantity > maxStock
+            ) {
+              queueMicrotask(() => {
+                feedback.error(
+                  "Insufficient stock",
+                  `Only ${maxStock} available for this product.`,
+                  "Lower the quantity or restock before selling more.",
+                );
+              });
+              return prev;
+            }
+            item.quantity = newQuantity;
+            item.totalPrice = item.quantity * item.unitPrice;
+          }
         }
-      }
-      return newCart;
-    });
-  }, []);
+        return newCart;
+      });
+    },
+    [],
+  );
 
   const clearCart = useCallback(() => {
     cartMemoryCache = null;
@@ -130,12 +187,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const cartItemCount = useMemo(() => {
-    return Array.from(cart.values()).reduce((sum, item) => sum + item.quantity, 0);
+    return Array.from(cart.values()).reduce(
+      (sum, item) => sum + item.quantity,
+      0,
+    );
   }, [cart]);
 
   const value = useMemo<CartContextValue>(
-    () => ({ cart, setCart, addToCart, updateQuantity, clearCart, cartItemCount, isCartHydrated: hydrated }),
-    [cart, setCart, addToCart, updateQuantity, clearCart, cartItemCount, hydrated]
+    () => ({
+      cart,
+      setCart,
+      addToCart,
+      updateQuantity,
+      clearCart,
+      cartItemCount,
+      isCartHydrated: hydrated,
+    }),
+    [
+      cart,
+      setCart,
+      addToCart,
+      updateQuantity,
+      clearCart,
+      cartItemCount,
+      hydrated,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
@@ -144,7 +220,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 export function useCart(): CartContextValue {
   const ctx = useContext(CartContext);
   if (!ctx) {
-    throw new Error('useCart must be used within a CartProvider');
+    throw new Error("useCart must be used within a CartProvider");
   }
   return ctx;
 }
