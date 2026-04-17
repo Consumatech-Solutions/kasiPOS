@@ -1,14 +1,18 @@
 export const CataloguePage = {
-  path: '/catalogue' as const,
+  path: "/catalogue" as const,
   productDialogSelector: '[data-testid="catalogue-product-dialog"]',
   categoryDialogSelector: '[data-testid="catalogue-category-dialog"]',
 
   getActiveDialog(selector: string) {
     const openSelector = `${selector}[data-state="open"]`;
-    return cy.get('body', { log: false }).then(($body) => {
+    return cy.get("body", { log: false }).then(($body) => {
       const $open = $body.find(openSelector);
       if ($open.length > 0) return cy.wrap($open.last());
-      return cy.get(selector, { timeout: 15_000 }).last();
+      const $visible = $body
+        .find(selector)
+        .filter((_, element) => Cypress.$(element).is(":visible"));
+      if ($visible.length > 0) return cy.wrap($visible.last());
+      return cy.get(openSelector, { timeout: 15_000 }).last();
     });
   },
 
@@ -18,51 +22,63 @@ export const CataloguePage = {
   },
 
   waitUntilLoaded() {
-    cy.waitForAppReady('/catalogue');
-    cy.findByText(/catalogue management/i).should('be.visible');
+    cy.waitForAppReady("/catalogue");
+    cy.findByText(/catalogue management/i).should("be.visible");
     return this;
   },
 
   clickSaveInProductDialog() {
     this.getActiveDialog(this.productDialogSelector).within(() => {
-      cy.contains('button', /^save$/i, { timeout: 10_000 }).should('not.be.disabled').click({ force: true });
+      cy.contains("button", /^save$/i, { timeout: 10_000 })
+        .should("not.be.disabled")
+        .click({ force: true });
     });
     return this;
   },
 
   clickSaveInCategoryDialog() {
     this.getActiveDialog(this.categoryDialogSelector).within(() => {
-      cy.contains('button', /^save$/i, { timeout: 10_000 }).should('not.be.disabled').click({ force: true });
+      cy.contains("button", /^save$/i, { timeout: 10_000 })
+        .should("not.be.disabled")
+        .click({ force: true });
     });
     return this;
   },
 
   openAddProductDialog() {
-    cy.get('[data-testid="catalogue-add-product-button"]').should('be.visible').click({ force: true });
+    cy.get('[data-testid="catalogue-add-product-button"]')
+      .should("be.visible")
+      .click({ force: true });
     cy.waitUntil(() => Cypress.$(this.productDialogSelector).length > 0, {
       timeout: 15_000,
-      errorMsg: 'Add Product dialog did not open',
+      errorMsg: "Add Product dialog did not open",
     });
-    this.getActiveDialog(this.productDialogSelector).find('input[name="name"]').should('exist');
+    this.getActiveDialog(this.productDialogSelector)
+      .find('input[name="name"]')
+      .should("exist");
     return this;
   },
 
   openAddCategoryDialog() {
     const clickAddCategory = () =>
-      cy.get('[data-testid="catalogue-add-category-button"]').should('be.visible').click({ force: true });
+      cy
+        .get('[data-testid="catalogue-add-category-button"]')
+        .should("be.visible")
+        .click({ force: true });
 
     clickAddCategory();
-    cy.wait(150);
-    cy.get('body').then(($body) => {
+    cy.get("body").then(($body) => {
       if ($body.find(this.categoryDialogSelector).length === 0) {
         clickAddCategory();
       }
     });
     cy.waitUntil(() => Cypress.$(this.categoryDialogSelector).length > 0, {
       timeout: 15_000,
-      errorMsg: 'Add Category dialog did not open',
+      errorMsg: "Add Category dialog did not open",
     });
-    this.getActiveDialog(this.categoryDialogSelector).find('input[name="name"]').should('be.visible');
+    this.getActiveDialog(this.categoryDialogSelector)
+      .find('input[name="name"]')
+      .should("be.visible");
     return this;
   },
 };
