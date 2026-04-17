@@ -77,11 +77,12 @@ describe("Vouchers", () => {
     PosPage.openVoucherDialog();
     cy.get("#voucherCode", { timeout: 15_000 }).clear();
     cy.get("#voucherCode", { timeout: 15_000 }).type("SAVE10");
-    cy.findByRole("button", { name: /find voucher/i }).should("be.enabled");
-    cy.findByRole("button", { name: /find voucher/i }).click();
-    cy.wait("@validateVoucher").then((interception) => {
-      expect(interception.response?.body).to.have.property("valid", true);
-    });
+    cy.findByRole("button", { name: /find voucher/i })
+      .should("be.enabled")
+      .click();
+    cy.wait("@validateVoucher")
+      .its("response.body")
+      .should("have.property", "valid", true);
     cy.findByRole("alert", { timeout: 15_000 }).should(
       "contain.text",
       "Voucher Found!",
@@ -110,11 +111,12 @@ describe("Vouchers", () => {
     PosPage.openVoucherDialog();
     cy.get("#voucherCode", { timeout: 15_000 }).clear();
     cy.get("#voucherCode", { timeout: 15_000 }).type("INACTIVE5");
-    cy.findByRole("button", { name: /find voucher/i }).should("be.enabled");
-    cy.findByRole("button", { name: /find voucher/i }).click();
-    cy.wait("@validateVoucher").then((interception) => {
-      expect(interception.response?.body).to.have.property("valid", false);
-    });
+    cy.findByRole("button", { name: /find voucher/i })
+      .should("be.enabled")
+      .click();
+    cy.wait("@validateVoucher")
+      .its("response.body")
+      .should("have.property", "valid", false);
     cy.findByRole("alert", { timeout: 15_000 }).should("contain.text", "Error");
     cy.findByRole("alert").should("contain.text", "inactive");
   });

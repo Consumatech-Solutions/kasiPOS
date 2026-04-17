@@ -82,6 +82,7 @@ import { cn } from "@/lib/utils";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useCart } from "@/components/providers/cart-provider";
 import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
+import { updateProductStockInDexie } from "@/lib/entity-cache";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -574,7 +575,26 @@ export default function PosPage() {
       }
     } else {
       // OFFLINE: Optimistically update and queue for later sync
+      const previousStockMap = new Map<string, number>();
       try {
+        // Snapshot stock before optimistic decrement (for rollback if save/queue fails offline)
+        const listQueriesSnapshot = queryClient.getQueriesData<{
+          data: { id?: string; stock?: number | null }[];
+        }>({ queryKey: productKeys.lists() });
+        for (const item of newTransaction.items) {
+          const pid = String(item.productId);
+          if (previousStockMap.has(pid)) continue;
+          let found: number | undefined;
+          for (const [, data] of listQueriesSnapshot) {
+            const row = data?.data?.find((p) => String(p.id) === pid);
+            if (row) {
+              found = row.stock ?? 0;
+              break;
+            }
+          }
+          previousStockMap.set(pid, found ?? 0);
+        }
+
         // 1. Optimistic cache update FIRST (synchronous, immediate UI feedback)
         const productQueryKeys = queryClient
           .getQueryCache()
@@ -594,7 +614,7 @@ export default function PosPage() {
                 ...old,
                 data: old.data.map((product) => {
                   const cartItem = newTransaction.items.find(
-                    (item) => item.productId === product.id,
+                    (item) => String(item.productId) === String(product.id),
                   );
                   if (cartItem) {
                     const currentStock = product.stock ?? 0;
@@ -652,17 +672,58 @@ export default function PosPage() {
         }
         console.error("Failed to complete offline sale:", error);
 
-        // Rollback optimistic updates on error
+        // Rollback optimistic cache + Dexie (invalidateQueries refetches and fails while offline)
+        const queriesData = queryClient.getQueriesData<{
+          data: { id?: string; stock?: number | null }[];
+          meta?: unknown;
+        }>({ queryKey: productKeys.lists() });
+        queriesData.forEach(([queryKey, data]) => {
+          if (!data?.data || !Array.isArray(data.data)) return;
+          queryClient.setQueryData(queryKey, {
+            ...data,
+            data: data.data.map((product) => {
+              const pid = String(product.id);
+              if (!previousStockMap.has(pid)) return product;
+              return { ...product, stock: previousStockMap.get(pid)! };
+            }),
+          });
+        });
         const productQueryKeys = queryClient
           .getQueryCache()
           .getAll()
-          .map((query) => query.queryKey);
-        const productQueries = productQueryKeys.filter(
-          (key) => Array.isArray(key) && key[0] === "products",
+          .map((q) => q.queryKey);
+        const nonListProductQueries = productQueryKeys.filter(
+          (key) =>
+            Array.isArray(key) &&
+            key[0] === "products" &&
+            !(key[1] === "list" || key.length < 2),
         );
-        productQueries.forEach((queryKey) => {
-          queryClient.invalidateQueries({ queryKey });
+        nonListProductQueries.forEach((queryKey) => {
+          queryClient.setQueryData<{ data: any[]; meta: any }>(
+            queryKey,
+            (old) => {
+              if (!old?.data) return old;
+              return {
+                ...old,
+                data: old.data.map(
+                  (product: { id?: string; stock?: number | null }) => {
+                    const pid = String(product.id);
+                    if (!previousStockMap.has(pid)) return product;
+                    return { ...product, stock: previousStockMap.get(pid)! };
+                  },
+                ),
+              };
+            },
+          );
         });
+
+        for (const item of newTransaction.items) {
+          const pid = String(item.productId);
+          const prev = previousStockMap.get(pid);
+          if (prev !== undefined) {
+            await updateProductStockInDexie(pid, prev);
+          }
+        }
 
         feedback.fromError(
           error,
@@ -1043,11 +1104,9 @@ export default function PosPage() {
                 </Dialog>
                 {settings?.campaigns && (
                   <Button
-                    type="button"
                     variant="ghost"
                     size="sm"
                     className="min-h-[44px] touch-target text-xs sm:text-sm"
-                    aria-label="Redeem voucher"
                     onClick={handleOpenVoucherModal}
                   >
                     <Ticket className="mr-1 sm:mr-2 h-4 w-4" />
