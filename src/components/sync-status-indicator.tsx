@@ -67,6 +67,8 @@ export function SyncStatusIndicator() {
     <>
       <div className="fixed bottom-4 right-4 z-50">
         <Button
+          type="button"
+          aria-label="Open cloud sync status"
           onClick={() => setIsModalOpen(true)}
           title={idleQuiet ? 'Cloud sync — tap for status and download' : undefined}
           className={`h-12 w-12 rounded-full shadow-lg ${colorClass} text-white p-0 relative ${idleQuiet ? 'opacity-90' : ''}`}

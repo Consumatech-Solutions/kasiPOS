@@ -1,0 +1,22 @@
+[
+  {
+    "id": "mkt-store-001",
+    "code": "fresh-mart",
+    "name": "Fresh Mart",
+    "logoUrl": null,
+    "description": "Local groceries and produce",
+    "isActive": true,
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "mkt-store-002",
+    "code": "quick-buy",
+    "name": "Quick Buy",
+    "logoUrl": null,
+    "description": "Fast moving household items",
+    "isActive": true,
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  }
+]

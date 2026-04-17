@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import type { Customer, Transaction } from '@/types';
 import { feedback } from '@/lib/feedback';
 import { useSettings } from '@/components/settings-provider';
@@ -395,14 +395,24 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customerTransactions?.map(transaction => (
+                {customerTransactions?.map((transaction) => {
+                  const txDate =
+                    transaction.date instanceof Date
+                      ? transaction.date
+                      : transaction.date
+                        ? parseISO(String(transaction.date))
+                        : transaction.createdAt
+                          ? parseISO(transaction.createdAt)
+                          : new Date();
+                  return (
                   <TableRow key={transaction.id}>
                     <TableCell>#{transaction.id}</TableCell>
-                    <TableCell>{format(transaction.date, 'PPP')}</TableCell>
+                    <TableCell>{format(txDate, 'PPP')}</TableCell>
                     <TableCell>{transaction.items.length}</TableCell>
                     <TableCell className="text-right">R{transaction.total.toFixed(2)}</TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             {(!customerTransactions || customerTransactions.length === 0) && (

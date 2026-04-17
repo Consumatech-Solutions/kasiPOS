@@ -36,7 +36,10 @@ class OfflineDetector {
   /** Dev only: when true, report offline so you can test without cutting the network */
   private forceOffline = false;
   /** Runtime flag: when true, app behaves offline-first even with network connectivity */
-  private offlineFirstActive = true;
+  private offlineFirstActive =
+    typeof window !== 'undefined' && Boolean((window as Window & { Cypress?: unknown }).Cypress)
+      ? false
+      : true;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -228,6 +231,25 @@ class OfflineDetector {
 
 // Export singleton instance
 export const offlineDetector = new OfflineDetector();
+
+/**
+ * Cypress drives the same path as the dev "Simulate offline" toggle so `isOnline` cannot flip back
+ * when a connectivity probe started by `navigator.onLine` / `online` resolves after `setOffline()`.
+ */
+function installE2eOfflineHarnessBridge(): void {
+  if (typeof window === 'undefined' || !isDevHost()) return;
+  try {
+    if (window.localStorage.getItem('__kasi_pos_e2e') !== '1') return;
+  } catch {
+    return;
+  }
+  const win = window as Window & { __KASI_POS_E2E_OFFLINE?: (forcedOffline: boolean) => void };
+  win.__KASI_POS_E2E_OFFLINE = (forcedOffline: boolean) => {
+    offlineDetector.setForceOffline(forcedOffline);
+  };
+}
+
+installE2eOfflineHarnessBridge();
 
 // Export convenience functions
 export function isOffline(): boolean {

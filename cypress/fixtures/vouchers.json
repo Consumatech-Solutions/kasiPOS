@@ -1,0 +1,47 @@
+[
+  {
+    "id": "vouch-001",
+    "code": "SAVE10",
+    "type": "percentage",
+    "value": 10,
+    "minPurchase": 20,
+    "isActive": true,
+    "expiresAt": "2027-01-01T00:00:00.000Z",
+    "maxUses": 100,
+    "maxUsesPerCustomer": 2,
+    "currentUses": 1,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "vouch-002",
+    "code": "R15OFF",
+    "type": "fixed",
+    "value": 15,
+    "minPurchase": 50,
+    "isActive": true,
+    "expiresAt": "2027-01-01T00:00:00.000Z",
+    "maxUses": 50,
+    "maxUsesPerCustomer": 1,
+    "currentUses": 0,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  },
+  {
+    "id": "vouch-003",
+    "code": "INACTIVE5",
+    "type": "percentage",
+    "value": 5,
+    "minPurchase": 10,
+    "isActive": false,
+    "expiresAt": null,
+    "maxUses": null,
+    "maxUsesPerCustomer": null,
+    "currentUses": 0,
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-10T08:00:00.000Z",
+    "updatedAt": "2026-04-10T08:00:00.000Z"
+  }
+]

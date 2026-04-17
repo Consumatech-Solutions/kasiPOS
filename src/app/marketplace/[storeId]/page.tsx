@@ -126,16 +126,25 @@ export default function StorePosPage(props: PageProps) {
   // Debounce search and update filters
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFilters((prev: any) => ({ ...prev, search: productSearch }));
+      setFilters((prev) => {
+        const nextSearch = productSearch || undefined;
+        if (prev.search === nextSearch) return prev;
+        return { ...prev, search: nextSearch };
+      });
     }, 500);
     return () => clearTimeout(timer);
-  }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [productSearch, setFilters]);
 
-  // Update category filter
+  // Update category filter (avoid new filter objects when ids are unchanged — prevents render/update loops)
   useEffect(() => {
-    const categoryId = apiCategories.find((c) => c.name === activeCategory)?.id;
-    setFilters((prev: any) => ({ ...prev, categoryId }));
-  }, [activeCategory, apiCategories]); // eslint-disable-line react-hooks/exhaustive-deps
+    const categoryId = activeCategory
+      ? apiCategories.find((c) => c.name === activeCategory)?.id
+      : undefined;
+    setFilters((prev) => {
+      if (prev.categoryId === categoryId) return prev;
+      return { ...prev, categoryId };
+    });
+  }, [activeCategory, apiCategories, setFilters]);
 
   const allCategories = useMemo(() => {
     if (!apiCategories) return [];
@@ -543,7 +552,7 @@ export default function StorePosPage(props: PageProps) {
                       />
                     </div>
                   </DialogHeader>
-                  <ScrollArea className="max-h-[50vh]">
+                  <div className="max-h-[50vh] overflow-y-auto overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -568,7 +577,7 @@ export default function StorePosPage(props: PageProps) {
                         ))}
                       </TableBody>
                     </Table>
-                  </ScrollArea>
+                  </div>
                 </DialogContent>
               </Dialog>
             </div>
@@ -738,50 +747,6 @@ export default function StorePosPage(props: PageProps) {
         customer={selectedCustomer}
         isLoading={isCompletingOrder || isCreating}
       />
-
-      {/* Customer Selection Dialog */}
-      <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Select a Customer</DialogTitle>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <Input
-                placeholder="Search by name or phone number..."
-                className="pl-10"
-                value={customerSearchTerm}
-                onChange={(e) => setCustomerSearchTerm(e.target.value)}
-              />
-            </div>
-          </DialogHeader>
-          <ScrollArea className="max-h-[50vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCustomers?.map((customer) => (
-                  <TableRow
-                    key={customer.id}
-                    className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleCustomerSelect(customer.id)}
-                  >
-                    <TableCell>{customer.name}</TableCell>
-                    <TableCell>{customer.contact}</TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm">Select</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
