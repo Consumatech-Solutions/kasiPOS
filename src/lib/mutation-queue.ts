@@ -60,6 +60,42 @@ type SingleMutationOutcome =
   | "server_retry"
   | "failed_removed";
 
+/** Stable JSON string for comparing queued mutation payloads (sorted keys at every object level). */
+function stableStringify(value: unknown): string {
+  if (value === null) return "null";
+  const t = typeof value;
+  if (t === "undefined") return "undefined";
+  if (t === "string" || t === "boolean" || t === "number" || t === "bigint") {
+    return JSON.stringify(value);
+  }
+  if (typeof value === "object") {
+    if (value instanceof Date) {
+      return JSON.stringify(value.toISOString());
+    }
+    if (Array.isArray(value)) {
+      return "[" + value.map((v) => stableStringify(v)).join(",") + "]";
+    }
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return (
+      "{" +
+      keys
+        .map((k) => JSON.stringify(k) + ":" + stableStringify(obj[k]))
+        .join(",") +
+      "}"
+    );
+  }
+  return JSON.stringify(String(value));
+}
+
+function hashVariables(variables: unknown): string {
+  try {
+    return stableStringify(variables);
+  } catch {
+    return String(variables);
+  }
+}
+
 /** Priority for sync order: categories before products (products reference categories), then customers, then others */
 function getMutationPriority(m: QueuedMutation): number {
   const [type, action] = m.mutationKey;
@@ -453,6 +489,21 @@ class MutationQueue {
       }
     }
 
+    const mutationKeyStr = mutation.mutationKey.join("/");
+    const variablesHash = hashVariables(mutation.variables);
+    const isDuplicatePayload = this.queue.some(
+      (m) =>
+        m.mutationKey.join("/") === mutationKeyStr &&
+        hashVariables(m.variables) === variablesHash,
+    );
+    if (isDuplicatePayload) {
+      console.log(
+        "[MutationQueue] Duplicate mutation skipped:",
+        mutationKeyStr,
+      );
+      return;
+    }
+
     const queuedMutation: QueuedMutation = {
       ...mutation,
       id: `mutation-${Date.now()}-${Math.random()}`,
@@ -638,6 +689,9 @@ class MutationQueue {
 
   clear() {
     this.queue = [];
+    this.processing = false;
+    this.currentMutation = null;
+    this.currentStatus = "idle";
     void this.persistQueue();
   }
 

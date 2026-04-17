@@ -91,11 +91,15 @@ vi.mock("@/lib/feedback", () => ({
 import { feedback } from "@/lib/feedback";
 import { mutationQueue } from "@/lib/mutation-queue";
 
+/** Unique variables so deduplication does not collapse distinct test mutations. */
+let testMutationSeq = 0;
+
 function addQueuedMutation(mutationKey: string[]) {
+  testMutationSeq += 1;
   mutationQueue.add({
     mutationKey,
     mutationFn: () => hoisted.executeMutationImpl(mutationKey, {}),
-    variables: {},
+    variables: { _testSeq: testMutationSeq },
   });
 }
 
@@ -111,6 +115,7 @@ async function runMaxRetriesFailureTest() {
 
 describe("mutationQueue", () => {
   beforeEach(() => {
+    testMutationSeq = 0;
     hoisted.offlineFirst = true;
     hoisted.mqRows.length = 0;
     hoisted.checkOffline.mockResolvedValue(false);
@@ -152,6 +157,49 @@ describe("mutationQueue", () => {
     const result = await mutationQueue.processQueue({ force: false });
     expect(result.stoppedReason).toBe("offline");
     expect(result.syncedCount).toBe(0);
+  });
+
+  it("dedupes identical mutationKey + variables (e.g. double queue add)", () => {
+    const vars = { name: "Widgets", _tempId: "temp-1" };
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: vars,
+    });
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { ...vars },
+    });
+    expect(mutationQueue.getPendingCount()).toBe(1);
+  });
+
+  it("treats same category payload as duplicate regardless of object key order", () => {
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { b: 1, a: 2 },
+    });
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { a: 2, b: 1 },
+    });
+    expect(mutationQueue.getPendingCount()).toBe(1);
+  });
+
+  it("allows two queued mutations when variables differ", () => {
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { name: "A" },
+    });
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { name: "B" },
+    });
+    expect(mutationQueue.getPendingCount()).toBe(2);
   });
 
   it("dedupes transactions/create when idempotencyKey matches an item already in queue", () => {

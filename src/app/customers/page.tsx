@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { format, parseISO } from "date-fns";
 import type { Customer, Transaction } from "@/types";
 import { feedback } from "@/lib/feedback";
@@ -143,7 +143,11 @@ export default function CustomersPage() {
     setCustomerDialogOpen(true);
   };
 
+  const customerSubmitRef = useRef(false);
+
   const handleCustomerSubmit = async (data: any) => {
+    if (customerSubmitRef.current || isCreating || isUpdating) return;
+    customerSubmitRef.current = true;
     try {
       if (editingCustomer) {
         if (isOnline) {
@@ -245,6 +249,8 @@ export default function CustomersPage() {
         "Failed to save customer",
         "Check your connection and try again.",
       );
+    } finally {
+      customerSubmitRef.current = false;
     }
   };
 

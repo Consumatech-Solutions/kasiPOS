@@ -182,6 +182,8 @@ export default function CataloguePage() {
   const [duplicateNameModal, setDuplicateNameModal] = useState<{
     type: "product" | "category";
   } | null>(null);
+  const productSubmitRef = useRef(false);
+  const categorySubmitRef = useRef(false);
 
   /** Open delete confirm after releasing focus from dropdown to avoid aria-hidden on focused element */
   const openDeleteConfirm = useCallback(
@@ -365,6 +367,9 @@ export default function CataloguePage() {
   };
 
   const handleProductSubmit = async (values: z.infer<typeof productSchema>) => {
+    if (productSubmitRef.current || isCreatingProduct || isUpdatingProduct)
+      return;
+    productSubmitRef.current = true;
     try {
       // Use the uploaded image URL if available, otherwise use the form value
       const imageUrl = productImageUrl || values.imageUrl || "";
@@ -530,6 +535,8 @@ export default function CataloguePage() {
         "Failed to save product",
         "Check your connection and try again.",
       );
+    } finally {
+      productSubmitRef.current = false;
     }
   };
 
@@ -596,6 +603,9 @@ export default function CataloguePage() {
   const handleCategorySubmit = async (
     values: z.infer<typeof categorySchema>,
   ) => {
+    if (categorySubmitRef.current || isCreatingCategory || isUpdatingCategory)
+      return;
+    categorySubmitRef.current = true;
     try {
       if (editingCategory && editingCategory.id) {
         if (isOnline) {
@@ -732,6 +742,8 @@ export default function CataloguePage() {
         "Failed to save category",
         "Check your connection and try again.",
       );
+    } finally {
+      categorySubmitRef.current = false;
     }
   };
 

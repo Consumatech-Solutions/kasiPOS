@@ -376,362 +376,359 @@ export default function PosPage() {
   };
 
   const [isCompletingSale, setIsCompletingSale] = useState(false);
+  const completingSaleRef = useRef(false);
 
   const handleCompleteSale = async (
     transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
   ) => {
-    if (isCompletingSale) return;
+    if (completingSaleRef.current || isCompletingSale) return;
+    completingSaleRef.current = true;
     setIsCompletingSale(true);
-    if (process.env.NODE_ENV === "development") {
-      console.log("[Complete Sale] Started", {
-        method: transactionDetails.paymentMethod,
-        items: transactionDetails.items.length,
-        total: transactionDetails.total,
-      });
-    }
-    const currentStore = await ensureStore();
-    if (!currentStore) {
-      setIsCompletingSale(false);
-      return;
-    }
-    if (process.env.NODE_ENV === "development") {
-      console.log("[Complete Sale] Store resolved", {
-        storeId: currentStore.id,
-        isOnline: isOnline,
-      });
-    }
-    const idempotencyKey = crypto.randomUUID();
-    const newTransaction: Omit<Transaction, "id"> = {
-      ...transactionDetails,
-      date: new Date(),
-      customerId: transactionDetails.customerId ?? selectedCustomerId,
-      voucherCode: appliedVoucherCode,
-      discountAmount: appliedDiscount,
-      discount: manualDiscount ?? undefined,
-      total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
-      storeId: currentStore.id!,
-      idempotencyKey,
-    };
-
-    const toReceiptData = (saleId: string): ReceiptData =>
-      buildReceiptDataFromUtil({
-        storeName: currentStore.name,
-        saleId,
-        items: newTransaction.items,
-        subtotal: cartTotal, // Ex-VAT subtotal when VAT on, otherwise same as total
-        discountAmount: appliedDiscount + manualDiscountAmount,
-        total: amountToPay,
-        paymentMethod: newTransaction.paymentMethod,
-        showVat: showVatInCheckout,
-        voucherCode: appliedVoucherCode ?? null,
-        timestamp: new Date(),
-      });
-
-    if (isOnline) {
-      // ONLINE: Use API - backend will update stock. Resolve temp IDs before sending.
-      try {
-        const mappings = await getDb().syncIdMapping.toArray();
-        const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
-        const unresolvedProductIds = newTransaction.items
-          .map((item) => String(item.productId))
-          .filter((id) => id.startsWith("temp-") && !map.has(id));
-        if (unresolvedProductIds.length > 0) {
-          setIsCompletingSale(false);
-          feedback.error(
-            "Products still syncing",
-            "Some products in your cart haven't finished syncing. Please wait a moment and try again.",
-          );
-          return;
-        }
-        const resolvedItems = newTransaction.items.map((item) => ({
-          ...item,
-          productId: map.get(String(item.productId)) ?? String(item.productId),
-        }));
-        const resolvedCustomerId =
-          newTransaction.customerId &&
-          String(newTransaction.customerId).startsWith("temp-")
-            ? (map.get(String(newTransaction.customerId)) ??
-              newTransaction.customerId)
-            : newTransaction.customerId;
-        const resolvedTx = {
-          ...newTransaction,
-          items: resolvedItems,
-          customerId: resolvedCustomerId,
-        };
-        const payload = toCreateTransactionDto(
-          resolvedTx as Omit<Transaction, "id"> & {
-            items: Array<TransactionItem & { [k: string]: unknown }>;
-          },
-        );
-        const response = await transactionsApi.create(payload, {
-          idempotencyKey,
+    try {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Complete Sale] Started", {
+          method: transactionDetails.paymentMethod,
+          items: transactionDetails.items.length,
+          total: transactionDetails.total,
         });
-
-        const resData = response.data as
-          | { id?: string; data?: { id?: string } }
-          | undefined;
-        const createdId =
-          resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
-        await db.transactions.add({
-          ...newTransaction,
-          id: String(createdId),
-        } as Transaction);
-
-        queryClient.invalidateQueries({
-          queryKey: productKeys.lists(),
-          refetchType: "all",
-        });
-
-        clearCartAndResetCoupons();
-        setSelectedCustomerId(undefined);
-        setActivePaymentMethod(null);
-        const receiptPayload = toReceiptData(String(createdId));
-        setReceiptData(receiptPayload);
-        setTimeout(() => setReceiptOpen(true), 0);
-
-        if (process.env.NODE_ENV === "development") {
-          console.log("[Complete Sale] Success (online)", {
-            createdId: resData?.id ?? resData?.data?.id,
-          });
-        }
-        feedback.success("Sale complete!", "View your receipt below.");
-      } catch (error: unknown) {
-        const err = error as {
-          message?: string;
-          response?: { status?: number; data?: unknown };
-        };
-        const response = err?.response as
-          | { status?: number; data?: unknown }
-          | undefined;
-        const status = response?.status;
-        const data = response?.data as Record<string, unknown> | undefined;
-        let serverMessage: string | undefined;
-        if (data && typeof data === "object") {
-          if (typeof data.message === "string") serverMessage = data.message;
-          else if (Array.isArray(data.message) && data.message[0] != null)
-            serverMessage = String(data.message[0]);
-          else if (Array.isArray(data.errors) && data.errors[0] != null)
-            serverMessage = String(data.errors[0]);
-          else if (typeof data.error === "string") serverMessage = data.error;
-          else if (typeof (data as { message?: string }).message === "string")
-            serverMessage = (data as { message?: string }).message;
-        }
-        const fallbackMessage =
-          err?.message ??
-          (error instanceof Error ? error.message : String(error));
-
-        if (process.env.NODE_ENV === "development") {
-          console.error(
-            "[Complete Sale] Failed",
-            "status:",
-            status,
-            "serverMessage:",
-            serverMessage,
-            "storeId sent:",
-            newTransaction?.storeId,
-          );
-          if (data)
-            console.error(
-              "[Complete Sale] Response data:",
-              JSON.stringify(data),
-            );
-          console.error("[Complete Sale] Error:", error);
-        }
-
-        setActivePaymentMethod(null);
-        const messageForUser = serverMessage ?? fallbackMessage;
-        const showInPopup =
-          status != null &&
-          status >= 400 &&
-          status < 500 &&
-          (messageForUser || status === 400);
-        const isStoreIdError =
-          messageForUser && /storeId|integer/i.test(messageForUser);
-        const isCreditNotConfigured =
-          messageForUser &&
-          /credit.*not configured|not configured.*credit/i.test(messageForUser);
-        const popupMessage = isStoreIdError
-          ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
-          : isCreditNotConfigured
-            ? "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term."
-            : messageForUser ||
-              "Something went wrong. Check the items and store.";
-        if (showInPopup) {
-          setInsufficientStockPopup({
-            open: true,
-            message: popupMessage,
-          });
-        } else {
-          feedback.fromError(
-            error,
-            "Failed to complete the sale",
-            messageForUser
-              ? `${messageForUser} Try again or check your connection.`
-              : "Check your connection and try again.",
-          );
-        }
-      } finally {
-        setIsCompletingSale(false);
       }
-    } else {
-      // OFFLINE: Optimistically update and queue for later sync
-      const previousStockMap = new Map<string, number>();
-      try {
-        // Snapshot stock before optimistic decrement (for rollback if save/queue fails offline)
-        const listQueriesSnapshot = queryClient.getQueriesData<{
-          data: { id?: string; stock?: number | null }[];
-        }>({ queryKey: productKeys.lists() });
-        for (const item of newTransaction.items) {
-          const pid = String(item.productId);
-          if (previousStockMap.has(pid)) continue;
-          let found: number | undefined;
-          for (const [, data] of listQueriesSnapshot) {
-            const row = data?.data?.find((p) => String(p.id) === pid);
-            if (row) {
-              found = row.stock ?? 0;
-              break;
-            }
+      const currentStore = await ensureStore();
+      if (!currentStore) return;
+
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Complete Sale] Store resolved", {
+          storeId: currentStore.id,
+          isOnline: isOnline,
+        });
+      }
+      const idempotencyKey = crypto.randomUUID();
+      const newTransaction: Omit<Transaction, "id"> = {
+        ...transactionDetails,
+        date: new Date(),
+        customerId: transactionDetails.customerId ?? selectedCustomerId,
+        voucherCode: appliedVoucherCode,
+        discountAmount: appliedDiscount,
+        discount: manualDiscount ?? undefined,
+        total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
+        storeId: currentStore.id!,
+        idempotencyKey,
+      };
+
+      const toReceiptData = (saleId: string): ReceiptData =>
+        buildReceiptDataFromUtil({
+          storeName: currentStore.name,
+          saleId,
+          items: newTransaction.items,
+          subtotal: cartTotal, // Ex-VAT subtotal when VAT on, otherwise same as total
+          discountAmount: appliedDiscount + manualDiscountAmount,
+          total: amountToPay,
+          paymentMethod: newTransaction.paymentMethod,
+          showVat: showVatInCheckout,
+          voucherCode: appliedVoucherCode ?? null,
+          timestamp: new Date(),
+        });
+
+      if (isOnline) {
+        // ONLINE: Use API - backend will update stock. Resolve temp IDs before sending.
+        try {
+          const mappings = await getDb().syncIdMapping.toArray();
+          const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
+          const unresolvedProductIds = newTransaction.items
+            .map((item) => String(item.productId))
+            .filter((id) => id.startsWith("temp-") && !map.has(id));
+          if (unresolvedProductIds.length > 0) {
+            feedback.error(
+              "Products still syncing",
+              "Some products in your cart haven't finished syncing. Please wait a moment and try again.",
+            );
+            return;
           }
-          previousStockMap.set(pid, found ?? 0);
-        }
-
-        // 1. Optimistic cache update FIRST (synchronous, immediate UI feedback)
-        const productQueryKeys = queryClient
-          .getQueryCache()
-          .getAll()
-          .map((query) => query.queryKey);
-        const productQueries = productQueryKeys.filter(
-          (key) => Array.isArray(key) && key[0] === "products",
-        );
-
-        // Update stock optimistically for all product queries
-        productQueries.forEach((queryKey) => {
-          queryClient.setQueryData<{ data: any[]; meta: any }>(
-            queryKey,
-            (old) => {
-              if (!old || !old.data) return old;
-              return {
-                ...old,
-                data: old.data.map((product) => {
-                  const cartItem = newTransaction.items.find(
-                    (item) => String(item.productId) === String(product.id),
-                  );
-                  if (cartItem) {
-                    const currentStock = product.stock ?? 0;
-                    const newStock = Math.max(
-                      0,
-                      currentStock - cartItem.quantity,
-                    );
-                    return { ...product, stock: newStock };
-                  }
-                  return product;
-                }),
-              };
+          const resolvedItems = newTransaction.items.map((item) => ({
+            ...item,
+            productId:
+              map.get(String(item.productId)) ?? String(item.productId),
+          }));
+          const resolvedCustomerId =
+            newTransaction.customerId &&
+            String(newTransaction.customerId).startsWith("temp-")
+              ? (map.get(String(newTransaction.customerId)) ??
+                newTransaction.customerId)
+              : newTransaction.customerId;
+          const resolvedTx = {
+            ...newTransaction,
+            items: resolvedItems,
+            customerId: resolvedCustomerId,
+          };
+          const payload = toCreateTransactionDto(
+            resolvedTx as Omit<Transaction, "id"> & {
+              items: Array<TransactionItem & { [k: string]: unknown }>;
             },
           );
-        });
-
-        // 2. Save transaction to local IndexedDB
-        await db.transactions.add(newTransaction as Transaction);
-
-        // 3. Queue the transaction for sync when back online
-        mutationQueue.add({
-          mutationKey: ["transactions", "create"],
-          mutationFn: () =>
-            transactionsApi.create(
-              toCreateTransactionDto(
-                newTransaction as Omit<Transaction, "id"> & {
-                  items: Array<TransactionItem & { [k: string]: unknown }>;
-                },
-              ),
-              { idempotencyKey },
-            ),
-          variables: newTransaction,
-        });
-
-        setIsCompletingSale(false);
-
-        const localSaleId = `LOCAL-${Date.now()}`;
-        if (process.env.NODE_ENV === "development") {
-          console.log("[Complete Sale] Success (offline)", { localSaleId });
-        }
-        clearCartAndResetCoupons();
-        setSelectedCustomerId(undefined);
-        setActivePaymentMethod(null);
-        const receiptPayload = toReceiptData(localSaleId);
-        setReceiptData(receiptPayload);
-        setTimeout(() => setReceiptOpen(true), 0);
-
-        feedback.success(
-          "Offline sale complete!",
-          "Receipt saved. Will sync when back online.",
-        );
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("[Complete Sale] Failed (offline)", { error });
-        }
-        console.error("Failed to complete offline sale:", error);
-
-        // Rollback optimistic cache + Dexie (invalidateQueries refetches and fails while offline)
-        const queriesData = queryClient.getQueriesData<{
-          data: { id?: string; stock?: number | null }[];
-          meta?: unknown;
-        }>({ queryKey: productKeys.lists() });
-        queriesData.forEach(([queryKey, data]) => {
-          if (!data?.data || !Array.isArray(data.data)) return;
-          queryClient.setQueryData(queryKey, {
-            ...data,
-            data: data.data.map((product) => {
-              const pid = String(product.id);
-              if (!previousStockMap.has(pid)) return product;
-              return { ...product, stock: previousStockMap.get(pid)! };
-            }),
+          const response = await transactionsApi.create(payload, {
+            idempotencyKey,
           });
-        });
-        const productQueryKeys = queryClient
-          .getQueryCache()
-          .getAll()
-          .map((q) => q.queryKey);
-        const nonListProductQueries = productQueryKeys.filter(
-          (key) =>
-            Array.isArray(key) &&
-            key[0] === "products" &&
-            !(key[1] === "list" || key.length < 2),
-        );
-        nonListProductQueries.forEach((queryKey) => {
-          queryClient.setQueryData<{ data: any[]; meta: any }>(
-            queryKey,
-            (old) => {
-              if (!old?.data) return old;
-              return {
-                ...old,
-                data: old.data.map(
-                  (product: { id?: string; stock?: number | null }) => {
-                    const pid = String(product.id);
-                    if (!previousStockMap.has(pid)) return product;
-                    return { ...product, stock: previousStockMap.get(pid)! };
+
+          const resData = response.data as
+            | { id?: string; data?: { id?: string } }
+            | undefined;
+          const createdId =
+            resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
+          await db.transactions.add({
+            ...newTransaction,
+            id: String(createdId),
+          } as Transaction);
+
+          queryClient.invalidateQueries({
+            queryKey: productKeys.lists(),
+            refetchType: "all",
+          });
+
+          clearCartAndResetCoupons();
+          setSelectedCustomerId(undefined);
+          setActivePaymentMethod(null);
+          const receiptPayload = toReceiptData(String(createdId));
+          setReceiptData(receiptPayload);
+          setTimeout(() => setReceiptOpen(true), 0);
+
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Complete Sale] Success (online)", {
+              createdId: resData?.id ?? resData?.data?.id,
+            });
+          }
+          feedback.success("Sale complete!", "View your receipt below.");
+        } catch (error: unknown) {
+          const err = error as {
+            message?: string;
+            response?: { status?: number; data?: unknown };
+          };
+          const response = err?.response as
+            | { status?: number; data?: unknown }
+            | undefined;
+          const status = response?.status;
+          const data = response?.data as Record<string, unknown> | undefined;
+          let serverMessage: string | undefined;
+          if (data && typeof data === "object") {
+            if (typeof data.message === "string") serverMessage = data.message;
+            else if (Array.isArray(data.message) && data.message[0] != null)
+              serverMessage = String(data.message[0]);
+            else if (Array.isArray(data.errors) && data.errors[0] != null)
+              serverMessage = String(data.errors[0]);
+            else if (typeof data.error === "string") serverMessage = data.error;
+            else if (typeof (data as { message?: string }).message === "string")
+              serverMessage = (data as { message?: string }).message;
+          }
+          const fallbackMessage =
+            err?.message ??
+            (error instanceof Error ? error.message : String(error));
+
+          if (process.env.NODE_ENV === "development") {
+            console.error(
+              "[Complete Sale] Failed",
+              "status:",
+              status,
+              "serverMessage:",
+              serverMessage,
+              "storeId sent:",
+              newTransaction?.storeId,
+            );
+            if (data)
+              console.error(
+                "[Complete Sale] Response data:",
+                JSON.stringify(data),
+              );
+            console.error("[Complete Sale] Error:", error);
+          }
+
+          setActivePaymentMethod(null);
+          const messageForUser = serverMessage ?? fallbackMessage;
+          const showInPopup =
+            status != null &&
+            status >= 400 &&
+            status < 500 &&
+            (messageForUser || status === 400);
+          const isStoreIdError =
+            messageForUser && /storeId|integer/i.test(messageForUser);
+          const isCreditNotConfigured =
+            messageForUser &&
+            /credit.*not configured|not configured.*credit/i.test(
+              messageForUser,
+            );
+          const popupMessage = isStoreIdError
+            ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
+            : isCreditNotConfigured
+              ? "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term."
+              : messageForUser ||
+                "Something went wrong. Check the items and store.";
+          if (showInPopup) {
+            setInsufficientStockPopup({
+              open: true,
+              message: popupMessage,
+            });
+          } else {
+            feedback.fromError(
+              error,
+              "Failed to complete the sale",
+              messageForUser
+                ? `${messageForUser} Try again or check your connection.`
+                : "Check your connection and try again.",
+            );
+          }
+        }
+      } else {
+        // OFFLINE: Optimistically update and queue for later sync
+        const previousStockMap = new Map<string, number>();
+        try {
+          // Snapshot stock before optimistic decrement (for rollback if save/queue fails offline)
+          const listQueriesSnapshot = queryClient.getQueriesData<{
+            data: { id?: string; stock?: number | null }[];
+          }>({ queryKey: productKeys.lists() });
+          for (const item of newTransaction.items) {
+            const pid = String(item.productId);
+            if (previousStockMap.has(pid)) continue;
+            let found: number | undefined;
+            for (const [, data] of listQueriesSnapshot) {
+              const row = data?.data?.find((p) => String(p.id) === pid);
+              if (row) {
+                found = row.stock ?? 0;
+                break;
+              }
+            }
+            previousStockMap.set(pid, found ?? 0);
+          }
+
+          const productQueryKeys = queryClient
+            .getQueryCache()
+            .getAll()
+            .map((query) => query.queryKey);
+          const productQueries = productQueryKeys.filter(
+            (key) => Array.isArray(key) && key[0] === "products",
+          );
+
+          productQueries.forEach((queryKey) => {
+            queryClient.setQueryData<{ data: any[]; meta: any }>(
+              queryKey,
+              (old) => {
+                if (!old || !old.data) return old;
+                return {
+                  ...old,
+                  data: old.data.map((product) => {
+                    const cartItem = newTransaction.items.find(
+                      (item) => String(item.productId) === String(product.id),
+                    );
+                    if (cartItem) {
+                      const currentStock = product.stock ?? 0;
+                      const newStock = Math.max(
+                        0,
+                        currentStock - cartItem.quantity,
+                      );
+                      return { ...product, stock: newStock };
+                    }
+                    return product;
+                  }),
+                };
+              },
+            );
+          });
+
+          await db.transactions.add(newTransaction as Transaction);
+
+          mutationQueue.add({
+            mutationKey: ["transactions", "create"],
+            mutationFn: () =>
+              transactionsApi.create(
+                toCreateTransactionDto(
+                  newTransaction as Omit<Transaction, "id"> & {
+                    items: Array<TransactionItem & { [k: string]: unknown }>;
                   },
                 ),
-              };
-            },
-          );
-        });
+                { idempotencyKey },
+              ),
+            variables: newTransaction,
+          });
 
-        for (const item of newTransaction.items) {
-          const pid = String(item.productId);
-          const prev = previousStockMap.get(pid);
-          if (prev !== undefined) {
-            await updateProductStockInDexie(pid, prev);
+          const localSaleId = `LOCAL-${Date.now()}`;
+          if (process.env.NODE_ENV === "development") {
+            console.log("[Complete Sale] Success (offline)", { localSaleId });
           }
-        }
+          clearCartAndResetCoupons();
+          setSelectedCustomerId(undefined);
+          setActivePaymentMethod(null);
+          const receiptPayload = toReceiptData(localSaleId);
+          setReceiptData(receiptPayload);
+          setTimeout(() => setReceiptOpen(true), 0);
 
-        feedback.fromError(
-          error,
-          "Failed to save the sale locally",
-          "Try again or check storage.",
-        );
-        setIsCompletingSale(false);
+          feedback.success(
+            "Offline sale complete!",
+            "Receipt saved. Will sync when back online.",
+          );
+        } catch (error) {
+          if (process.env.NODE_ENV === "development") {
+            console.error("[Complete Sale] Failed (offline)", { error });
+          }
+          console.error("Failed to complete offline sale:", error);
+
+          const queriesData = queryClient.getQueriesData<{
+            data: { id?: string; stock?: number | null }[];
+            meta?: unknown;
+          }>({ queryKey: productKeys.lists() });
+          queriesData.forEach(([queryKey, data]) => {
+            if (!data?.data || !Array.isArray(data.data)) return;
+            queryClient.setQueryData(queryKey, {
+              ...data,
+              data: data.data.map((product) => {
+                const pid = String(product.id);
+                if (!previousStockMap.has(pid)) return product;
+                return { ...product, stock: previousStockMap.get(pid)! };
+              }),
+            });
+          });
+          const pqKeys = queryClient
+            .getQueryCache()
+            .getAll()
+            .map((q) => q.queryKey);
+          const nonListProductQueries = pqKeys.filter(
+            (key) =>
+              Array.isArray(key) &&
+              key[0] === "products" &&
+              !(key[1] === "list" || key.length < 2),
+          );
+          nonListProductQueries.forEach((queryKey) => {
+            queryClient.setQueryData<{ data: any[]; meta: any }>(
+              queryKey,
+              (old) => {
+                if (!old?.data) return old;
+                return {
+                  ...old,
+                  data: old.data.map(
+                    (product: { id?: string; stock?: number | null }) => {
+                      const pid = String(product.id);
+                      if (!previousStockMap.has(pid)) return product;
+                      return { ...product, stock: previousStockMap.get(pid)! };
+                    },
+                  ),
+                };
+              },
+            );
+          });
+
+          for (const item of newTransaction.items) {
+            const pid = String(item.productId);
+            const prev = previousStockMap.get(pid);
+            if (prev !== undefined) {
+              await updateProductStockInDexie(pid, prev);
+            }
+          }
+
+          feedback.fromError(
+            error,
+            "Failed to save the sale locally",
+            "Try again or check storage.",
+          );
+        }
       }
+    } finally {
+      completingSaleRef.current = false;
+      setIsCompletingSale(false);
     }
   };
 

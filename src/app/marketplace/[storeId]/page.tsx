@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useMemo, useEffect } from "react";
+import { use, useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -271,10 +271,12 @@ export default function StorePosPage(props: PageProps) {
   };
 
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  const completingOrderRef = useRef(false);
 
   const handleCompleteSale = async (
     transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
   ) => {
+    if (completingOrderRef.current || isCompletingOrder) return;
     if (!currentStore || !storeId) {
       feedback.error(
         "Order failed",
@@ -295,6 +297,7 @@ export default function StorePosPage(props: PageProps) {
       return;
     }
 
+    completingOrderRef.current = true;
     setIsCompletingOrder(true);
     try {
       const vat = cartSubtotal * 0.15;
@@ -340,6 +343,7 @@ export default function StorePosPage(props: PageProps) {
         ERROR_CODES.MARKETPLACE_ORDER,
       );
     } finally {
+      completingOrderRef.current = false;
       setIsCompletingOrder(false);
     }
   };
