@@ -25,10 +25,14 @@ describe("POS sale flow", () => {
 
   it("browses products and supports search", () => {
     PosPage.searchProducts("Cola");
-    cy.contains("td", /cola 330ml/i).should("be.visible");
+    cy.contains("td", /cola 330ml/i, { timeout: 15_000 }).should("be.visible");
 
     PosPage.searchProducts("NoSuchProduct");
-    cy.contains("td", /cola 330ml/i).should("not.exist");
+    // Product filter is debounced (~500ms in page.tsx); assert on the table so Cypress retries until the row is gone.
+    cy.get('[data-testid="pos-product-table"]', { timeout: 15_000 }).should(
+      "not.contain",
+      "Cola 330ml",
+    );
   });
 
   it("adds product to cart and increments quantity", () => {

@@ -18,6 +18,10 @@ export const PosPage = {
     cy.contains(/sale #/i, { timeout: 30_000 }).should("be.visible");
     cy.contains(/loading cart/i).should("not.exist");
     this.ensureProductCarouselView();
+    cy.get('[data-testid="pos-product-table"]', { timeout: 90_000 }).should(
+      "not.contain",
+      "Loading products",
+    );
     return this;
   },
 
@@ -27,7 +31,7 @@ export const PosPage = {
     ).clear();
     cy.findByPlaceholderText(
       /scan barcode or search item|search categories/i,
-    ).type(term);
+    ).type(term, { delay: 0 });
     return this;
   },
 
