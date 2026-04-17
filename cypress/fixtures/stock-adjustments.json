@@ -1,0 +1,24 @@
+[
+  {
+    "id": "adj-001",
+    "productId": "prod-water-001",
+    "productName": "Still Water 500ml",
+    "oldStock": 5,
+    "newStock": 8,
+    "reason": "New stock received",
+    "note": "Morning delivery",
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-14T08:30:00.000Z"
+  },
+  {
+    "id": "adj-002",
+    "productId": "prod-soap-001",
+    "productName": "Hand Soap",
+    "oldStock": 6,
+    "newStock": 4,
+    "reason": "Damages",
+    "note": "2 damaged units",
+    "storeId": "store-e2e-001",
+    "createdAt": "2026-04-14T10:15:00.000Z"
+  }
+]
