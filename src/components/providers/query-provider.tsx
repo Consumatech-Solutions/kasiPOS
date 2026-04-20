@@ -46,7 +46,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
               return failureCount < 3;
             },
             retryDelay: (attemptIndex) =>
-              Math.min(1000 * 2 ** attemptIndex, 30000),
+              Math.min(1000 * 2 ** attemptIndex, 90020),
           },
           mutations: {
             networkMode: "offlineFirst",
@@ -76,7 +76,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
               return failureCount < 2;
             },
             retryDelay: (attemptIndex) =>
-              Math.min(1000 * 2 ** attemptIndex, 30000),
+              Math.min(1000 * 2 ** attemptIndex, 90020),
           },
         },
       }),

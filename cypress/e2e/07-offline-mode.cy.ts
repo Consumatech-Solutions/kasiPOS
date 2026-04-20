@@ -110,7 +110,7 @@ describe("Offline mode", () => {
 
   it("simulates backend failure when products API returns an error", () => {
     const api = (
-      (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:3000"
+      (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:9002"
     ).replace(/\/+$/, "");
     cy.intercept("GET", `${api}/products*`, {
       statusCode: 503,

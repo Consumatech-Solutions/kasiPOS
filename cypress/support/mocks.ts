@@ -118,7 +118,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     stripTrailingSlashes(apiBaseUrl) === stripTrailingSlashes(cypressBaseUrl)
   ) {
     throw new Error(
-      "API_BASE_URL matches the Cypress baseUrl. Root GET/HEAD mocks would intercept the Next.js document and cause SyntaxError in the app. Point API_BASE_URL at the backend (e.g. http://localhost:3000), not the Next.js server URL.",
+      "API_BASE_URL matches the Cypress baseUrl. Root GET/HEAD mocks would intercept the Next.js document and cause SyntaxError in the app. Point API_BASE_URL at the backend (e.g. http://localhost:9002), not the Next.js server URL.",
     );
   }
   const state = {

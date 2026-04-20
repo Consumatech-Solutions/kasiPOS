@@ -4,7 +4,7 @@ import { registerApiMocks } from "./mocks";
 
 const KASI_POS_DB_NAME = "kasiPosDatabase";
 const API_BASE_URL =
-  (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:3000";
+  (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:9002";
 const NORMALIZED_API_BASE_URL = API_BASE_URL.replace(/\/+$/, "");
 
 let mockControls: { setOffline: (value: boolean) => void } | null = null;
