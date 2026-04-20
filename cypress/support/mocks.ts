@@ -81,7 +81,7 @@ function stripTrailingSlashes(url: string): string {
 function e2eCorsHeaders(): Record<string, string> {
   const raw =
     (Cypress.config("baseUrl") as string | undefined) ||
-    "http://localhost:3000";
+    "http://localhost:9002";
   const origin = stripTrailingSlashes(raw);
   return {
     "access-control-allow-origin": origin,
@@ -111,7 +111,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   const apiBaseUrl =
     options.apiBaseUrl ??
     (Cypress.env("API_BASE_URL") as string) ??
-    "http://localhost:3000";
+    "http://localhost:9002";
   const cypressBaseUrl = Cypress.config("baseUrl") as string | undefined;
   if (
     cypressBaseUrl &&

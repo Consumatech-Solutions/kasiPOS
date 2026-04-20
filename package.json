@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "prepare": "husky",
-    "dev": "next dev -p 3000",
-    "dev:turbo": "next dev -p 3000 --turbo",
-    "dev:webpack": "next dev -p 3000",
-    "dev:fresh": "npm run clean && next dev -p 3000",
+    "dev": "next dev -p 9002",
+    "dev:turbo": "next dev -p 9002 --turbo",
+    "dev:webpack": "next dev -p 9002",
+    "dev:fresh": "npm run clean && next dev -p 9002",
     "clean": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\"",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
@@ -22,7 +22,7 @@
     "e2e": "cypress run",
     "coverage": "vitest run --coverage",
     "cy:run": "cypress run",
-    "test:e2e": "start-server-and-test dev http://localhost:3000 cy:run"
+    "test:e2e": "start-server-and-test dev http://localhost:9002 cy:run"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
