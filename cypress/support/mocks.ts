@@ -81,11 +81,12 @@ function stripTrailingSlashes(url: string): string {
 function e2eCorsHeaders(): Record<string, string> {
   const raw =
     (Cypress.config("baseUrl") as string | undefined) ||
-    "http://localhost:9002";
+    "http://localhost:3000";
   const origin = stripTrailingSlashes(raw);
   return {
     "access-control-allow-origin": origin,
-    "access-control-allow-headers": "Authorization,Content-Type",
+    "access-control-allow-headers":
+      "Authorization,Content-Type,Idempotency-Key",
     "access-control-allow-methods": "GET,HEAD,POST,PATCH,PUT,DELETE,OPTIONS",
   };
 }
