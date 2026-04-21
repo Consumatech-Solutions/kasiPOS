@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useMemo, useEffect } from "react";
+import { use, useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -80,7 +80,9 @@ type PageProps = { params: Promise<{ storeId?: string }> };
 
 export default function StorePosPage(props: PageProps) {
   const resolvedParams = use(props.params);
-  const storeId = resolvedParams?.storeId ? String(resolvedParams.storeId) : null;
+  const storeId = resolvedParams?.storeId
+    ? String(resolvedParams.storeId)
+    : null;
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
@@ -117,7 +119,11 @@ export default function StorePosPage(props: PageProps) {
     loading: productsLoading,
     setFilters,
   } = useProducts(1, 1000);
-  const { createOrder, loading: orderLoading, isCreating } = useMarketplaceOrders({
+  const {
+    createOrder,
+    loading: orderLoading,
+    isCreating,
+  } = useMarketplaceOrders({
     autoLoad: false,
   });
 
@@ -239,11 +245,21 @@ export default function StorePosPage(props: PageProps) {
 
   const handleCheckout = (method: "Cash" | "Card" | "Mobile Money") => {
     if (cart.size === 0) {
-      feedback.error('Cart is empty', 'Add products to the cart before checkout.', 'Add items and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
+      feedback.error(
+        "Cart is empty",
+        "Add products to the cart before checkout.",
+        "Add items and try again.",
+        { code: ERROR_CODES.MARKETPLACE_ORDER },
+      );
       return;
     }
     if (!selectedCustomerId) {
-      feedback.error('No customer selected', 'A customer is required for this marketplace order.', 'Click Add Customer and select a customer.', { code: ERROR_CODES.MARKETPLACE_ORDER });
+      feedback.error(
+        "No customer selected",
+        "A customer is required for this marketplace order.",
+        "Click Add Customer and select a customer.",
+        { code: ERROR_CODES.MARKETPLACE_ORDER },
+      );
       return;
     }
     setActivePaymentMethod(method);
@@ -255,20 +271,33 @@ export default function StorePosPage(props: PageProps) {
   };
 
   const [isCompletingOrder, setIsCompletingOrder] = useState(false);
+  const completingOrderRef = useRef(false);
 
   const handleCompleteSale = async (
     transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
   ) => {
+    if (completingOrderRef.current || isCompletingOrder) return;
     if (!currentStore || !storeId) {
-      feedback.error('Order failed', 'Store context was not found.', 'Refresh the page and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
+      feedback.error(
+        "Order failed",
+        "Store context was not found.",
+        "Refresh the page and try again.",
+        { code: ERROR_CODES.MARKETPLACE_ORDER },
+      );
       return;
     }
 
     if (!selectedCustomerId) {
-      feedback.error('Order failed', 'No customer was selected.', 'Select a customer and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
+      feedback.error(
+        "Order failed",
+        "No customer was selected.",
+        "Select a customer and try again.",
+        { code: ERROR_CODES.MARKETPLACE_ORDER },
+      );
       return;
     }
 
+    completingOrderRef.current = true;
     setIsCompletingOrder(true);
     try {
       const vat = cartSubtotal * 0.15;
@@ -297,7 +326,10 @@ export default function StorePosPage(props: PageProps) {
       const response = await createOrder(orderData);
       const createdOrder = response.data;
 
-      feedback.success('Order created', `Marketplace order ${createdOrder.orderCode} has been created successfully.`);
+      feedback.success(
+        "Order created",
+        `Marketplace order ${createdOrder.orderCode} has been created successfully.`,
+      );
 
       // Clear cart and reset state
       setCart(new Map());
@@ -306,11 +338,12 @@ export default function StorePosPage(props: PageProps) {
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        'Order failed',
-        'Check your connection and try again.',
-        ERROR_CODES.MARKETPLACE_ORDER
+        "Order failed",
+        "Check your connection and try again.",
+        ERROR_CODES.MARKETPLACE_ORDER,
       );
     } finally {
+      completingOrderRef.current = false;
       setIsCompletingOrder(false);
     }
   };
@@ -424,9 +457,13 @@ export default function StorePosPage(props: PageProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[50px] hidden sm:table-cell">View</TableHead>
+                      <TableHead className="w-[50px] hidden sm:table-cell">
+                        View
+                      </TableHead>
                       <TableHead>Product</TableHead>
-                      <TableHead className="hidden md:table-cell">Stock</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Stock
+                      </TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
@@ -437,7 +474,11 @@ export default function StorePosPage(props: PageProps) {
                         <TableCell className="hidden sm:table-cell">
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="touch-target">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="touch-target"
+                              >
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
@@ -456,18 +497,25 @@ export default function StorePosPage(props: PageProps) {
                                     loading="lazy"
                                     decoding="async"
                                     onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      target.style.display = 'none';
-                                      const initialsDiv = target.nextElementSibling as HTMLElement;
+                                      const target =
+                                        e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      const initialsDiv =
+                                        target.nextElementSibling as HTMLElement;
                                       if (initialsDiv) {
-                                        initialsDiv.style.display = 'flex';
+                                        initialsDiv.style.display = "flex";
                                       }
                                     }}
                                   />
                                 ) : null}
-                                <div 
-                                  className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${isOnline && product.productImage ? 'hidden' : ''}`}
-                                  style={{ display: isOnline && product.productImage ? 'none' : 'flex' }}
+                                <div
+                                  className={`w-[300px] h-[300px] rounded-md bg-primary/10 flex items-center justify-center ${isOnline && product.productImage ? "hidden" : ""}`}
+                                  style={{
+                                    display:
+                                      isOnline && product.productImage
+                                        ? "none"
+                                        : "flex",
+                                  }}
                                 >
                                   <span className="text-6xl font-bold text-primary">
                                     {getProductInitials(product.name)}
@@ -480,10 +528,14 @@ export default function StorePosPage(props: PageProps) {
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
                             <span>{product.name}</span>
-                            <span className="text-xs text-muted-foreground md:hidden">Stock: {product.stock}</span>
+                            <span className="text-xs text-muted-foreground md:hidden">
+                              Stock: {product.stock}
+                            </span>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">{product.stock}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {product.stock}
+                        </TableCell>
                         <TableCell>
                           R
                           {(typeof product.price === "number"
@@ -492,8 +544,13 @@ export default function StorePosPage(props: PageProps) {
                           ).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" className="min-h-[44px] touch-target" onClick={() => addToCart(product)}>
-                            <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Add</span>
+                          <Button
+                            size="sm"
+                            className="min-h-[44px] touch-target"
+                            onClick={() => addToCart(product)}
+                          >
+                            <Plus className="h-4 w-4 sm:mr-2" />{" "}
+                            <span className="hidden sm:inline">Add</span>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -522,7 +579,9 @@ export default function StorePosPage(props: PageProps) {
                     <span className="sr-only">Back to Marketplace</span>
                   </Link>
                 </Button>
-                <h2 className="font-semibold text-base sm:text-lg">Order for {storeName}</h2>
+                <h2 className="font-semibold text-base sm:text-lg">
+                  Order for {storeName}
+                </h2>
               </div>
               <Dialog
                 open={customerDialogOpen}
@@ -536,7 +595,11 @@ export default function StorePosPage(props: PageProps) {
                     onClick={() => setCustomerSearchTerm("")}
                   >
                     <User className="mr-1 sm:mr-2 h-4 w-4" />
-                    <span className="truncate max-w-[120px] sm:max-w-none">{selectedCustomer ? selectedCustomer.name : "Add Customer"}</span>
+                    <span className="truncate max-w-[120px] sm:max-w-none">
+                      {selectedCustomer
+                        ? selectedCustomer.name
+                        : "Add Customer"}
+                    </span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
@@ -607,10 +670,11 @@ export default function StorePosPage(props: PageProps) {
                             className="rounded-md bg-gray-200 object-cover"
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              const initialsDiv = target.nextElementSibling as HTMLElement;
+                              target.style.display = "none";
+                              const initialsDiv =
+                                target.nextElementSibling as HTMLElement;
                               if (initialsDiv) {
-                                initialsDiv.style.display = 'flex';
+                                initialsDiv.style.display = "flex";
                               }
                             }}
                           />

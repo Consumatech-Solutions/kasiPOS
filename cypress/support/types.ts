@@ -4,7 +4,7 @@ export type SeedAuthSession = {
     id: string;
     name: string;
     phone: string;
-    role: 'admin' | 'staff' | 'store_admin';
+    role: "admin" | "staff" | "store_admin";
     storeId: string | null;
     isActive: boolean;
     createdAt: string;
@@ -29,7 +29,7 @@ export type SeedAuthSession = {
     credit?: {
       customerCredit: {
         creditLimit: number;
-        termType: 'fixed' | 'variable';
+        termType: "fixed" | "variable";
         term?: number;
       };
     } | null;
@@ -37,7 +37,7 @@ export type SeedAuthSession = {
     updatedAt: string;
   };
   settings: {
-    theme: 'light' | 'dark';
+    theme: "light" | "dark";
     currentStore: Record<string, unknown>;
     showVatInCheckout: boolean;
   };
@@ -88,7 +88,7 @@ export type TransactionRecord = {
     imageUrl?: string;
   }>;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money' | 'Credit';
+  paymentMethod: "Cash" | "Card" | "Mobile Money" | "Credit";
   voucherCode?: string | null;
   discountAmount?: number | null;
   storeId: string;
@@ -98,7 +98,7 @@ export type TransactionRecord = {
 export type VoucherRecord = {
   id: string;
   code: string;
-  type: 'percentage' | 'fixed';
+  type: "percentage" | "fixed";
   value: number;
   minPurchase: number;
   isActive: boolean;
@@ -128,7 +128,7 @@ export type ParcelRecord = {
   storeId: string;
   deliveryNumber: string;
   customerName: string;
-  status: 'Incoming' | 'Received' | 'Collected';
+  status: "Incoming" | "Received" | "Collected";
   collectionCode?: string | null;
   receiptCode?: string | null;
   dateReceived?: string | null;
@@ -169,8 +169,8 @@ export type MarketplaceOrderRecord = {
   vatAmount: number;
   serviceFee: number;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
-  status: 'pending' | 'completed' | 'cancelled';
+  paymentMethod: "Cash" | "Card" | "Mobile Money";
+  status: "pending" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;
 };
@@ -186,4 +186,3 @@ export type SeedData = {
   marketplaceStores: MarketplaceStoreRecord[];
   marketplaceOrders: MarketplaceOrderRecord[];
 };
-

@@ -91,11 +91,15 @@ vi.mock("@/lib/feedback", () => ({
 import { feedback } from "@/lib/feedback";
 import { mutationQueue } from "@/lib/mutation-queue";
 
+/** Unique variables so deduplication does not collapse distinct test mutations. */
+let testMutationSeq = 0;
+
 function addQueuedMutation(mutationKey: string[]) {
+  testMutationSeq += 1;
   mutationQueue.add({
     mutationKey,
     mutationFn: () => hoisted.executeMutationImpl(mutationKey, {}),
-    variables: {},
+    variables: { _testSeq: testMutationSeq },
   });
 }
 
@@ -111,6 +115,7 @@ async function runMaxRetriesFailureTest() {
 
 describe("mutationQueue", () => {
   beforeEach(() => {
+    testMutationSeq = 0;
     hoisted.offlineFirst = true;
     hoisted.mqRows.length = 0;
     hoisted.checkOffline.mockResolvedValue(false);
@@ -154,6 +159,49 @@ describe("mutationQueue", () => {
     expect(result.syncedCount).toBe(0);
   });
 
+  it("dedupes identical mutationKey + variables (e.g. double queue add)", () => {
+    const vars = { name: "Widgets", _tempId: "temp-1" };
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: vars,
+    });
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { ...vars },
+    });
+    expect(mutationQueue.getPendingCount()).toBe(1);
+  });
+
+  it("treats same category payload as duplicate regardless of object key order", () => {
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { b: 1, a: 2 },
+    });
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { a: 2, b: 1 },
+    });
+    expect(mutationQueue.getPendingCount()).toBe(1);
+  });
+
+  it("allows two queued mutations when variables differ", () => {
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { name: "A" },
+    });
+    mutationQueue.add({
+      mutationKey: ["categories", "create"],
+      mutationFn: () => Promise.resolve(),
+      variables: { name: "B" },
+    });
+    expect(mutationQueue.getPendingCount()).toBe(2);
+  });
+
   it("dedupes transactions/create when idempotencyKey matches an item already in queue", () => {
     const idem = "550e8400-e29b-41d4-a716-446655440000";
     const base = {
@@ -189,6 +237,48 @@ describe("mutationQueue", () => {
       "customers/create",
       "transactions/create",
     ]);
+  });
+
+  it("does not run products until all queued category mutations for that phase have completed", async () => {
+    let categoriesCompleted = 0;
+    hoisted.executeMutationImpl.mockImplementation(async (key: string[]) => {
+      if (key[0] === "categories") {
+        categoriesCompleted += 1;
+        return { ok: true };
+      }
+      if (key[0] === "products") {
+        expect(categoriesCompleted).toBeGreaterThanOrEqual(2);
+        return { ok: true };
+      }
+      return { ok: true };
+    });
+    addQueuedMutation(["products", "create"]);
+    addQueuedMutation(["categories", "create"]);
+    addQueuedMutation(["customers", "create"]);
+    addQueuedMutation(["categories", "create"]);
+    addQueuedMutation(["products", "create"]);
+    await mutationQueue.processQueue({ force: true });
+    expect(mutationQueue.getPendingCount()).toBe(0);
+  });
+
+  it("runs up to three product mutations concurrently (batch cap)", async () => {
+    let concurrent = 0;
+    let maxConcurrent = 0;
+    hoisted.executeMutationImpl.mockImplementation(async (key: string[]) => {
+      if (key[0] !== "products") {
+        return { ok: true };
+      }
+      concurrent += 1;
+      maxConcurrent = Math.max(maxConcurrent, concurrent);
+      await new Promise((r) => setTimeout(r, 50));
+      concurrent -= 1;
+      return { ok: true };
+    });
+    for (let i = 0; i < 4; i++) {
+      addQueuedMutation(["products", "create"]);
+    }
+    await mutationQueue.processQueue({ force: true });
+    expect(maxConcurrent).toBe(3);
   });
 
   it("processQueue pauses on network error and keeps mutation on queue", async () => {

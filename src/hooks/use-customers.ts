@@ -127,6 +127,12 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         return { data, meta };
       } catch (e) {
         console.warn("[useCustomers] API failed, using Dexie", e);
+        return getCustomersFromDexie(
+          initialPage,
+          initialLimit,
+          searchQuery?.trim() || undefined,
+          storeIdForOffline ?? undefined,
+        );
       }
 
       let result = await getCustomersFromDexie(
