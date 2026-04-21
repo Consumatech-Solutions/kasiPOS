@@ -7,6 +7,7 @@ import {
   getCustomersFromDexie,
   saveCustomersToDexie,
 } from "@/lib/entity-cache";
+import { pullAllCustomersFromApi } from "@/lib/catalogue-network-hydrate";
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "@/types";
 import type {
   PaginationMeta,
@@ -113,6 +114,16 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           await saveCustomersToDexie(data);
         }
 
+        if (data.length === 0) {
+          const dexieFallback = await getCustomersFromDexie(
+            initialPage,
+            initialLimit,
+            searchQuery?.trim() || undefined,
+            storeIdForOffline ?? undefined,
+          );
+          if (dexieFallback.meta.total > 0) return dexieFallback;
+        }
+
         return { data, meta };
       } catch (e) {
         console.warn("[useCustomers] API failed, using Dexie", e);
@@ -123,6 +134,27 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           storeIdForOffline ?? undefined,
         );
       }
+
+      let result = await getCustomersFromDexie(
+        initialPage,
+        initialLimit,
+        searchQuery?.trim() || undefined,
+        storeIdForOffline ?? undefined,
+      );
+      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
+        try {
+          await pullAllCustomersFromApi({ storeId: String(storeIdForOffline) });
+          result = await getCustomersFromDexie(
+            initialPage,
+            initialLimit,
+            searchQuery?.trim() || undefined,
+            storeIdForOffline ?? undefined,
+          );
+        } catch (e) {
+          console.warn("[useCustomers] Bulk hydrate failed", e);
+        }
+      }
+      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,

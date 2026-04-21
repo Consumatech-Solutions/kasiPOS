@@ -85,7 +85,8 @@ function e2eCorsHeaders(): Record<string, string> {
   const origin = stripTrailingSlashes(raw);
   return {
     "access-control-allow-origin": origin,
-    "access-control-allow-headers": "Authorization,Content-Type",
+    "access-control-allow-headers":
+      "Authorization,Content-Type,Idempotency-Key",
     "access-control-allow-methods": "GET,HEAD,POST,PATCH,PUT,DELETE,OPTIONS",
   };
 }
@@ -110,14 +111,14 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   const apiBaseUrl =
     options.apiBaseUrl ??
     (Cypress.env("API_BASE_URL") as string) ??
-    "http://localhost:3000";
+    "http://localhost:9002";
   const cypressBaseUrl = Cypress.config("baseUrl") as string | undefined;
   if (
     cypressBaseUrl &&
     stripTrailingSlashes(apiBaseUrl) === stripTrailingSlashes(cypressBaseUrl)
   ) {
     throw new Error(
-      "API_BASE_URL matches the Cypress baseUrl. Root GET/HEAD mocks would intercept the Next.js document and cause SyntaxError in the app. Point API_BASE_URL at the backend (e.g. http://localhost:3000), not the Next.js server URL.",
+      "API_BASE_URL matches the Cypress baseUrl. Root GET/HEAD mocks would intercept the Next.js document and cause SyntaxError in the app. Point API_BASE_URL at the backend (e.g. http://localhost:9002), not the Next.js server URL.",
     );
   }
   const state = {
