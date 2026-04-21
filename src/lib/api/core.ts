@@ -22,7 +22,7 @@ export const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 90020, // 30 second timeout
+  timeout: 30000, // 30 second timeout
 });
 
 api.interceptors.request.use(

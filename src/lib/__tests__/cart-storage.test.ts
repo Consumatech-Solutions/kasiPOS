@@ -82,7 +82,7 @@ describe("Cart storage (persistence)", () => {
         const loaded = await loadCartFromSessionStorageAsync();
         expect(loaded.size).toBe(2);
       },
-      { timeout: 9002, interval: 10 },
+      { timeout: 3000, interval: 10 },
     );
     const loaded = await loadCartFromSessionStorageAsync();
     expect(loaded.get("id1")?.productName).toBe("Item 1");
@@ -103,7 +103,7 @@ describe("Cart storage (persistence)", () => {
         const fromDb = await loadCartFromSessionStorageAsync();
         expect(raw !== null || fromDb.size > 0).toBe(true);
       },
-      { timeout: 9002, interval: 10 },
+      { timeout: 3000, interval: 10 },
     );
     saveCartToSessionStorage(makeCart([]));
     await vi.waitFor(
@@ -111,7 +111,7 @@ describe("Cart storage (persistence)", () => {
         const loaded = await loadCartFromSessionStorageAsync();
         expect(loaded.size).toBe(0);
       },
-      { timeout: 9002, interval: 10 },
+      { timeout: 3000, interval: 10 },
     );
     expect(loadCartFromSessionStorage().size).toBe(0);
   });

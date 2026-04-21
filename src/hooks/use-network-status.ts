@@ -24,7 +24,7 @@ export function useNetworkStatus() {
       if (online) {
         setWasOffline(true);
         queryClient.resumePausedMutations();
-        setTimeout(() => setWasOffline(false), 9002);
+        setTimeout(() => setWasOffline(false), 3000);
       }
     });
     return unsubscribe;
