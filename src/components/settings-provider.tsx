@@ -13,6 +13,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { AppSettings, User, Store } from "@/types";
 import { storesApi } from "@/lib/api/stores";
 import { authApi } from "@/lib/api/auth";
+import { isNetworkErrorLike } from "@/lib/network-error";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -282,15 +283,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   // ...
 
-  // Helper: treat as network/offline error (from API core or axios)
-  const isNetworkError = (err: any) =>
-    err?.isNetworkError === true ||
-    err?.isOffline === true ||
-    err?.code === "ERR_NETWORK" ||
-    err?.message === "Network Error" ||
-    (typeof err?.message === "string" &&
-      err.message.includes("Network request failed"));
-
   // This effect runs on mount to check for updated user data
   useEffect(() => {
     const bootstrapData = async () => {
@@ -327,7 +319,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               await logout();
               return;
             }
-            if (isNetworkError(profileErr)) {
+            if (isNetworkErrorLike(profileErr)) {
               if (
                 process.env.NODE_ENV === "development" &&
                 !(window as any).__bootstrapNetworkWarned
@@ -357,7 +349,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 setSetting("currentStore", store);
               }
             } catch (error: any) {
-              if (isNetworkError(error)) {
+              if (isNetworkErrorLike(error)) {
                 const { loadStoreFromIndexedDB } =
                   await import("@/lib/store-persistence");
                 const cachedStore = await loadStoreFromIndexedDB(
@@ -378,7 +370,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               );
               if (store) setSetting("currentStore", store);
             } catch (e) {
-              if (isNetworkError(e)) {
+              if (isNetworkErrorLike(e)) {
                 const { loadStoreFromIndexedDB } =
                   await import("@/lib/store-persistence");
                 const cachedStore = await loadStoreFromIndexedDB();
@@ -393,7 +385,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         } catch (error: any) {
           if (
-            !isNetworkError(error) &&
+            !isNetworkErrorLike(error) &&
             process.env.NODE_ENV === "development"
           ) {
             console.error("Failed to bootstrap app data:", error);
@@ -564,7 +556,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error: any) {
         // If network fails, try loading from IndexedDB
-        if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+        if (isNetworkErrorLike(error)) {
           console.log(
             "[SettingsProvider] Network error during login - loading store from IndexedDB",
           );

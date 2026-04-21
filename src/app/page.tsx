@@ -443,6 +443,17 @@ export default function PosPage() {
             );
             return;
           }
+          const unresolvedCustomerId =
+            newTransaction.customerId &&
+            String(newTransaction.customerId).startsWith("temp-") &&
+            !map.has(String(newTransaction.customerId));
+          if (unresolvedCustomerId) {
+            feedback.error(
+              "Customer still syncing",
+              "The selected customer has not finished syncing yet. Please wait a moment and try again.",
+            );
+            return;
+          }
           const resolvedItems = newTransaction.items.map((item) => ({
             ...item,
             productId:
@@ -629,6 +640,21 @@ export default function PosPage() {
               },
             );
           });
+
+          const soldQuantityByProduct = new Map<string, number>();
+          for (const item of newTransaction.items) {
+            const pid = String(item.productId);
+            soldQuantityByProduct.set(
+              pid,
+              (soldQuantityByProduct.get(pid) ?? 0) + item.quantity,
+            );
+          }
+
+          for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
+            const previousStock = previousStockMap.get(pid) ?? 0;
+            const newStock = Math.max(0, previousStock - soldQty);
+            await updateProductStockInDexie(pid, newStock);
+          }
 
           await db.transactions.add(newTransaction as Transaction);
 
