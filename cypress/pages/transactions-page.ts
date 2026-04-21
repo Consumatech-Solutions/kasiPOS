@@ -1,5 +1,5 @@
 export const TransactionsPage = {
-  path: '/transactions' as const,
+  path: "/transactions" as const,
 
   visit() {
     cy.visitApp(this.path);
@@ -7,7 +7,7 @@ export const TransactionsPage = {
   },
 
   waitUntilLoaded() {
-    cy.findByText(/transaction history/i).should('be.visible');
+    cy.findByText(/transaction history/i).should("be.visible");
     return this;
   },
 };

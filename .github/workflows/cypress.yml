@@ -21,6 +21,9 @@ jobs:
         run: npm ci
 
       - name: Start Next.js dev server
+        env:
+          # Must match Cypress `API_BASE_URL` and `cypress/support/mocks.ts` intercepts.
+          NEXT_PUBLIC_API_URL: http://localhost:3000
         run: npm run dev &
 
       - name: Wait for app

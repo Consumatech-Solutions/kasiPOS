@@ -25,10 +25,14 @@ describe("POS sale flow", () => {
 
   it("browses products and supports search", () => {
     PosPage.searchProducts("Cola");
-    cy.contains("td", /cola 330ml/i).should("be.visible");
+    cy.contains("td", /cola 330ml/i, { timeout: 15_000 }).should("be.visible");
 
     PosPage.searchProducts("NoSuchProduct");
-    cy.contains("td", /cola 330ml/i).should("not.exist");
+    // Product filter is debounced (~500ms in page.tsx); assert on the table so Cypress retries until the row is gone.
+    cy.get('[data-testid="pos-product-table"]', { timeout: 15_000 }).should(
+      "not.contain",
+      "Cola 330ml",
+    );
   });
 
   it("adds product to cart and increments quantity", () => {
@@ -121,13 +125,13 @@ describe("POS sale flow", () => {
     });
 
     // Toast can be transient in headless runs; receipt dialog is the stable completion signal.
-    cy.findByRole("dialog", { name: /receipt/i, timeout: 25_000 }).should(
+    cy.get('[data-testid="receipt-dialog"]', { timeout: 25_000 }).should(
       "be.visible",
     );
-    cy.findByRole("dialog", { name: /receipt/i }).within(() => {
+    cy.get('[data-testid="receipt-dialog"]').within(() => {
       cy.findByText(/^receipt$/i).should("be.visible");
     });
-    cy.findByRole("dialog", { name: /receipt/i })
+    cy.get('[data-testid="receipt-dialog"]')
       .findByRole("button", { name: /^close$/i })
       .click({ force: true });
     cy.contains(/cart is empty/i).should("be.visible");
@@ -152,10 +156,10 @@ describe("POS sale flow", () => {
         force: true,
       });
     });
-    cy.findByRole("dialog", { name: /receipt/i, timeout: 25_000 }).should(
+    cy.get('[data-testid="receipt-dialog"]', { timeout: 25_000 }).should(
       "be.visible",
     );
-    cy.findByRole("dialog", { name: /receipt/i })
+    cy.get('[data-testid="receipt-dialog"]')
       .findByRole("button", { name: /^close$/i })
       .click({ force: true });
 

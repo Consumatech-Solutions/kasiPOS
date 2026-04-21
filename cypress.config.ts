@@ -31,7 +31,7 @@ function readJsonFixture<T>(projectRoot: string, fixtureName: string): T {
     projectRoot,
     "cypress",
     "fixtures",
-    `${fixtureName}.json`
+    `${fixtureName}.json`,
   );
   const raw = fs.readFileSync(fixturePath, "utf8");
   return JSON.parse(raw) as T;
@@ -80,8 +80,7 @@ function buildSeedAuthSession(input: SeedAuthSessionInput = {}) {
   };
 
   return {
-    token:
-      process.env.CYPRESS_E2E_AUTH_STUB ?? "kasi-pos-e2e-local-auth-stub",
+    token: process.env.CYPRESS_E2E_AUTH_STUB ?? "kasi-pos-e2e-local-auth-stub",
     user,
     store,
     settings: {
@@ -129,29 +128,29 @@ export default defineConfig({
             products: readJsonFixture(config.projectRoot, fixtureSet.products),
             categories: readJsonFixture(
               config.projectRoot,
-              fixtureSet.categories
+              fixtureSet.categories,
             ),
             customers: readJsonFixture(
               config.projectRoot,
-              fixtureSet.customers
+              fixtureSet.customers,
             ),
             transactions: readJsonFixture(
               config.projectRoot,
-              fixtureSet.transactions
+              fixtureSet.transactions,
             ),
             vouchers: readJsonFixture(config.projectRoot, fixtureSet.vouchers),
             stockAdjustments: readJsonFixture(
               config.projectRoot,
-              fixtureSet.stockAdjustments
+              fixtureSet.stockAdjustments,
             ),
             parcels: readJsonFixture(config.projectRoot, fixtureSet.parcels),
             marketplaceStores: readJsonFixture(
               config.projectRoot,
-              fixtureSet.marketplaceStores
+              fixtureSet.marketplaceStores,
             ),
             marketplaceOrders: readJsonFixture(
               config.projectRoot,
-              fixtureSet.marketplaceOrders
+              fixtureSet.marketplaceOrders,
             ),
           };
         },
