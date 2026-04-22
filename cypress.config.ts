@@ -26,6 +26,28 @@ type LoadSeedDataInput = {
   fixtureSet?: Partial<SeedDataFixtureSet>;
 };
 
+type CypressMode = "mock" | "real";
+
+function resolveConfigValue(
+  key: string,
+  config: Cypress.PluginConfigOptions,
+): string | undefined {
+  const fromProcess = process.env[key];
+  if (fromProcess != null && fromProcess !== "") return fromProcess;
+  const fromCypressEnv = config.env?.[key];
+  if (fromCypressEnv == null || fromCypressEnv === "") return undefined;
+  return String(fromCypressEnv);
+}
+
+function resolveMode(config: Cypress.PluginConfigOptions): CypressMode {
+  const rawMode = (
+    resolveConfigValue("CYPRESS_TEST_MODE", config) ??
+    resolveConfigValue("TEST_MODE", config) ??
+    "mock"
+  ).toLowerCase();
+  return rawMode === "real" ? "real" : "mock";
+}
+
 function readJsonFixture<T>(projectRoot: string, fixtureName: string): T {
   const fixturePath = path.join(
     projectRoot,
@@ -106,6 +128,44 @@ export default defineConfig({
     defaultCommandTimeout: 15_000,
     pageLoadTimeout: 120_000,
     setupNodeEvents(on, config) {
+      const testMode = resolveMode(config);
+      const resolvedApiBase =
+        resolveConfigValue("API_BASE_URL", config) ??
+        process.env.NEXT_PUBLIC_API_URL ??
+        "http://localhost:9002";
+      const realAuthPhone =
+        resolveConfigValue("CYPRESS_REAL_AUTH_PHONE", config) ??
+        resolveConfigValue("REAL_AUTH_PHONE", config);
+      const realAuthPassword =
+        resolveConfigValue("CYPRESS_REAL_AUTH_PASSWORD", config) ??
+        resolveConfigValue("REAL_AUTH_PASSWORD", config);
+      const realLoginPath =
+        resolveConfigValue("CYPRESS_REAL_LOGIN_PATH", config) ??
+        resolveConfigValue("REAL_LOGIN_PATH", config) ??
+        "/login";
+      const realPostLoginPath =
+        resolveConfigValue("CYPRESS_REAL_POST_LOGIN_PATH", config) ??
+        resolveConfigValue("REAL_POST_LOGIN_PATH", config) ??
+        "/";
+
+      if (testMode === "real") {
+        if (!realAuthPhone || !realAuthPassword) {
+          throw new Error(
+            "CYPRESS_TEST_MODE=real requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD (or CYPRESS_REAL_AUTH_PHONE / CYPRESS_REAL_AUTH_PASSWORD).",
+          );
+        }
+      }
+
+      config.env = {
+        ...(config.env ?? {}),
+        TEST_MODE: testMode,
+        API_BASE_URL: resolvedApiBase,
+        REAL_AUTH_PHONE: realAuthPhone,
+        REAL_AUTH_PASSWORD: realAuthPassword,
+        REAL_LOGIN_PATH: realLoginPath,
+        REAL_POST_LOGIN_PATH: realPostLoginPath,
+      };
+
       on("task", {
         seedAuthSession(input: SeedAuthSessionInput = {}) {
           return buildSeedAuthSession(input);
