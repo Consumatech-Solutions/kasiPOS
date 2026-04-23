@@ -89,7 +89,7 @@ api.interceptors.response.use(
       ) {
         if (!(window as any).__backendNetworkErrorLogged) {
           console.warn(
-            "⚠️ Backend not available - running in offline mode. Categories and products will be managed locally.",
+            "Backend not available - running in offline mode. Categories and products will be managed locally.",
             {
               backendUrl:
                 process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002",
