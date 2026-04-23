@@ -107,6 +107,18 @@ function corsReply(
   } as any);
 }
 
+function isDocumentNavigation(req: {
+  headers?: Record<string, string | string[] | undefined>;
+  resourceType?: string;
+}): boolean {
+  const resourceType = String(req.resourceType ?? "").toLowerCase();
+  if (resourceType === "document") return true;
+
+  const acceptHeader = String(req.headers?.accept ?? "").toLowerCase();
+  // Browser navigations prefer HTML; API/XHR requests are usually JSON or */*.
+  return acceptHeader.includes("text/html");
+}
+
 export function registerApiMocks(options: MockApiOptions): MockApiControls {
   const apiBaseUrl =
     options.apiBaseUrl ??
@@ -200,6 +212,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     corsReply(req, { statusCode: 200, body: clone(options.seedAuth.store) });
   });
   cy.intercept("GET", `${apiBaseUrl}/settings*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     corsReply(req, {
       statusCode: 200,
@@ -350,6 +367,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   }).as("deleteProduct");
 
   cy.intercept("GET", `${apiBaseUrl}/customers*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     const q = String(req.query.search ?? "")
       .trim()
@@ -418,6 +440,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   }).as("deleteCustomer");
 
   cy.intercept("GET", `${apiBaseUrl}/transactions*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     let rows = [...state.transactions];
     const search = String(req.query.search ?? "").toLowerCase();
@@ -500,6 +527,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   }).as("createTransaction");
 
   cy.intercept("GET", `${apiBaseUrl}/vouchers*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     const isActiveParam = req.query.isActive;
     let rows = [...state.vouchers];
