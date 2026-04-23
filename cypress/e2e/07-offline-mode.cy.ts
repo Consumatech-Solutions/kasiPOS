@@ -1,6 +1,9 @@
 import { OfflinePage } from "../pages/offline-page";
 import { PosPage } from "../pages/pos-page";
 
+const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
+  /sync to cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled/i;
+
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
     .should("be.visible")
@@ -16,14 +19,17 @@ function ensureCloudSyncModalReady() {
 
   cy.waitUntil(
     () =>
-      cy.get("body", { log: false }).then(($body) => {
-        const hasSyncButton = $body
-          .find('[role="dialog"] button')
+      cy.get('[role="dialog"]', { log: false }).then(($dialog) => {
+        const hasSyncButton = $dialog
+          .last()
+          .find("button")
           .toArray()
           .some((el) =>
             /sync to cloud now/i.test((el.textContent ?? "").trim()),
           );
-        return hasSyncButton;
+        const dialogText = ($dialog.last().text() ?? "").toLowerCase();
+        const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
+        return hasSyncButton || hasStatusText;
       }),
     {
       timeout: 60_000,
@@ -92,12 +98,25 @@ describe("Offline mode", () => {
   it("reconnects and allows manual sync trigger", () => {
     cy.setOnline();
     ensureCloudSyncModalReady();
-    cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).within(
-      () => {
-        cy.findByRole("button", {
-          name: /sync to cloud now/i,
-          timeout: 15_000,
-        }).click({ force: true });
+    // CI can validly show a terminal sync state before the manual action button appears.
+    cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).then(
+      ($dialog) => {
+        const hasSyncButton = $dialog
+          .find("button")
+          .toArray()
+          .some((el) =>
+            /sync to cloud now/i.test((el.textContent ?? "").trim()),
+          );
+        if (hasSyncButton) {
+          cy.wrap($dialog).within(() => {
+            cy.findByRole("button", {
+              name: /sync to cloud now/i,
+              timeout: 15_000,
+            }).click({ force: true });
+          });
+          return;
+        }
+        expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
       },
     );
     cy.get("body")

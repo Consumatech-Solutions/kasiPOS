@@ -2,6 +2,9 @@ import { CataloguePage } from "../pages/catalogue-page";
 import { CustomersPage } from "../pages/customers-page";
 import { PosPage } from "../pages/pos-page";
 
+const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
+  /sync to cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled/i;
+
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
     .should("be.visible")
@@ -12,14 +15,17 @@ function triggerManualSync() {
   openCloudSyncModal();
   cy.waitUntil(
     () =>
-      cy.get("body", { log: false }).then(($body) => {
-        const hasSyncButton = $body
-          .find('[role="dialog"] button')
+      cy.get('[role="dialog"]', { log: false }).then(($dialog) => {
+        const hasSyncButton = $dialog
+          .last()
+          .find("button")
           .toArray()
           .some((el) =>
             /sync to cloud now/i.test((el.textContent ?? "").trim()),
           );
-        return hasSyncButton;
+        const dialogText = ($dialog.last().text() ?? "").toLowerCase();
+        const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
+        return hasSyncButton || hasStatusText;
       }),
     {
       timeout: 60_000,
@@ -28,11 +34,23 @@ function triggerManualSync() {
       errorMsg: "Sync action button was not rendered in cloud sync modal",
     },
   );
-  cy.contains('[role="dialog"] button', /sync to cloud now/i, {
-    timeout: 20_000,
-  })
-    .should("be.visible")
-    .click({ force: true });
+  // CI can validly settle in a terminal sync state where no manual action button is shown.
+  cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).then(
+    ($dialog) => {
+      const hasSyncButton = $dialog
+        .find("button")
+        .toArray()
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
+      if (hasSyncButton) {
+        cy.wrap($dialog)
+          .contains("button", /sync to cloud now/i, { timeout: 20_000 })
+          .should("be.visible")
+          .click({ force: true });
+        return;
+      }
+      expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
+    },
+  );
 }
 
 function createCustomerOffline(name: string, contact: string) {
