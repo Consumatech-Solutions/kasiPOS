@@ -116,9 +116,7 @@ function buildSeedAuthSession(input: SeedAuthSessionInput = {}) {
 export default defineConfig({
   e2e: {
     baseUrl: "http://localhost:9002",
-    env: {
-      API_BASE_URL: process.env.API_BASE_URL || "http://localhost:9003",
-    },
+    env: {},
     supportFile: "cypress/support/e2e.ts",
     specPattern: "cypress/e2e/**/*.cy.ts",
     viewportWidth: 1280,
@@ -130,12 +128,10 @@ export default defineConfig({
     setupNodeEvents(on, config) {
       const testMode = resolveMode(config);
       const resolvedBaseUrl = String(config.baseUrl ?? "http://localhost:9002");
-      const defaultMockApiBase = "http://localhost:9003";
       const resolvedApiBaseCandidate =
         resolveConfigValue("API_BASE_URL", config) ??
-        (testMode === "mock"
-          ? defaultMockApiBase
-          : (process.env.NEXT_PUBLIC_API_URL ?? defaultMockApiBase));
+        process.env.NEXT_PUBLIC_API_URL ??
+        resolvedBaseUrl;
       const realAuthPhone =
         resolveConfigValue("CYPRESS_REAL_AUTH_PHONE", config) ??
         resolveConfigValue("REAL_AUTH_PHONE", config);
