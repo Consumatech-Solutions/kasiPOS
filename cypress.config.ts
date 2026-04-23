@@ -117,7 +117,7 @@ export default defineConfig({
   e2e: {
     baseUrl: "http://localhost:9002",
     env: {
-      API_BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002",
+      API_BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:9003",
     },
     supportFile: "cypress/support/e2e.ts",
     specPattern: "cypress/e2e/**/*.cy.ts",
@@ -129,10 +129,13 @@ export default defineConfig({
     pageLoadTimeout: 120_000,
     setupNodeEvents(on, config) {
       const testMode = resolveMode(config);
+      const resolvedBaseUrl = String(config.baseUrl ?? "http://localhost:9002");
+      const defaultMockApiBase = "http://localhost:9003";
       const resolvedApiBase =
         resolveConfigValue("API_BASE_URL", config) ??
-        process.env.NEXT_PUBLIC_API_URL ??
-        "http://localhost:9002";
+        (testMode === "mock"
+          ? defaultMockApiBase
+          : (process.env.NEXT_PUBLIC_API_URL ?? defaultMockApiBase));
       const realAuthPhone =
         resolveConfigValue("CYPRESS_REAL_AUTH_PHONE", config) ??
         resolveConfigValue("REAL_AUTH_PHONE", config);
@@ -154,6 +157,15 @@ export default defineConfig({
             "CYPRESS_TEST_MODE=real requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD (or CYPRESS_REAL_AUTH_PHONE / CYPRESS_REAL_AUTH_PASSWORD).",
           );
         }
+      }
+      if (
+        testMode === "mock" &&
+        String(resolvedApiBase).replace(/\/+$/, "") ===
+          resolvedBaseUrl.replace(/\/+$/, "")
+      ) {
+        throw new Error(
+          `Mock mode requires API_BASE_URL to differ from baseUrl to prevent intercepting the Next.js document. Resolved baseUrl=${resolvedBaseUrl}, API_BASE_URL=${resolvedApiBase}. Set API_BASE_URL to your backend origin (for example http://localhost:9003).`,
+        );
       }
 
       config.env = {
