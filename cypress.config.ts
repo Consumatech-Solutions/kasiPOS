@@ -131,7 +131,7 @@ export default defineConfig({
       const testMode = resolveMode(config);
       const resolvedBaseUrl = String(config.baseUrl ?? "http://localhost:9002");
       const defaultMockApiBase = "http://localhost:9003";
-      const resolvedApiBase =
+      const resolvedApiBaseCandidate =
         resolveConfigValue("API_BASE_URL", config) ??
         (testMode === "mock"
           ? defaultMockApiBase
@@ -158,13 +158,18 @@ export default defineConfig({
           );
         }
       }
-      if (
-        testMode === "mock" &&
-        String(resolvedApiBase).replace(/\/+$/, "") ===
-          resolvedBaseUrl.replace(/\/+$/, "")
-      ) {
-        throw new Error(
-          `Mock mode requires API_BASE_URL to differ from baseUrl to prevent intercepting the Next.js document. Resolved baseUrl=${resolvedBaseUrl}, API_BASE_URL=${resolvedApiBase}. Set API_BASE_URL to your backend origin (for example http://localhost:9003).`,
+      const normalizedBaseUrl = resolvedBaseUrl.replace(/\/+$/, "");
+      const normalizedApiBase = String(resolvedApiBaseCandidate).replace(
+        /\/+$/,
+        "",
+      );
+      const resolvedApiBase =
+        testMode === "mock" && normalizedApiBase === normalizedBaseUrl
+          ? defaultMockApiBase
+          : String(resolvedApiBaseCandidate);
+      if (testMode === "mock" && normalizedApiBase === normalizedBaseUrl) {
+        console.warn(
+          `[cypress.config] Mock mode detected API/base URL collision. baseUrl=${resolvedBaseUrl}, API_BASE_URL=${resolvedApiBaseCandidate}. Remapping API_BASE_URL to ${defaultMockApiBase}.`,
         );
       }
 
