@@ -117,9 +117,20 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     cypressBaseUrl &&
     stripTrailingSlashes(apiBaseUrl) === stripTrailingSlashes(cypressBaseUrl)
   ) {
-    throw new Error(
-      `API_BASE_URL matches Cypress baseUrl. Root GET/HEAD mocks would intercept the Next.js document and cause SyntaxError in the app. Resolved API_BASE_URL=${apiBaseUrl}, baseUrl=${cypressBaseUrl}. Point API_BASE_URL to a backend origin different from baseUrl (for example http://localhost:9003).`,
-    );
+    // Same-origin API mocking is safe as long as we never intercept root GET (document request).
+    Cypress.log({
+      name: "mockApi",
+      message: `API_BASE_URL matches baseUrl (${apiBaseUrl}); root GET interception is disabled to avoid capturing the Next.js document.`,
+    });
+  }
+  if (
+    cypressBaseUrl &&
+    stripTrailingSlashes(apiBaseUrl) !== stripTrailingSlashes(cypressBaseUrl)
+  ) {
+    Cypress.log({
+      name: "mockApi",
+      message: `Using cross-origin API mocks at ${apiBaseUrl} (baseUrl=${cypressBaseUrl}).`,
+    });
   }
   const state = {
     products: clone(options.seedData.products),
@@ -173,10 +184,6 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   cy.intercept("HEAD", `${apiBaseUrl}`, (req) => {
     if (replyOfflineIfNeeded(req)) return;
     corsReply(req, { statusCode: 200, body: "" });
-  });
-  cy.intercept("GET", `${apiBaseUrl}`, (req) => {
-    if (replyOfflineIfNeeded(req)) return;
-    corsReply(req, { statusCode: 200, body: { ok: true } });
   });
 
   cy.intercept("GET", `${apiBaseUrl}/auth/profile`, (req) => {

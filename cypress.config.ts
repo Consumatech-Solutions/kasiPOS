@@ -163,13 +163,10 @@ export default defineConfig({
         /\/+$/,
         "",
       );
-      const resolvedApiBase =
-        testMode === "mock" && normalizedApiBase === normalizedBaseUrl
-          ? defaultMockApiBase
-          : String(resolvedApiBaseCandidate);
+      const resolvedApiBase = String(resolvedApiBaseCandidate);
       if (testMode === "mock" && normalizedApiBase === normalizedBaseUrl) {
         console.warn(
-          `[cypress.config] Mock mode detected API/base URL collision. baseUrl=${resolvedBaseUrl}, API_BASE_URL=${resolvedApiBaseCandidate}. Remapping API_BASE_URL to ${defaultMockApiBase}.`,
+          `[cypress.config] Mock mode API_BASE_URL matches baseUrl (${resolvedBaseUrl}). This is supported because root GET API interception is disabled; preserving API_BASE_URL=${resolvedApiBaseCandidate}.`,
         );
       }
 
