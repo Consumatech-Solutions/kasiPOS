@@ -22,17 +22,41 @@ import { parcelsApi } from "@/lib/api/parcels";
 import { usersApi } from "@/lib/api/users";
 import { settingsApi, type PatchSettingsBody } from "@/lib/api/settings";
 import { getDb } from "@/lib/db";
+import { isNetworkErrorLike } from "@/lib/network-error";
 
 const DELIVERY_FEE = 150;
 
 async function resolveCategoryId(categoryName: string): Promise<string> {
-  const categoriesResp = await catalogueApi.categories.getAll();
-  const categories: ApiCategory[] = Array.isArray(categoriesResp)
-    ? categoriesResp
-    : ((categoriesResp as { data?: ApiCategory[] })?.data ?? []);
-  const category = categories.find((c) => c.name === categoryName);
-  if (!category) throw new Error(`Category "${categoryName}" not found`);
-  return category.id;
+  const normalizedName = categoryName.trim().toLowerCase();
+  if (!normalizedName) {
+    throw new Error("Cannot resolve empty category name.");
+  }
+
+  try {
+    const categoriesResp = await catalogueApi.categories.getAll();
+    const categories: ApiCategory[] = Array.isArray(categoriesResp)
+      ? categoriesResp
+      : ((categoriesResp as { data?: ApiCategory[] })?.data ?? []);
+    const apiCategory = categories.find(
+      (c) => String(c.name).trim().toLowerCase() === normalizedName,
+    );
+    if (apiCategory) return apiCategory.id;
+  } catch (error) {
+    if (!isNetworkErrorLike(error)) throw error;
+  }
+
+  const localCategories = await getDb().categoryCache.toArray();
+  const localCategory = localCategories.find(
+    (c) =>
+      String(c.name ?? "")
+        .trim()
+        .toLowerCase() === normalizedName,
+  );
+  if (localCategory?.id) return String(localCategory.id);
+
+  throw new Error(
+    `Category "${categoryName}" not found in API response or local cache.`,
+  );
 }
 
 function normalizeProductPayload(

@@ -257,6 +257,8 @@ function installE2eOfflineHarnessBridge(): void {
     __KASI_POS_E2E_OFFLINE?: (forcedOffline: boolean) => void;
   };
   win.__KASI_POS_E2E_OFFLINE = (forcedOffline: boolean) => {
+    // Keep Cypress "online/offline" controls aligned with the offline-first gate.
+    offlineDetector.setOfflineFirstActive(forcedOffline);
     offlineDetector.setForceOffline(forcedOffline);
   };
 }

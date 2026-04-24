@@ -1,4 +1,5 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { isNetworkErrorLike } from "@/lib/network-error";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002";
 
@@ -88,7 +89,7 @@ api.interceptors.response.use(
       ) {
         if (!(window as any).__backendNetworkErrorLogged) {
           console.warn(
-            "⚠️ Backend not available - running in offline mode. Categories and products will be managed locally.",
+            "Backend not available - running in offline mode. Categories and products will be managed locally.",
             {
               backendUrl:
                 process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002",
@@ -154,7 +155,7 @@ export function isRetryableError(error: any): boolean {
   }
 
   // Network errors are retryable
-  if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+  if (isNetworkErrorLike(error)) {
     return true;
   }
 
@@ -174,8 +175,6 @@ export function isRetryableError(error: any): boolean {
 // Helper function to check if we're offline
 export function isOfflineError(error: any): boolean {
   return (
-    error?.isOffline === true ||
-    (!isOnline() &&
-      (error?.code === "ERR_NETWORK" || error?.message === "Network Error"))
+    error?.isOffline === true || (!isOnline() && isNetworkErrorLike(error))
   );
 }

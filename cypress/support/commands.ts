@@ -6,8 +6,39 @@ const KASI_POS_DB_NAME = "kasiPosDatabase";
 const API_BASE_URL =
   (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:9002";
 const NORMALIZED_API_BASE_URL = API_BASE_URL.replace(/\/+$/, "");
+const TEST_MODE =
+  String((Cypress.env("TEST_MODE") as string | undefined) ?? "mock")
+    .toLowerCase()
+    .trim() === "real"
+    ? "real"
+    : "mock";
+const IS_REAL_MODE = TEST_MODE === "real";
+const REAL_AUTH_PHONE = Cypress.env("REAL_AUTH_PHONE") as string | undefined;
+const REAL_AUTH_PASSWORD = Cypress.env("REAL_AUTH_PASSWORD") as
+  | string
+  | undefined;
+const REAL_LOGIN_PATH =
+  (Cypress.env("REAL_LOGIN_PATH") as string | undefined) ?? "/login";
+const REAL_POST_LOGIN_PATH =
+  (Cypress.env("REAL_POST_LOGIN_PATH") as string | undefined) ?? "/";
 
 let mockControls: { setOffline: (value: boolean) => void } | null = null;
+
+function ensureMockMode(commandName: string): void {
+  if (!IS_REAL_MODE) return;
+  throw new Error(
+    `${commandName}() is only available in mock mode. Current mode: real.`,
+  );
+}
+
+function ensureRealCredentials(): void {
+  if (!IS_REAL_MODE) return;
+  if (!REAL_AUTH_PHONE || !REAL_AUTH_PASSWORD) {
+    throw new Error(
+      "Real mode requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD.",
+    );
+  }
+}
 
 function applySessionToStorage(win: Window, session: SeedAuthSession) {
   win.localStorage.setItem("token", session.token);
@@ -19,6 +50,99 @@ function applySessionToStorage(win: Window, session: SeedAuthSession) {
   win.localStorage.setItem("kasiPOS_hardwareSetupCompleted", "true");
   win.localStorage.setItem("__kasi_pos_e2e", "1");
   win.sessionStorage.setItem("__kasi_pos_e2e", "1");
+}
+
+function loginWithRealCredentials(): Cypress.Chainable<void> {
+  ensureRealCredentials();
+  const phone = REAL_AUTH_PHONE as string;
+  const password = REAL_AUTH_PASSWORD as string;
+  return cy
+    .visit(REAL_LOGIN_PATH, { failOnStatusCode: false })
+    .then(() => {
+      cy.findByLabelText(/mobile number/i, { timeout: 20_000 }).clear();
+      cy.findByLabelText(/mobile number/i, { timeout: 20_000 }).type(phone);
+      cy.findByLabelText(/password/i, { timeout: 20_000 }).clear();
+      cy.findByLabelText(/password/i, { timeout: 20_000 }).type(password, {
+        log: false,
+      });
+      cy.findByRole("button", { name: /sign in/i, timeout: 20_000 }).click();
+      cy.waitUntil(
+        () =>
+          cy.location("pathname", { log: false }).then((pathname) => {
+            return pathname !== "/login";
+          }),
+        {
+          timeout: 30_000,
+          interval: 250,
+          description: "wait for post-login route transition",
+        },
+      );
+      cy.waitForAppReady(
+        REAL_POST_LOGIN_PATH.startsWith("/")
+          ? new RegExp(
+              `^${REAL_POST_LOGIN_PATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+            )
+          : REAL_POST_LOGIN_PATH,
+      );
+    })
+    .then(() => {
+      cy.window().then((win) => {
+        const token = win.localStorage.getItem("token");
+        const rawUser = win.localStorage.getItem("user");
+        const rawSettings = win.localStorage.getItem("kasi-pos-settings");
+        if (!token || !rawUser || !rawSettings) {
+          throw new Error(
+            "Real login succeeded but auth/session keys were not found in localStorage.",
+          );
+        }
+        const user = JSON.parse(rawUser) as SeedAuthSession["user"];
+        const settings = JSON.parse(rawSettings) as SeedAuthSession["settings"];
+        const store =
+          (settings.currentStore as SeedAuthSession["store"]) ??
+          ({
+            id: user.storeId ?? "unknown-store",
+            name: "Real Store",
+            vatNumber: null,
+            logoUrl: null,
+            receiptHeader: null,
+            receiptFooter: null,
+            isSetupComplete: true,
+            ownerId: "real-owner",
+            enabledModules: {
+              campaigns: false,
+              marketplace: false,
+              boph: false,
+              buyStock: true,
+              showVatInCheckout: true,
+            },
+            credit: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } as SeedAuthSession["store"]);
+
+        const session: SeedAuthSession = {
+          token,
+          user,
+          store,
+          settings,
+        };
+        cy.wrap(session, { log: false }).as("seedAuthSession");
+        cy.wrap(
+          {
+            products: [],
+            categories: [],
+            customers: [],
+            transactions: [],
+            vouchers: [],
+            stockAdjustments: [],
+            parcels: [],
+            marketplaceStores: [],
+            marketplaceOrders: [],
+          } as SeedData,
+          { log: false },
+        ).as("seedData");
+      });
+    });
 }
 
 function deleteKasiPosDb(win: Window): Promise<void> {
@@ -100,6 +224,9 @@ Cypress.Commands.add("clearAppData", () => {
 });
 
 Cypress.Commands.add("bootstrapAuth", (input = {}) => {
+  if (IS_REAL_MODE) {
+    return loginWithRealCredentials();
+  }
   cy.task("seedAuthSession", input).then((sessionObj) => {
     const session = sessionObj as SeedAuthSession;
     cy.window().then((win) => {
@@ -110,6 +237,7 @@ Cypress.Commands.add("bootstrapAuth", (input = {}) => {
 });
 
 Cypress.Commands.add("seedIndexedDb", (input = {}) => {
+  ensureMockMode("seedIndexedDb");
   cy.task("loadSeedData", input).then((seedObj) => {
     const seed = seedObj as SeedData;
     cy.get<SeedAuthSession>("@seedAuthSession").then((session) => {
@@ -120,6 +248,7 @@ Cypress.Commands.add("seedIndexedDb", (input = {}) => {
 });
 
 Cypress.Commands.add("mockApi", (input = {}) => {
+  ensureMockMode("mockApi");
   cy.get<SeedAuthSession>("@seedAuthSession").then((session) => {
     cy.get<SeedData>("@seedData").then((seed) => {
       mockControls = registerApiMocks({
@@ -133,6 +262,7 @@ Cypress.Commands.add("mockApi", (input = {}) => {
 });
 
 Cypress.Commands.add("setOffline", () => {
+  ensureMockMode("setOffline");
   mockControls?.setOffline(true);
   cy.window().then((win) => {
     const bridge = (
@@ -150,6 +280,7 @@ Cypress.Commands.add("setOffline", () => {
 });
 
 Cypress.Commands.add("setOnlineModeOnly", () => {
+  ensureMockMode("setOnlineModeOnly");
   if (!mockControls) return;
   mockControls.setOffline(false);
   cy.window().then((win) => {
@@ -168,6 +299,7 @@ Cypress.Commands.add("setOnlineModeOnly", () => {
 });
 
 Cypress.Commands.add("setOnline", () => {
+  ensureMockMode("setOnline");
   if (!mockControls) {
     throw new Error(
       "setOnline() called before cy.setupScenario() — API mocks are not registered.",
@@ -263,6 +395,17 @@ Cypress.Commands.add(
 
 Cypress.Commands.add("visitApp", (path = "/") => {
   const normalized = path || "/";
+  if (IS_REAL_MODE) {
+    cy.visit(normalized, {
+      onBeforeLoad(win) {
+        Object.defineProperty(win.navigator, "onLine", {
+          configurable: true,
+          value: true,
+        });
+      },
+    });
+    return cy.wrap(undefined, { log: false });
+  }
   return cy.get<SeedAuthSession>("@seedAuthSession").then((session) => {
     const load = () =>
       cy.visit(normalized, {
@@ -300,6 +443,12 @@ Cypress.Commands.add("visitApp", (path = "/") => {
 });
 
 Cypress.Commands.add("setupScenario", (input = {}) => {
+  if (IS_REAL_MODE) {
+    Cypress.session.clearAllSavedSessions();
+    cy.clearCookies();
+    cy.clearLocalStorage();
+    return loginWithRealCredentials();
+  }
   Cypress.session.clearAllSavedSessions();
   cy.clearCookies();
   cy.clearLocalStorage();

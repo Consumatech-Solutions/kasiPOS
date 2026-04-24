@@ -32,3 +32,54 @@ KasiPOS includes powerful optional modules that you can enable from the Settings
 - **Styling:** Tailwind CSS
 - **Local Database:** Dexie.js (a wrapper for IndexedDB) for robust offline storage
 - **PWA:** Fully installable Progressive Web App with offline capabilities.
+
+## Cypress Modes
+
+The E2E suite supports two execution modes:
+
+- `mock` (default): uses seeded fixtures and Cypress API intercept mocks.
+- `real`: uses real staging credentials and real backend calls.
+
+### Mock mode (default)
+
+```bash
+npm run cy:run:mock
+```
+
+### Real-credentials mode (staging)
+
+```bash
+npm run cy:run:real
+```
+
+Real mode requires credentials. You can provide them from:
+
+- environment variables (highest priority), and/or
+- `cypress.env.json` (local file).
+
+Environment variables override `cypress.env.json`.
+
+Required keys for real mode:
+
+- `REAL_AUTH_PHONE`
+- `REAL_AUTH_PASSWORD`
+
+Optional keys:
+
+- `API_BASE_URL` (staging API URL)
+- `REAL_LOGIN_PATH` (default `/login`)
+- `REAL_POST_LOGIN_PATH` (default `/`)
+
+Example `cypress.env.json` (do not commit):
+
+```json
+{
+  "REAL_AUTH_PHONE": "0812345678",
+  "REAL_AUTH_PASSWORD": "your-password",
+  "API_BASE_URL": "https://staging-api.example.com",
+  "REAL_LOGIN_PATH": "/login",
+  "REAL_POST_LOGIN_PATH": "/"
+}
+```
+
+Security note: never commit real credentials to git.

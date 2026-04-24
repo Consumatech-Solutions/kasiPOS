@@ -107,6 +107,18 @@ function corsReply(
   } as any);
 }
 
+function isDocumentNavigation(req: {
+  headers?: Record<string, string | string[] | undefined>;
+  resourceType?: string;
+}): boolean {
+  const resourceType = String(req.resourceType ?? "").toLowerCase();
+  if (resourceType === "document") return true;
+
+  const acceptHeader = String(req.headers?.accept ?? "").toLowerCase();
+  // Browser navigations prefer HTML; API/XHR requests are usually JSON or */*.
+  return acceptHeader.includes("text/html");
+}
+
 export function registerApiMocks(options: MockApiOptions): MockApiControls {
   const apiBaseUrl =
     options.apiBaseUrl ??
@@ -117,9 +129,20 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     cypressBaseUrl &&
     stripTrailingSlashes(apiBaseUrl) === stripTrailingSlashes(cypressBaseUrl)
   ) {
-    throw new Error(
-      "API_BASE_URL matches the Cypress baseUrl. Root GET/HEAD mocks would intercept the Next.js document and cause SyntaxError in the app. Point API_BASE_URL at the backend (e.g. http://localhost:9002), not the Next.js server URL.",
-    );
+    // Same-origin API mocking is safe as long as we never intercept root GET (document request).
+    Cypress.log({
+      name: "mockApi",
+      message: `API_BASE_URL matches baseUrl (${apiBaseUrl}); root GET interception is disabled to avoid capturing the Next.js document.`,
+    });
+  }
+  if (
+    cypressBaseUrl &&
+    stripTrailingSlashes(apiBaseUrl) !== stripTrailingSlashes(cypressBaseUrl)
+  ) {
+    Cypress.log({
+      name: "mockApi",
+      message: `Using cross-origin API mocks at ${apiBaseUrl} (baseUrl=${cypressBaseUrl}).`,
+    });
   }
   const state = {
     products: clone(options.seedData.products),
@@ -174,10 +197,6 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     if (replyOfflineIfNeeded(req)) return;
     corsReply(req, { statusCode: 200, body: "" });
   });
-  cy.intercept("GET", `${apiBaseUrl}`, (req) => {
-    if (replyOfflineIfNeeded(req)) return;
-    corsReply(req, { statusCode: 200, body: { ok: true } });
-  });
 
   cy.intercept("GET", `${apiBaseUrl}/auth/profile`, (req) => {
     if (replyOfflineIfNeeded(req)) return;
@@ -193,6 +212,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     corsReply(req, { statusCode: 200, body: clone(options.seedAuth.store) });
   });
   cy.intercept("GET", `${apiBaseUrl}/settings*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     corsReply(req, {
       statusCode: 200,
@@ -343,6 +367,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   }).as("deleteProduct");
 
   cy.intercept("GET", `${apiBaseUrl}/customers*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     const q = String(req.query.search ?? "")
       .trim()
@@ -411,6 +440,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   }).as("deleteCustomer");
 
   cy.intercept("GET", `${apiBaseUrl}/transactions*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     let rows = [...state.transactions];
     const search = String(req.query.search ?? "").toLowerCase();
@@ -493,6 +527,11 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   }).as("createTransaction");
 
   cy.intercept("GET", `${apiBaseUrl}/vouchers*`, (req) => {
+    // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
     if (replyOfflineIfNeeded(req)) return;
     const isActiveParam = req.query.isActive;
     let rows = [...state.vouchers];

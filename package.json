@@ -22,6 +22,8 @@
     "e2e": "cypress run",
     "coverage": "vitest run --coverage",
     "cy:run": "cypress run",
+    "cy:run:mock": "cross-env CYPRESS_TEST_MODE=mock cypress run",
+    "cy:run:real": "cross-env CYPRESS_TEST_MODE=real cypress run --spec \"cypress/e2e/11-real-auth-smoke.cy.ts\"",
     "test:e2e": "start-server-and-test dev http://localhost:9002 cy:run"
   },
   "lint-staged": {
