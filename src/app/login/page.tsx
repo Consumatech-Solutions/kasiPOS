@@ -75,14 +75,14 @@ export default function LoginPage() {
       if (err?.code === "ERR_NETWORK" || err?.message === "Network Error") {
         if (process.env.NODE_ENV === "development") {
           console.warn(
-            "Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:9002).",
+            "Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:9002)."
           );
         }
         feedback.error(
           "Connection error",
           "Cannot reach server.",
           "Ensure the backend is running and try again.",
-          { code: ERROR_CODES.LOGIN },
+          { code: ERROR_CODES.LOGIN }
         );
         return;
       }
@@ -102,7 +102,7 @@ export default function LoginPage() {
         status === 401
           ? "Check your phone number and password."
           : "Try again or request access if you don't have an account.",
-        { code: ERROR_CODES.LOGIN },
+        { code: ERROR_CODES.LOGIN }
       );
     }
   };

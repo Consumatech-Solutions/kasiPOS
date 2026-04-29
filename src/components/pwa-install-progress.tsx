@@ -22,7 +22,7 @@ export function PWAInstallProgress({
 }: PWAInstallProgressProps) {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<"installing" | "completed" | "error">(
-    "installing",
+    "installing"
   );
   const [error, setError] = useState<string | null>(null);
 

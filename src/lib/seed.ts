@@ -18,7 +18,7 @@ export async function seedDatabase() {
         if (voucherToPatch && voucherToPatch.minPurchase !== 5) {
           await db.vouchers.update(voucherToPatch.id!, { minPurchase: 5 });
         }
-      },
+      }
     )
     .catch((err: Error) => {
       console.error("Failed to seed database:", err);

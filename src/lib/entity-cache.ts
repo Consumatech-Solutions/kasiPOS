@@ -33,7 +33,7 @@ export const LAST_SYNC_KEYS = {
 export type LastSyncEntity = keyof typeof LAST_SYNC_KEYS;
 
 export async function getLastSyncAt(
-  entity: LastSyncEntity,
+  entity: LastSyncEntity
 ): Promise<string | null> {
   if (typeof window === "undefined") return null;
   const db = getDb();
@@ -43,7 +43,7 @@ export async function getLastSyncAt(
 
 export async function setLastSyncAt(
   entity: LastSyncEntity,
-  isoDate: string,
+  isoDate: string
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -55,7 +55,7 @@ function resolvedProductStoreId(
     storeId?: string | number | null;
     store_id?: string | number | null;
   },
-  fallback?: string | null,
+  fallback?: string | null
 ): string | undefined {
   const fromRow = p.storeId ?? p.store_id;
   if (fromRow != null && fromRow !== "") return String(fromRow);
@@ -65,14 +65,14 @@ function resolvedProductStoreId(
 
 export async function saveProductsToDexie(
   data: ApiProduct[],
-  storeId?: string | null,
+  storeId?: string | null
 ): Promise<void> {
   if (typeof window === "undefined" || !data.length) return;
   const db = getDb();
   const records = data.map((p) => {
     const sid = resolvedProductStoreId(
       p as ApiProduct & { storeId?: string | number | null },
-      storeId,
+      storeId
     );
     return {
       ...p,
@@ -104,8 +104,8 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
     const allCust = await db.customers.toArray();
     allCust.sort((a, b) =>
       ((a as Customer).updatedAt ?? "").localeCompare(
-        (b as Customer).updatedAt ?? "",
-      ),
+        (b as Customer).updatedAt ?? ""
+      )
     );
     const toDelete = allCust.slice(0, count - cap).map((r) => r.id);
     await db.customers.bulkDelete(toDelete);
@@ -113,7 +113,7 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
 }
 
 export async function saveTransactionsToDexie(
-  data: Transaction[],
+  data: Transaction[]
 ): Promise<void> {
   if (typeof window === "undefined" || !data.length) return;
   const db = getDb();
@@ -124,7 +124,7 @@ export async function saveTransactionsToDexie(
       (t as Transaction & { date?: string }).date ?? new Date().toISOString(),
   }));
   await db.transactionCache.bulkPut(
-    records as { id: string; date?: string; [k: string]: unknown }[],
+    records as { id: string; date?: string; [k: string]: unknown }[]
   );
   const count = await db.transactionCache.count();
   const cap = entityCap();
@@ -140,7 +140,7 @@ export async function saveTransactionsToDexie(
 
 export async function updateProductStockInDexie(
   productId: string,
-  newStock: number,
+  newStock: number
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -152,7 +152,7 @@ export async function updateProductStockInDexie(
 
 export async function updateProductInDexie(
   productId: string,
-  updates: Partial<ApiProduct>,
+  updates: Partial<ApiProduct>
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -170,7 +170,7 @@ export async function deleteProductFromDexie(productId: string): Promise<void> {
 
 export async function saveCategoriesToDexie(
   data: ApiCategory[],
-  storeId?: string | null,
+  storeId?: string | null
 ): Promise<void> {
   if (typeof window === "undefined" || !data.length) return;
   const db = getDb();
@@ -197,7 +197,7 @@ export async function saveCategoriesToDexie(
 export async function getCategoriesFromDexie(
   page: number,
   limit: number,
-  storeIdForOffline?: string | null,
+  storeIdForOffline?: string | null
 ): Promise<{ data: ApiCategory[]; meta: PaginationMeta }> {
   if (typeof window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
@@ -227,7 +227,7 @@ export async function getCategoriesFromDexie(
 
 export async function updateCategoryInDexie(
   categoryId: string,
-  updates: Partial<ApiCategory>,
+  updates: Partial<ApiCategory>
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -238,7 +238,7 @@ export async function updateCategoryInDexie(
 }
 
 export async function deleteCategoryFromDexie(
-  categoryId: string,
+  categoryId: string
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -253,7 +253,7 @@ export function isTempEntityId(id: unknown): boolean {
 
 function rowMatchesStoreScope(
   rowStoreId: string | number | null | undefined,
-  syncStoreId: string | null | undefined,
+  syncStoreId: string | null | undefined
 ): boolean {
   if (syncStoreId == null || syncStoreId === "") return true;
   if (rowStoreId == null || rowStoreId === "") return true;
@@ -267,7 +267,7 @@ export type PurgeTempIdCatalogueResult = {
 };
 
 export async function purgeTempIdCatalogueRowsAfterCloudSync(
-  storeId?: string | null,
+  storeId?: string | null
 ): Promise<PurgeTempIdCatalogueResult> {
   if (typeof window === "undefined") {
     return { productsRemoved: 0, categoriesRemoved: 0, customersRemoved: 0 };
@@ -280,8 +280,8 @@ export async function purgeTempIdCatalogueRowsAfterCloudSync(
     .filter((p) =>
       rowMatchesStoreScope(
         (p as { storeId?: string | number | null }).storeId,
-        storeId,
-      ),
+        storeId
+      )
     )
     .map((p) => String(p.id));
 
@@ -317,7 +317,7 @@ export type PurgeUnscopedProductsResult = { removed: number };
 export type PurgeUnscopedCategoriesResult = { removed: number };
 
 export async function purgeUnscopedProductsCacheOnce(
-  storeId: string,
+  storeId: string
 ): Promise<PurgeUnscopedProductsResult | null> {
   if (typeof window === "undefined" || !storeId) return null;
   const key = `${PURGE_UNSCOPED_PRODUCTS_KEY_PREFIX}:${storeId}`;
@@ -346,7 +346,7 @@ export async function purgeUnscopedProductsCacheOnce(
 }
 
 export async function purgeUnscopedCategoriesCacheOnce(
-  storeId: string,
+  storeId: string
 ): Promise<PurgeUnscopedCategoriesResult | null> {
   if (typeof window === "undefined" || !storeId) return null;
   const key = `${PURGE_UNSCOPED_CATEGORIES_KEY_PREFIX}:${storeId}`;
@@ -375,7 +375,7 @@ export async function purgeUnscopedCategoriesCacheOnce(
 }
 
 export async function purgeUnscopedCatalogueCacheOnce(
-  storeId: string,
+  storeId: string
 ): Promise<{ productsRemoved: number; categoriesRemoved: number } | null> {
   const p = await purgeUnscopedProductsCacheOnce(storeId);
   const c = await purgeUnscopedCategoriesCacheOnce(storeId);
@@ -388,7 +388,7 @@ export async function purgeUnscopedCatalogueCacheOnce(
 
 export async function updateCustomerInDexie(
   customerId: string,
-  updates: Partial<Customer>,
+  updates: Partial<Customer>
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -399,7 +399,7 @@ export async function updateCustomerInDexie(
 }
 
 export async function deleteCustomerFromDexie(
-  customerId: string,
+  customerId: string
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
@@ -407,7 +407,7 @@ export async function deleteCustomerFromDexie(
 }
 
 export async function savePurchaseOrdersToDexie(
-  orders: PurchaseOrder[],
+  orders: PurchaseOrder[]
 ): Promise<void> {
   if (typeof window === "undefined" || !orders.length) return;
   const db = getDb();
@@ -416,7 +416,7 @@ export async function savePurchaseOrdersToDexie(
     ? JSON.parse(record.value)
     : [];
   const byId = new Map<string, PurchaseOrder>(
-    existing.map((o) => [o.id ?? "", o]),
+    existing.map((o) => [o.id ?? "", o])
   );
   for (const o of orders) {
     if (o.id) byId.set(o.id, o);
@@ -435,7 +435,7 @@ export async function savePurchaseOrdersToDexie(
 
 export async function getPurchaseOrdersFromDexie(
   page: number = 1,
-  limit: number = 10,
+  limit: number = 10
 ): Promise<{ data: PurchaseOrder[]; total: number }> {
   if (typeof window === "undefined") {
     return { data: [], total: 0 };
@@ -451,14 +451,14 @@ export async function getPurchaseOrdersFromDexie(
 
 export async function updatePurchaseOrderStatusInDexie(
   orderId: string,
-  newStatus: "pending" | "completed" | "cancelled",
+  newStatus: "pending" | "completed" | "cancelled"
 ): Promise<void> {
   if (typeof window === "undefined") return;
   const db = getDb();
   const record = await db.keyVal.get(PURCHASE_ORDERS_KEY);
   const all: PurchaseOrder[] = record?.value ? JSON.parse(record.value) : [];
   const updated = all.map((o) =>
-    o.id === orderId ? { ...o, status: newStatus } : o,
+    o.id === orderId ? { ...o, status: newStatus } : o
   );
   await db.keyVal.put({
     key: PURCHASE_ORDERS_KEY,
@@ -473,7 +473,7 @@ export type ProductDexieListFilters = {
 
 function filterProductsInMemory(
   rows: ApiProduct[],
-  filters?: ProductDexieListFilters,
+  filters?: ProductDexieListFilters
 ): ApiProduct[] {
   if (!filters?.search?.trim() && !filters?.categoryId) {
     return rows;
@@ -498,7 +498,7 @@ export async function getProductsFromDexie(
   page: number,
   limit: number,
   storeIdForOffline?: string | null,
-  filters?: ProductDexieListFilters,
+  filters?: ProductDexieListFilters
 ): Promise<{ data: ApiProduct[]; meta: PaginationMeta }> {
   if (typeof window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
@@ -533,7 +533,7 @@ export async function getProductsFromDexie(
         : String(cat).trim() !== "");
     if (product.categoryId && !hasCategory) {
       const category = categories.find(
-        (c) => String(c.id) === String(product.categoryId),
+        (c) => String(c.id) === String(product.categoryId)
       );
       if (category) {
         const ac = category as ApiCategory;
@@ -566,7 +566,7 @@ export async function getCustomersFromDexie(
   page: number,
   limit: number,
   search?: string,
-  storeId?: string | null,
+  storeId?: string | null
 ): Promise<{ data: Customer[]; meta: PaginationMeta }> {
   if (typeof window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
@@ -586,7 +586,7 @@ export async function getCustomersFromDexie(
     all = all.filter(
       (c) =>
         (c.name && String(c.name).toLowerCase().includes(q)) ||
-        (c.contact && String(c.contact).toLowerCase().includes(q)),
+        (c.contact && String(c.contact).toLowerCase().includes(q))
     );
   }
   const total = all.length;
@@ -605,7 +605,7 @@ export async function getCustomersFromDexie(
 export async function getTransactionsFromDexie(
   page: number,
   limit: number,
-  storeId?: string | null,
+  storeId?: string | null
 ): Promise<{ data: Transaction[]; meta: PaginationMeta }> {
   if (typeof window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
@@ -615,17 +615,16 @@ export async function getTransactionsFromDexie(
   if (storeId != null && storeId !== "") {
     all = all.filter(
       (t) =>
-        (t as unknown as Transaction & { storeId?: string }).storeId ===
-        storeId,
+        (t as unknown as Transaction & { storeId?: string }).storeId === storeId
     );
   }
   const sorted = (all as { date?: string }[]).sort((a, b) =>
-    (b.date ?? "").localeCompare(a.date ?? ""),
+    (b.date ?? "").localeCompare(a.date ?? "")
   );
   const total = sorted.length;
   const data = sorted.slice(
     (page - 1) * limit,
-    page * limit,
+    page * limit
   ) as unknown as Transaction[];
   return {
     data,

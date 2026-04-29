@@ -27,7 +27,7 @@ vi.mock("@/lib/feedback", () => ({
 }));
 
 function product(
-  p: Partial<Product> & Pick<Product, "id" | "name" | "price">,
+  p: Partial<Product> & Pick<Product, "id" | "name" | "price">
 ): Product {
   return { ...p } as Product;
 }
@@ -108,10 +108,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <Harness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.getByTestId("hydrated").textContent).toBe("yes"),
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
     );
     const user = userEvent.setup();
     await user.click(screen.getByTestId("add-p1"));
@@ -127,10 +127,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <Harness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.getByTestId("hydrated").textContent).toBe("yes"),
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
     );
     const user = userEvent.setup();
     await user.click(screen.getByTestId("add-p1"));
@@ -154,7 +154,7 @@ describe("CartProvider", () => {
                   id: "x",
                   name: "X",
                   price: "9.5" as unknown as number,
-                }),
+                })
               )
             }
           >
@@ -166,10 +166,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <PriceHarness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: /go/i })).toBeTruthy(),
+      expect(screen.queryByRole("button", { name: /go/i })).toBeTruthy()
     );
     await userEvent.click(screen.getByRole("button", { name: /go/i }));
     expect(screen.getByTestId("total").textContent).toBe("9.5");
@@ -179,10 +179,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <Harness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.getByTestId("hydrated").textContent).toBe("yes"),
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
     );
     const user = userEvent.setup();
     await user.click(screen.getByTestId("add-p1"));
@@ -194,10 +194,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <Harness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.getByTestId("hydrated").textContent).toBe("yes"),
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
     );
     const user = userEvent.setup();
     await user.click(screen.getByTestId("add-p1"));
@@ -209,10 +209,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <Harness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.getByTestId("hydrated").textContent).toBe("yes"),
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
     );
     const user = userEvent.setup();
     await user.click(screen.getByTestId("add-p1"));
@@ -231,10 +231,10 @@ describe("CartProvider", () => {
     render(
       <CartProvider>
         <Harness />
-      </CartProvider>,
+      </CartProvider>
     );
     await waitFor(() =>
-      expect(screen.getByTestId("hydrated").textContent).toBe("yes"),
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
     );
     const user = userEvent.setup();
     await user.click(screen.getByTestId("add-p1"));

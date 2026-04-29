@@ -96,7 +96,7 @@ export default function PosPage() {
   >();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryView, setCategoryView] = useState<"carousel" | "grid">(
-    "carousel",
+    "carousel"
   );
   const [categorySearch, setCategorySearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -175,7 +175,7 @@ export default function PosPage() {
   const filteredCategories = useMemo(() => {
     if (!allCategories) return [];
     return allCategories.filter((c) =>
-      c.toLowerCase().includes(categorySearch.toLowerCase()),
+      c.toLowerCase().includes(categorySearch.toLowerCase())
     );
   }, [allCategories, categorySearch]);
 
@@ -195,7 +195,7 @@ export default function PosPage() {
         customer.name
           .toLowerCase()
           .includes(customerSearchTerm.toLowerCase()) ||
-        customer.contact?.includes(customerSearchTerm),
+        customer.contact?.includes(customerSearchTerm)
     );
   }, [customers, customerSearchTerm]);
 
@@ -207,14 +207,14 @@ export default function PosPage() {
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce(
     (acc, item) => acc + item.totalPrice,
-    0,
+    0
   );
   const manualDiscountAmount = useMemo(() => {
     if (!manualDiscount) return 0;
     if (manualDiscount.discountType === "percentage") {
       return (
         Math.round(
-          ((cartSubtotal * manualDiscount.discountAmount) / 100) * 100,
+          ((cartSubtotal * manualDiscount.discountAmount) / 100) * 100
         ) / 100
       );
     }
@@ -231,7 +231,7 @@ export default function PosPage() {
       feedback.error(
         "Cannot redeem voucher",
         "You need a cart total of at least R5 to redeem a voucher.",
-        "Add more items to the cart.",
+        "Add more items to the cart."
       );
       return;
     }
@@ -241,13 +241,13 @@ export default function PosPage() {
   const creditConfigured = settings?.currentStore?.credit != null;
 
   const handleCheckout = (
-    method: "Cash" | "Card" | "Mobile Money" | "Credit",
+    method: "Cash" | "Card" | "Mobile Money" | "Credit"
   ) => {
     if (cart.size === 0) {
       feedback.error(
         "Cart is empty",
         "Please add products to the cart before checkout.",
-        "Add products and try again.",
+        "Add products and try again."
       );
       return;
     }
@@ -256,7 +256,7 @@ export default function PosPage() {
         feedback.error(
           "Credit not configured",
           "Set the customer credit limit in Store settings to allow sales on credit.",
-          "Open Settings",
+          "Open Settings"
         );
         return;
       }
@@ -291,7 +291,7 @@ export default function PosPage() {
     setAppliedDiscount(amount);
     feedback.success(
       "Voucher applied",
-      `Discount of R${amount.toFixed(2)} applied.`,
+      `Discount of R${amount.toFixed(2)} applied.`
     );
   };
 
@@ -303,7 +303,7 @@ export default function PosPage() {
         : discount.discountAmount;
     feedback.success(
       "Discount applied",
-      `Discount of R${amount.toFixed(2)} applied.`,
+      `Discount of R${amount.toFixed(2)} applied.`
     );
   };
 
@@ -339,14 +339,14 @@ export default function PosPage() {
       addToCart(productForCart);
       feedback.success(
         "Product added",
-        `${productByBarcode.name} added to cart.`,
+        `${productByBarcode.name} added to cart.`
       );
     } else {
       setProductSearch(barcode);
       setCategoryView("carousel");
       feedback.success(
         "Barcode scanned",
-        `No product found with barcode "${barcode}". Showing search results.`,
+        `No product found with barcode "${barcode}". Showing search results.`
       );
     }
   };
@@ -355,7 +355,7 @@ export default function PosPage() {
   const completingSaleRef = useRef(false);
 
   const handleCompleteSale = async (
-    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
+    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">
   ) => {
     if (completingSaleRef.current || isCompletingSale) return;
     completingSaleRef.current = true;
@@ -414,7 +414,7 @@ export default function PosPage() {
           if (unresolvedProductIds.length > 0) {
             feedback.error(
               "Products still syncing",
-              "Some products in your cart haven't finished syncing. Please wait a moment and try again.",
+              "Some products in your cart haven't finished syncing. Please wait a moment and try again."
             );
             return;
           }
@@ -425,7 +425,7 @@ export default function PosPage() {
           if (unresolvedCustomerId) {
             feedback.error(
               "Customer still syncing",
-              "The selected customer has not finished syncing yet. Please wait a moment and try again.",
+              "The selected customer has not finished syncing yet. Please wait a moment and try again."
             );
             return;
           }
@@ -448,7 +448,7 @@ export default function PosPage() {
           const payload = toCreateTransactionDto(
             resolvedTx as Omit<Transaction, "id"> & {
               items: Array<TransactionItem & { [k: string]: unknown }>;
-            },
+            }
           );
           const response = await transactionsApi.create(payload, {
             idempotencyKey,
@@ -515,12 +515,12 @@ export default function PosPage() {
               "serverMessage:",
               serverMessage,
               "storeId sent:",
-              newTransaction?.storeId,
+              newTransaction?.storeId
             );
             if (data)
               console.error(
                 "[Complete Sale] Response data:",
-                JSON.stringify(data),
+                JSON.stringify(data)
               );
             console.error("[Complete Sale] Error:", error);
           }
@@ -537,7 +537,7 @@ export default function PosPage() {
           const isCreditNotConfigured =
             messageForUser &&
             /credit.*not configured|not configured.*credit/i.test(
-              messageForUser,
+              messageForUser
             );
           const popupMessage = isStoreIdError
             ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
@@ -556,7 +556,7 @@ export default function PosPage() {
               "Failed to complete the sale",
               messageForUser
                 ? `${messageForUser} Try again or check your connection.`
-                : "Check your connection and try again.",
+                : "Check your connection and try again."
             );
           }
         }
@@ -585,7 +585,7 @@ export default function PosPage() {
             .getAll()
             .map((query) => query.queryKey);
           const productQueries = productQueryKeys.filter(
-            (key) => Array.isArray(key) && key[0] === "products",
+            (key) => Array.isArray(key) && key[0] === "products"
           );
 
           productQueries.forEach((queryKey) => {
@@ -597,20 +597,20 @@ export default function PosPage() {
                   ...old,
                   data: old.data.map((product) => {
                     const cartItem = newTransaction.items.find(
-                      (item) => String(item.productId) === String(product.id),
+                      (item) => String(item.productId) === String(product.id)
                     );
                     if (cartItem) {
                       const currentStock = product.stock ?? 0;
                       const newStock = Math.max(
                         0,
-                        currentStock - cartItem.quantity,
+                        currentStock - cartItem.quantity
                       );
                       return { ...product, stock: newStock };
                     }
                     return product;
                   }),
                 };
-              },
+              }
             );
           });
 
@@ -619,7 +619,7 @@ export default function PosPage() {
             const pid = String(item.productId);
             soldQuantityByProduct.set(
               pid,
-              (soldQuantityByProduct.get(pid) ?? 0) + item.quantity,
+              (soldQuantityByProduct.get(pid) ?? 0) + item.quantity
             );
           }
 
@@ -638,9 +638,9 @@ export default function PosPage() {
                 toCreateTransactionDto(
                   newTransaction as Omit<Transaction, "id"> & {
                     items: Array<TransactionItem & { [k: string]: unknown }>;
-                  },
+                  }
                 ),
-                { idempotencyKey },
+                { idempotencyKey }
               ),
             variables: newTransaction,
           });
@@ -658,7 +658,7 @@ export default function PosPage() {
 
           feedback.success(
             "Offline sale complete!",
-            "Receipt saved. Will sync when back online.",
+            "Receipt saved. Will sync when back online."
           );
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
@@ -689,7 +689,7 @@ export default function PosPage() {
             (key) =>
               Array.isArray(key) &&
               key[0] === "products" &&
-              !(key[1] === "list" || key.length < 2),
+              !(key[1] === "list" || key.length < 2)
           );
           nonListProductQueries.forEach((queryKey) => {
             queryClient.setQueryData<{ data: any[]; meta: any }>(
@@ -703,10 +703,10 @@ export default function PosPage() {
                       const pid = String(product.id);
                       if (!previousStockMap.has(pid)) return product;
                       return { ...product, stock: previousStockMap.get(pid)! };
-                    },
+                    }
                   ),
                 };
-              },
+              }
             );
           });
 
@@ -721,7 +721,7 @@ export default function PosPage() {
           feedback.fromError(
             error,
             "Failed to save the sale locally",
-            "Try again or check storage.",
+            "Try again or check storage."
           );
         }
       }
@@ -773,7 +773,7 @@ export default function PosPage() {
                 className="h-10 w-10 touch-target"
                 onClick={() =>
                   setCategoryView((prev) =>
-                    prev === "carousel" ? "grid" : "carousel",
+                    prev === "carousel" ? "grid" : "carousel"
                   )
                 }
               >
@@ -811,7 +811,7 @@ export default function PosPage() {
                         size="sm"
                         onClick={() =>
                           selectCategory(
-                            activeCategory === cat.name ? null : cat.name,
+                            activeCategory === cat.name ? null : cat.name
                           )
                         }
                       >

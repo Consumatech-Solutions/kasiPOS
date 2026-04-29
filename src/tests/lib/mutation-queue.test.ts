@@ -283,7 +283,7 @@ describe("mutationQueue", () => {
 
   it("processQueue pauses on network error and keeps mutation on queue", async () => {
     hoisted.executeMutationImpl.mockRejectedValueOnce(
-      new Error("Network Error"),
+      new Error("Network Error")
     );
     addQueuedMutation(["categories", "create"]);
     const result = await mutationQueue.processQueue({ force: true });

@@ -6,7 +6,7 @@ import type { StoreRecord } from "@/lib/db";
 
 export async function saveStorePermanently(
   store: Store,
-  setSetting?: (key: "currentStore", value: Store | null) => void,
+  setSetting?: (key: "currentStore", value: Store | null) => void
 ): Promise<void> {
   if (!store || !store.id) {
     console.warn("[StorePersistence] Cannot save store: invalid store data");
@@ -25,7 +25,7 @@ export async function saveStorePermanently(
       } catch (error) {
         console.warn(
           "[StorePersistence] Failed to save store to localStorage:",
-          error,
+          error
         );
       }
     }
@@ -44,7 +44,7 @@ export async function saveStorePermanently(
       } catch (error) {
         console.error(
           "[StorePersistence] Failed to save store to IndexedDB:",
-          error,
+          error
         );
       }
     }
@@ -54,7 +54,7 @@ export async function saveStorePermanently(
 }
 
 export async function loadStoreFromIndexedDB(
-  storeId?: string | number | null,
+  storeId?: string | number | null
 ): Promise<Store | null> {
   if (typeof window === "undefined") {
     return null;
@@ -72,7 +72,7 @@ export async function loadStoreFromIndexedDB(
       const stores = await db.stores.toArray();
       if (stores.length > 0) {
         console.log(
-          "[StorePersistence] Loaded store from IndexedDB (first available)",
+          "[StorePersistence] Loaded store from IndexedDB (first available)"
         );
         return stores[0] as Store;
       }
@@ -80,7 +80,7 @@ export async function loadStoreFromIndexedDB(
   } catch (error) {
     console.error(
       "[StorePersistence] Error loading store from IndexedDB:",
-      error,
+      error
     );
   }
 
@@ -89,7 +89,7 @@ export async function loadStoreFromIndexedDB(
 
 export async function fetchAndSaveStore(
   setSetting?: (key: "currentStore", value: Store | null) => void,
-  preferredStoreId?: string | number | null,
+  preferredStoreId?: string | number | null
 ): Promise<Store | null> {
   try {
     const { storesApi } = await import("@/lib/api/stores");
@@ -122,7 +122,7 @@ export async function fetchAndSaveStore(
 
     if (isNetworkFailure) {
       const cachedStore = await loadStoreFromIndexedDB(
-        preferredStoreId ?? undefined,
+        preferredStoreId ?? undefined
       );
       if (cachedStore && setSetting) {
         setSetting("currentStore", cachedStore);

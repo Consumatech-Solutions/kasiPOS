@@ -99,7 +99,7 @@ export default function VouchersPage() {
   const [voucherDialogOpen, setVoucherDialogOpen] = useState(false);
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
   const [filterActive, setFilterActive] = useState<boolean | undefined>(
-    undefined,
+    undefined
   );
 
   const form = useForm<z.infer<typeof voucherSchema>>({
@@ -166,7 +166,7 @@ export default function VouchersPage() {
           });
           feedback.success(
             "Queued",
-            "Voucher update queued. Will sync when online.",
+            "Voucher update queued. Will sync when online."
           );
         }
       } else {
@@ -188,7 +188,7 @@ export default function VouchersPage() {
         error,
         "Failed to save voucher",
         "Check your connection and try again.",
-        ERROR_CODES.VOUCHER,
+        ERROR_CODES.VOUCHER
       );
     }
   };
@@ -206,7 +206,7 @@ export default function VouchersPage() {
         });
         feedback.success(
           "Queued",
-          "Voucher deletion queued. Will sync when online.",
+          "Voucher deletion queued. Will sync when online."
         );
       }
     } catch (error: unknown) {
@@ -214,7 +214,7 @@ export default function VouchersPage() {
         error,
         "Failed to delete voucher",
         "Try again or check your connection.",
-        ERROR_CODES.VOUCHER,
+        ERROR_CODES.VOUCHER
       );
     }
   };
@@ -231,7 +231,7 @@ export default function VouchersPage() {
     if (expiresAt < now)
       return { text: "Expired", variant: "destructive" as const };
     const daysUntil = Math.ceil(
-      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
     );
     if (daysUntil <= 7)
       return {
@@ -249,7 +249,7 @@ export default function VouchersPage() {
       <RequireOnlineBanner />
       <div
         className={cn(
-          !isOnline && "opacity-60 pointer-events-none select-none",
+          !isOnline && "opacity-60 pointer-events-none select-none"
         )}
       >
         <Card>
@@ -596,7 +596,7 @@ export default function VouchersPage() {
                               field.onChange(
                                 e.target.value
                                   ? parseInt(e.target.value, 10)
-                                  : null,
+                                  : null
                               )
                             }
                             placeholder="Unlimited"
@@ -622,7 +622,7 @@ export default function VouchersPage() {
                               field.onChange(
                                 e.target.value
                                   ? parseInt(e.target.value, 10)
-                                  : null,
+                                  : null
                               )
                             }
                             placeholder="Unlimited"

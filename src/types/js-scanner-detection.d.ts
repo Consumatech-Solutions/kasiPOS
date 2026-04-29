@@ -1,4 +1,4 @@
-declare module 'js-scanner-detection' {
+declare module "js-scanner-detection" {
   export interface ScannerDetectorOptions {
     onComplete?: (barcode: string) => void;
     onError?: (value: string) => void;

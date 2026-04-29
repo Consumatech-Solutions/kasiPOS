@@ -107,7 +107,7 @@ export default function BuyStockHistoryPage() {
 
   const handleStatusChange = async (
     orderId: string,
-    newStatus: "pending" | "completed" | "cancelled",
+    newStatus: "pending" | "completed" | "cancelled"
   ) => {
     if (!orderId) return;
 
@@ -117,18 +117,18 @@ export default function BuyStockHistoryPage() {
         await purchaseOrdersApi.updateStatus(orderId, { status: newStatus });
         setPurchaseOrders((prev) =>
           prev.map((order) =>
-            order.id === orderId ? { ...order, status: newStatus } : order,
-          ),
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
         );
         feedback.success(
           "Status updated",
-          `Purchase order status changed to ${newStatus}.`,
+          `Purchase order status changed to ${newStatus}.`
         );
       } else {
         setPurchaseOrders((prev) =>
           prev.map((order) =>
-            order.id === orderId ? { ...order, status: newStatus } : order,
-          ),
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
         );
         await updatePurchaseOrderStatusInDexie(orderId, newStatus);
         mutationQueue.add({
@@ -147,7 +147,7 @@ export default function BuyStockHistoryPage() {
         error,
         "Failed to update status",
         "Check your connection and try again.",
-        ERROR_CODES.PURCHASE_ORDER,
+        ERROR_CODES.PURCHASE_ORDER
       );
     } finally {
       setUpdatingStatus(null);
@@ -267,7 +267,7 @@ export default function BuyStockHistoryPage() {
                                       e.stopPropagation();
                                       handleStatusChange(
                                         order.id!,
-                                        "completed",
+                                        "completed"
                                       );
                                     }}
                                   >
@@ -281,7 +281,7 @@ export default function BuyStockHistoryPage() {
                                       e.stopPropagation();
                                       handleStatusChange(
                                         order.id!,
-                                        "cancelled",
+                                        "cancelled"
                                       );
                                     }}
                                     className="text-destructive focus:text-destructive"

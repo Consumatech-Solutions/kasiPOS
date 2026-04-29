@@ -23,7 +23,7 @@ function DbProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const isResizeObserverNoise = (value: unknown): boolean =>
       /ResizeObserver loop (completed with undelivered notifications|limit exceeded)/i.test(
-        String(value ?? ""),
+        String(value ?? "")
       );
 
     const onWindowError = (event: ErrorEvent) => {
@@ -95,8 +95,8 @@ function DbProvider({ children }: { children: React.ReactNode }) {
               await navigator.serviceWorker.getRegistrations();
             await Promise.allSettled(
               existingRegistrations.map((registration) =>
-                registration.unregister(),
-              ),
+                registration.unregister()
+              )
             );
             return;
           }
@@ -118,7 +118,7 @@ function DbProvider({ children }: { children: React.ReactNode }) {
             {
               scope: "/",
               updateViaCache: "none",
-            },
+            }
           );
 
           registration.addEventListener("updatefound", () => {
@@ -139,12 +139,12 @@ function DbProvider({ children }: { children: React.ReactNode }) {
             () => {
               registration.update();
             },
-            60 * 60 * 1000,
+            60 * 60 * 1000
           );
         } catch (registrationError) {
           console.error(
             "[Service Worker] Registration failed:",
-            registrationError,
+            registrationError
           );
         }
       };

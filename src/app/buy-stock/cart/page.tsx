@@ -82,7 +82,7 @@ export default function BuyStockCartPage() {
         return newCart;
       });
     },
-    [],
+    []
   );
 
   const handleRemoveItem = useCallback((productId: string) => {
@@ -95,11 +95,11 @@ export default function BuyStockCartPage() {
 
   const subtotal = useMemo(
     () => cart.reduce((acc, item) => acc + item.totalPrice, 0),
-    [cart],
+    [cart]
   );
   const total = useMemo(
     () => subtotal + (deliveryMethod === "delivery" ? DELIVERY_FEE : 0),
-    [subtotal, deliveryMethod],
+    [subtotal, deliveryMethod]
   );
 
   const [isConfirmingOrder, setIsConfirmingOrder] = useState(false);
@@ -114,7 +114,7 @@ export default function BuyStockCartPage() {
         "Cart is empty",
         "Add items to your cart before confirming.",
         "Go to Buy Stock and add items, then try again.",
-        { code: ERROR_CODES.PURCHASE_ORDER },
+        { code: ERROR_CODES.PURCHASE_ORDER }
       );
       return;
     }
@@ -141,7 +141,7 @@ export default function BuyStockCartPage() {
           error,
           "Purchase order failed",
           "Check your connection and try again.",
-          ERROR_CODES.PURCHASE_ORDER,
+          ERROR_CODES.PURCHASE_ORDER
         );
       } finally {
         setIsConfirmingOrder(false);
@@ -172,14 +172,14 @@ export default function BuyStockCartPage() {
 
         feedback.success(
           "Order queued",
-          "Order saved locally. It will sync when you are back online.",
+          "Order saved locally. It will sync when you are back online."
         );
       } catch (error: unknown) {
         feedback.fromError(
           error,
           "Failed to save order locally",
           "Try again or check storage.",
-          ERROR_CODES.PURCHASE_ORDER,
+          ERROR_CODES.PURCHASE_ORDER
         );
         setIsConfirmingOrder(false);
       }
@@ -247,7 +247,7 @@ export default function BuyStockCartPage() {
                                 onClick={() =>
                                   handleQuantityChange(
                                     item.productId,
-                                    item.quantity - 1,
+                                    item.quantity - 1
                                   )
                                 }
                               >
@@ -259,7 +259,7 @@ export default function BuyStockCartPage() {
                                 onChange={(e) =>
                                   handleQuantityChange(
                                     item.productId,
-                                    parseInt(e.target.value, 10) || 0,
+                                    parseInt(e.target.value, 10) || 0
                                   )
                                 }
                                 className="h-8 w-24 sm:w-28 text-center min-w-[80px]"
@@ -272,7 +272,7 @@ export default function BuyStockCartPage() {
                                 onClick={() =>
                                   handleQuantityChange(
                                     item.productId,
-                                    item.quantity + 1,
+                                    item.quantity + 1
                                   )
                                 }
                               >
@@ -309,7 +309,7 @@ export default function BuyStockCartPage() {
                           value={deliveryMethod}
                           onValueChange={(value) =>
                             setDeliveryMethod(
-                              value as "delivery" | "collection",
+                              value as "delivery" | "collection"
                             )
                           }
                           className="grid grid-cols-2 gap-4 mt-2"

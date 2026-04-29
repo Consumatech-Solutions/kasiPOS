@@ -90,7 +90,7 @@ export function buildTestPrintPayload(): Uint8Array {
   const left = new Uint8Array([0x1b, 0x61, 0x00]);
   const cut = new Uint8Array([0x1d, 0x56, 0x00]);
   const out = new Uint8Array(
-    init.length + center.length + textBytes.length + left.length + cut.length,
+    init.length + center.length + textBytes.length + left.length + cut.length
   );
   let off = 0;
   out.set(init, off);
@@ -118,7 +118,7 @@ async function checkServerHealth(): Promise<boolean> {
 }
 
 export async function getDevices(
-  type?: "printer" | "scanner" | "pos",
+  type?: "printer" | "scanner" | "pos"
 ): Promise<Device[]> {
   const devices: Device[] = [];
 
@@ -138,7 +138,7 @@ export async function getDevices(
           product: d.product,
           serialNumber: d.serialNumber,
           connected: d.connected,
-        })),
+        }))
       );
     } catch (error) {
       console.error("Error getting WebUSB printers:", error);
@@ -161,7 +161,7 @@ export async function getDevices(
           product: d.product,
           serialNumber: d.serialNumber,
           connected: d.connected,
-        })),
+        }))
       );
     } catch (error) {
       console.error("Error getting WebHID scanners:", error);
@@ -192,7 +192,7 @@ export async function getDevices(
           error.message.includes("Failed to fetch")
         ) {
           throw new Error(
-            "Cannot connect to printer server. Make sure it is running on localhost:7788",
+            "Cannot connect to printer server. Make sure it is running on localhost:7788"
           );
         }
         throw error;
@@ -200,7 +200,7 @@ export async function getDevices(
     }
   } else if (devices.length === 0) {
     throw new Error(
-      "No devices available. WebUSB/WebHID not supported or printer server not running.",
+      "No devices available. WebUSB/WebHID not supported or printer server not running."
     );
   }
 
@@ -241,7 +241,7 @@ export async function getQzDevices(): Promise<Device[]> {
 
 export async function printReceipt(
   deviceId: string,
-  data: Uint8Array,
+  data: Uint8Array
 ): Promise<PrintResponse> {
   if (deviceId.startsWith("webusb_")) {
     if (!isWebUSBAvailable()) {
@@ -258,7 +258,7 @@ export async function printReceipt(
   if (deviceId === "thermal-android") {
     if (!isAndroid()) {
       throw new Error(
-        "Android thermal printing is only available on Android devices",
+        "Android thermal printing is only available on Android devices"
       );
     }
     const base64 = btoa(String.fromCharCode(...data));
@@ -290,7 +290,7 @@ export async function printReceipt(
   } catch (error: any) {
     if (error.message.includes("Failed to fetch")) {
       throw new Error(
-        "Cannot connect to printer server. Make sure it is running on localhost:7788",
+        "Cannot connect to printer server. Make sure it is running on localhost:7788"
       );
     }
     throw error;
@@ -299,7 +299,7 @@ export async function printReceipt(
 
 export async function scanBarcode(
   deviceId: string,
-  timeout: number = 5000,
+  timeout: number = 5000
 ): Promise<ScanResponse> {
   if (deviceId.startsWith("webhid_")) {
     if (!isWebHIDAvailable()) {
@@ -338,7 +338,7 @@ export async function scanBarcode(
     }
     if (error.message.includes("Failed to fetch")) {
       throw new Error(
-        "Cannot connect to printer server. Make sure it is running on localhost:7788",
+        "Cannot connect to printer server. Make sure it is running on localhost:7788"
       );
     }
     throw error;
@@ -348,7 +348,7 @@ export async function scanBarcode(
 export async function pollScanner(
   deviceId: string,
   onProgress?: () => void,
-  pollInterval: number = 500,
+  pollInterval: number = 500
 ): Promise<string> {
   if (deviceId.startsWith("webhid_")) {
     if (!isWebHIDAvailable()) {
@@ -384,7 +384,7 @@ export async function pollScanner(
 
 export async function connectPos(
   deviceId: string,
-  command?: string,
+  command?: string
 ): Promise<PosResponse> {
   try {
     const response = await fetch(`${PRINTER_SERVER_URL}/pos`, {
@@ -404,7 +404,7 @@ export async function connectPos(
         .json()
         .catch(() => ({ error: response.statusText }));
       throw new Error(
-        error.error || `POS connection failed: ${response.statusText}`,
+        error.error || `POS connection failed: ${response.statusText}`
       );
     }
 
@@ -412,7 +412,7 @@ export async function connectPos(
   } catch (error: any) {
     if (error.message.includes("Failed to fetch")) {
       throw new Error(
-        "Cannot connect to printer server. Make sure it is running on localhost:7788",
+        "Cannot connect to printer server. Make sure it is running on localhost:7788"
       );
     }
     throw error;
@@ -420,7 +420,7 @@ export async function connectPos(
 }
 
 export function getStoredDevice(
-  type: "printer" | "scanner" | "pos",
+  type: "printer" | "scanner" | "pos"
 ): string | null {
   if (typeof window === "undefined") return null;
   const key = STORAGE_KEYS[type];
@@ -428,7 +428,7 @@ export function getStoredDevice(
 }
 
 export function getStoredDeviceConnectionType(
-  type: "printer" | "scanner" | "pos",
+  type: "printer" | "scanner" | "pos"
 ): "webusb" | "webhid" | "server" | "qz" | null {
   if (typeof window === "undefined") return null;
   const key = `${CONNECTION_TYPE_KEY}_${type}`;
@@ -451,7 +451,7 @@ export function getStoredDeviceConnectionType(
 export function storeDevice(
   type: "printer" | "scanner" | "pos",
   deviceId: string,
-  connectionType?: "webusb" | "webhid" | "server" | "qz",
+  connectionType?: "webusb" | "webhid" | "server" | "qz"
 ): void {
   if (typeof window === "undefined") return;
   const key = STORAGE_KEYS[type];

@@ -42,7 +42,7 @@ export default function BuyStockPage() {
     1000,
     {
       storeIdForOffline: currentStore?.id ?? undefined,
-    },
+    }
   );
   const allProducts = apiProducts || [];
 
@@ -53,7 +53,7 @@ export default function BuyStockPage() {
     return allProducts.filter(
       (p: any) =>
         (p.lowStockThreshold || 0) > 0 &&
-        (p.stock ?? 0) <= (p.lowStockThreshold || 0),
+        (p.stock ?? 0) <= (p.lowStockThreshold || 0)
     );
   }, [allProducts]);
 
@@ -79,7 +79,7 @@ export default function BuyStockPage() {
         "No quantity",
         "Enter a quantity to add the item to your cart.",
         "Enter a number greater than 0.",
-        { code: ERROR_CODES.PURCHASE_ORDER },
+        { code: ERROR_CODES.PURCHASE_ORDER }
       );
       return;
     }
@@ -96,10 +96,10 @@ export default function BuyStockPage() {
     };
 
     const cart: PurchaseOrderItem[] = JSON.parse(
-      localStorage.getItem("purchaseOrderCart") || "[]",
+      localStorage.getItem("purchaseOrderCart") || "[]"
     );
     const existingItemIndex = cart.findIndex(
-      (item) => item.productId === product.id,
+      (item) => item.productId === product.id
     );
 
     if (existingItemIndex > -1) {
@@ -114,7 +114,7 @@ export default function BuyStockPage() {
 
     feedback.success(
       "Added to cart",
-      `${quantity} × ${product.name} added to your purchase order cart.`,
+      `${quantity} × ${product.name} added to your purchase order cart.`
     );
   };
 
@@ -123,7 +123,7 @@ export default function BuyStockPage() {
       <RequireOnlineBanner />
       <div
         className={cn(
-          !isOnline && "opacity-60 pointer-events-none select-none",
+          !isOnline && "opacity-60 pointer-events-none select-none"
         )}
       >
         <Card>
@@ -213,7 +213,7 @@ export default function BuyStockPage() {
                           <TableCell className="font-semibold text-green-600">
                             R
                             {getGroupPrice(
-                              Number(product.costPrice) || 0,
+                              Number(product.costPrice) || 0
                             ).toFixed(2)}
                           </TableCell>
                           <TableCell>
@@ -293,7 +293,7 @@ export default function BuyStockPage() {
                           <TableCell className="font-semibold text-green-600">
                             R
                             {getGroupPrice(
-                              Number(product.costPrice) || 0,
+                              Number(product.costPrice) || 0
                             ).toFixed(2)}
                           </TableCell>
                           <TableCell>

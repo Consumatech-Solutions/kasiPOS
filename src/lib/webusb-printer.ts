@@ -45,7 +45,7 @@ export async function getWebUSBPrinters(): Promise<WebUSBDevice[]> {
         productId: d.productId.toString(16),
         productName: d.productName,
         manufacturerName: d.manufacturerName,
-      })),
+      }))
     );
 
     return devices.map((device) => ({
@@ -67,7 +67,7 @@ export async function getWebUSBPrinters(): Promise<WebUSBDevice[]> {
 }
 
 export async function requestWebUSBPrinter(
-  filters?: USBDeviceFilter[],
+  filters?: USBDeviceFilter[]
 ): Promise<USBDevice> {
   if (!isWebUSBAvailable() || !navigator.usb) {
     throw new Error("WebUSB API is not available in this browser");
@@ -103,7 +103,7 @@ export async function requestWebUSBPrinter(
 export async function connectWebUSBPrinter(
   vendorId: number,
   productId: number,
-  serialNumber?: string,
+  serialNumber?: string
 ): Promise<USBDevice> {
   if (!isWebUSBAvailable() || !navigator.usb) {
     throw new Error("WebUSB API is not available in this browser");
@@ -115,7 +115,7 @@ export async function connectWebUSBPrinter(
       (d) =>
         d.vendorId === vendorId &&
         d.productId === productId &&
-        (!serialNumber || d.serialNumber === serialNumber),
+        (!serialNumber || d.serialNumber === serialNumber)
     );
 
     if (!device) {
@@ -152,7 +152,7 @@ function findBulkOutEndpoint(device: USBDevice): USBEndpoint {
 
 export async function printToWebUSB(
   deviceId: string,
-  data: Uint8Array,
+  data: Uint8Array
 ): Promise<PrintResponse> {
   if (!isWebUSBAvailable()) {
     throw new Error("WebUSB API is not available in this browser");

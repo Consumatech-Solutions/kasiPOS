@@ -1,35 +1,62 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Search, Loader2 } from 'lucide-react';
-import { feedback } from '@/lib/feedback';
-import { ERROR_CODES } from '@/lib/error-codes';
-import { useMarketplaceOrders } from '@/hooks/use-marketplace-orders';
-import { useMarketplaceStores } from '@/hooks/use-marketplace-stores';
-import { useNetworkStatus } from '@/hooks/use-network-status';
-import { RequireOnlineBanner } from '@/components/require-online-banner';
-import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { MarketplaceOrderItem } from '@/lib/api/marketplace-orders';
-
+import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2 } from "lucide-react";
+import { feedback } from "@/lib/feedback";
+import { ERROR_CODES } from "@/lib/error-codes";
+import { useMarketplaceOrders } from "@/hooks/use-marketplace-orders";
+import { useMarketplaceStores } from "@/hooks/use-marketplace-stores";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { RequireOnlineBanner } from "@/components/require-online-banner";
+import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { MarketplaceOrderItem } from "@/lib/api/marketplace-orders";
 
 export default function MarketplacePage() {
   const { isOnline } = useNetworkStatus();
-  const [orderCode, setOrderCode] = useState('');
+  const [orderCode, setOrderCode] = useState("");
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
-  const { findByOrderCode, foundOrder, searchLoading } = useMarketplaceOrders({ autoLoad: false });
-  const { stores: marketplaces, loading: storesLoading } = useMarketplaceStores({ activeOnly: true, autoLoad: true });
+  const { findByOrderCode, foundOrder, searchLoading } = useMarketplaceOrders({
+    autoLoad: false,
+  });
+  const { stores: marketplaces, loading: storesLoading } = useMarketplaceStores(
+    { activeOnly: true, autoLoad: true }
+  );
 
   const handleSearch = async () => {
     if (!orderCode.trim()) {
-      feedback.error('Order code required', 'Enter an order code to search.', 'Type the code and try again.', { code: ERROR_CODES.MARKETPLACE_ORDER });
+      feedback.error(
+        "Order code required",
+        "Enter an order code to search.",
+        "Type the code and try again.",
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
+      );
       return;
     }
 
@@ -37,12 +64,17 @@ export default function MarketplacePage() {
       await findByOrderCode(orderCode.trim());
       setSearchDialogOpen(true);
     } catch (error: unknown) {
-      feedback.fromError(error, 'Order not found', 'Check the order code and try again.', ERROR_CODES.MARKETPLACE_ORDER);
+      feedback.fromError(
+        error,
+        "Order not found",
+        "Check the order code and try again.",
+        ERROR_CODES.MARKETPLACE_ORDER
+      );
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch();
     }
   };
@@ -50,162 +82,217 @@ export default function MarketplacePage() {
   return (
     <div className="p-2 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
       <RequireOnlineBanner />
-      <div className={cn(!isOnline && 'opacity-60 pointer-events-none select-none')}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">Marketplace</CardTitle>
-          <CardDescription className="text-sm">Place orders from third-party stores for your customers.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div
+        className={cn(
+          !isOnline && "opacity-60 pointer-events-none select-none"
+        )}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg sm:text-xl">Marketplace</CardTitle>
+            <CardDescription className="text-sm">
+              Place orders from third-party stores for your customers.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="max-w-md space-y-2">
-                <label htmlFor="order-code" className="text-sm font-medium">Have an Order Code?</label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <Input 
-                      id="order-code" 
-                      placeholder="Enter order code..." 
-                      className="touch-target"
-                      value={orderCode}
-                      onChange={(e) => setOrderCode(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      disabled={searchLoading}
-                    />
-                    <Button onClick={handleSearch} disabled={searchLoading} className="min-h-[44px] touch-target w-full sm:w-auto whitespace-nowrap px-3 sm:px-4">
-                        {searchLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
-                            <span className="hidden sm:inline">Find Order</span>
-                            <span className="sm:hidden">Find</span>
-                          </>
-                        ) : (
-                          <>
-                            <Search className="mr-2 h-4 w-4 flex-shrink-0" />
-                            <span className="hidden sm:inline">Find Order</span>
-                            <span className="sm:hidden">Find</span>
-                          </>
-                        )}
-                    </Button>
-                </div>
+              <label htmlFor="order-code" className="text-sm font-medium">
+                Have an Order Code?
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  id="order-code"
+                  placeholder="Enter order code..."
+                  className="touch-target"
+                  value={orderCode}
+                  onChange={(e) => setOrderCode(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={searchLoading}
+                />
+                <Button
+                  onClick={handleSearch}
+                  disabled={searchLoading}
+                  className="min-h-[44px] touch-target w-full sm:w-auto whitespace-nowrap px-3 sm:px-4"
+                >
+                  {searchLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
+                      <span className="hidden sm:inline">Find Order</span>
+                      <span className="sm:hidden">Find</span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4 flex-shrink-0" />
+                      <span className="hidden sm:inline">Find Order</span>
+                      <span className="sm:hidden">Find</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-        </CardContent>
-      </Card>
-      
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Available Stores</h2>
-        <Button variant="outline" asChild className="min-h-[44px] touch-target w-full sm:w-auto">
-          <Link href="/marketplace/orders">
-            View Orders
-          </Link>
-        </Button>
-      </div>
-      <div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {marketplaces.map((store) => (
-            <Link href={`/marketplace/${store.code}`} key={store.id}>
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+            Available Stores
+          </h2>
+          <Button
+            variant="outline"
+            asChild
+            className="min-h-[44px] touch-target w-full sm:w-auto"
+          >
+            <Link href="/marketplace/orders">View Orders</Link>
+          </Button>
+        </div>
+        <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {marketplaces.map((store) => (
+              <Link href={`/marketplace/${store.code}`} key={store.id}>
                 <Card className="hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
-                <CardHeader className="flex-row items-center gap-4">
-                    <Image 
-                      src={store.logoUrl || '/placeholder-store.png'} 
-                      alt={`${store.name} logo`} 
-                      width={80} 
-                      height={40} 
+                  <CardHeader className="flex-row items-center gap-4">
+                    <Image
+                      src={store.logoUrl || "/placeholder-store.png"}
+                      alt={`${store.name} logo`}
+                      width={80}
+                      height={40}
                       className="rounded-md object-contain"
                       unoptimized
-                      onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-store.png'; }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src =
+                          "/placeholder-store.png";
+                      }}
                     />
                     <div>
-                        <CardTitle>{store.name}</CardTitle>
+                      <CardTitle>{store.name}</CardTitle>
                     </div>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                    <p className="text-sm text-muted-foreground">{store.description || 'No description available.'}</p>
-                </CardContent>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-sm text-muted-foreground">
+                      {store.description || "No description available."}
+                    </p>
+                  </CardContent>
                 </Card>
-            </Link>
-          ))}
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle className="text-lg sm:text-xl">Order Details</DialogTitle>
-            <DialogDescription className="text-sm">
-              Order Code: {foundOrder?.orderCode}
-            </DialogDescription>
-          </DialogHeader>
-          {foundOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Marketplace Store</p>
-                  <p className="text-sm">{marketplaces.find(m => m.code === foundOrder.marketplaceStoreId)?.name || foundOrder.marketplaceStoreId}</p>
+        <Dialog open={searchDialogOpen} onOpenChange={setSearchDialogOpen}>
+          <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg sm:text-xl">
+                Order Details
+              </DialogTitle>
+              <DialogDescription className="text-sm">
+                Order Code: {foundOrder?.orderCode}
+              </DialogDescription>
+            </DialogHeader>
+            {foundOrder && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Marketplace Store
+                    </p>
+                    <p className="text-sm">
+                      {marketplaces.find(
+                        (m) => m.code === foundOrder.marketplaceStoreId
+                      )?.name || foundOrder.marketplaceStoreId}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Status</p>
+                    <Badge
+                      variant={
+                        foundOrder.status === "completed"
+                          ? "default"
+                          : foundOrder.status === "cancelled"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {foundOrder.status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">
+                      Payment Method
+                    </p>
+                    <p className="text-sm">{foundOrder.paymentMethod}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Date</p>
+                    <p className="text-sm">
+                      {new Date(foundOrder.createdAt).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Status</p>
-                  <Badge variant={foundOrder.status === 'completed' ? 'default' : foundOrder.status === 'cancelled' ? 'destructive' : 'secondary'}>
-                    {foundOrder.status.toUpperCase()}
-                  </Badge>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Payment Method</p>
-                  <p className="text-sm">{foundOrder.paymentMethod}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-500">Date</p>
-                  <p className="text-sm">{new Date(foundOrder.createdAt).toLocaleString()}</p>
-                </div>
-              </div>
 
-              <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">Items</p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {foundOrder.items.map((item: MarketplaceOrderItem, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell>{item.productName}</TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                        <TableCell className="text-right">R{(Number(item.unitPrice) || 0).toFixed(2)}</TableCell>
-                        <TableCell className="text-right">R{(Number(item.totalPrice) || 0).toFixed(2)}</TableCell>
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-2">
+                    Items
+                  </p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead className="text-right">Unit Price</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {foundOrder.items.map(
+                        (item: MarketplaceOrderItem, index: number) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.productName}</TableCell>
+                            <TableCell>{item.quantity}</TableCell>
+                            <TableCell className="text-right">
+                              R{(Number(item.unitPrice) || 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              R{(Number(item.totalPrice) || 0).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
-              <div className="space-y-2 pt-4 border-t">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span>R{(Number(foundOrder.subtotal) || 0).toFixed(2)}</span>
-                </div>
-                {foundOrder.vatAmount > 0 && (
+                <div className="space-y-2 pt-4 border-t">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">VAT</span>
-                    <span>R{(Number(foundOrder.vatAmount) || 0).toFixed(2)}</span>
+                    <span className="text-gray-500">Subtotal</span>
+                    <span>
+                      R{(Number(foundOrder.subtotal) || 0).toFixed(2)}
+                    </span>
                   </div>
-                )}
-                {foundOrder.serviceFee > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Service Fee</span>
-                    <span>R{(Number(foundOrder.serviceFee) || 0).toFixed(2)}</span>
+                  {foundOrder.vatAmount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">VAT</span>
+                      <span>
+                        R{(Number(foundOrder.vatAmount) || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {foundOrder.serviceFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Service Fee</span>
+                      <span>
+                        R{(Number(foundOrder.serviceFee) || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold pt-2">
+                    <span>Total</span>
+                    <span>R{(Number(foundOrder.total) || 0).toFixed(2)}</span>
                   </div>
-                )}
-                <div className="flex justify-between text-lg font-bold pt-2">
-                  <span>Total</span>
-                  <span>R{(Number(foundOrder.total) || 0).toFixed(2)}</span>
                 </div>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

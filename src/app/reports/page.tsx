@@ -37,7 +37,7 @@ export default function ReportsPage() {
     if (!transactions) return [];
 
     const last7Days = Array.from({ length: 7 }, (_, i) =>
-      format(subDays(new Date(), i), "yyyy-MM-dd"),
+      format(subDays(new Date(), i), "yyyy-MM-dd")
     ).reverse();
 
     const dailySales = transactions.reduce(
@@ -46,7 +46,7 @@ export default function ReportsPage() {
         acc[date] = (acc[date] || 0) + t.total;
         return acc;
       },
-      {} as Record<string, number>,
+      {} as Record<string, number>
     );
 
     return last7Days.map((date) => ({
@@ -65,7 +65,7 @@ export default function ReportsPage() {
           acc[item.productName] = (acc[item.productName] || 0) + item.quantity;
           return acc;
         },
-        {} as Record<string, number>,
+        {} as Record<string, number>
       );
 
     return Object.entries(productSales)

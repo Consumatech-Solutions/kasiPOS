@@ -36,7 +36,7 @@ interface PaymentModalProps {
   cartTotal: number;
   cartItems: TransactionItem[];
   onCompleteSale: (
-    transaction: Omit<Transaction, "id" | "date" | "storeId">,
+    transaction: Omit<Transaction, "id" | "date" | "storeId">
   ) => void;
   customer: Customer | null | undefined;
   isLoading?: boolean;

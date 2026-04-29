@@ -109,7 +109,7 @@ class OfflineDetector {
 
   private async checkConnectivity(
     force: boolean = false,
-    bypassOfflineFirst: boolean = false,
+    bypassOfflineFirst: boolean = false
   ): Promise<boolean> {
     if (this.checkPromise && !force) {
       return this.checkPromise;
@@ -137,7 +137,7 @@ class OfflineDetector {
         const controller = new AbortController();
         const timeoutId = setTimeout(
           () => controller.abort(),
-          NETWORK_TEST_TIMEOUT,
+          NETWORK_TEST_TIMEOUT
         );
         const url = BACKEND_URL.replace(/\/$/, "");
 

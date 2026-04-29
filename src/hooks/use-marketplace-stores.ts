@@ -25,7 +25,7 @@ export const marketplaceStoreKeys = {
 };
 
 export function useMarketplaceStores(
-  options: UseMarketplaceStoresOptions = {},
+  options: UseMarketplaceStoresOptions = {}
 ) {
   const { activeOnly = true, autoLoad = true } = options;
   const queryClient = useQueryClient();
@@ -80,7 +80,7 @@ export function useMarketplaceStores(
       queryClient.setQueryData<MarketplaceStore[]>(queryKey, (old) => {
         if (!old) return [newStore];
         return old.map((s) =>
-          s.id && String(s.id).startsWith("temp-") ? newStore : s,
+          s.id && String(s.id).startsWith("temp-") ? newStore : s
         );
       });
       queryClient.invalidateQueries({ queryKey: marketplaceStoreKeys.lists() });
@@ -108,8 +108,8 @@ export function useMarketplaceStores(
           previousData.map((s) =>
             s.id === id
               ? { ...s, ...data, updatedAt: new Date().toISOString() }
-              : s,
-          ),
+              : s
+          )
         );
       }
 
@@ -137,7 +137,7 @@ export function useMarketplaceStores(
       if (previousData) {
         queryClient.setQueryData<MarketplaceStore[]>(
           queryKey,
-          previousData.filter((s) => s.id !== id),
+          previousData.filter((s) => s.id !== id)
         );
       }
 

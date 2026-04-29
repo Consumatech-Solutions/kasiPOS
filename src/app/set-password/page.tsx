@@ -60,7 +60,7 @@ function SetPasswordContent() {
         "Set password failed",
         "No phone number was provided.",
         "Go back to Request Access and enter your mobile number.",
-        { code: ERROR_CODES.SET_PASSWORD },
+        { code: ERROR_CODES.SET_PASSWORD }
       );
       router.push("/request-access");
       return;
@@ -75,7 +75,7 @@ function SetPasswordContent() {
         "Session expired",
         "Your verification session has expired.",
         "Request a new code from Request Access and try again.",
-        { code: ERROR_CODES.SET_PASSWORD },
+        { code: ERROR_CODES.SET_PASSWORD }
       );
       router.push("/request-access");
       return;
@@ -87,7 +87,7 @@ function SetPasswordContent() {
       if (response.data && response.data.accessToken) {
         feedback.success(
           "Password set",
-          "Your password has been set. You can now sign in.",
+          "Your password has been set. You can now sign in."
         );
         if (typeof window !== "undefined")
           localStorage.removeItem("kasi-pos-temp-token");
@@ -101,7 +101,7 @@ function SetPasswordContent() {
         error,
         "Set password failed",
         "Ensure your password meets the requirements and try again, or request a new code.",
-        ERROR_CODES.SET_PASSWORD,
+        ERROR_CODES.SET_PASSWORD
       );
     }
   };

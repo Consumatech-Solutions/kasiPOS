@@ -68,7 +68,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
               Math.min(1000 * 2 ** attemptIndex, 30000),
           },
         },
-      }),
+      })
   );
 
   useEffect(() => {

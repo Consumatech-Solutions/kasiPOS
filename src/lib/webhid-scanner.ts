@@ -40,7 +40,7 @@ export async function getWebHIDScanners(): Promise<WebHIDDevice[]> {
           COMMON_SCANNER_VENDORS.includes(device.vendorId as any) ||
           device.collections.some(
             (collection) =>
-              collection.usagePage === 0x01 || collection.usagePage === 0x0c,
+              collection.usagePage === 0x01 || collection.usagePage === 0x0c
           )
         );
       })
@@ -63,7 +63,7 @@ export async function getWebHIDScanners(): Promise<WebHIDDevice[]> {
 }
 
 export async function requestWebHIDScanner(
-  filters?: HIDDeviceFilter[],
+  filters?: HIDDeviceFilter[]
 ): Promise<HIDDevice> {
   if (!isWebHIDAvailable() || !navigator.hid) {
     throw new Error("WebHID API is not available in this browser");
@@ -88,7 +88,7 @@ export async function requestWebHIDScanner(
 export async function connectWebHIDScanner(
   vendorId: number,
   productId: number,
-  serialNumber?: string,
+  serialNumber?: string
 ): Promise<HIDDevice> {
   if (!isWebHIDAvailable() || !navigator.hid) {
     throw new Error("WebHID API is not available in this browser");
@@ -100,7 +100,7 @@ export async function connectWebHIDScanner(
       (d) =>
         d.vendorId === vendorId &&
         d.productId === productId &&
-        (!serialNumber || d.serialNumber === serialNumber),
+        (!serialNumber || d.serialNumber === serialNumber)
     );
 
     if (!device) {
@@ -153,7 +153,7 @@ function parseBarcodeFromReport(data: DataView): string | null {
 
 export async function scanBarcodeFromWebHID(
   deviceId: string,
-  timeout: number = 5000,
+  timeout: number = 5000
 ): Promise<ScanResponse> {
   if (!isWebHIDAvailable()) {
     throw new Error("WebHID API is not available in this browser");
@@ -217,7 +217,7 @@ export async function scanBarcodeFromWebHID(
 export async function pollWebHIDScanner(
   deviceId: string,
   onProgress?: () => void,
-  pollInterval: number = 500,
+  pollInterval: number = 500
 ): Promise<string> {
   const maxAttempts = 200;
   let attempts = 0;

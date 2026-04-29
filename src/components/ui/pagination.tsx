@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import type { PaginationMeta } from '@/types/pagination';
+import * as React from "react";
+import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import type { PaginationMeta } from "@/types/pagination";
 
 interface PaginationProps {
   meta: PaginationMeta;
@@ -21,8 +21,8 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
   }
 
   // Compute pages to show (max 5 visible)
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    const pages: (number | 'ellipsis')[] = [];
+  const getPageNumbers = (): (number | "ellipsis")[] => {
+    const pages: (number | "ellipsis")[] = [];
     const maxVisible = 5;
 
     // If only one page, still show it
@@ -40,21 +40,21 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
       if (page <= 3) {
         // Start: [1] [2] [3] [4] ... [last]
         for (let i = 1; i <= 4; i++) pages.push(i);
-        pages.push('ellipsis');
+        pages.push("ellipsis");
         pages.push(totalPages);
       } else if (page >= totalPages - 2) {
         // End: [1] ... [n-3] [n-2] [n-1] [n]
         pages.push(1);
-        pages.push('ellipsis');
+        pages.push("ellipsis");
         for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
       } else {
         // Middle: [1] ... [p-1] [p] [p+1] ... [last]
         pages.push(1);
-        pages.push('ellipsis');
+        pages.push("ellipsis");
         pages.push(page - 1);
         pages.push(page);
         pages.push(page + 1);
-        pages.push('ellipsis');
+        pages.push("ellipsis");
         pages.push(totalPages);
       }
     }
@@ -67,11 +67,11 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
   const endItem = Math.min(page * limit, total);
 
   return (
-    <div className={cn('flex items-center justify-between px-2', className)}>
+    <div className={cn("flex items-center justify-between px-2", className)}>
       <div className="flex-1 text-sm text-muted-foreground">
         Showing {startItem} to {endItem} of {total} results
       </div>
-      
+
       <div className="flex items-center gap-1">
         <Button
           variant="outline"
@@ -85,7 +85,7 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
         </Button>
 
         {pageNumbers.map((p, index) => {
-          if (p === 'ellipsis') {
+          if (p === "ellipsis") {
             return (
               <Button
                 key={`ellipsis-${index}`}
@@ -104,7 +104,7 @@ export function Pagination({ meta, onPageChange, className }: PaginationProps) {
           return (
             <Button
               key={pageNum}
-              variant={pageNum === page ? 'default' : 'outline'}
+              variant={pageNum === page ? "default" : "outline"}
               size="sm"
               onClick={() => onPageChange(pageNum)}
               className="h-8 w-8 p-0"

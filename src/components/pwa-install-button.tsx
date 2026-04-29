@@ -1,7 +1,7 @@
-'use client';
-import { usePwaInstall } from '@/hooks/use-pwa-install';
-import { Button } from './ui/button';
-import { Download } from 'lucide-react';
+"use client";
+import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { Button } from "./ui/button";
+import { Download } from "lucide-react";
 
 export default function PwaInstallButton() {
   const { canInstall, install } = usePwaInstall();

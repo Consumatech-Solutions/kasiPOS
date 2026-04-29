@@ -39,7 +39,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
 }) => {
   const [devices, setDevices] = useState<HardwareDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<HardwareDevice | null>(
-    null,
+    null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -89,7 +89,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
 
   const handleConnectSuccess = (
     deviceId: string,
-    deviceType: "printer" | "scanner" | "pos",
+    deviceType: "printer" | "scanner" | "pos"
   ) => {
     setDevices((prevDevices) =>
       prevDevices.map((d) => {
@@ -101,7 +101,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
         return matchesType
           ? { ...d, status: "connected" as ConnectionStatus, deviceId }
           : d;
-      }),
+      })
     );
     setSelectedDevice(null);
   };

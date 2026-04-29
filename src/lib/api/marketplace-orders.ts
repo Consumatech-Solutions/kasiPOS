@@ -86,7 +86,7 @@ export const marketplaceOrdersApi = {
       {
         params:
           Object.keys(requestParams).length > 0 ? requestParams : undefined,
-      },
+      }
     );
   },
 

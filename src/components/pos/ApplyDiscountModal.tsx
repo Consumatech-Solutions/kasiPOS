@@ -42,7 +42,7 @@ export default function ApplyDiscountModal({
   onApply,
 }: ApplyDiscountModalProps) {
   const [discountType, setDiscountType] = useState<"percentage" | "amount">(
-    "percentage",
+    "percentage"
   );
   const [percentage, setPercentage] = useState<number>(10);
   const [amount, setAmount] = useState<number>(20);
@@ -130,7 +130,7 @@ export default function ApplyDiscountModal({
               onClick={() => setDiscountType("percentage")}
               className={cn(
                 "flex-1 rounded-md py-3 text-xs font-medium transition-colors cursor-pointer",
-                discountType === "percentage" ? "text-white" : "",
+                discountType === "percentage" ? "text-white" : ""
               )}
               style={{
                 backgroundColor:
@@ -147,7 +147,7 @@ export default function ApplyDiscountModal({
               onClick={() => setDiscountType("amount")}
               className={cn(
                 "flex-1 rounded-md py-3 text-xs font-medium transition-colors cursor-pointer",
-                discountType === "amount" ? "text-white" : "",
+                discountType === "amount" ? "text-white" : ""
               )}
               style={{
                 backgroundColor:

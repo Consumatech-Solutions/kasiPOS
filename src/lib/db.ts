@@ -233,12 +233,12 @@ export class KasiPosDexie extends Dexie {
           const customersTable = tx.table("customers");
           await customersTable.clear();
           console.log(
-            "Version 10: Cleared customers table to prepare for primary key change",
+            "Version 10: Cleared customers table to prepare for primary key change"
           );
         } catch (error) {
           // Table might not exist, which is OK
           console.log(
-            "Version 10: Customers table already removed or does not exist",
+            "Version 10: Customers table already removed or does not exist"
           );
         }
       });
@@ -309,7 +309,7 @@ export class KasiPosDexie extends Dexie {
           // Ignore errors - stores are now managed via API
           console.warn(
             "Store migration skipped (stores now managed via API):",
-            error,
+            error
           );
         }
       });

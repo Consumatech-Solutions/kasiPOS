@@ -26,14 +26,14 @@ export const filesApi = {
     ];
     if (!allowedTypes.includes(file.type)) {
       throw new Error(
-        "Invalid file type. Only images (JPEG, PNG, GIF, WebP) are accepted.",
+        "Invalid file type. Only images (JPEG, PNG, GIF, WebP) are accepted."
       );
     }
 
     const maxSizeBytes = 2 * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       throw new Error(
-        `File too large. Maximum: 2MB (current: ${(file.size / 1024 / 1024).toFixed(2)}MB)`,
+        `File too large. Maximum: 2MB (current: ${(file.size / 1024 / 1024).toFixed(2)}MB)`
       );
     }
 
@@ -43,7 +43,7 @@ export const filesApi = {
     try {
       const response = await api.post(
         `${API_BASE_PATH}/upload/product-image`,
-        formData,
+        formData
       );
       return response.data;
     } catch (error: any) {
@@ -53,7 +53,7 @@ export const filesApi = {
         errorResponseData?.message ||
           errorResponseData?.error ||
           error?.message ||
-          "Unknown error",
+          "Unknown error"
       );
 
       if (errorStatus === 400) {
@@ -65,7 +65,7 @@ export const filesApi = {
             retryFormData.append(fieldName, file);
             const retryResponse = await api.post(
               `${API_BASE_PATH}/upload/product-image`,
-              retryFormData,
+              retryFormData
             );
 
             return retryResponse.data;
@@ -75,7 +75,7 @@ export const filesApi = {
         }
 
         throw new Error(
-          `Validation error (400): ${errorMessage}. Check backend configuration.`,
+          `Validation error (400): ${errorMessage}. Check backend configuration.`
         );
       }
 
@@ -93,7 +93,7 @@ export const filesApi = {
         error?.message === "Network Error"
       ) {
         throw new Error(
-          "Cannot reach server. Ensure the backend is running and accessible.",
+          "Cannot reach server. Ensure the backend is running and accessible."
         );
       }
 

@@ -30,7 +30,7 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(
-    currentImageUrl || null,
+    currentImageUrl || null
   );
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +60,7 @@ export function ImageUpload({
   };
 
   const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -75,7 +75,7 @@ export function ImageUpload({
         "Invalid file",
         validationError,
         `Use an image under ${maxSizeMB}MB (JPEG, PNG, GIF, WebP).`,
-        { code: ERROR_CODES.IMAGE_UPLOAD },
+        { code: ERROR_CODES.IMAGE_UPLOAD }
       );
       return;
     }
@@ -105,7 +105,7 @@ export function ImageUpload({
       onUploadSuccess(imageUrl);
       feedback.success(
         "Image uploaded",
-        "The product image has been uploaded.",
+        "The product image has been uploaded."
       );
       setError(null);
     } catch (err: unknown) {
@@ -118,7 +118,7 @@ export function ImageUpload({
         err,
         "Upload failed",
         "Check file size (max 2MB) and format, then try again.",
-        ERROR_CODES.IMAGE_UPLOAD,
+        ERROR_CODES.IMAGE_UPLOAD
       );
     } finally {
       setUploading(false);
@@ -152,7 +152,7 @@ export function ImageUpload({
         err,
         "Delete failed",
         "Try again or check your connection.",
-        ERROR_CODES.IMAGE_UPLOAD,
+        ERROR_CODES.IMAGE_UPLOAD
       );
     }
   };

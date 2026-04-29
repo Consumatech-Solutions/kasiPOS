@@ -128,7 +128,7 @@ export default function MarketplaceOrdersPage() {
                   variant={"outline"}
                   className={cn(
                     "w-full sm:w-[240px] justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground",
+                    !selectedDate && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -239,7 +239,7 @@ export default function MarketplaceOrdersPage() {
                             <p className="text-sm text-muted-foreground">
                               {format(
                                 new Date(order.createdAt),
-                                "MMM dd, yyyy HH:mm",
+                                "MMM dd, yyyy HH:mm"
                               )}
                             </p>
                           </div>
@@ -305,11 +305,11 @@ export default function MarketplaceOrdersPage() {
                                     <TableCell className="text-right">
                                       R
                                       {(Number(item.totalPrice) || 0).toFixed(
-                                        2,
+                                        2
                                       )}
                                     </TableCell>
                                   </TableRow>
-                                ),
+                                )
                               )}
                             </TableBody>
                           </Table>

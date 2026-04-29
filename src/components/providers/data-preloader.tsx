@@ -39,7 +39,7 @@ async function waitForServiceWorkerReady(): Promise<boolean> {
             clearTimeout(timeout);
             setTimeout(() => resolve(true), 500);
           },
-          { once: true },
+          { once: true }
         );
       });
     }
@@ -51,7 +51,7 @@ async function waitForServiceWorkerReady(): Promise<boolean> {
 
 async function ensureAssetCached(
   cache: Cache,
-  asset: string,
+  asset: string
 ): Promise<boolean> {
   try {
     const cached = await cache.match(asset);
@@ -73,7 +73,7 @@ async function ensureAssetCached(
 
 async function verifyServiceWorkerCache(
   maxRetries: number = 5,
-  retryDelay: number = 1000,
+  retryDelay: number = 1000
 ): Promise<boolean> {
   if (typeof window === "undefined" || !("caches" in window)) {
     return false;
@@ -82,7 +82,7 @@ async function verifyServiceWorkerCache(
   const swReady = await waitForServiceWorkerReady();
   if (!swReady) {
     console.log(
-      "[DataPreloader] Service worker not ready yet - cache verification may complete on next load",
+      "[DataPreloader] Service worker not ready yet - cache verification may complete on next load"
     );
   }
 
@@ -140,7 +140,7 @@ async function verifyServiceWorkerCache(
     } catch (error) {
       console.error(
         "[DataPreloader] Error verifying service worker cache:",
-        error,
+        error
       );
       if (attempt < maxRetries - 1) {
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
@@ -308,7 +308,7 @@ export function DataPreloader() {
 
       async function preloadPagesInBatches(
         routes: string[],
-        batchSize: number = 3,
+        batchSize: number = 3
       ): Promise<void> {
         for (let i = 0; i < routes.length; i += batchSize) {
           const batch = routes.slice(i, i + batchSize);
@@ -317,8 +317,8 @@ export function DataPreloader() {
             batch.map((route) =>
               preloadPage(route)
                 .then(() => updateProgress())
-                .catch(() => updateProgress()),
-            ),
+                .catch(() => updateProgress())
+            )
           );
 
           if (i + batchSize < routes.length) {

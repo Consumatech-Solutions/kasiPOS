@@ -41,13 +41,13 @@ describe("query-persist-policy", () => {
 
   it("shouldDehydrateQueryForIndexedDB requires success status", () => {
     expect(
-      shouldDehydrateQueryForIndexedDB(mockQuery("pending", "customers")),
+      shouldDehydrateQueryForIndexedDB(mockQuery("pending", "customers"))
     ).toBe(false);
     expect(
-      shouldDehydrateQueryForIndexedDB(mockQuery("success", "customers")),
+      shouldDehydrateQueryForIndexedDB(mockQuery("success", "customers"))
     ).toBe(true);
     expect(
-      shouldDehydrateQueryForIndexedDB(mockQuery("success", "transactions")),
+      shouldDehydrateQueryForIndexedDB(mockQuery("success", "transactions"))
     ).toBe(false);
   });
 });

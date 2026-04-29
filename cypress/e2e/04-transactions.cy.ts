@@ -37,7 +37,7 @@ describe("Transactions", () => {
     cy.findByRole("button", { name: /clear filters/i }).click();
     cy.findByPlaceholderText(/search by order # or customer/i).should(
       "have.value",
-      "",
+      ""
     );
   });
 

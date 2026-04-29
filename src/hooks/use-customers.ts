@@ -57,7 +57,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   if (storeId != null && storeId !== "") params.storeId = storeId;
 
   const queryKey = customerKeys.list(
-    Object.keys(params).length > 0 ? params : undefined,
+    Object.keys(params).length > 0 ? params : undefined
   );
 
   const query = useQuery({
@@ -69,7 +69,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           initialPage,
           initialLimit,
           searchQuery?.trim() || undefined,
-          storeIdForOffline ?? undefined,
+          storeIdForOffline ?? undefined
         );
       }
 
@@ -102,7 +102,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
             limit: initialLimit,
             totalPages: Math.max(
               1,
-              Math.ceil((data.length || 1) / initialLimit),
+              Math.ceil((data.length || 1) / initialLimit)
             ),
           };
         }
@@ -116,7 +116,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
             initialPage,
             initialLimit,
             searchQuery?.trim() || undefined,
-            storeIdForOffline ?? undefined,
+            storeIdForOffline ?? undefined
           );
           if (dexieFallback.meta.total > 0) return dexieFallback;
         }
@@ -128,7 +128,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           initialPage,
           initialLimit,
           searchQuery?.trim() || undefined,
-          storeIdForOffline ?? undefined,
+          storeIdForOffline ?? undefined
         );
       }
     },
@@ -166,7 +166,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -186,10 +186,10 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           return {
             ...old,
             data: old.data.map((cust) =>
-              cust.id?.startsWith("temp-") ? newCustomer : cust,
+              cust.id?.startsWith("temp-") ? newCustomer : cust
             ),
           };
-        },
+        }
       );
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },
@@ -200,7 +200,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       customersApi.update(
         id,
         data,
-        storeId != null && storeId !== "" ? { storeId } : undefined,
+        storeId != null && storeId !== "" ? { storeId } : undefined
       ),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
@@ -217,9 +217,9 @@ export function useCustomers(options: UseCustomersOptions = {}) {
             data: previousData.data.map((cust) =>
               cust.id === id
                 ? { ...cust, ...data, updatedAt: new Date().toISOString() }
-                : cust,
+                : cust
             ),
-          },
+          }
         );
       }
 
@@ -239,7 +239,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     mutationFn: (id: string) =>
       customersApi.delete(
         id,
-        storeId != null && storeId !== "" ? { storeId } : undefined,
+        storeId != null && storeId !== "" ? { storeId } : undefined
       ),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
@@ -258,7 +258,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
               ...previousData.meta,
               total: Math.max(0, previousData.meta.total - 1),
             },
-          },
+          }
         );
       }
 

@@ -78,14 +78,14 @@ export function DeviceSelector({
 
       if (searchDuration < minDelay) {
         await new Promise((resolve) =>
-          setTimeout(resolve, minDelay - searchDuration),
+          setTimeout(resolve, minDelay - searchDuration)
         );
       }
 
       if (deviceList.length === 0) {
         setStep("error");
         setError(
-          `No ${getTypeLabel().toLowerCase()} devices found. Please connect a device and try again.`,
+          `No ${getTypeLabel().toLowerCase()} devices found. Please connect a device and try again.`
         );
         return;
       }

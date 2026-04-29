@@ -39,7 +39,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  },
+  }
 );
 
 api.interceptors.response.use(
@@ -47,7 +47,7 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (!isOnline()) {
       const offlineError: OfflineError = new Error(
-        "No internet connection",
+        "No internet connection"
       ) as OfflineError;
       offlineError.isOffline = true;
       offlineError.isNetworkError = true;
@@ -63,7 +63,7 @@ api.interceptors.response.use(
       error.code === "ETIMEDOUT"
     ) {
       const networkError: OfflineError = new Error(
-        "Network request failed. Please check your connection.",
+        "Network request failed. Please check your connection."
       ) as OfflineError;
       networkError.isNetworkError = true;
       networkError.retryable = true;
@@ -80,7 +80,7 @@ api.interceptors.response.use(
             {
               backendUrl:
                 process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002",
-            },
+            }
           );
           (window as any).__backendNetworkErrorLogged = true;
         }
@@ -113,7 +113,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export function isRetryableError(error: any): boolean {

@@ -25,7 +25,7 @@ export const marketplaceOrderKeys = {
 };
 
 function normalizeMarketplaceOrderResponse(
-  response: MarketplaceOrder[] | PaginatedResponse<MarketplaceOrder>,
+  response: MarketplaceOrder[] | PaginatedResponse<MarketplaceOrder>
 ): { data: MarketplaceOrder[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
@@ -55,7 +55,7 @@ function normalizeMarketplaceOrderResponse(
 }
 
 export function useMarketplaceOrders(
-  options: UseMarketplaceOrdersOptions = {},
+  options: UseMarketplaceOrdersOptions = {}
 ) {
   const { autoLoad = true, ...params } = options;
   const queryClient = useQueryClient();
@@ -130,7 +130,7 @@ export function useMarketplaceOrders(
         return {
           ...old,
           data: old.data.map((o) =>
-            o.id && String(o.id).startsWith("temp-") ? newOrder : o,
+            o.id && String(o.id).startsWith("temp-") ? newOrder : o
           ),
         };
       });
@@ -143,7 +143,7 @@ export function useMarketplaceOrders(
     onSuccess: (response, code) => {
       queryClient.setQueryData(
         marketplaceOrderKeys.search(code),
-        response.data,
+        response.data
       );
     },
   });

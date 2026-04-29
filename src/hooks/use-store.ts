@@ -65,7 +65,7 @@ export function useStore() {
         throw err;
       }
     },
-    [store],
+    [store]
   );
 
   return {

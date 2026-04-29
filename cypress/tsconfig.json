@@ -2,7 +2,12 @@
   "compilerOptions": {
     "target": "ES2017",
     "lib": ["ES2017", "dom"],
-    "types": ["cypress", "node", "@testing-library/cypress", "cypress-wait-until"],
+    "types": [
+      "cypress",
+      "node",
+      "@testing-library/cypress",
+      "cypress-wait-until"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,

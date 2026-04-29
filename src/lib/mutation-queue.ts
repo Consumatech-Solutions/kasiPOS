@@ -174,7 +174,7 @@ class MutationQueue {
       const unsubscribe = offlineDetector.subscribe((offline) => {
         if (!offline && this.queue.length > 0) {
           console.log(
-            "[MutationQueue] Online with pending queue; waiting for scheduled/manual sync",
+            "[MutationQueue] Online with pending queue; waiting for scheduled/manual sync"
           );
         }
       });
@@ -184,7 +184,7 @@ class MutationQueue {
           checkOfflineStatus(true).then((offline) => {
             if (!offline && this.queue.length > 0) {
               console.log(
-                "[MutationQueue] Native online with pending queue; waiting for scheduled/manual sync",
+                "[MutationQueue] Native online with pending queue; waiting for scheduled/manual sync"
               );
             }
           });
@@ -222,7 +222,7 @@ class MutationQueue {
           });
         }
         console.log(
-          `[MutationQueue] Restored ${records.length} queued mutations from Dexie`,
+          `[MutationQueue] Restored ${records.length} queued mutations from Dexie`
         );
         this.notifyStatusChange();
       }
@@ -244,7 +244,7 @@ class MutationQueue {
                 timestamp: m.timestamp,
                 retries: m.retries ?? 0,
                 status: "pending",
-              })),
+              }))
             );
             localStorage.removeItem("kasipos-mutation-queue");
             return this.restoreQueue();
@@ -280,7 +280,7 @@ class MutationQueue {
             retries: m.retries,
             status: m.status ?? "pending",
             idempotencyKey: m.idempotencyKey,
-          })),
+          }))
         );
       }
     } catch (error) {
@@ -305,7 +305,7 @@ class MutationQueue {
   }
 
   private async processSingleMutationWithRetries(
-    mutation: QueuedMutation,
+    mutation: QueuedMutation
   ): Promise<SingleMutationOutcome> {
     while (true) {
       try {
@@ -334,10 +334,10 @@ class MutationQueue {
           mutation.retries++;
           mutation.status = "pending";
           console.log(
-            `[MutationQueue] Retrying mutation (attempt ${mutation.retries}/${MAX_RETRIES})`,
+            `[MutationQueue] Retrying mutation (attempt ${mutation.retries}/${MAX_RETRIES})`
           );
           await new Promise((resolve) =>
-            setTimeout(resolve, RETRY_DELAY * mutation.retries),
+            setTimeout(resolve, RETRY_DELAY * mutation.retries)
           );
           continue;
         }
@@ -348,7 +348,7 @@ class MutationQueue {
           "[MutationQueue] Mutation failed after max retries:",
           mutation.mutationKey,
           error,
-          logId,
+          logId
         );
         const userMessage =
           error?.message ?? "Changes could not be synced to the server.";
@@ -356,7 +356,7 @@ class MutationQueue {
           "Sync failed",
           userMessage,
           "Your data is saved locally. Check your connection and try again.",
-          { logId, code: error?.code },
+          { logId, code: error?.code }
         );
         return "failed_removed";
       }
@@ -375,7 +375,7 @@ class MutationQueue {
       batch.map(async (mutation) => ({
         mutation,
         outcome: await this.processSingleMutationWithRetries(mutation),
-      })),
+      }))
     );
 
     let successes = 0;
@@ -385,7 +385,7 @@ class MutationQueue {
       if (outcome === "success") {
         successes++;
         console.log(
-          `[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join("/")}`,
+          `[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join("/")}`
         );
         if (this.queryClient && mutation.mutationKey.length > 0) {
           const key = mutation.mutationKey[0];
@@ -411,7 +411,7 @@ class MutationQueue {
     }
 
     const first = settled.find(
-      (s) => s.outcome === "network_pause" || s.outcome === "server_retry",
+      (s) => s.outcome === "network_pause" || s.outcome === "server_retry"
     );
     const stopReason =
       first?.outcome === "server_retry" ? "server_retry" : "network_pause";
@@ -425,7 +425,7 @@ class MutationQueue {
   }
 
   add(
-    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retries" | "status">,
+    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retries" | "status">
   ) {
     const [type, action] = mutation.mutationKey;
     const inferredKey =
@@ -454,13 +454,13 @@ class MutationQueue {
             "idempotencyKey" in m.variables
               ? String(
                   (m.variables as { idempotencyKey?: string }).idempotencyKey ??
-                    "",
+                    ""
                 )
-              : "")) === inferredKey,
+              : "")) === inferredKey
       );
       if (hasDuplicate) {
         console.log(
-          "[MutationQueue] Skipping duplicate transactions/create (same idempotency key)",
+          "[MutationQueue] Skipping duplicate transactions/create (same idempotency key)"
         );
         return;
       }
@@ -471,12 +471,12 @@ class MutationQueue {
     const isDuplicatePayload = this.queue.some(
       (m) =>
         m.mutationKey.join("/") === mutationKeyStr &&
-        hashVariables(m.variables) === variablesHash,
+        hashVariables(m.variables) === variablesHash
     );
     if (isDuplicatePayload) {
       console.log(
         "[MutationQueue] Duplicate mutation skipped:",
-        mutationKeyStr,
+        mutationKeyStr
       );
       return;
     }
@@ -504,7 +504,7 @@ class MutationQueue {
       checkOfflineStatus().then((isOffline) => {
         if (isOffline) {
           console.log(
-            "[MutationQueue] Offline - mutation queued for scheduled / reconnect sync",
+            "[MutationQueue] Offline - mutation queued for scheduled / reconnect sync"
           );
         }
       });
@@ -530,7 +530,7 @@ class MutationQueue {
 
     if (!force && offlineDetector.getOfflineFirstActive()) {
       console.log(
-        "[MutationQueue] Offline-first mode active - skipping queue processing",
+        "[MutationQueue] Offline-first mode active - skipping queue processing"
       );
       return {
         initialPending,
@@ -545,7 +545,7 @@ class MutationQueue {
         const hasConnectivity = await offlineDetector.forceCheck();
         if (!hasConnectivity) {
           console.log(
-            "[MutationQueue] No connectivity for forced sync - skipping queue processing",
+            "[MutationQueue] No connectivity for forced sync - skipping queue processing"
           );
           return {
             initialPending,
@@ -558,7 +558,7 @@ class MutationQueue {
         const isOfflineStatus = await checkOfflineStatus();
         if (isOfflineStatus) {
           console.log(
-            "[MutationQueue] Still offline - skipping queue processing",
+            "[MutationQueue] Still offline - skipping queue processing"
           );
           return {
             initialPending,
@@ -574,7 +574,7 @@ class MutationQueue {
     this.currentStatus = "syncing";
     this.sortQueueByDependencyOrder();
     console.log(
-      `[MutationQueue] Processing ${this.queue.length} queued mutations (sorted by dependency order)`,
+      `[MutationQueue] Processing ${this.queue.length} queued mutations (sorted by dependency order)`
     );
     this.notifyStatusChange();
 
@@ -591,7 +591,7 @@ class MutationQueue {
               const verifiedOffline = await checkOfflineStatus(true);
               if (verifiedOffline) {
                 console.log(
-                  "[MutationQueue] Went offline during processing - pausing",
+                  "[MutationQueue] Went offline during processing - pausing"
                 );
                 this.currentStatus = "idle";
                 this.currentMutation = null;

@@ -32,7 +32,7 @@ export function BarcodeScanner({
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | undefined>(
-    undefined,
+    undefined
   );
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -54,7 +54,7 @@ export function BarcodeScanner({
           const devices = await getDevices("scanner");
           if (devices.length === 0) {
             setError(
-              "No scanner devices found. Please connect a scanner and try again.",
+              "No scanner devices found. Please connect a scanner and try again."
             );
             return;
           }
@@ -192,7 +192,7 @@ export function BarcodeScanner({
           (device) =>
             device.label.toLowerCase().includes("back") ||
             device.label.toLowerCase().includes("rear") ||
-            device.label.toLowerCase().includes("environment"),
+            device.label.toLowerCase().includes("environment")
         );
         const selectedDeviceId =
           backCamera?.deviceId || videoInputDevices[0].deviceId;
@@ -214,7 +214,7 @@ export function BarcodeScanner({
             if (err && !(err instanceof NotFoundException)) {
               console.error("Scan error:", err);
             }
-          },
+          }
         );
       } catch (err: any) {
         console.error("Error starting scanner:", err);

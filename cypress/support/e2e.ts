@@ -6,7 +6,7 @@ Cypress.on("uncaught:exception", (error) => {
   const message = error?.message ?? "";
   if (
     /Hydration failed because the server rendered HTML didn't match the client/i.test(
-      message,
+      message
     ) ||
     /Text content does not match server-rendered HTML/i.test(message)
   ) {

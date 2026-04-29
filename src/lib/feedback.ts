@@ -64,7 +64,7 @@ function buildErrorDescription(
   reason?: string,
   recovery?: string,
   code?: string,
-  logId?: string,
+  logId?: string
 ): string {
   const parts: string[] = [];
   if (reason) parts.push(reason);
@@ -93,14 +93,14 @@ export const feedback = {
     title: string,
     reason?: string,
     recovery?: string,
-    options?: { logId?: string; code?: string },
+    options?: { logId?: string; code?: string }
   ): void {
     const logId = options?.logId ?? genLogId();
     const description = buildErrorDescription(
       reason,
       recovery,
       options?.code,
-      logId,
+      logId
     );
     toast({
       title,
@@ -119,7 +119,7 @@ export const feedback = {
     error: unknown,
     title: string = "Action failed",
     recovery: string = "Check your connection and try again.",
-    code?: string,
+    code?: string
   ): string {
     const logId = genLogId();
     const reason = getErrorMessage(error);

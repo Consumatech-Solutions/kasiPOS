@@ -88,7 +88,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             <td style="text-align:center">${item.quantity}</td>
             <td style="text-align:right">R ${(item.unitPrice ?? 0).toFixed(2)}</td>
             <td style="text-align:right">R ${(item.totalPrice ?? 0).toFixed(2)}</td>
-          </tr>`,
+          </tr>`
       )
       .join("");
     const discountRow =
@@ -125,7 +125,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   };
 
   const buildThermalReceipt = async (
-    receiptData: ReceiptData,
+    receiptData: ReceiptData
   ): Promise<Uint8Array> => {
     const formattedDate = formatReceiptDate(receiptData.timestamp);
 
@@ -180,7 +180,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         <Text align="center">Thank you for your purchase</Text>
         <Br />
         <Cut />
-      </ThermalPrinter>,
+      </ThermalPrinter>
     );
   };
 
@@ -295,7 +295,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
       feedback.error(
         "Print blocked",
         "Your browser blocked the print window.",
-        "Allow pop-ups for this site and try again.",
+        "Allow pop-ups for this site and try again."
       );
       return;
     }
@@ -332,7 +332,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const handleDownloadPdf = () => {
     feedback.success(
       "Save as PDF",
-      'Use the print dialog and choose "Save as PDF" as the destination.',
+      'Use the print dialog and choose "Save as PDF" as the destination.'
     );
     handlePrint();
   };
@@ -340,14 +340,14 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const handleEmailReceipt = () => {
     feedback.success(
       "Coming soon",
-      "Email receipt delivery will be available in a future update.",
+      "Email receipt delivery will be available in a future update."
     );
   };
 
   const handleSmsReceipt = () => {
     feedback.success(
       "Coming soon",
-      "SMS receipt delivery will be available in a future update.",
+      "SMS receipt delivery will be available in a future update."
     );
   };
 

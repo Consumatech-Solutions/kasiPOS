@@ -34,7 +34,7 @@ async function resolveCategoryId(categoryName: string): Promise<string> {
       ? categoriesResp
       : ((categoriesResp as { data?: ApiCategory[] })?.data ?? []);
     const apiCategory = categories.find(
-      (c) => String(c.name).trim().toLowerCase() === normalizedName,
+      (c) => String(c.name).trim().toLowerCase() === normalizedName
     );
     if (apiCategory) return apiCategory.id;
   } catch (error) {
@@ -46,17 +46,17 @@ async function resolveCategoryId(categoryName: string): Promise<string> {
     (c) =>
       String(c.name ?? "")
         .trim()
-        .toLowerCase() === normalizedName,
+        .toLowerCase() === normalizedName
   );
   if (localCategory?.id) return String(localCategory.id);
 
   throw new Error(
-    `Category "${categoryName}" not found in API response or local cache.`,
+    `Category "${categoryName}" not found in API response or local cache.`
   );
 }
 
 function normalizeProductPayload(
-  data: Record<string, unknown>,
+  data: Record<string, unknown>
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
     name: data.name,
@@ -74,7 +74,7 @@ function normalizeProductPayload(
 
 export async function executeMutation(
   mutationKey: string[],
-  variables: unknown,
+  variables: unknown
 ): Promise<unknown> {
   const [type, action] = mutationKey;
   if (!type || !action)
@@ -114,7 +114,7 @@ export async function executeMutation(
         ? { ...raw, items: resolvedItems, customerId: resolvedCustomerId }
         : { ...raw, customerId: resolvedCustomerId };
       const dto = toCreateTransactionDto(
-        resolved as Parameters<typeof toCreateTransactionDto>[0],
+        resolved as Parameters<typeof toCreateTransactionDto>[0]
       );
       const idempotencyKey = raw.idempotencyKey;
       return transactionsApi.create(dto as unknown as CreateTransactionDto, {
@@ -158,7 +158,7 @@ export async function executeMutation(
       }
       return catalogueApi.products.update(
         id,
-        updatePayload as Parameters<typeof catalogueApi.products.update>[1],
+        updatePayload as Parameters<typeof catalogueApi.products.update>[1]
       );
     }
 
@@ -169,7 +169,7 @@ export async function executeMutation(
 
     case "categories/create":
       return catalogueApi.categories.create(
-        variables as Parameters<typeof catalogueApi.categories.create>[0],
+        variables as Parameters<typeof catalogueApi.categories.create>[0]
       );
 
     case "categories/update": {
@@ -268,7 +268,7 @@ export async function executeMutation(
 
     case "vouchers/create":
       return vouchersApi.create(
-        variables as Parameters<typeof vouchersApi.create>[0],
+        variables as Parameters<typeof vouchersApi.create>[0]
       );
 
     case "vouchers/update": {
@@ -286,12 +286,12 @@ export async function executeMutation(
 
     case "parcels/create":
       return parcelsApi.create(
-        variables as Parameters<typeof parcelsApi.create>[0],
+        variables as Parameters<typeof parcelsApi.create>[0]
       );
 
     case "users/create":
       return usersApi.create(
-        variables as Parameters<typeof usersApi.create>[0],
+        variables as Parameters<typeof usersApi.create>[0]
       );
 
     case "users/update": {

@@ -162,7 +162,7 @@ export default function SettingsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [transferTargetUser, setTransferTargetUser] = useState<User | null>(
-    null,
+    null
   );
   const [deleteCurrentAdminOnTransfer, setDeleteCurrentAdminOnTransfer] =
     useState(false);
@@ -233,7 +233,7 @@ export default function SettingsPage() {
       const response = await usersApi.findAll(
         userManagementStoreId,
         page,
-        TABLE_LIMIT,
+        TABLE_LIMIT
       );
       const body = response.data;
       const list = Array.isArray(body?.data) ? body.data : [];
@@ -245,7 +245,7 @@ export default function SettingsPage() {
         userManagementStoreId,
         page,
         list as User[],
-        totalPages,
+        totalPages
       );
     } catch (error) {
       console.error("Failed to fetch users:", error);
@@ -379,7 +379,7 @@ export default function SettingsPage() {
       console.error("Failed to update store modules:", err);
       feedback.error(
         "Update failed",
-        err?.message ?? "Could not update feature. Try again.",
+        err?.message ?? "Could not update feature. Try again."
       );
       setSetting(feature, !enabled);
     } finally {
@@ -412,7 +412,7 @@ export default function SettingsPage() {
       console.error("Failed to update showVatInCheckout:", err);
       feedback.error(
         "Update failed",
-        err?.message ?? "Could not update setting. Try again.",
+        err?.message ?? "Could not update setting. Try again."
       );
       setSetting("showVatInCheckout", !checked);
     } finally {
@@ -426,7 +426,7 @@ export default function SettingsPage() {
         "No store",
         "Load a store first or ensure your account has a store.",
         undefined,
-        { code: "CREDIT" },
+        { code: "CREDIT" }
       );
       return;
     }
@@ -435,7 +435,7 @@ export default function SettingsPage() {
         "No store",
         "Load your store before saving credit settings.",
         undefined,
-        { code: "CREDIT" },
+        { code: "CREDIT" }
       );
       return;
     }
@@ -458,7 +458,7 @@ export default function SettingsPage() {
       : { credit: null };
 
     const applyLocalCredit = async (
-      normalizedCredit: typeof settingsStore.credit,
+      normalizedCredit: typeof settingsStore.credit
     ) => {
       setSetting("currentStore", {
         ...settingsStore,
@@ -466,7 +466,7 @@ export default function SettingsPage() {
       });
       await saveStorePermanently(
         { ...settingsStore, credit: normalizedCredit },
-        setSetting,
+        setSetting
       );
       const cc =
         normalizedCredit &&
@@ -489,7 +489,7 @@ export default function SettingsPage() {
               termType: cc.termType === "variable" ? "variable" : "fixed",
               term: cc.term,
             }
-          : null,
+          : null
       );
       setCreditForm((f) =>
         cc
@@ -499,7 +499,7 @@ export default function SettingsPage() {
               termType: cc.termType === "variable" ? "variable" : "fixed",
               term: cc.term ?? 7,
             }
-          : { ...f, enabled: false },
+          : { ...f, enabled: false }
       );
     };
 
@@ -508,7 +508,7 @@ export default function SettingsPage() {
         "Server unavailable",
         "Connect to the internet and ensure the server is reachable to save credit settings.",
         undefined,
-        { code: "CREDIT" },
+        { code: "CREDIT" }
       );
       return;
     }
@@ -559,12 +559,12 @@ export default function SettingsPage() {
           "Saved but not confirmed on server",
           "Credit settings were sent, but the server did not return the stored config.",
           "Check store settings on the server, then try a credit sale again.",
-          { code: "CREDIT" },
+          { code: "CREDIT" }
         );
       } else {
         feedback.success(
           "Credit settings saved",
-          "Customer credit configuration has been updated.",
+          "Customer credit configuration has been updated."
         );
       }
     } catch (err: unknown) {
@@ -663,14 +663,14 @@ export default function SettingsPage() {
   };
 
   const handleUserSubmit = async (
-    values: z.infer<typeof userManagementSchema>,
+    values: z.infer<typeof userManagementSchema>
   ) => {
     if (!effectiveOnline) {
       feedback.error(
         "Server unavailable",
         "Staff changes require a working connection to the server. Reconnect and try again.",
         undefined,
-        { code: "USER" },
+        { code: "USER" }
       );
       return;
     }
@@ -683,7 +683,7 @@ export default function SettingsPage() {
         "No store",
         "Cannot add staff without a store. Open the app and ensure a store is loaded.",
         undefined,
-        { code: "USER" },
+        { code: "USER" }
       );
       return;
     }
@@ -703,7 +703,7 @@ export default function SettingsPage() {
             "Invalid number",
             "Please enter at least 10 digits.",
             undefined,
-            { code: "USER" },
+            { code: "USER" }
           );
           return;
         }
@@ -717,7 +717,7 @@ export default function SettingsPage() {
         await usersApi.create(createData);
         feedback.success(
           "Staff user added",
-          "They will receive an SMS to set up their password. They are assigned to this store only.",
+          "They will receive an SMS to set up their password. They are assigned to this store only."
         );
       }
       setUserDialogOpen(false);
@@ -732,7 +732,7 @@ export default function SettingsPage() {
       feedback.fromError(
         error,
         "Failed to save user",
-        "Check the details and try again, or try again later.",
+        "Check the details and try again, or try again later."
       );
     }
   };
@@ -748,7 +748,7 @@ export default function SettingsPage() {
         "Server unavailable",
         "Deleting staff requires a working connection to the server.",
         undefined,
-        { code: "USER" },
+        { code: "USER" }
       );
       return;
     }
@@ -757,7 +757,7 @@ export default function SettingsPage() {
         feedback.error(
           "Cannot delete",
           "You cannot delete your own account.",
-          "Ask another admin to remove you.",
+          "Ask another admin to remove you."
         );
         return;
       }
@@ -769,7 +769,7 @@ export default function SettingsPage() {
       feedback.fromError(
         error,
         "Failed to delete user",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };
@@ -786,7 +786,7 @@ export default function SettingsPage() {
     if (!ok) {
       feedback.error(
         "Server unavailable",
-        "Role transfer requires a working connection to the server. Please reconnect and try again.",
+        "Role transfer requires a working connection to the server. Please reconnect and try again."
       );
       return;
     }
@@ -802,7 +802,7 @@ export default function SettingsPage() {
         "Role transferred",
         deleteCurrentAdminOnTransfer
           ? "You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in; your account is removed as selected."
-          : "You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in—you will be a staff user at this store.",
+          : "You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in—you will be a staff user at this store."
       );
       setTransferDialogOpen(false);
       await logout();
@@ -811,7 +811,7 @@ export default function SettingsPage() {
       feedback.fromError(
         error,
         "Failed to transfer role",
-        "Please verify the selected user is a staff member and try again.",
+        "Please verify the selected user is a staff member and try again."
       );
     } finally {
       setIsTransferringRole(false);
@@ -825,7 +825,7 @@ export default function SettingsPage() {
   };
 
   const handlePasswordSubmit = async (
-    values: z.infer<typeof passwordSchema>,
+    values: z.infer<typeof passwordSchema>
   ) => {
     if (!userForPassword?.id) return;
     if (!effectiveOnline) {
@@ -833,7 +833,7 @@ export default function SettingsPage() {
         "Server unavailable",
         "Setting a password requires a working connection to the server.",
         undefined,
-        { code: "USER" },
+        { code: "USER" }
       );
       return;
     }
@@ -848,7 +848,7 @@ export default function SettingsPage() {
       feedback.fromError(
         error,
         "Failed to update password",
-        "Ensure the password meets requirements and try again.",
+        "Ensure the password meets requirements and try again."
       );
     }
   };
@@ -860,7 +860,7 @@ export default function SettingsPage() {
       feedback.error(
         "Server unavailable",
         "Connect to the internet and ensure the server is reachable to update the app.",
-        "Connect to Wi‑Fi or mobile data and try again.",
+        "Connect to Wi‑Fi or mobile data and try again."
       );
       return;
     }
@@ -890,7 +890,7 @@ export default function SettingsPage() {
 
       feedback.success(
         "Cache cleared",
-        "Reloading the app with the latest version...",
+        "Reloading the app with the latest version..."
       );
 
       setTimeout(() => {
@@ -901,7 +901,7 @@ export default function SettingsPage() {
       feedback.fromError(
         error,
         "Failed to update the app",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
       setIsUpdating(false);
     }
@@ -1042,7 +1042,7 @@ export default function SettingsPage() {
             <div
               className={cn(
                 "space-y-2 pt-4 transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none",
+                !effectiveOnline && "opacity-60 pointer-events-none"
               )}
             >
               <h3 className="text-lg font-semibold">Feature Management</h3>
@@ -1055,7 +1055,7 @@ export default function SettingsPage() {
             <div
               className={cn(
                 "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none",
+                !effectiveOnline && "opacity-60 pointer-events-none"
               )}
             >
               <div>
@@ -1080,7 +1080,7 @@ export default function SettingsPage() {
             <div
               className={cn(
                 "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none",
+                !effectiveOnline && "opacity-60 pointer-events-none"
               )}
             >
               <div>
@@ -1104,7 +1104,7 @@ export default function SettingsPage() {
             <div
               className={cn(
                 "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none",
+                !effectiveOnline && "opacity-60 pointer-events-none"
               )}
             >
               <div>
@@ -1126,7 +1126,7 @@ export default function SettingsPage() {
             <div
               className={cn(
                 "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none",
+                !effectiveOnline && "opacity-60 pointer-events-none"
               )}
             >
               <div>

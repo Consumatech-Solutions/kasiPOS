@@ -93,7 +93,7 @@ export default function StorePosPage(props: PageProps) {
   >();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryView, setCategoryView] = useState<"carousel" | "grid">(
-    "carousel",
+    "carousel"
   );
   const [categorySearch, setCategorySearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -149,7 +149,7 @@ export default function StorePosPage(props: PageProps) {
   const filteredCategories = useMemo(() => {
     if (!allCategories) return [];
     return allCategories.filter((c) =>
-      c.toLowerCase().includes(categorySearch.toLowerCase()),
+      c.toLowerCase().includes(categorySearch.toLowerCase())
     );
   }, [allCategories, categorySearch]);
 
@@ -168,7 +168,7 @@ export default function StorePosPage(props: PageProps) {
         customer.name
           .toLowerCase()
           .includes(customerSearchTerm.toLowerCase()) ||
-        customer.contact?.includes(customerSearchTerm),
+        customer.contact?.includes(customerSearchTerm)
     );
   }, [allCustomers, customerSearchTerm]);
 
@@ -225,7 +225,7 @@ export default function StorePosPage(props: PageProps) {
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce(
     (acc, item) => acc + (Number(item.totalPrice) || 0),
-    0,
+    0
   );
   const vat = cartSubtotal * 0.15;
   const serviceFee = 15.0;
@@ -237,7 +237,7 @@ export default function StorePosPage(props: PageProps) {
         "Cart is empty",
         "Add products to the cart before checkout.",
         "Add items and try again.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -246,7 +246,7 @@ export default function StorePosPage(props: PageProps) {
         "No customer selected",
         "A customer is required for this marketplace order.",
         "Click Add Customer and select a customer.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -262,7 +262,7 @@ export default function StorePosPage(props: PageProps) {
   const completingOrderRef = useRef(false);
 
   const handleCompleteSale = async (
-    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
+    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">
   ) => {
     if (completingOrderRef.current || isCompletingOrder) return;
     if (!currentStore || !storeId) {
@@ -270,7 +270,7 @@ export default function StorePosPage(props: PageProps) {
         "Order failed",
         "Store context was not found.",
         "Refresh the page and try again.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -280,7 +280,7 @@ export default function StorePosPage(props: PageProps) {
         "Order failed",
         "No customer was selected.",
         "Select a customer and try again.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -312,13 +312,13 @@ export default function StorePosPage(props: PageProps) {
       };
 
       const response = await createOrder(
-        orderData as CreateMarketplaceOrderDto,
+        orderData as CreateMarketplaceOrderDto
       );
       const createdOrder = response.data;
 
       feedback.success(
         "Order created",
-        `Marketplace order ${createdOrder.orderCode} has been created successfully.`,
+        `Marketplace order ${createdOrder.orderCode} has been created successfully.`
       );
 
       setCart(new Map());
@@ -365,7 +365,7 @@ export default function StorePosPage(props: PageProps) {
               className="h-10 w-10 touch-target"
               onClick={() =>
                 setCategoryView((prev) =>
-                  prev === "carousel" ? "grid" : "carousel",
+                  prev === "carousel" ? "grid" : "carousel"
                 )
               }
             >

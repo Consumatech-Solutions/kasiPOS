@@ -112,7 +112,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           feedback.error(
             "Insufficient stock",
             `Only ${maxStock} available for this product.`,
-            "Reduce the quantity or restock before adding more.",
+            "Reduce the quantity or restock before adding more."
           );
         });
         return prev;
@@ -157,7 +157,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 feedback.error(
                   "Insufficient stock",
                   `Only ${maxStock} available for this product.`,
-                  "Lower the quantity or restock before selling more.",
+                  "Lower the quantity or restock before selling more."
                 );
               });
               return prev;
@@ -169,7 +169,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return newCart;
       });
     },
-    [],
+    []
   );
 
   const clearCart = useCallback(() => {
@@ -180,7 +180,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const cartItemCount = useMemo(() => {
     return Array.from(cart.values()).reduce(
       (sum, item) => sum + item.quantity,
-      0,
+      0
     );
   }, [cart]);
 
@@ -202,7 +202,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       clearCart,
       cartItemCount,
       hydrated,
-    ],
+    ]
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

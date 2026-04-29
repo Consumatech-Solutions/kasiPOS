@@ -50,7 +50,7 @@ export interface UseCategoriesOptions {
 export function useCategories(
   initialPage: number = 1,
   initialLimit: number = 10,
-  options?: UseCategoriesOptions,
+  options?: UseCategoriesOptions
 ) {
   const storeIdForOffline = options?.storeIdForOffline;
   const queryClient = useQueryClient();
@@ -78,7 +78,7 @@ export function useCategories(
           let parsed = parseCategoriesListResponse(
             response,
             initialPage,
-            initialLimit,
+            initialLimit
           );
           if (parsed.data.length === 0 && storeIdForOffline) {
             const retry = await catalogueApi.categories.getAll({
@@ -88,20 +88,20 @@ export function useCategories(
             parsed = parseCategoriesListResponse(
               retry,
               initialPage,
-              initialLimit,
+              initialLimit
             );
           }
           if (parsed.data.length > 0) {
             await saveCategoriesToDexie(
               parsed.data,
-              storeIdForOffline ?? undefined,
+              storeIdForOffline ?? undefined
             );
           }
           if (parsed.data.length === 0) {
             const dexieFallback = await getCategoriesFromDexie(
               initialPage,
               initialLimit,
-              storeIdForOffline,
+              storeIdForOffline
             );
             if (dexieFallback.meta.total > 0) return dexieFallback;
           }
@@ -114,7 +114,7 @@ export function useCategories(
       let result = await getCategoriesFromDexie(
         initialPage,
         initialLimit,
-        storeIdForOffline,
+        storeIdForOffline
       );
       if (!isOffline && storeIdForOffline && result.meta.total === 0) {
         try {
@@ -128,7 +128,7 @@ export function useCategories(
           result = await getCategoriesFromDexie(
             initialPage,
             initialLimit,
-            storeIdForOffline,
+            storeIdForOffline
           );
         } catch (e) {
           console.warn("[useCategories] Bulk hydrate failed", e);
@@ -170,7 +170,7 @@ export function useCategories(
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -189,14 +189,14 @@ export function useCategories(
           return {
             ...old,
             data: old.data.map((cat) =>
-              String(cat?.id ?? "").startsWith("temp-") ? newCategory : cat,
+              String(cat?.id ?? "").startsWith("temp-") ? newCategory : cat
             ),
           };
-        },
+        }
       );
       await saveCategoriesToDexie(
         [newCategory],
-        storeIdForOffline ?? undefined,
+        storeIdForOffline ?? undefined
       );
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
@@ -222,9 +222,9 @@ export function useCategories(
             data: previousData.data.map((cat) =>
               String(cat.id) === String(id)
                 ? { ...cat, ...data, updatedAt: new Date().toISOString() }
-                : cat,
+                : cat
             ),
-          },
+          }
         );
       }
 
@@ -238,7 +238,7 @@ export function useCategories(
     onSuccess: async (updatedCategory) => {
       await saveCategoriesToDexie(
         [updatedCategory],
-        storeIdForOffline ?? undefined,
+        storeIdForOffline ?? undefined
       );
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: categoryKeys.lists() });
@@ -266,7 +266,7 @@ export function useCategories(
               ...previousData.meta,
               total: Math.max(0, previousData.meta.total - 1),
             },
-          },
+          }
         );
       }
 
@@ -323,7 +323,7 @@ export interface UseProductsOptions {
 export function useProducts(
   initialPage: number = 1,
   initialLimit: number = 10,
-  options?: UseProductsOptions,
+  options?: UseProductsOptions
 ) {
   const storeIdForOffline = options?.storeIdForOffline;
   const queryClient = useQueryClient();
@@ -364,7 +364,7 @@ export function useProducts(
           let parsed = parseProductsListResponse(
             response,
             currentPage,
-            initialLimit,
+            initialLimit
           );
           if (parsed.data.length === 0 && storeIdForOffline) {
             const retry = await catalogueApi.products.getAll({
@@ -376,13 +376,13 @@ export function useProducts(
             parsed = parseProductsListResponse(
               retry,
               currentPage,
-              initialLimit,
+              initialLimit
             );
           }
           if (parsed.data.length > 0) {
             await saveProductsToDexie(
               parsed.data,
-              storeIdForOffline ?? undefined,
+              storeIdForOffline ?? undefined
             );
           }
           if (parsed.data.length === 0) {
@@ -390,7 +390,7 @@ export function useProducts(
               currentPage,
               initialLimit,
               storeIdForOffline,
-              dexieListFilters,
+              dexieListFilters
             );
             if (dexieFallback.meta.total > 0) return dexieFallback;
           }
@@ -404,7 +404,7 @@ export function useProducts(
         currentPage,
         initialLimit,
         storeIdForOffline,
-        dexieListFilters,
+        dexieListFilters
       );
       if (!isOffline && storeIdForOffline && result.meta.total === 0) {
         try {
@@ -419,7 +419,7 @@ export function useProducts(
             currentPage,
             initialLimit,
             storeIdForOffline,
-            dexieListFilters,
+            dexieListFilters
           );
         } catch (e) {
           console.warn("[useProducts] Bulk hydrate failed", e);
@@ -447,7 +447,7 @@ export function useProducts(
             barCode?: string;
             productImage?: string;
             category: string;
-          },
+          }
     ) => {
       let createDto: CreateProductDto;
 
@@ -512,7 +512,7 @@ export function useProducts(
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -531,10 +531,10 @@ export function useProducts(
           return {
             ...old,
             data: old.data.map((prod) =>
-              String(prod?.id ?? "").startsWith("temp-") ? newProduct : prod,
+              String(prod?.id ?? "").startsWith("temp-") ? newProduct : prod
             ),
           };
-        },
+        }
       );
       await saveProductsToDexie([newProduct], storeIdForOffline ?? undefined);
       queueMicrotask(() => {
@@ -599,9 +599,9 @@ export function useProducts(
             data: previousData.data.map((prod) =>
               String(prod.id) === String(id)
                 ? { ...prod, ...data, updatedAt: new Date().toISOString() }
-                : prod,
+                : prod
             ),
-          },
+          }
         );
       }
 
@@ -615,7 +615,7 @@ export function useProducts(
     onSuccess: async (updatedProduct) => {
       await saveProductsToDexie(
         [updatedProduct],
-        storeIdForOffline ?? undefined,
+        storeIdForOffline ?? undefined
       );
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
@@ -643,7 +643,7 @@ export function useProducts(
               ...previousData.meta,
               total: Math.max(0, previousData.meta.total - 1),
             },
-          },
+          }
         );
       }
 

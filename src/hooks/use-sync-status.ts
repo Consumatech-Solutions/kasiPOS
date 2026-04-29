@@ -5,7 +5,7 @@ import { mutationQueue, type SyncStatusData } from "@/lib/mutation-queue";
 
 export function useSyncStatus() {
   const [status, setStatus] = useState<SyncStatusData>(
-    mutationQueue.getStatus(),
+    mutationQueue.getStatus()
   );
 
   useEffect(() => {

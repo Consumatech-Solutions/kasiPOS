@@ -28,7 +28,7 @@ export const stockAdjustmentKeys = {
 };
 
 function normalizeStockAdjustmentResponse(
-  response: StockAdjustment[] | PaginatedResponse<StockAdjustment>,
+  response: StockAdjustment[] | PaginatedResponse<StockAdjustment>
 ): { data: StockAdjustment[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
@@ -89,7 +89,7 @@ export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
         }
         response = await stockAdjustmentsApi.getByProduct(resolvedProductId);
         return normalizeStockAdjustmentResponse(
-          Array.isArray(response.data) ? response.data : [],
+          Array.isArray(response.data) ? response.data : []
         );
       } else {
         const params: GetStockAdjustmentsParams = {
@@ -156,7 +156,7 @@ export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
         return {
           ...old,
           data: old.data.map((adj) =>
-            adj.id && String(adj.id).startsWith("temp-") ? newAdjustment : adj,
+            adj.id && String(adj.id).startsWith("temp-") ? newAdjustment : adj
           ),
         };
       });

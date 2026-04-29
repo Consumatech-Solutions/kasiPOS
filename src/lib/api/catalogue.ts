@@ -18,7 +18,7 @@ const API_BASE_PATH = "";
 export const catalogueApi = {
   categories: {
     getAll: async (
-      params?: PaginationParams,
+      params?: PaginationParams
     ): Promise<ApiCategory[] | PaginatedResponse<ApiCategory>> => {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append("page", params.page.toString());
@@ -51,11 +51,11 @@ export const catalogueApi = {
 
     update: async (
       id: string,
-      data: UpdateCategoryDto,
+      data: UpdateCategoryDto
     ): Promise<ApiCategory> => {
       const response = await api.patch(
         `${API_BASE_PATH}/categories/${id}`,
-        data,
+        data
       );
       return response.data;
     },
@@ -67,7 +67,7 @@ export const catalogueApi = {
 
   products: {
     getAll: async (
-      params?: PaginationParams,
+      params?: PaginationParams
     ): Promise<ApiProduct[] | PaginatedResponse<ApiProduct>> => {
       const queryParams = new URLSearchParams();
       if (params?.page) queryParams.append("page", params.page.toString());
@@ -111,11 +111,11 @@ export const catalogueApi = {
     },
 
     addTemplate: async (
-      data: AddTemplateRequest,
+      data: AddTemplateRequest
     ): Promise<AddTemplateProductResponse[]> => {
       const response = await api.post<AddTemplateProductResponse[]>(
         `${API_BASE_PATH}/products/add-template`,
-        data,
+        data
       );
       return Array.isArray(response.data)
         ? response.data
@@ -147,7 +147,7 @@ export const catalogueApi = {
 
     getForStore: async (): Promise<ProductTemplate[]> => {
       const response = await api.get<ProductTemplate[]>(
-        `${API_BASE_PATH}/product-templates/for-store`,
+        `${API_BASE_PATH}/product-templates/for-store`
       );
       const raw = response.data;
       return Array.isArray(raw) ? raw : [];

@@ -64,12 +64,12 @@ export default function StoreSetupPage() {
   const { updateStore, createStore } = useStore();
   const [step, setStep] = useState(1);
   const [logoUrl, setLogoUrl] = useState<string | null>(
-    currentStore?.logoUrl || null,
+    currentStore?.logoUrl || null
   );
 
   const form = useForm<FormData>({
     resolver: zodResolver(
-      step === 1 ? (businessInfoSchema as any) : (receiptSchema as any),
+      step === 1 ? (businessInfoSchema as any) : (receiptSchema as any)
     ),
     defaultValues: {
       name: currentStore?.name || "",
@@ -137,7 +137,7 @@ export default function StoreSetupPage() {
       feedback.fromError(
         error,
         "Failed to save store",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };

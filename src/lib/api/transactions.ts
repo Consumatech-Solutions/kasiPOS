@@ -105,7 +105,7 @@ export function toCreateTransactionDto(raw: {
 export const transactionsApi = {
   create: (
     data: CreateTransactionDto,
-    options?: { idempotencyKey?: string },
+    options?: { idempotencyKey?: string }
   ) => {
     const headers =
       options?.idempotencyKey != null && options.idempotencyKey !== ""
@@ -114,7 +114,7 @@ export const transactionsApi = {
     return api.post<Transaction>(
       "/transactions",
       data,
-      headers ? { headers } : undefined,
+      headers ? { headers } : undefined
     );
   },
 
@@ -135,7 +135,7 @@ export const transactionsApi = {
       {
         params:
           Object.keys(requestParams).length > 0 ? requestParams : undefined,
-      },
+      }
     );
   },
 

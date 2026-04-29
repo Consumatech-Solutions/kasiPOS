@@ -80,7 +80,7 @@ export function useHardwareSetup() {
   const context = useContext(HardwareSetupContext);
   if (context === undefined) {
     throw new Error(
-      "useHardwareSetup must be used within a HardwareSetupProvider",
+      "useHardwareSetup must be used within a HardwareSetupProvider"
     );
   }
   return context;

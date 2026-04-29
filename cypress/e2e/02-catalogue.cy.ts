@@ -41,7 +41,7 @@ function openCategoriesTab() {
     .first()
     .click({ force: true });
   cy.contains("th, td", /category name/i, { timeout: 15_000 }).should(
-    "be.visible",
+    "be.visible"
   );
 }
 
@@ -107,7 +107,7 @@ describe("Catalogue", () => {
       {
         timeout: 15_000,
         errorMsg: "Product edit dialog did not open",
-      },
+      }
     );
     CataloguePage.getActiveDialog(CataloguePage.productDialogSelector).within(
       () => {
@@ -117,7 +117,7 @@ describe("Catalogue", () => {
         cy.get('input[name="price"]').scrollIntoView();
         cy.get('input[name="price"]').clear();
         cy.get('input[name="price"]').type("13");
-      },
+      }
     );
     cy.setOnline();
     CataloguePage.clickSaveInProductDialog();
@@ -126,7 +126,7 @@ describe("Catalogue", () => {
       expect(Number(interception.request.body.price)).to.eq(13);
     });
     cy.contains("td", /cola 330ml updated/i, { timeout: 20_000 }).should(
-      "be.visible",
+      "be.visible"
     );
   });
 
@@ -220,7 +220,7 @@ describe("Catalogue", () => {
       .its("response.statusCode")
       .should("be.oneOf", [200, 204]);
     cy.contains("td", /temporary category/i, { timeout: 20_000 }).should(
-      "not.exist",
+      "not.exist"
     );
   });
 });

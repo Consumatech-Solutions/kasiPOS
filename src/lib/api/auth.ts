@@ -22,7 +22,7 @@ export const authApi = {
       { password },
       {
         headers: { Authorization: `Bearer ${tempToken}` },
-      },
+      }
     ),
   setPasswordStoreAdmin: (data: SetPasswordStoreAdminRequest) =>
     api.post<AuthResponse>("/auth/set-password-store-admin", data),

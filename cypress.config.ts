@@ -30,7 +30,7 @@ type CypressMode = "mock" | "real";
 
 function resolveConfigValue(
   key: string,
-  config: Cypress.PluginConfigOptions,
+  config: Cypress.PluginConfigOptions
 ): string | undefined {
   const fromProcess = process.env[key];
   if (fromProcess != null && fromProcess !== "") return fromProcess;
@@ -53,7 +53,7 @@ function readJsonFixture<T>(projectRoot: string, fixtureName: string): T {
     projectRoot,
     "cypress",
     "fixtures",
-    `${fixtureName}.json`,
+    `${fixtureName}.json`
   );
   const raw = fs.readFileSync(fixturePath, "utf8");
   return JSON.parse(raw) as T;
@@ -150,19 +150,19 @@ export default defineConfig({
       if (testMode === "real") {
         if (!realAuthPhone || !realAuthPassword) {
           throw new Error(
-            "CYPRESS_TEST_MODE=real requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD (or CYPRESS_REAL_AUTH_PHONE / CYPRESS_REAL_AUTH_PASSWORD).",
+            "CYPRESS_TEST_MODE=real requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD (or CYPRESS_REAL_AUTH_PHONE / CYPRESS_REAL_AUTH_PASSWORD)."
           );
         }
       }
       const normalizedBaseUrl = resolvedBaseUrl.replace(/\/+$/, "");
       const normalizedApiBase = String(resolvedApiBaseCandidate).replace(
         /\/+$/,
-        "",
+        ""
       );
       const resolvedApiBase = String(resolvedApiBaseCandidate);
       if (testMode === "mock" && normalizedApiBase === normalizedBaseUrl) {
         console.warn(
-          `[cypress.config] Mock mode API_BASE_URL matches baseUrl (${resolvedBaseUrl}). This is supported because root GET API interception is disabled; preserving API_BASE_URL=${resolvedApiBaseCandidate}.`,
+          `[cypress.config] Mock mode API_BASE_URL matches baseUrl (${resolvedBaseUrl}). This is supported because root GET API interception is disabled; preserving API_BASE_URL=${resolvedApiBaseCandidate}.`
         );
       }
 
@@ -198,29 +198,29 @@ export default defineConfig({
             products: readJsonFixture(config.projectRoot, fixtureSet.products),
             categories: readJsonFixture(
               config.projectRoot,
-              fixtureSet.categories,
+              fixtureSet.categories
             ),
             customers: readJsonFixture(
               config.projectRoot,
-              fixtureSet.customers,
+              fixtureSet.customers
             ),
             transactions: readJsonFixture(
               config.projectRoot,
-              fixtureSet.transactions,
+              fixtureSet.transactions
             ),
             vouchers: readJsonFixture(config.projectRoot, fixtureSet.vouchers),
             stockAdjustments: readJsonFixture(
               config.projectRoot,
-              fixtureSet.stockAdjustments,
+              fixtureSet.stockAdjustments
             ),
             parcels: readJsonFixture(config.projectRoot, fixtureSet.parcels),
             marketplaceStores: readJsonFixture(
               config.projectRoot,
-              fixtureSet.marketplaceStores,
+              fixtureSet.marketplaceStores
             ),
             marketplaceOrders: readJsonFixture(
               config.projectRoot,
-              fixtureSet.marketplaceOrders,
+              fixtureSet.marketplaceOrders
             ),
           };
         },

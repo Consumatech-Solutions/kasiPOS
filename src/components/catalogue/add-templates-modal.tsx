@@ -48,10 +48,10 @@ export function AddTemplatesModal({
   const [step, setStep] = useState(STEP_1);
   const [categorySearch, setCategorySearch] = useState("");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(
-    new Set(),
+    new Set()
   );
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(
-    new Set(),
+    new Set()
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,7 +79,7 @@ export function AddTemplatesModal({
         (pt) =>
           pt.categoryTemplateId === ct.id ||
           pt.categoryTemplate?.id === ct.id ||
-          pt.category?.id === ct.id,
+          pt.category?.id === ct.id
       );
       return {
         id: ct.id,
@@ -98,13 +98,13 @@ export function AddTemplatesModal({
     if (!categorySearch.trim()) return categoriesWithTemplates;
     const q = categorySearch.trim().toLowerCase();
     return categoriesWithTemplates.filter((c) =>
-      c.name.toLowerCase().includes(q),
+      c.name.toLowerCase().includes(q)
     );
   }, [categoriesWithTemplates, categorySearch]);
 
   const selectedCategories = useMemo(
     () => categoriesWithTemplates.filter((c) => selectedCategoryIds.has(c.id)),
-    [categoriesWithTemplates, selectedCategoryIds],
+    [categoriesWithTemplates, selectedCategoryIds]
   );
 
   const toggleCategory = useCallback((id: string) => {
@@ -146,15 +146,15 @@ export function AddTemplatesModal({
   const selectedCategoriesWithProducts = useMemo(
     () =>
       selectedCategories.filter((cat) =>
-        cat.templates.some((t) => selectedTemplateIds.has(t.id)),
+        cat.templates.some((t) => selectedTemplateIds.has(t.id))
       ),
-    [selectedCategories, selectedTemplateIds],
+    [selectedCategories, selectedTemplateIds]
   );
 
   const handleNextFromStep1 = useCallback(() => {
     const templateIds = new Set<string>();
     selectedCategories.forEach((c) =>
-      c.templates.forEach((t) => templateIds.add(t.id)),
+      c.templates.forEach((t) => templateIds.add(t.id))
     );
     setSelectedTemplateIds(templateIds);
     setStep(STEP_2);
@@ -174,7 +174,7 @@ export function AddTemplatesModal({
       feedback.error(
         "Invalid selection",
         "Select at least one product to add.",
-        "Go back and select products.",
+        "Go back and select products."
       );
       return;
     }
@@ -184,7 +184,7 @@ export function AddTemplatesModal({
       const count = Array.isArray(created) ? created.length : 0;
       feedback.success(
         "Products added",
-        `${count} product(s) added to your catalogue. Categories are created if needed.`,
+        `${count} product(s) added to your catalogue. Categories are created if needed.`
       );
       onOpenChange(false);
       onSuccess?.();
@@ -207,7 +207,7 @@ export function AddTemplatesModal({
         feedback.error(
           "No store",
           message || "Your account has no store assigned.",
-          "Contact support.",
+          "Contact support."
         );
       } else if (status === 403) {
         if (
@@ -220,7 +220,7 @@ export function AddTemplatesModal({
             console.warn(
               "[Add Templates] 403 Forbidden. Your app sees role:",
               user?.role ?? "(none)",
-              '— Backend must allow role "store_admin" on GET /product-templates/for-store and POST /products/add-template; JWT must include this role.',
+              '— Backend must allow role "store_admin" on GET /product-templates/for-store and POST /products/add-template; JWT must include this role.'
             );
           } catch {
             /* ignore */
@@ -229,25 +229,25 @@ export function AddTemplatesModal({
         feedback.error(
           "Not allowed",
           message || "The server rejected access (Store Admin only).",
-          "If you are Store Admin: the backend must allow your role on the template and add-template endpoints. Otherwise contact support.",
+          "If you are Store Admin: the backend must allow your role on the template and add-template endpoints. Otherwise contact support."
         );
       } else if (status === 404) {
         feedback.error(
           "Not found",
           message || "Category or template not found.",
-          "Refresh and try again.",
+          "Refresh and try again."
         );
       } else if (status === 409) {
         feedback.error(
           "Duplicate",
           message || "Some products already exist (template already added).",
-          "Edit or remove existing products.",
+          "Edit or remove existing products."
         );
       } else {
         feedback.fromError(
           err,
           "Failed to add products",
-          "Check your connection and try again.",
+          "Check your connection and try again."
         );
       }
     } finally {
@@ -274,7 +274,7 @@ export function AddTemplatesModal({
       }
       onOpenChange(open);
     },
-    [onOpenChange],
+    [onOpenChange]
   );
 
   return (
@@ -353,7 +353,7 @@ export function AddTemplatesModal({
               <Accordion type="multiple" className="w-full">
                 {selectedCategories.map((cat) => {
                   const allSelected = cat.templates.every((t) =>
-                    selectedTemplateIds.has(t.id),
+                    selectedTemplateIds.has(t.id)
                   );
                   return (
                     <AccordionItem key={cat.id} value={cat.id}>
@@ -371,7 +371,7 @@ export function AddTemplatesModal({
                             (
                             {
                               cat.templates.filter((t) =>
-                                selectedTemplateIds.has(t.id),
+                                selectedTemplateIds.has(t.id)
                               ).length
                             }
                             /{cat.templates.length})
@@ -427,7 +427,7 @@ export function AddTemplatesModal({
               <ul className="space-y-2">
                 {selectedCategoriesWithProducts.map((cat) => {
                   const selectedTemplates = cat.templates.filter((t) =>
-                    selectedTemplateIds.has(t.id),
+                    selectedTemplateIds.has(t.id)
                   );
                   const count = selectedTemplates.length;
                   return (

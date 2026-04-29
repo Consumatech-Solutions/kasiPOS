@@ -99,13 +99,13 @@ describe("store-persistence", () => {
     getMyStoreMock.mockRejectedValue(
       Object.assign(new Error("Network Error"), {
         isNetworkError: true,
-      }),
+      })
     );
     const result = await fetchAndSaveStore(setSetting, baseStore.id);
     expect(result?.id).toBe(baseStore.id);
     expect(setSetting).toHaveBeenCalledWith(
       "currentStore",
-      expect.objectContaining({ id: baseStore.id }),
+      expect.objectContaining({ id: baseStore.id })
     );
   });
 });

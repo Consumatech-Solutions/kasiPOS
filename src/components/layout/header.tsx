@@ -210,7 +210,7 @@ export default function Header() {
                   ? "text-green-600 dark:text-green-400"
                   : hasInternet
                     ? "text-amber-600 dark:text-amber-400"
-                    : "text-red-600 dark:text-red-400",
+                    : "text-red-600 dark:text-red-400"
               )}
             />
           </Button>
@@ -428,7 +428,7 @@ function NotificationItem({
     <div
       className={cn(
         "relative px-4 py-3 hover:bg-muted/50 transition-colors",
-        !notification.read && "bg-muted/30",
+        !notification.read && "bg-muted/30"
       )}
     >
       <div className="flex gap-3">
@@ -440,7 +440,7 @@ function NotificationItem({
             <p
               className={cn(
                 "text-sm font-medium",
-                !notification.read && "font-semibold",
+                !notification.read && "font-semibold"
               )}
             >
               {notification.title}

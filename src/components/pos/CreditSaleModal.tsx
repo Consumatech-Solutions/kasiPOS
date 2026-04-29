@@ -50,7 +50,7 @@ export default function CreditSaleModal({
 }: CreditSaleModalProps) {
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null,
+    null
   );
   const [paymentDate, setPaymentDate] = useState<Date>(getDefaultPaymentDate());
   const [note, setNote] = useState("");
@@ -68,7 +68,7 @@ export default function CreditSaleModal({
     return customers.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
-        (c.contact ?? "").toLowerCase().includes(q),
+        (c.contact ?? "").toLowerCase().includes(q)
     );
   }, [customers, customerSearch]);
 
@@ -178,7 +178,7 @@ export default function CreditSaleModal({
                 <ChevronDown
                   className={cn(
                     "h-4 w-4 shrink-0 transition-transform",
-                    customerOpen && "rotate-180",
+                    customerOpen && "rotate-180"
                   )}
                 />
               </button>
@@ -213,7 +213,7 @@ export default function CreditSaleModal({
                             type="button"
                             className={cn(
                               "w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent",
-                              selectedCustomer?.id === c.id && "bg-accent",
+                              selectedCustomer?.id === c.id && "bg-accent"
                             )}
                             onClick={() => {
                               setSelectedCustomer(c);

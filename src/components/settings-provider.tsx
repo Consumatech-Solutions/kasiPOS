@@ -18,7 +18,7 @@ interface SettingsContextType {
   settings: AppSettings;
   setSetting: <K extends keyof AppSettings>(
     key: K,
-    value: AppSettings[K],
+    value: AppSettings[K]
   ) => void;
   isPwa: boolean;
   logout: () => Promise<void>;
@@ -26,7 +26,7 @@ interface SettingsContextType {
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(
-  undefined,
+  undefined
 );
 
 const defaultSettings: AppSettings = {
@@ -131,7 +131,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
-    [],
+    []
   );
 
   useLayoutEffect(() => {
@@ -228,7 +228,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.warn(
           "[SettingsProvider] Failed to load store from IndexedDB:",
-          error,
+          error
         );
       }
     };
@@ -251,7 +251,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(
         "kasi-pos-settings",
-        JSON.stringify({ theme }),
+        JSON.stringify({ theme })
       );
       window.localStorage.removeItem("token");
       window.localStorage.removeItem("user");
@@ -282,7 +282,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               const { loadStoreFromIndexedDB } =
                 await import("@/lib/store-persistence");
               const cachedStore = await loadStoreFromIndexedDB(
-                settings.currentUser.storeId,
+                settings.currentUser.storeId
               );
               if (cachedStore) setSetting("currentStore", cachedStore);
             } catch {
@@ -310,7 +310,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               ) {
                 (window as any).__bootstrapNetworkWarned = true;
                 console.warn(
-                  "[SettingsProvider] Backend not reachable. Using cached user and store.",
+                  "[SettingsProvider] Backend not reachable. Using cached user and store."
                 );
               }
             } else {
@@ -324,7 +324,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 await import("@/lib/store-persistence");
               const store = await fetchAndSaveStore(
                 setSetting,
-                freshUser?.storeId ?? null,
+                freshUser?.storeId ?? null
               );
               if (store) {
                 setSetting("currentStore", store);
@@ -334,7 +334,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 const { loadStoreFromIndexedDB } =
                   await import("@/lib/store-persistence");
                 const cachedStore = await loadStoreFromIndexedDB(
-                  freshUser!.storeId,
+                  freshUser!.storeId
                 );
                 if (cachedStore) setSetting("currentStore", cachedStore);
               } else if (process.env.NODE_ENV === "development") {
@@ -347,7 +347,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 await import("@/lib/store-persistence");
               const store = await fetchAndSaveStore(
                 setSetting,
-                freshUser?.storeId ?? null,
+                freshUser?.storeId ?? null
               );
               if (store) setSetting("currentStore", store);
             } catch (e) {
@@ -411,7 +411,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (settings.currentUser) {
         window.localStorage.setItem(
           "user",
-          JSON.stringify(settings.currentUser),
+          JSON.stringify(settings.currentUser)
         );
       } else {
         const existingUser = window.localStorage.getItem("user");
@@ -497,7 +497,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const { fetchAndSaveStore } = await import("@/lib/store-persistence");
         const store = await fetchAndSaveStore(
           setSetting,
-          userData?.storeId ?? null,
+          userData?.storeId ?? null
         );
         if (store) {
           setSetting("currentStore", store);
@@ -512,7 +512,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       } catch (error: any) {
         if (isNetworkErrorLike(error)) {
           console.log(
-            "[SettingsProvider] Network error during login - loading store from IndexedDB",
+            "[SettingsProvider] Network error during login - loading store from IndexedDB"
           );
           const { loadStoreFromIndexedDB } =
             await import("@/lib/store-persistence");
@@ -523,12 +523,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         } else {
           console.warn(
             "[SettingsProvider] Failed to fetch store after login:",
-            error,
+            error
           );
         }
       }
     },
-    [setSetting],
+    [setSetting]
   );
 
   const canRenderChildren = () => {

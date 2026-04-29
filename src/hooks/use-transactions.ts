@@ -29,7 +29,7 @@ export const transactionKeys = {
 };
 
 function normalizeTransactionResponse(
-  response: Transaction[] | PaginatedResponse<Transaction>,
+  response: Transaction[] | PaginatedResponse<Transaction>
 ): { data: Transaction[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
@@ -72,7 +72,7 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
         return getTransactionsFromDexie(
           params.page ?? 1,
           params.limit ?? 10,
-          storeIdForOffline ?? undefined,
+          storeIdForOffline ?? undefined
         );
       }
       const response = await transactionsApi.getAll(params);
@@ -115,7 +115,7 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -135,10 +135,10 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           return {
             ...old,
             data: old.data.map((t) =>
-              t.id && String(t.id).startsWith("temp-") ? newTransaction : t,
+              t.id && String(t.id).startsWith("temp-") ? newTransaction : t
             ),
           };
-        },
+        }
       );
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
     },

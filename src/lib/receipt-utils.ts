@@ -43,7 +43,7 @@ export function validateReceiptContent(data: ReceiptData): string[] {
 
   const itemsSubtotal = data.items.reduce(
     (sum, item) => sum + (item.totalPrice ?? item.unitPrice * item.quantity),
-    0,
+    0
   );
   const roundedItemsSubtotal = Math.round(itemsSubtotal * 100) / 100;
   const expectedItemsTotal = data.showVat
@@ -51,7 +51,7 @@ export function validateReceiptContent(data: ReceiptData): string[] {
     : Math.round(data.subtotal * 100) / 100;
   if (Math.abs(roundedItemsSubtotal - expectedItemsTotal) > 0.02) {
     errors.push(
-      `Items total ${roundedItemsSubtotal} does not match ${data.showVat ? "subtotal + discount" : "subtotal"} (${expectedItemsTotal})`,
+      `Items total ${roundedItemsSubtotal} does not match ${data.showVat ? "subtotal + discount" : "subtotal"} (${expectedItemsTotal})`
     );
   }
 
@@ -62,7 +62,7 @@ export function validateReceiptContent(data: ReceiptData): string[] {
     errors.push(
       data.showVat
         ? `Total ${data.total} does not match subtotal + VAT (${expectedTotal})`
-        : `Total ${data.total} does not match subtotal - discount (${expectedTotal})`,
+        : `Total ${data.total} does not match subtotal - discount (${expectedTotal})`
     );
   }
 
@@ -70,7 +70,7 @@ export function validateReceiptContent(data: ReceiptData): string[] {
     const expectedVat = data.total * (VAT_RATE / (100 + VAT_RATE));
     if (Math.abs(data.vatAmount - expectedVat) > 0.02) {
       errors.push(
-        `VAT amount ${data.vatAmount.toFixed(2)} does not match expected ${expectedVat.toFixed(2)}`,
+        `VAT amount ${data.vatAmount.toFixed(2)} does not match expected ${expectedVat.toFixed(2)}`
       );
     }
   }
@@ -89,7 +89,7 @@ export function validateReceiptContent(data: ReceiptData): string[] {
     const expectedLineTotal = item.totalPrice ?? lineTotal;
     if (Math.abs(lineTotal - expectedLineTotal) > 0.02) {
       errors.push(
-        `Item ${i + 1}: quantity * unitPrice does not match totalPrice`,
+        `Item ${i + 1}: quantity * unitPrice does not match totalPrice`
       );
     }
   });

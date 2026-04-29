@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { createPortal } from "react-dom"
-import { useToast } from "@/hooks/use-toast"
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useToast } from "@/hooks/use-toast";
 import {
   Toast,
   ToastClose,
@@ -10,7 +10,7 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
-} from "@/components/ui/toast"
+} from "@/components/ui/toast";
 
 /**
  * Renders the toast stack in a portal to document.body so it is not a descendant
@@ -19,12 +19,12 @@ import {
  * when a toast is visible and a dialog is open/closed.
  */
 export function Toaster() {
-  const { toasts } = useToast()
-  const [mounted, setMounted] = useState(false)
+  const { toasts } = useToast();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
+    setMounted(true);
+  }, []);
 
   const content = (
     <ToastProvider>
@@ -40,15 +40,15 @@ export function Toaster() {
             {action}
             <ToastClose />
           </Toast>
-        )
+        );
       })}
       <ToastViewport />
     </ToastProvider>
-  )
+  );
 
   if (!mounted || typeof document === "undefined") {
-    return null
+    return null;
   }
 
-  return createPortal(content, document.body)
+  return createPortal(content, document.body);
 }

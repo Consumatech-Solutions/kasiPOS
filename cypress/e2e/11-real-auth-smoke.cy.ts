@@ -13,7 +13,7 @@ describe("Real auth smoke", () => {
     cy.waitForAppReady(
       expectedPath.startsWith("/")
         ? new RegExp(`^${expectedPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
-        : expectedPath,
+        : expectedPath
     );
     cy.location("pathname", { timeout: 30_000 }).should("not.eq", "/login");
     cy.window().then((win) => {

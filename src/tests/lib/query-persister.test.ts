@@ -20,7 +20,7 @@ function makePersistedClient(queries: unknown[]): PersistedClient {
 function makeQuery(
   root: string,
   data: unknown,
-  dataUpdatedAt: number,
+  dataUpdatedAt: number
 ): unknown {
   return {
     queryKey: [root, "list"],
@@ -59,7 +59,7 @@ describe("query-persister", () => {
       makeQuery(
         "customers",
         { data: [{ id: "c-1", name: "Alice" }] },
-        Date.now(),
+        Date.now()
       ),
     ]);
 
@@ -80,14 +80,14 @@ describe("query-persister", () => {
             payload: LARGE_TEXT,
           })),
         },
-        1,
+        1
       ),
       makeQuery(
         "customers",
         {
           data: [{ id: "cust-1", name: "Primary Customer" }],
         },
-        2,
+        2
       ),
     ]);
 
@@ -100,7 +100,7 @@ describe("query-persister", () => {
 
     const restored = JSON.parse(record!.value) as PersistedClient;
     const roots = restored.clientState.queries.map(
-      (query: any) => query.queryKey?.[0],
+      (query: any) => query.queryKey?.[0]
     );
     expect(roots).toContain("customers");
     expect(roots).not.toContain("transactions");
@@ -117,7 +117,7 @@ describe("query-persister", () => {
             payload: LARGE_TEXT,
           })),
         },
-        1,
+        1
       ),
     ]);
 

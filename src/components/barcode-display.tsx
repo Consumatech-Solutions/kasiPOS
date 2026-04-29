@@ -72,7 +72,7 @@ export function BarcodeDisplay({
 
         const tempSvg = document.createElementNS(
           "http://www.w3.org/2000/svg",
-          "svg",
+          "svg"
         );
 
         let actualFormat = format;
@@ -132,7 +132,7 @@ export function BarcodeDisplay({
             barcodeRef.current.setAttribute("height", String(bbox.height));
             barcodeRef.current.setAttribute(
               "viewBox",
-              `0 0 ${bbox.width} ${bbox.height}`,
+              `0 0 ${bbox.width} ${bbox.height}`
             );
           } else {
             barcodeRef.current.setAttribute("width", "200");

@@ -25,7 +25,7 @@ export const parcelKeys = {
 };
 
 function normalizeParcelResponse(
-  response: Parcel[] | PaginatedResponse<Parcel>,
+  response: Parcel[] | PaginatedResponse<Parcel>
 ): { data: Parcel[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
@@ -97,7 +97,7 @@ export function useParcels(options: UseParcelsOptions = {}) {
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -117,10 +117,10 @@ export function useParcels(options: UseParcelsOptions = {}) {
           return {
             ...old,
             data: old.data.map((p) =>
-              p.id && String(p.id).startsWith("temp-") ? newParcel : p,
+              p.id && String(p.id).startsWith("temp-") ? newParcel : p
             ),
           };
-        },
+        }
       );
       queryClient.invalidateQueries({ queryKey: parcelKeys.lists() });
     },
@@ -150,9 +150,9 @@ export function useParcels(options: UseParcelsOptions = {}) {
                     dateReceived: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                   }
-                : p,
+                : p
             ),
-          },
+          }
         );
       }
 
@@ -194,9 +194,9 @@ export function useParcels(options: UseParcelsOptions = {}) {
                     dateCollected: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                   }
-                : p,
+                : p
             ),
-          },
+          }
         );
       }
 
@@ -230,9 +230,9 @@ export function useParcels(options: UseParcelsOptions = {}) {
             data: previousData.data.map((p) =>
               p.id === id
                 ? { ...p, ...data, updatedAt: new Date().toISOString() }
-                : p,
+                : p
             ),
-          },
+          }
         );
       }
 
@@ -267,7 +267,7 @@ export function useParcels(options: UseParcelsOptions = {}) {
               ...previousData.meta,
               total: Math.max(0, previousData.meta.total - 1),
             },
-          },
+          }
         );
       }
 

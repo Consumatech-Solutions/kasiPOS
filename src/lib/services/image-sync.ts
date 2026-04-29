@@ -30,7 +30,7 @@ class ImageSyncService {
         const file = imageStorageService.blobToFile(
           image.imageData,
           fileName,
-          image.mimeType,
+          image.mimeType
         );
 
         const response = await filesApi.uploadProductImage(file);
@@ -68,7 +68,7 @@ class ImageSyncService {
       const file = imageStorageService.blobToFile(
         image.imageData,
         fileName,
-        image.mimeType,
+        image.mimeType
       );
 
       const response = await filesApi.uploadProductImage(file);
@@ -113,6 +113,6 @@ if (typeof window !== "undefined") {
         imageSyncService.syncUnsyncedImages();
       }
     },
-    5 * 60 * 1000,
+    5 * 60 * 1000
   );
 }

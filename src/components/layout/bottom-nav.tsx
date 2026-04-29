@@ -49,7 +49,7 @@ export default function BottomNav() {
                   "flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2",
                   isActive ? "border-destructive" : "border-transparent",
                   isGreyed &&
-                    "opacity-50 pointer-events-none cursor-not-allowed",
+                    "opacity-50 pointer-events-none cursor-not-allowed"
                 )}
               >
                 <Link href={item.href} aria-disabled={isGreyed}>

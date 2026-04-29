@@ -74,7 +74,7 @@ export default function TransactionsPage() {
       const searchLower = searchTerm.toLowerCase();
       const transactionId = transaction.id?.toLowerCase() || "";
       const customerName = getCustomerName(
-        transaction.customerId,
+        transaction.customerId
       ).toLowerCase();
 
       const isTransactionIdSearch = /^[0-9a-f-]{0,36}$/i.test(searchTerm);
@@ -108,7 +108,7 @@ export default function TransactionsPage() {
                 variant={"outline"}
                 className={cn(
                   "w-full sm:w-[240px] justify-start text-left font-normal",
-                  !selectedDate && "text-muted-foreground",
+                  !selectedDate && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />

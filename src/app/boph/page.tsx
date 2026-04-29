@@ -157,7 +157,7 @@ export default function BophPage() {
 
   const incomingParcels = useMemo(
     () => (allParcels || []).filter((p) => p.status === "Incoming"),
-    [allParcels],
+    [allParcels]
   );
   const receivedParcels = useMemo(() => {
     const parcels = (allParcels || []).filter((p) => p.status === "Received");
@@ -165,12 +165,12 @@ export default function BophPage() {
     return parcels.filter((p) =>
       p.collectionCode
         ?.toLowerCase()
-        .includes(collectionCodeInput.toLowerCase()),
+        .includes(collectionCodeInput.toLowerCase())
     );
   }, [allParcels, collectionCodeInput]);
   const collectedParcels = useMemo(
     () => (allParcels || []).filter((p) => p.status === "Collected"),
-    [allParcels],
+    [allParcels]
   );
 
   const generateCode = (length: number, prefix: string = "") => {
@@ -234,7 +234,7 @@ export default function BophPage() {
   };
 
   const handleConfirmCollection = async (
-    values: z.infer<typeof collectionFormSchema>,
+    values: z.infer<typeof collectionFormSchema>
   ) => {
     if (!selectedParcel || !selectedParcel.id) {
       toast({
@@ -286,7 +286,7 @@ export default function BophPage() {
       <RequireOnlineBanner />
       <div
         className={cn(
-          !isOnline && "opacity-60 pointer-events-none select-none",
+          !isOnline && "opacity-60 pointer-events-none select-none"
         )}
       >
         <Card>
@@ -464,7 +464,7 @@ export default function BophPage() {
                                     {parcel.dateReceived
                                       ? format(
                                           new Date(parcel.dateReceived),
-                                          "PPP",
+                                          "PPP"
                                         )
                                       : "N/A"}
                                   </span>
@@ -552,7 +552,7 @@ export default function BophPage() {
                                 {parcel.dateCollected
                                   ? format(
                                       new Date(parcel.dateCollected),
-                                      "PPP p",
+                                      "PPP p"
                                     )
                                   : "N/A"}
                               </TableCell>

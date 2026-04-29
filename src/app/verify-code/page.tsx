@@ -50,7 +50,7 @@ function VerifyCodeContent() {
         "Verification failed",
         "No phone number was provided.",
         "Go back to Request Access and enter your mobile number.",
-        { code: ERROR_CODES.VERIFY },
+        { code: ERROR_CODES.VERIFY }
       );
       router.push("/request-access");
       return;
@@ -62,7 +62,7 @@ function VerifyCodeContent() {
       if (response.data) {
         feedback.success(
           "Verification successful",
-          "You can now continue to sign in or set your password.",
+          "You can now continue to sign in or set your password."
         );
 
         const { tempToken, hasPassword, user } = response.data;
@@ -86,7 +86,7 @@ function VerifyCodeContent() {
         error,
         "Verification failed",
         "Check the code and try again, or request a new code from Request Access.",
-        ERROR_CODES.VERIFY,
+        ERROR_CODES.VERIFY
       );
     }
   };

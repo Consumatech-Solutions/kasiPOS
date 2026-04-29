@@ -35,13 +35,13 @@ export const stockAdjustmentsApi = {
       {
         params:
           Object.keys(requestParams).length > 0 ? requestParams : undefined,
-      },
+      }
     );
   },
 
   getByProduct: (productId: string) => {
     return api.get<StockAdjustment[]>(
-      `/stock-adjustments/product/${productId}`,
+      `/stock-adjustments/product/${productId}`
     );
   },
 };

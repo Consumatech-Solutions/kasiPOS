@@ -35,7 +35,7 @@ export const customersApi = {
   update: (
     id: string,
     data: UpdateCustomerDto,
-    params?: { storeId?: string | null },
+    params?: { storeId?: string | null }
   ) => {
     const requestParams: Record<string, string> = {};
     if (params?.storeId != null && params.storeId !== "")

@@ -39,7 +39,7 @@ describe("BOPH", () => {
     cy.findByRole("tab", { name: /ready/i }).click({ force: true });
     cy.findByPlaceholderText(/search by collection code/i).type("WRONG-CODE");
     cy.contains(/no parcel found with that collection code/i).should(
-      "be.visible",
+      "be.visible"
     );
   });
 
@@ -63,7 +63,7 @@ describe("BOPH", () => {
     cy.findByRole("tabpanel", { name: /history/i }).within(() => {
       cy.get("td.hidden.md\\:table-cell").should(
         "contain.text",
-        "Collection Tester",
+        "Collection Tester"
       );
     });
   });

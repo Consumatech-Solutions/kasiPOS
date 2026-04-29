@@ -81,7 +81,7 @@ export function useEnsureStore() {
         "Offline",
         "Cannot fetch store while offline.",
         "Check your connection and try again.",
-        { code: ERROR_CODES.STORE },
+        { code: ERROR_CODES.STORE }
       );
       return null;
     }
@@ -100,12 +100,12 @@ export function useEnsureStore() {
 
       if (isNetworkErrorLike(error)) {
         const cachedStore = await loadCachedStore(
-          settings.currentUser?.storeId,
+          settings.currentUser?.storeId
         );
         if (cachedStore) {
           feedback.success(
             "Using cached store",
-            "Loaded store from offline cache.",
+            "Loaded store from offline cache."
           );
           return cachedStore;
         }
@@ -114,7 +114,7 @@ export function useEnsureStore() {
         error,
         "Failed to load store",
         "Check your connection and try again.",
-        ERROR_CODES.STORE,
+        ERROR_CODES.STORE
       );
       return null;
     }

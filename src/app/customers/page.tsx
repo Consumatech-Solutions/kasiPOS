@@ -101,7 +101,7 @@ export default function CustomersPage() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null,
+    null
   );
 
   const customerTransactions = useLiveQuery(() => {
@@ -143,7 +143,7 @@ export default function CustomersPage() {
           await updateCustomer(editingCustomer.id, data);
           feedback.success(
             "Customer updated",
-            "Customer updated successfully.",
+            "Customer updated successfully."
           );
         } else {
           const updatedCustomer = {
@@ -160,7 +160,7 @@ export default function CustomersPage() {
               queryClient.setQueryData(queryKey, {
                 ...qData,
                 data: qData.data.map((c) =>
-                  c.id === editingCustomer.id ? updatedCustomer : c,
+                  c.id === editingCustomer.id ? updatedCustomer : c
                 ),
               });
             }
@@ -173,7 +173,7 @@ export default function CustomersPage() {
           });
           feedback.success(
             "Queued",
-            "Customer update queued. Will sync when online.",
+            "Customer update queued. Will sync when online."
           );
         }
       } else {
@@ -184,7 +184,7 @@ export default function CustomersPage() {
             "Customer created",
             hasContact
               ? "A welcome SMS has been sent to the number provided."
-              : "Customer registered.",
+              : "Customer registered."
           );
         } else {
           const tempId = `temp-${Date.now()}`;
@@ -233,7 +233,7 @@ export default function CustomersPage() {
       feedback.fromError(
         error,
         "Failed to save customer",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     } finally {
       customerSubmitRef.current = false;
@@ -241,7 +241,7 @@ export default function CustomersPage() {
   };
 
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(
-    null,
+    null
   );
 
   const handleDeleteCustomer = async (id: string) => {
@@ -276,14 +276,14 @@ export default function CustomersPage() {
         });
         feedback.success(
           "Queued",
-          "Customer deletion queued. Will sync when online.",
+          "Customer deletion queued. Will sync when online."
         );
       }
     } catch (error) {
       feedback.fromError(
         error,
         "Failed to delete customer",
-        "Try again or check your connection.",
+        "Try again or check your connection."
       );
     } finally {
       setDeletingCustomerId(null);

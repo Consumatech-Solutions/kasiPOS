@@ -7,7 +7,7 @@ const PROBE_INTERVAL_MS = 20000;
 
 export function useEffectiveOnline() {
   const [hasBrowserOnline, setHasBrowserOnline] = useState(
-    typeof window !== "undefined" ? navigator.onLine : true,
+    typeof window !== "undefined" ? navigator.onLine : true
   );
   const [backendReachable, setBackendReachable] = useState(false);
   const [isProbing, setIsProbing] = useState(false);

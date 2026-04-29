@@ -17,7 +17,7 @@ export function cartToStorage(cart: Map<string, TransactionItem>): string {
 }
 
 export function cartFromStorage(
-  raw: string | null,
+  raw: string | null
 ): Map<string, TransactionItem> {
   if (!raw || typeof raw !== "string") return new Map();
   try {
@@ -52,7 +52,7 @@ export function cartFromStorage(
 }
 
 export function saveCartToSessionStorage(
-  cart: Map<string, TransactionItem>,
+  cart: Map<string, TransactionItem>
 ): void {
   if (typeof window === "undefined") return;
   const payload = cartToStorage(cart);

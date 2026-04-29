@@ -3,7 +3,7 @@ import { InventoryPage } from "../pages/inventory-page";
 
 function cartRow(productName: string) {
   return cy.get(
-    `[data-testid="pos-cart-line"][data-product-name="${productName}"]`,
+    `[data-testid="pos-cart-line"][data-product-name="${productName}"]`
   );
 }
 
@@ -31,7 +31,7 @@ describe("POS sale flow", () => {
     // Product filter is debounced (~500ms in page.tsx); assert on the table so Cypress retries until the row is gone.
     cy.get('[data-testid="pos-product-table"]', { timeout: 15_000 }).should(
       "not.contain",
-      "Cola 330ml",
+      "Cola 330ml"
     );
   });
 
@@ -126,7 +126,7 @@ describe("POS sale flow", () => {
 
     // Toast can be transient in headless runs; receipt dialog is the stable completion signal.
     cy.get('[data-testid="receipt-dialog"]', { timeout: 25_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     cy.get('[data-testid="receipt-dialog"]').within(() => {
       cy.findByText(/^receipt$/i).should("be.visible");
@@ -157,7 +157,7 @@ describe("POS sale flow", () => {
       });
     });
     cy.get('[data-testid="receipt-dialog"]', { timeout: 25_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     cy.get('[data-testid="receipt-dialog"]')
       .findByRole("button", { name: /^close$/i })

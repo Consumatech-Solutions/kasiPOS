@@ -52,7 +52,7 @@ export default function ProfilePage() {
       feedback.error(
         "Error",
         "No user is logged in.",
-        "Sign in again and try again.",
+        "Sign in again and try again."
       );
       return;
     }
@@ -69,7 +69,7 @@ export default function ProfilePage() {
       feedback.error(
         "Operation not allowed",
         "Updating phone number is not supported yet.",
-        "Please contact admin.",
+        "Please contact admin."
       );
       return;
     }
@@ -90,14 +90,14 @@ export default function ProfilePage() {
 
       feedback.success(
         "Profile updated",
-        "Your name has been successfully updated.",
+        "Your name has been successfully updated."
       );
       router.push("/");
     } catch (error: any) {
       feedback.fromError(
         error,
         "Update failed",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };

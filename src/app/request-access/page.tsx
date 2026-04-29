@@ -28,11 +28,9 @@ import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 
 const requestAccessSchema = z.object({
-  phone: z
-    .string()
-    .min(10, {
-      message: "Please enter a valid mobile number (at least 10 digits).",
-    }),
+  phone: z.string().min(10, {
+    message: "Please enter a valid mobile number (at least 10 digits).",
+  }),
 });
 
 function normalizePhone(input: string): string {
@@ -57,7 +55,7 @@ export default function RequestAccessPage() {
         "Invalid number",
         "Please enter at least 10 digits.",
         undefined,
-        { code: ERROR_CODES.REQUEST_ACCESS },
+        { code: ERROR_CODES.REQUEST_ACCESS }
       );
       return;
     }
@@ -65,7 +63,7 @@ export default function RequestAccessPage() {
       await authApi.requestOtp(phone);
       feedback.success(
         "Code sent",
-        `A verification code has been sent to ${phone}. Check your messages and enter the code on the next screen.`,
+        `A verification code has been sent to ${phone}. Check your messages and enter the code on the next screen.`
       );
       router.push(`/verify-code?phone=${encodeURIComponent(phone)}`);
     } catch (error: unknown) {
@@ -73,7 +71,7 @@ export default function RequestAccessPage() {
         error,
         "Could not send code",
         "Check your mobile number and try again, or try again later.",
-        ERROR_CODES.REQUEST_ACCESS,
+        ERROR_CODES.REQUEST_ACCESS
       );
     }
   };

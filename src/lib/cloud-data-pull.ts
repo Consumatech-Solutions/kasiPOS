@@ -77,7 +77,7 @@ function markSlotCompleted(slotId: string): void {
 }
 
 export function getNextDueScheduledSyncSlotId(
-  now: Date = new Date(),
+  now: Date = new Date()
 ): string | null {
   if (typeof window === "undefined") return null;
   const completed = readCompletedSlots();
@@ -117,7 +117,7 @@ export interface RunCloudDataPullOptions {
 const DATA_STEPS = 4;
 
 export async function runCloudDataPull(
-  options: RunCloudDataPullOptions,
+  options: RunCloudDataPullOptions
 ): Promise<void> {
   const { queryClient, storeId, onProgress } = options;
   const storeIdString =
@@ -140,7 +140,7 @@ export async function runCloudDataPull(
       1,
       1,
       storeIdString,
-      {},
+      {}
     );
     if (productCountCheck.meta.total === 0) {
       try {
@@ -154,7 +154,7 @@ export async function runCloudDataPull(
       } catch (e) {
         console.warn(
           "[cloud-data-pull] Full product hydrate after empty Dexie failed",
-          e,
+          e
         );
       }
     }
@@ -163,7 +163,7 @@ export async function runCloudDataPull(
   const productResult = await getProductsFromDexie(1, 100, storeIdString, {});
   queryClient.setQueryData(
     productKeys.list({ page: 1, limit: 100 }),
-    productResult,
+    productResult
   );
   bump();
 
@@ -178,7 +178,7 @@ export async function runCloudDataPull(
     const categoryCountCheck = await getCategoriesFromDexie(
       1,
       1,
-      storeIdString,
+      storeIdString
     );
     if (categoryCountCheck.meta.total === 0) {
       try {
@@ -192,7 +192,7 @@ export async function runCloudDataPull(
       } catch (e) {
         console.warn(
           "[cloud-data-pull] Full category hydrate after empty Dexie failed",
-          e,
+          e
         );
       }
     }
@@ -201,7 +201,7 @@ export async function runCloudDataPull(
   const categoryResult = await getCategoriesFromDexie(1, 50, storeIdString);
   queryClient.setQueryData(
     categoryKeys.list({ page: 1, limit: 50 }),
-    categoryResult,
+    categoryResult
   );
   bump();
 
@@ -215,16 +215,16 @@ export async function runCloudDataPull(
     1,
     50,
     undefined,
-    storeIdString,
+    storeIdString
   );
   queryClient.setQueryData(
     customerKeys.list({ page: 1, limit: 50 }),
-    customerResult,
+    customerResult
   );
   bump();
 
   const purgeTemp = await purgeTempIdCatalogueRowsAfterCloudSync(
-    storeId ?? undefined,
+    storeId ?? undefined
   );
   if (
     process.env.NODE_ENV === "development" &&
@@ -234,7 +234,7 @@ export async function runCloudDataPull(
   ) {
     console.log(
       "[cloud-data-pull] Removed local temp-id catalogue rows after sync",
-      purgeTemp,
+      purgeTemp
     );
   }
 
@@ -264,7 +264,7 @@ export async function runCloudDataPull(
   }
   queryClient.setQueryData(
     voucherKeys.list({ page: 1, limit: 50, isActive: true }),
-    voucherNormalized,
+    voucherNormalized
   );
   bump();
 
@@ -279,7 +279,7 @@ export async function needsInitialCloudHydration(): Promise<boolean> {
 }
 
 export async function runManualFullCloudSync(
-  options: RunCloudDataPullOptions,
+  options: RunCloudDataPullOptions
 ): Promise<void> {
   const hasConnectivity = await offlineDetector.forceCheck();
   if (!hasConnectivity) {

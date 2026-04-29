@@ -127,7 +127,7 @@ export default function InventoryPage() {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   const [editingThresholdId, setEditingThresholdId] = useState<string | null>(
-    null,
+    null
   );
   const [thresholdValue, setThresholdValue] = useState(0);
 
@@ -166,7 +166,7 @@ export default function InventoryPage() {
       (apiCategories ?? [])
         .map((c: { id: string; name: string }) => `${c.id}:${c.name}`)
         .join("|"),
-    [apiCategories],
+    [apiCategories]
   );
 
   useEffect(() => {
@@ -174,7 +174,7 @@ export default function InventoryPage() {
       selectedCategory === "all"
         ? undefined
         : (apiCategories ?? []).find(
-            (c: { name: string }) => c.name === selectedCategory,
+            (c: { name: string }) => c.name === selectedCategory
           )?.id;
     setProductFilters((prev: { search?: string; categoryId?: string }) => ({
       ...prev,
@@ -267,14 +267,14 @@ export default function InventoryPage() {
   };
 
   const handleAdjustmentSubmit = async (
-    values: z.infer<typeof adjustmentSchema>,
+    values: z.infer<typeof adjustmentSchema>
   ) => {
     if (!selectedProduct || !selectedProduct.id) return;
     if (!values.reason) {
       feedback.error(
         "Reason required",
         "Please select a reason for the adjustment.",
-        "Select a reason.",
+        "Select a reason."
       );
       return;
     }
@@ -285,7 +285,7 @@ export default function InventoryPage() {
       feedback.error(
         "Quantity required",
         "Please enter a value.",
-        "Enter the quantity or updated stock.",
+        "Enter the quantity or updated stock."
       );
       return;
     }
@@ -308,7 +308,7 @@ export default function InventoryPage() {
           feedback.error(
             "Invalid value",
             "Updated stock must be less than the current stock amount.",
-            "Enter a lower value.",
+            "Enter a lower value."
           );
           return;
         }
@@ -319,7 +319,7 @@ export default function InventoryPage() {
           feedback.error(
             "Invalid value",
             "Updated stock must be more than the current stock amount.",
-            "Enter a higher value.",
+            "Enter a higher value."
           );
           return;
         }
@@ -332,7 +332,7 @@ export default function InventoryPage() {
       feedback.error(
         "Invalid value",
         "Stock can't be negative.",
-        "Reduce the quantity.",
+        "Reduce the quantity."
       );
       return;
     }
@@ -352,7 +352,7 @@ export default function InventoryPage() {
 
         feedback.success(
           "Stock updated",
-          `Stock for ${selectedProduct.name} updated.`,
+          `Stock for ${selectedProduct.name} updated.`
         );
       } else {
         const productId = String(selectedProduct.id);
@@ -367,7 +367,7 @@ export default function InventoryPage() {
             const updated = {
               ...data,
               data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: newStock } : p,
+                String(p.id) === productId ? { ...p, stock: newStock } : p
               ),
             };
             queryClient.setQueryData(queryKey, updated);
@@ -391,7 +391,7 @@ export default function InventoryPage() {
 
         feedback.success(
           "Queued",
-          "Stock updated locally. Will sync when online.",
+          "Stock updated locally. Will sync when online."
         );
       }
       setAdjustmentDialogOpen(false);
@@ -408,7 +408,7 @@ export default function InventoryPage() {
             const updated = {
               ...data,
               data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: previousStock } : p,
+                String(p.id) === productId ? { ...p, stock: previousStock } : p
               ),
             };
             queryClient.setQueryData(queryKey, updated);
@@ -419,7 +419,7 @@ export default function InventoryPage() {
       feedback.fromError(
         error,
         "Failed to adjust stock",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };
@@ -429,7 +429,7 @@ export default function InventoryPage() {
       feedback.error(
         "Invalid threshold",
         "Threshold must be zero or more.",
-        "Enter a value ≥ 0.",
+        "Enter a value ≥ 0."
       );
       return;
     }
@@ -442,7 +442,7 @@ export default function InventoryPage() {
 
         feedback.success(
           "Low stock trigger updated",
-          "Low stock trigger updated.",
+          "Low stock trigger updated."
         );
       } else {
         mutationQueue.add({
@@ -455,7 +455,7 @@ export default function InventoryPage() {
         });
         feedback.success(
           "Queued",
-          "Threshold update queued. Will sync when online.",
+          "Threshold update queued. Will sync when online."
         );
       }
       setEditingThresholdId(null);
@@ -463,7 +463,7 @@ export default function InventoryPage() {
       feedback.fromError(
         error,
         "Failed to update threshold",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };
@@ -607,7 +607,7 @@ export default function InventoryPage() {
                         <Badge
                           variant={getStockBadgeVariant(
                             product.stock ?? 0,
-                            (product as any).lowStockThreshold,
+                            (product as any).lowStockThreshold
                           )}
                         >
                           {product.stock ?? 0}
@@ -646,7 +646,7 @@ export default function InventoryPage() {
                                 onClick={() => {
                                   setEditingThresholdId(product.id!);
                                   setThresholdValue(
-                                    (product as any).lowStockThreshold || 0,
+                                    (product as any).lowStockThreshold || 0
                                   );
                                 }}
                               >
@@ -761,9 +761,7 @@ export default function InventoryPage() {
                           value={field.value ?? ""}
                           onChange={(e) =>
                             field.onChange(
-                              e.target.value === ""
-                                ? undefined
-                                : e.target.value,
+                              e.target.value === "" ? undefined : e.target.value
                             )
                           }
                         />

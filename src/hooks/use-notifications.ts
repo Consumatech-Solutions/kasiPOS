@@ -63,12 +63,12 @@ export function useNotifications() {
       setNotifications((prev) => [newNotification, ...prev]);
       return newNotification.id;
     },
-    [],
+    []
   );
 
   const markAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
   }, []);
 

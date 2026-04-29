@@ -28,7 +28,7 @@ function getDataUpdatedAt(query: PersistedQuery): number {
 
 function shrinkPersistedClientByDroppingQueries(
   persistedClient: PersistedClient,
-  maxCacheSize: number,
+  maxCacheSize: number
 ): PersistedClient | undefined {
   const queries = persistedClient.clientState.queries.map((query, index) => ({
     query,
@@ -37,7 +37,7 @@ function shrinkPersistedClientByDroppingQueries(
   const removable = queries
     .filter(
       ({ query }) =>
-        !QUERY_ROOTS_PROTECTED_FROM_PERSIST_EVICTION.has(getQueryRoot(query)),
+        !QUERY_ROOTS_PROTECTED_FROM_PERSIST_EVICTION.has(getQueryRoot(query))
     )
     .map(({ query, index }) => {
       const root = getQueryRoot(query);
@@ -63,7 +63,7 @@ function shrinkPersistedClientByDroppingQueries(
   for (const candidate of removable) {
     removedIndexes.add(candidate.index);
     const remainingQueries = persistedClient.clientState.queries.filter(
-      (_query, index) => !removedIndexes.has(index),
+      (_query, index) => !removedIndexes.has(index)
     );
     const candidateClient: PersistedClient = {
       ...persistedClient,
@@ -82,7 +82,7 @@ function shrinkPersistedClientByDroppingQueries(
 
 function shrinkPersistedClientIfOversized(
   persistedClient: PersistedClient,
-  maxCacheSize: number,
+  maxCacheSize: number
 ): PersistedClient | undefined {
   const serialized = JSON.stringify(persistedClient);
   if (estimateSizeInBytes(serialized) <= maxCacheSize) {
@@ -100,15 +100,15 @@ export function createIDBPersister() {
         let sizeInBytes = estimateSizeInBytes(serialized);
         if (sizeInBytes > MAX_CACHE_SIZE) {
           console.warn(
-            "Query cache exceeds size limit, pruning oversized entries before persist",
+            "Query cache exceeds size limit, pruning oversized entries before persist"
           );
           const prunedClient = shrinkPersistedClientIfOversized(
             persistedClient,
-            MAX_CACHE_SIZE,
+            MAX_CACHE_SIZE
           );
           if (!prunedClient) {
             console.warn(
-              "Query cache still exceeds size limit after pruning, skipping persist",
+              "Query cache still exceeds size limit after pruning, skipping persist"
             );
             return;
           }
@@ -116,7 +116,7 @@ export function createIDBPersister() {
           sizeInBytes = estimateSizeInBytes(serialized);
           if (sizeInBytes > MAX_CACHE_SIZE) {
             console.warn(
-              "Query cache still exceeds size limit after pruning, skipping persist",
+              "Query cache still exceeds size limit after pruning, skipping persist"
             );
             return;
           }

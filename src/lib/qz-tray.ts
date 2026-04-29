@@ -34,14 +34,14 @@ export async function getQzPrinters(): Promise<
     throw new Error(
       message.includes("connect") || message.includes("Connection")
         ? "Cannot connect to QZ Tray. Please ensure QZ Tray is installed and running."
-        : message,
+        : message
     );
   }
 }
 
 export async function printViaQz(
   deviceId: string,
-  data: Uint8Array,
+  data: Uint8Array
 ): Promise<void> {
   if (!deviceId.startsWith(QZ_PREFIX)) {
     throw new Error(`Invalid QZ device ID: ${deviceId}`);
@@ -68,7 +68,7 @@ export async function printViaQz(
     throw new Error(
       message.includes("connect") || message.includes("Connection")
         ? "Cannot connect to QZ Tray. Please ensure QZ Tray is running."
-        : message,
+        : message
     );
   }
 }

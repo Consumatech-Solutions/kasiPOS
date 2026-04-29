@@ -80,7 +80,7 @@ class ImageStorageService {
   }
 
   async getProductImage(
-    productId: string | number,
+    productId: string | number
   ): Promise<ProductImageRecord | null> {
     try {
       const images = await db.productImages
