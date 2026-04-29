@@ -1,25 +1,36 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useSyncStatus } from '@/hooks/use-sync-status';
-import { useSettings } from '@/components/settings-provider';
-import { useToast } from '@/hooks/use-toast';
-import { offlineDetector } from '@/lib/offline-detector';
-import { runManualFullCloudSync, runManualPushSync, CLOUD_SYNC_LOCAL_HOURS } from '@/lib/cloud-data-pull';
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSyncStatus } from "@/hooks/use-sync-status";
+import { useSettings } from "@/components/settings-provider";
+import { useToast } from "@/hooks/use-toast";
+import { offlineDetector } from "@/lib/offline-detector";
+import {
+  runManualFullCloudSync,
+  runManualPushSync,
+  CLOUD_SYNC_LOCAL_HOURS,
+} from "@/lib/cloud-data-pull";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle2, XCircle, Clock, Download, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import {
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Download,
+  RefreshCw,
+} from "lucide-react";
+import { format } from "date-fns";
 
 interface SyncStatusModalProps {
   isOpen: boolean;
@@ -27,23 +38,24 @@ interface SyncStatusModalProps {
 }
 
 export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
-  const { status, queue, currentMutation, isPreloading, preloadProgress } = useSyncStatus();
+  const { queue, currentMutation, isPreloading, preloadProgress } =
+    useSyncStatus();
   const queryClient = useQueryClient();
   const { settings } = useSettings();
   const { toast } = useToast();
   const [isManualPulling, setIsManualPulling] = useState(false);
   const [isManualPushing, setIsManualPushing] = useState(false);
 
-  const scheduleLabel = CLOUD_SYNC_LOCAL_HOURS.map((h) => `${h}:00`).join(', ');
+  const scheduleLabel = CLOUD_SYNC_LOCAL_HOURS.map((h) => `${h}:00`).join(", ");
 
   const handleDownloadFromCloud = async () => {
     const reachable = await offlineDetector.forceCheck();
     if (!reachable) {
       toast({
-        variant: 'destructive',
-        title: 'Server unreachable',
+        variant: "destructive",
+        title: "Server unreachable",
         description:
-          'Check your network and that the app can reach the API server, then try downloading from the cloud again.',
+          "Check your network and that the app can reach the API server, then try downloading from the cloud again.",
       });
       return;
     }
@@ -54,14 +66,15 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
         storeId: settings?.currentStore?.id ?? undefined,
       });
       toast({
-        title: 'Cloud data updated',
-        description: 'Queued changes were uploaded and the latest catalogue data was downloaded.',
+        title: "Cloud data updated",
+        description:
+          "Queued changes were uploaded and the latest catalogue data was downloaded.",
       });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Something went wrong.';
+      const message = e instanceof Error ? e.message : "Something went wrong.";
       toast({
-        variant: 'destructive',
-        title: 'Sync failed',
+        variant: "destructive",
+        title: "Sync failed",
         description: message,
       });
     } finally {
@@ -75,26 +88,26 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
       const result = await runManualPushSync();
       if (result.initialPending === 0) {
         toast({
-          title: 'Nothing to sync',
-          description: 'There are no queued local changes to upload right now.',
+          title: "Nothing to sync",
+          description: "There are no queued local changes to upload right now.",
         });
       } else if (result.remainingPending === 0 && result.syncedCount > 0) {
         toast({
-          title: 'Cloud sync complete',
-          description: `Uploaded ${result.syncedCount} queued change${result.syncedCount === 1 ? '' : 's'} to the backend.`,
+          title: "Cloud sync complete",
+          description: `Uploaded ${result.syncedCount} queued change${result.syncedCount === 1 ? "" : "s"} to the backend.`,
         });
       } else {
         toast({
-          variant: 'destructive',
-          title: 'Sync incomplete',
-          description: `${result.remainingPending} queued item${result.remainingPending === 1 ? '' : 's'} still pending (${result.stoppedReason.replace('_', ' ')}).`,
+          variant: "destructive",
+          title: "Sync incomplete",
+          description: `${result.remainingPending} queued item${result.remainingPending === 1 ? "" : "s"} still pending (${result.stoppedReason.replace("_", " ")}).`,
         });
       }
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : 'Something went wrong.';
+      const message = e instanceof Error ? e.message : "Something went wrong.";
       toast({
-        variant: 'destructive',
-        title: 'Sync failed',
+        variant: "destructive",
+        title: "Sync failed",
         description: message,
       });
     } finally {
@@ -104,11 +117,11 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
 
   const getStatusIcon = (mutationStatus?: string) => {
     switch (mutationStatus) {
-      case 'syncing':
+      case "syncing":
         return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'completed':
+      case "completed":
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'failed':
+      case "failed":
         return <XCircle className="h-4 w-4 text-red-500" />;
       default:
         return <Clock className="h-4 w-4 text-gray-500" />;
@@ -117,11 +130,19 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
 
   const getStatusBadge = (mutationStatus?: string) => {
     switch (mutationStatus) {
-      case 'syncing':
-        return <Badge variant="default" className="bg-blue-500">Syncing</Badge>;
-      case 'completed':
-        return <Badge variant="default" className="bg-green-500">Completed</Badge>;
-      case 'failed':
+      case "syncing":
+        return (
+          <Badge variant="default" className="bg-blue-500">
+            Syncing
+          </Badge>
+        );
+      case "completed":
+        return (
+          <Badge variant="default" className="bg-green-500">
+            Completed
+          </Badge>
+        );
+      case "failed":
         return <Badge variant="destructive">Failed</Badge>;
       default:
         return <Badge variant="secondary">Pending</Badge>;
@@ -129,7 +150,7 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
   };
 
   const getMutationLabel = (mutationKey: string[]) => {
-    if (mutationKey.length === 0) return 'Unknown';
+    if (mutationKey.length === 0) return "Unknown";
     const [type, action] = mutationKey;
     if (action) {
       return `${type.charAt(0).toUpperCase() + type.slice(1)} ${action}`;
@@ -158,10 +179,10 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
           </DialogTitle>
           <DialogDescription>
             {isPreloading
-              ? 'Downloading essential data for offline use...'
-              : 'Cloud sync is scheduled at ' +
+              ? "Downloading essential data for offline use..."
+              : "Cloud sync is scheduled at " +
                 scheduleLabel +
-                ' (local time). If a slot is missed while offline, it runs on next connection. You can also pull updates manually anytime.'}
+                " (local time). If a slot is missed while offline, it runs on next connection. You can also pull updates manually anytime."}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,7 +244,7 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
               {getMutationLabel(currentMutation.mutationKey)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {format(new Date(currentMutation.timestamp), 'PPp')}
+              {format(new Date(currentMutation.timestamp), "PPp")}
             </p>
           </div>
         )}
@@ -248,7 +269,7 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
                         {getMutationLabel(mutation.mutationKey)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(mutation.timestamp), 'PPp')}
+                        {format(new Date(mutation.timestamp), "PPp")}
                       </p>
                     </div>
                   </div>
@@ -269,5 +290,3 @@ export function SyncStatusModal({ isOpen, onClose }: SyncStatusModalProps) {
     </Dialog>
   );
 }
-
-

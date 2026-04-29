@@ -1,7 +1,3 @@
-/**
- * Entity cache: persist API data to Dexie with cap, read when offline.
- */
-
 import {
   getDb,
   type ProductCacheRecord,
@@ -14,7 +10,6 @@ import type { Transaction } from "@/types";
 
 const ENTITY_CAP = 10000;
 
-/** Lower cap in Vitest via KASIPOS_TEST_ENTITY_CAP (see entity-cache tests). */
 function entityCap(): number {
   if (
     typeof process !== "undefined" &&
@@ -55,7 +50,6 @@ export async function setLastSyncAt(
   await db.keyVal.put({ key: LAST_SYNC_KEYS[entity], value: isoDate });
 }
 
-/** Resolve store id for Dexie: prefer API payload (camelCase or snake_case), then explicit sync context. */
 function resolvedProductStoreId(
   p: ApiProduct & {
     storeId?: string | number | null;
@@ -257,7 +251,6 @@ export function isTempEntityId(id: unknown): boolean {
   return id != null && String(id).startsWith(TEMP_ENTITY_ID_PREFIX);
 }
 
-/** When syncStoreId is set, include rows with no storeId (legacy optimistic rows) or matching store. */
 function rowMatchesStoreScope(
   rowStoreId: string | number | null | undefined,
   syncStoreId: string | null | undefined,
@@ -273,11 +266,6 @@ export type PurgeTempIdCatalogueResult = {
   customersRemoved: number;
 };
 
-/**
- * Remove optimistic offline rows (ids starting with "temp-") from Dexie after cloud catalogue sync
- * so only server-backed products, categories, and customers remain locally.
- * Call only after the mutation queue has flushed creates/updates and pull has merged server data.
- */
 export async function purgeTempIdCatalogueRowsAfterCloudSync(
   storeId?: string | null,
 ): Promise<PurgeTempIdCatalogueResult> {
@@ -328,9 +316,6 @@ const PURGE_UNSCOPED_CATEGORIES_KEY_PREFIX =
 export type PurgeUnscopedProductsResult = { removed: number };
 export type PurgeUnscopedCategoriesResult = { removed: number };
 
-/**
- * One-time per browser + store: remove productCache rows with no storeId (not attributable to a store).
- */
 export async function purgeUnscopedProductsCacheOnce(
   storeId: string,
 ): Promise<PurgeUnscopedProductsResult | null> {
@@ -360,9 +345,6 @@ export async function purgeUnscopedProductsCacheOnce(
   }
 }
 
-/**
- * One-time per browser + store: remove categoryCache rows with no storeId.
- */
 export async function purgeUnscopedCategoriesCacheOnce(
   storeId: string,
 ): Promise<PurgeUnscopedCategoriesResult | null> {
@@ -392,7 +374,6 @@ export async function purgeUnscopedCategoriesCacheOnce(
   }
 }
 
-/** Runs both product and category unscoped purges (each has its own one-time flag). */
 export async function purgeUnscopedCatalogueCacheOnce(
   storeId: string,
 ): Promise<{ productsRemoved: number; categoriesRemoved: number } | null> {
@@ -443,7 +424,7 @@ export async function savePurchaseOrdersToDexie(
   const merged = Array.from(byId.values()).sort((a, b) => {
     const aT = a.createdAt ?? "";
     const bT = b.createdAt ?? "";
-    return bT.localeCompare(aT); // newest first
+    return bT.localeCompare(aT);
   });
   const capped = merged.slice(0, PURCHASE_ORDER_CAP);
   await db.keyVal.put({

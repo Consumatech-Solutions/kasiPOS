@@ -1,9 +1,8 @@
+"use client";
 
-'use client';
-
-import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,85 +10,86 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Store, 
-  User, 
-  Bell, 
-  Wifi, 
-  ChevronDown, 
-  Home, 
-  ShoppingCart, 
-  PackageCheck, 
-  ShoppingBasket, 
-  Ticket, 
-  LayoutGrid, 
-  ScrollText, 
-  Users, 
+} from "@/components/ui/popover";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Store,
+  User,
+  Bell,
+  Wifi,
+  ShoppingCart,
+  PackageCheck,
+  ShoppingBasket,
+  Ticket,
+  LayoutGrid,
+  ScrollText,
+  Users,
   BookOpen,
   Check,
   CheckCheck,
   X,
+  Home,
   AlertCircle,
   Info,
   CheckCircle,
   AlertTriangle,
-  Printer
-} from 'lucide-react';
-import Link from 'next/link';
-import { useSettings } from '../settings-provider';
-import { useHardwareSetup } from '@/components/hardware-setup/HardwareSetupProvider';
-import { useNotifications, type Notification, type NotificationType } from '@/hooks/use-notifications';
-import { useNetworkStatus } from '@/hooks/use-network-status';
-import { offlineDetector } from '@/lib/offline-detector';
-import { useMemo } from 'react';
-import { Switch } from '@/components/ui/switch';
-import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
+  Printer,
+} from "lucide-react";
+import Link from "next/link";
+import { useSettings } from "../settings-provider";
+import { useHardwareSetup } from "@/components/hardware-setup/HardwareSetupProvider";
+import {
+  useNotifications,
+  type Notification,
+  type NotificationType,
+} from "@/hooks/use-notifications";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { offlineDetector } from "@/lib/offline-detector";
+import { useMemo } from "react";
+import { Switch } from "@/components/ui/switch";
+import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
-// Page title mapping
 const pageTitles: Record<string, string> = {
-  '/': 'Home',
-  '/catalogue': 'Catalogue',
-  '/inventory': 'Inventory',
-  '/transactions': 'Orders',
-  '/customers': 'Customers',
-  '/buy-stock': 'Buy Stock',
-  '/vouchers': 'Campaigns',
-  '/marketplace': 'Marketplace',
-  '/boph': 'BOPH',
-  '/settings': 'Settings',
-  '/profile': 'Profile',
+  "/": "Home",
+  "/catalogue": "Catalogue",
+  "/inventory": "Inventory",
+  "/transactions": "Orders",
+  "/customers": "Customers",
+  "/buy-stock": "Buy Stock",
+  "/vouchers": "Campaigns",
+  "/marketplace": "Marketplace",
+  "/boph": "BOPH",
+  "/settings": "Settings",
+  "/profile": "Profile",
 };
 
 const pageIcons: Record<string, React.ElementType> = {
-  '/': Home,
-  '/catalogue': BookOpen,
-  '/inventory': LayoutGrid,
-  '/transactions': ScrollText,
-  '/customers': Users,
-  '/buy-stock': ShoppingCart,
-  '/vouchers': Ticket,
-  '/marketplace': ShoppingBasket,
-  '/boph': PackageCheck,
+  "/": Home,
+  "/catalogue": BookOpen,
+  "/inventory": LayoutGrid,
+  "/transactions": ScrollText,
+  "/customers": Users,
+  "/buy-stock": ShoppingCart,
+  "/vouchers": Ticket,
+  "/marketplace": ShoppingBasket,
+  "/boph": PackageCheck,
 };
 
 const getNotificationIcon = (type: NotificationType) => {
   switch (type) {
-    case 'success':
+    case "success":
       return CheckCircle;
-    case 'warning':
+    case "warning":
       return AlertTriangle;
-    case 'error':
+    case "error":
       return AlertCircle;
     default:
       return Info;
@@ -98,14 +98,14 @@ const getNotificationIcon = (type: NotificationType) => {
 
 const getNotificationColor = (type: NotificationType) => {
   switch (type) {
-    case 'success':
-      return 'text-green-600 dark:text-green-400';
-    case 'warning':
-      return 'text-yellow-600 dark:text-yellow-400';
-    case 'error':
-      return 'text-red-600 dark:text-red-400';
+    case "success":
+      return "text-green-600 dark:text-green-400";
+    case "warning":
+      return "text-yellow-600 dark:text-yellow-400";
+    case "error":
+      return "text-red-600 dark:text-red-400";
     default:
-      return 'text-blue-600 dark:text-blue-400';
+      return "text-blue-600 dark:text-blue-400";
   }
 };
 
@@ -122,20 +122,18 @@ export default function Header() {
     markAllAsRead,
     removeNotification,
   } = useNotifications();
-  const { isOnline, wasOffline, hasInternet, cloudUnreachable } = useNetworkStatus();
+  const { isOnline, wasOffline, hasInternet, cloudUnreachable } =
+    useNetworkStatus();
   const { openHardwareSetup } = useHardwareSetup();
 
-  // Get current page title
   const currentPageTitle = useMemo(() => {
-    // Check exact match first
     if (pageTitles[pathname]) {
       return pageTitles[pathname];
     }
-    // Check for dynamic routes (e.g., /marketplace/[storeId])
-    if (pathname.startsWith('/marketplace/')) {
-      return 'Marketplace Store';
+    if (pathname.startsWith("/marketplace/")) {
+      return "Marketplace Store";
     }
-    return 'Dashboard';
+    return "Dashboard";
   }, [pathname]);
 
   const PageIcon = pageIcons[pathname] || Store;
@@ -149,12 +147,13 @@ export default function Header() {
     }
   };
 
-
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
-      {/* Left Section: Logo and Page Title */}
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-        <Link href="/" className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <Link
+          href="/"
+          className="flex items-center gap-1 sm:gap-2 flex-shrink-0"
+        >
           {!logoError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -168,16 +167,17 @@ export default function Header() {
               <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
           )}
-          <span className="text-base sm:text-lg font-bold hidden sm:inline">kasiPOS</span>
+          <span className="text-base sm:text-lg font-bold hidden sm:inline">
+            kasiPOS
+          </span>
         </Link>
-        
+
         <div className="hidden md:flex items-center gap-2 text-muted-foreground">
           <div className="h-6 w-px bg-border" />
           <PageIcon className="h-4 w-4" />
           <span className="text-sm font-medium">{currentPageTitle}</span>
         </div>
 
-        {/* Store Name */}
         {currentStore && (
           <div className="hidden lg:flex items-center gap-2 ml-auto mr-4">
             <div className="h-6 w-px bg-border" />
@@ -191,28 +191,28 @@ export default function Header() {
         )}
       </div>
 
-      {/* Right Section: Actions */}
       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {/* Network Status Indicator */}
         <div className="relative">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-9 w-9 sm:h-10 sm:w-10 touch-target"
             title={
               isOnline
-                ? 'Online'
-                  : 'Offline - Working in offline mode, syncing will be performed at 6:00 AM, 12:00 PM, and 6:00 PM'
+                ? "Online"
+                : "Offline - Working in offline mode, syncing will be performed at 6:00 AM, 12:00 PM, and 6:00 PM"
             }
           >
-            <Wifi className={cn(
-              "h-4 w-4 sm:h-5 sm:w-5",
-              isOnline
-                ? "text-green-600 dark:text-green-400"
-                : hasInternet
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-red-600 dark:text-red-400"
-            )} />
+            <Wifi
+              className={cn(
+                "h-4 w-4 sm:h-5 sm:w-5",
+                isOnline
+                  ? "text-green-600 dark:text-green-400"
+                  : hasInternet
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-red-600 dark:text-red-400",
+              )}
+            />
           </Button>
           {wasOffline && (
             <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 animate-pulse">
@@ -221,29 +221,36 @@ export default function Header() {
           )}
         </div>
 
-        {/* Dev only: simulate offline to test without cutting network */}
-        {process.env.NODE_ENV === 'development' && offlineDetector.isDevHost() && (
-          <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
-            <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">Simulate offline</span>
-            <Switch
-              checked={offlineDetector.getForceOffline()}
-              onCheckedChange={(checked) => offlineDetector.setForceOffline(checked)}
-              aria-label="Simulate offline"
-            />
-          </div>
-        )}
-        
-        {/* Notifications */}
+        {process.env.NODE_ENV === "development" &&
+          offlineDetector.isDevHost() && (
+            <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
+              <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                Simulate offline
+              </span>
+              <Switch
+                checked={offlineDetector.getForceOffline()}
+                onCheckedChange={(checked) =>
+                  offlineDetector.setForceOffline(checked)
+                }
+                aria-label="Simulate offline"
+              />
+            </div>
+          )}
+
         <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10 touch-target">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-9 w-9 sm:h-10 sm:w-10 touch-target"
+            >
               <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
               {unreadCount > 0 && (
-                <Badge 
+                <Badge
                   className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 hover:bg-red-600"
                   variant="destructive"
                 >
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                  {unreadCount > 9 ? "9+" : unreadCount}
                 </Badge>
               )}
             </Button>
@@ -274,7 +281,9 @@ export default function Header() {
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-sm text-muted-foreground">No notifications</p>
+                  <p className="text-sm text-muted-foreground">
+                    No notifications
+                  </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     You're all caught up!
                   </p>
@@ -315,34 +324,48 @@ export default function Header() {
           </PopoverContent>
         </Popover>
 
-        {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full touch-target">
+            <Button
+              variant="ghost"
+              className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full touch-target"
+            >
               <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-border">
                 <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                  {currentUser?.name 
-                    ? currentUser.name
-                        .split(' ')
-                        .map(n => n.charAt(0))
-                        .join('')
-                        .toUpperCase()
-                        .slice(0, 2)
-                    : <User className="h-4 w-4" />
-                  }
+                  {currentUser?.name ? (
+                    currentUser.name
+                      .split(" ")
+                      .map((n) => n.charAt(0))
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                  ) : (
+                    <User className="h-4 w-4" />
+                  )}
                 </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 sm:w-56 p-2" align="end" sideOffset={8} alignOffset={-4} collisionPadding={8}>
+          <DropdownMenuContent
+            className="w-56 sm:w-56 p-2"
+            align="end"
+            sideOffset={8}
+            alignOffset={-4}
+            collisionPadding={8}
+          >
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{currentUser?.name || 'User'}</p>
+                <p className="text-sm font-medium leading-none">
+                  {currentUser?.name || "User"}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {currentUser?.phone || 'No phone'}
+                  {currentUser?.phone || "No phone"}
                 </p>
                 {currentUser?.role && (
-                  <Badge variant="secondary" className="w-fit mt-1 text-[10px] px-1.5 py-0">
+                  <Badge
+                    variant="secondary"
+                    className="w-fit mt-1 text-[10px] px-1.5 py-0"
+                  >
                     {currentUser.role}
                   </Badge>
                 )}
@@ -355,11 +378,16 @@ export default function Header() {
                 Profile
               </DropdownMenuItem>
             </Link>
-            <DropdownMenuItem onClick={openHardwareSetup} className="min-h-[44px] touch-target">
+            <DropdownMenuItem
+              onClick={openHardwareSetup}
+              className="min-h-[44px] touch-target"
+            >
               <Printer className="mr-2 h-4 w-4" />
               Hardware setup
             </DropdownMenuItem>
-            {(currentUser?.role === 'admin' || currentStore?.ownerId === currentUser?.id || currentUser?.role === 'store_admin') && (
+            {(currentUser?.role === "admin" ||
+              currentStore?.ownerId === currentUser?.id ||
+              currentUser?.role === "store_admin") && (
               <Link href="/settings">
                 <DropdownMenuItem className="min-h-[44px] touch-target">
                   <Store className="mr-2 h-4 w-4" />
@@ -368,7 +396,10 @@ export default function Header() {
               </Link>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive min-h-[44px] touch-target">
+            <DropdownMenuItem
+              onClick={logout}
+              className="text-destructive focus:text-destructive min-h-[44px] touch-target"
+            >
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -396,17 +427,22 @@ function NotificationItem({
   return (
     <div
       className={cn(
-        'relative px-4 py-3 hover:bg-muted/50 transition-colors',
-        !notification.read && 'bg-muted/30'
+        "relative px-4 py-3 hover:bg-muted/50 transition-colors",
+        !notification.read && "bg-muted/30",
       )}
     >
       <div className="flex gap-3">
-        <div className={cn('flex-shrink-0 mt-0.5', colorClass)}>
+        <div className={cn("flex-shrink-0 mt-0.5", colorClass)}>
           <Icon className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className={cn('text-sm font-medium', !notification.read && 'font-semibold')}>
+            <p
+              className={cn(
+                "text-sm font-medium",
+                !notification.read && "font-semibold",
+              )}
+            >
               {notification.title}
             </p>
             <div className="flex items-center gap-1 flex-shrink-0">

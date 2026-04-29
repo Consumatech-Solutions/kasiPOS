@@ -26,8 +26,6 @@ import { Input } from "@/components/ui/input";
 import { useSettings } from "@/components/settings-provider";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
-import { useRouter } from "next/navigation";
-import { db } from "@/lib/db";
 
 const loginSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
@@ -36,7 +34,6 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const { login } = useSettings();
-  const router = useRouter();
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -52,13 +49,10 @@ export default function LoginPage() {
 
       if (response.data && response.data.accessToken) {
         feedback.success("Login successful", "Welcome back!");
-        // Pass user and token to settings provider
         await login({
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
-        // Router push is handled inside login() or settings provider effect, but we can do it here too if needed
-        // router.push('/');
       }
     } catch (error: unknown) {
       const err = error as {

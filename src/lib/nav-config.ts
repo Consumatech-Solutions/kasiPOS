@@ -1,4 +1,3 @@
-
 import {
   Home,
   LayoutGrid,
@@ -10,29 +9,53 @@ import {
   ShoppingBasket,
   PackageCheck,
   ShoppingCart,
-} from 'lucide-react';
-import { AppSettings, User } from '@/types';
+} from "lucide-react";
+import { AppSettings, User } from "@/types";
 
-/** Routes that remain fully usable without backend reachability (browser + API probe). */
-export const OFFLINE_FIRST_PATHS = ['/', '/catalogue', '/inventory', '/customers'] as const;
+export const OFFLINE_FIRST_PATHS = [
+  "/",
+  "/catalogue",
+  "/inventory",
+  "/customers",
+] as const;
 
 type NavItem = {
   href: string;
   label: string;
   icon: React.ElementType;
   featureFlag?: keyof AppSettings;
-  roles?: User['role'][];
-}
+  roles?: User["role"][];
+};
 
 export const navItems: NavItem[] = [
-  { href: '/', label: 'Home', icon: Home },
-  { href: '/catalogue', label: 'Catalogue', icon: BookOpen },
-  { href: '/inventory', label: 'Inventory', icon: LayoutGrid },
-  { href: '/transactions', label: 'Orders', icon: ScrollText },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/buy-stock', label: 'Buy Stock', icon: ShoppingCart, featureFlag: 'buyStock' },
-  { href: '/vouchers', label: 'Campaigns', icon: Ticket, featureFlag: 'campaigns' },
-  { href: '/marketplace', label: 'Marketplace', icon: ShoppingBasket, featureFlag: 'marketplace' },
-  { href: '/boph', label: 'BOPH', icon: PackageCheck, featureFlag: 'boph' },
-  { href: '/settings', label: 'Settings', icon: Settings, roles: ['admin', 'store_admin'] },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/catalogue", label: "Catalogue", icon: BookOpen },
+  { href: "/inventory", label: "Inventory", icon: LayoutGrid },
+  { href: "/transactions", label: "Orders", icon: ScrollText },
+  { href: "/customers", label: "Customers", icon: Users },
+  {
+    href: "/buy-stock",
+    label: "Buy Stock",
+    icon: ShoppingCart,
+    featureFlag: "buyStock",
+  },
+  {
+    href: "/vouchers",
+    label: "Campaigns",
+    icon: Ticket,
+    featureFlag: "campaigns",
+  },
+  {
+    href: "/marketplace",
+    label: "Marketplace",
+    icon: ShoppingBasket,
+    featureFlag: "marketplace",
+  },
+  { href: "/boph", label: "BOPH", icon: PackageCheck, featureFlag: "boph" },
+  {
+    href: "/settings",
+    label: "Settings",
+    icon: Settings,
+    roles: ["admin", "store_admin"],
+  },
 ];

@@ -1,4 +1,4 @@
-import { db, type ProductImageRecord } from '@/lib/db';
+import { db, type ProductImageRecord } from "@/lib/db";
 
 export interface LocalImage {
   id: string;
@@ -13,16 +13,10 @@ export interface LocalImage {
 }
 
 class ImageStorageService {
-  /**
-   * Generate a unique ID for the image
-   */
   private generateImageId(): string {
     return `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Store an image locally in IndexedDB
-   */
   async storeImage(productId: string | number, file: File): Promise<string> {
     const imageId = this.generateImageId();
     const imageBlob = new Blob([file], { type: file.type });
@@ -38,10 +32,9 @@ class ImageStorageService {
       updatedAt: new Date().toISOString(),
     };
 
-    // Remove existing product image if any
     try {
       const existingImages = await db.productImages
-        .where('productId')
+        .where("productId")
         .equals(String(productId))
         .toArray();
 
@@ -49,24 +42,18 @@ class ImageStorageService {
         await db.productImages.delete(existingImage.id);
       }
     } catch (err) {
-      console.error('Error deleting existing images:', err);
+      console.error("Error deleting existing images:", err);
     }
 
-    // Add the new image
     await db.productImages.add(imageRecord);
 
-    // Return blob URL for immediate display
     return URL.createObjectURL(imageBlob);
   }
 
-  /**
-   * Get URL of a local (blob://) or server image
-   * Note: Blob URLs created here must be revoked by the component that uses them
-   */
   async getProductImageUrl(productId: string | number): Promise<string | null> {
     try {
       const images = await db.productImages
-        .where('productId')
+        .where("productId")
         .equals(String(productId))
         .toArray();
 
@@ -76,45 +63,38 @@ class ImageStorageService {
 
       const image = images[0];
 
-      // If synced, return server URL
       if (image.synced && image.serverUrl) {
         return image.serverUrl;
       }
 
-      // Otherwise create a new blob URL from image data
-      // Component using this URL must revoke it with URL.revokeObjectURL()
       try {
         return URL.createObjectURL(image.imageData);
       } catch (blobError) {
-        console.error('Error creating blob URL:', blobError);
+        console.error("Error creating blob URL:", blobError);
         return null;
       }
     } catch (err) {
-      console.error('Error getting product image URL:', err);
+      console.error("Error getting product image URL:", err);
       return null;
     }
   }
 
-  /**
-   * Get full product image record
-   */
-  async getProductImage(productId: string | number): Promise<ProductImageRecord | null> {
+  async getProductImage(
+    productId: string | number,
+  ): Promise<ProductImageRecord | null> {
     try {
       const images = await db.productImages
-        .where('productId')
+        .where("productId")
         .equals(String(productId))
         .toArray();
 
       return images.length > 0 ? images[0] : null;
     } catch (err) {
-      console.error('Error getting product image:', err);
+      console.error("Error getting product image:", err);
       return null;
     }
   }
 
-  /**
-   * Mark an image as synced with server URL
-   */
   async markAsSynced(imageId: string, serverUrl: string): Promise<void> {
     await db.productImages.update(imageId, {
       synced: true,
@@ -123,29 +103,19 @@ class ImageStorageService {
     });
   }
 
-  /**
-   * Get all unsynced images
-   */
   async getUnsyncedImages(): Promise<ProductImageRecord[]> {
-    // Fetch all images and filter unsynced (Dexie cannot use .where() on boolean)
     const allImages = await db.productImages.toArray();
-    return allImages.filter(img => !img.synced);
+    return allImages.filter((img: any) => !img.synced);
   }
 
-  /**
-   * Delete a local image
-   */
   async deleteImage(imageId: string): Promise<void> {
     await db.productImages.delete(imageId);
   }
 
-  /**
-   * Delete all images for a product
-   */
   async deleteProductImages(productId: string | number): Promise<void> {
     try {
       const images = await db.productImages
-        .where('productId')
+        .where("productId")
         .equals(String(productId))
         .toArray();
 
@@ -153,29 +123,23 @@ class ImageStorageService {
         await this.deleteImage(image.id);
       }
     } catch (err) {
-      console.error('Error deleting product images:', err);
+      console.error("Error deleting product images:", err);
     }
   }
 
-  /**
-   * Convert Blob to File for upload
-   */
   blobToFile(blob: Blob, fileName: string, mimeType: string): File {
     return new File([blob], fileName, { type: mimeType });
   }
 
-  /**
-   * Get file extension from MIME type
-   */
   getFileExtension(mimeType: string): string {
     const extensions: Record<string, string> = {
-      'image/jpeg': 'jpg',
-      'image/jpg': 'jpg',
-      'image/png': 'png',
-      'image/gif': 'gif',
-      'image/webp': 'webp',
+      "image/jpeg": "jpg",
+      "image/jpg": "jpg",
+      "image/png": "png",
+      "image/gif": "gif",
+      "image/webp": "webp",
     };
-    return extensions[mimeType] || 'jpg';
+    return extensions[mimeType] || "jpg";
   }
 }
 

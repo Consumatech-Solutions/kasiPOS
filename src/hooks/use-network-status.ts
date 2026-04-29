@@ -31,7 +31,7 @@ export function useNetworkStatus() {
   }, [queryClient]);
 
   return {
-    isOnline, // cloud/backend reachable
+    isOnline,
     cloudReachable: isOnline,
     hasInternet,
     wasOffline,

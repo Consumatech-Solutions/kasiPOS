@@ -1,5 +1,5 @@
-import { api } from './core';
-import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
+import { api } from "./core";
+import type { PaginatedResponse, PaginationParams } from "@/types/pagination";
 
 export type MarketplaceOrderItem = {
   productId: string;
@@ -21,8 +21,8 @@ export type MarketplaceOrder = {
   vatAmount: number;
   serviceFee: number;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
-  status: 'pending' | 'completed' | 'cancelled';
+  paymentMethod: "Cash" | "Card" | "Mobile Money";
+  status: "pending" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;
 };
@@ -45,24 +45,21 @@ export type CreateMarketplaceOrderDto = {
   vatAmount?: number;
   serviceFee?: number;
   total: number;
-  paymentMethod: 'Cash' | 'Card' | 'Mobile Money';
+  paymentMethod: "Cash" | "Card" | "Mobile Money";
 };
 
 export interface GetMarketplaceOrdersParams extends PaginationParams {
   marketplaceStoreId?: string;
   customerId?: string;
-  status?: 'pending' | 'completed' | 'cancelled';
-  search?: string; // Search by order code
+  status?: "pending" | "completed" | "cancelled";
+  search?: string;
 }
 
 export const marketplaceOrdersApi = {
   create: (data: CreateMarketplaceOrderDto) => {
-    return api.post<MarketplaceOrder>('/marketplace-orders', data);
+    return api.post<MarketplaceOrder>("/marketplace-orders", data);
   },
 
-  /**
-   * Get all marketplace orders with pagination and filters
-   */
   getAll: (params?: GetMarketplaceOrdersParams) => {
     const requestParams: Record<string, number | string> = {};
     if (params?.page !== undefined) {
@@ -84,31 +81,28 @@ export const marketplaceOrdersApi = {
       requestParams.search = params.search;
     }
 
-    return api.get<PaginatedResponse<MarketplaceOrder> | MarketplaceOrder[]>('/marketplace-orders', {
-      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
-    });
+    return api.get<PaginatedResponse<MarketplaceOrder> | MarketplaceOrder[]>(
+      "/marketplace-orders",
+      {
+        params:
+          Object.keys(requestParams).length > 0 ? requestParams : undefined,
+      },
+    );
   },
 
-  /**
-   * Search for an order by order code
-   */
   findByOrderCode: (code: string) => {
-    return api.get<MarketplaceOrder>('/marketplace-orders/search', {
+    return api.get<MarketplaceOrder>("/marketplace-orders/search", {
       params: { code },
     });
   },
 
-  /**
-   * Get a marketplace order by ID
-   */
   getById: (id: string) => {
     return api.get<MarketplaceOrder>(`/marketplace-orders/${id}`);
   },
 
-  /**
-   * Update marketplace order status
-   */
-  updateStatus: (id: string, status: 'pending' | 'completed' | 'cancelled') => {
-    return api.patch<MarketplaceOrder>(`/marketplace-orders/${id}/status`, { status });
+  updateStatus: (id: string, status: "pending" | "completed" | "cancelled") => {
+    return api.patch<MarketplaceOrder>(`/marketplace-orders/${id}/status`, {
+      status,
+    });
   },
 };

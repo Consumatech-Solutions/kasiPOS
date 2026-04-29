@@ -1,18 +1,11 @@
-/**
- * Offline Detection Utility
- *
- * Determines connectivity by calling the backend URL. If the backend cannot be
- * reached, the app is considered offline. Runs a connectivity check every 10s.
- */
-
 interface OfflineState {
   isOffline: boolean;
   lastChecked: number;
   isChecking: boolean;
 }
 
-const CONNECTIVITY_CHECK_INTERVAL_MS = 10000; // Check every 10 seconds
-const NETWORK_TEST_TIMEOUT = 5000; // Timeout for backend reachability
+const CONNECTIVITY_CHECK_INTERVAL_MS = 10000;
+const NETWORK_TEST_TIMEOUT = 5000;
 const BACKEND_URL =
   typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL
     ? process.env.NEXT_PUBLIC_API_URL
@@ -34,9 +27,7 @@ class OfflineDetector {
   private checkPromise: Promise<boolean> | null = null;
   private listeners: Set<(isOffline: boolean) => void> = new Set();
   private intervalId: ReturnType<typeof setInterval> | null = null;
-  /** Dev only: when true, report offline so you can test without cutting the network */
   private forceOffline = false;
-  /** Runtime flag: when true, app behaves offline-first even with network connectivity */
   private offlineFirstActive =
     typeof window !== "undefined" &&
     Boolean((window as Window & { Cypress?: unknown }).Cypress)
@@ -45,13 +36,11 @@ class OfflineDetector {
 
   constructor() {
     if (typeof window !== "undefined") {
-      // Initial state; first check will run immediately via interval
       this.state.isOffline = !navigator.onLine;
 
       window.addEventListener("online", this.handleOnline);
       window.addEventListener("offline", this.handleOffline);
 
-      // Run connectivity checks only when runtime is allowed online.
       this.checkConnectivity(false);
       this.intervalId = setInterval(() => {
         this.checkConnectivity(false);
@@ -60,9 +49,7 @@ class OfflineDetector {
   }
 
   private handleOnline = () => {
-    // Notify "online" immediately so UI and mutation queue can sync without waiting for the check
     this.setState(false);
-    // Then verify with network test; if it fails, revert to offline
     this.checkConnectivity(false)
       .then((isOnline) => {
         if (!isOnline) this.setState(true);
@@ -73,7 +60,6 @@ class OfflineDetector {
   };
 
   private handleOffline = () => {
-    // When navigator says we're offline, we can trust it immediately
     this.setState(true);
   };
 
@@ -90,7 +76,6 @@ class OfflineDetector {
     this.listeners.forEach((listener) => listener(effective));
   }
 
-  /** Dev only: effective offline = forced offline (when dev) OR real offline */
   getEffectiveOffline(): boolean {
     if (this.forceOffline && isDevHost()) return true;
     if (this.offlineFirstActive) return true;
@@ -122,10 +107,6 @@ class OfflineDetector {
     return this.offlineFirstActive;
   }
 
-  /**
-   * Check connectivity by calling the backend URL. If the backend cannot be
-   * reached, we are considered offline.
-   */
   private async checkConnectivity(
     force: boolean = false,
     bypassOfflineFirst: boolean = false,
@@ -143,8 +124,6 @@ class OfflineDetector {
           return false;
         }
 
-        // In offline-first runtime, avoid backend probes unless explicitly bypassed
-        // by scheduled/manual sync windows.
         if (this.offlineFirstActive && !bypassOfflineFirst) {
           this.setState(true);
           return false;
@@ -187,27 +166,16 @@ class OfflineDetector {
     return this.checkPromise;
   }
 
-  /**
-   * Get current offline status (synchronous, uses cached value).
-   * In dev, includes "simulate offline" override.
-   */
   isOffline(): boolean {
     return this.getEffectiveOffline();
   }
 
-  /**
-   * Get current offline status (asynchronous, performs fresh check if needed).
-   * In dev with simulate offline, returns true without hitting the network.
-   */
   async checkOfflineStatus(force: boolean = false): Promise<boolean> {
     if (this.forceOffline && isDevHost()) return true;
     if (this.offlineFirstActive) return true;
     return !(await this.checkConnectivity(force));
   }
 
-  /**
-   * Subscribe to offline status changes (effective status, including dev simulate)
-   */
   subscribe(callback: (isOffline: boolean) => void): () => void {
     this.listeners.add(callback);
     callback(this.getEffectiveOffline());
@@ -216,16 +184,10 @@ class OfflineDetector {
     };
   }
 
-  /**
-   * Force a fresh connectivity check
-   */
   async forceCheck(): Promise<boolean> {
     return await this.checkConnectivity(true, true);
   }
 
-  /**
-   * Cleanup - remove event listeners and stop periodic check
-   */
   destroy() {
     if (typeof window !== "undefined") {
       window.removeEventListener("online", this.handleOnline);
@@ -239,13 +201,8 @@ class OfflineDetector {
   }
 }
 
-// Export singleton instance
 export const offlineDetector = new OfflineDetector();
 
-/**
- * Cypress drives the same path as the dev "Simulate offline" toggle so `isOnline` cannot flip back
- * when a connectivity probe started by `navigator.onLine` / `online` resolves after `setOffline()`.
- */
 function installE2eOfflineHarnessBridge(): void {
   if (typeof window === "undefined" || !isDevHost()) return;
   try {
@@ -257,7 +214,6 @@ function installE2eOfflineHarnessBridge(): void {
     __KASI_POS_E2E_OFFLINE?: (forcedOffline: boolean) => void;
   };
   win.__KASI_POS_E2E_OFFLINE = (forcedOffline: boolean) => {
-    // Keep Cypress "online/offline" controls aligned with the offline-first gate.
     offlineDetector.setOfflineFirstActive(forcedOffline);
     offlineDetector.setForceOffline(forcedOffline);
   };
@@ -265,7 +221,6 @@ function installE2eOfflineHarnessBridge(): void {
 
 installE2eOfflineHarnessBridge();
 
-// Export convenience functions
 export function isOffline(): boolean {
   return offlineDetector.isOffline();
 }

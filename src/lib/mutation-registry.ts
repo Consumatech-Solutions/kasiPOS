@@ -1,7 +1,3 @@
-/**
- * Registry to re-execute queued mutations after page reload.
- * Maps mutationKey + variables to the actual API call (mutationFn cannot be serialized to Dexie).
- */
 import {
   transactionsApi,
   toCreateTransactionDto,
@@ -121,7 +117,6 @@ export async function executeMutation(
         resolved as Parameters<typeof toCreateTransactionDto>[0],
       );
       const idempotencyKey = raw.idempotencyKey;
-      // Cast: toCreateTransactionDto return type can be inferred as unknown[] for items by TS in some configs
       return transactionsApi.create(dto as unknown as CreateTransactionDto, {
         idempotencyKey,
       });

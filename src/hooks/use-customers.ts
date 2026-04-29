@@ -7,7 +7,6 @@ import {
   getCustomersFromDexie,
   saveCustomersToDexie,
 } from "@/lib/entity-cache";
-import { pullAllCustomersFromApi } from "@/lib/catalogue-network-hydrate";
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "@/types";
 import type {
   PaginationMeta,
@@ -19,9 +18,7 @@ interface UseCustomersOptions {
   initialPage?: number;
   initialLimit?: number;
   searchQuery?: string;
-  /** Optional: for admin; scope API list/get/update/delete to this store. Omit for store admin (backend uses JWT). */
   storeId?: string | null;
-  /** Optional: when set, offline Dexie list is filtered by this store (e.g. currentStore.id for store admin). */
   storeIdForOffline?: string | null;
 }
 
@@ -134,27 +131,6 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           storeIdForOffline ?? undefined,
         );
       }
-
-      let result = await getCustomersFromDexie(
-        initialPage,
-        initialLimit,
-        searchQuery?.trim() || undefined,
-        storeIdForOffline ?? undefined,
-      );
-      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
-        try {
-          await pullAllCustomersFromApi({ storeId: String(storeIdForOffline) });
-          result = await getCustomersFromDexie(
-            initialPage,
-            initialLimit,
-            searchQuery?.trim() || undefined,
-            storeIdForOffline ?? undefined,
-          );
-        } catch (e) {
-          console.warn("[useCustomers] Bulk hydrate failed", e);
-        }
-      }
-      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,

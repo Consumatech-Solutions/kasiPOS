@@ -101,9 +101,7 @@
     border-top-color: hsl(var(--border));
 }
 
-/* Mobile-specific utilities */
 @layer utilities {
-  /* Safe area insets for notched devices */
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -117,7 +115,6 @@
     padding-right: env(safe-area-inset-right);
   }
   
-  /* Touch-friendly sizing */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
@@ -128,26 +125,22 @@
     min-width: 0px;
   }
   
-  /* Prevent text size adjustment on iOS */
   @supports (-webkit-touch-callout: none) {
     input,
     textarea,
     select {
-      font-size: 16px; /* Prevents zoom on iOS */
+      font-size: 16px;
     }
   }
   
-  /* Ensure dropdowns and popovers are visible on mobile */
   [data-radix-portal] {
     z-index: 9999 !important;
   }
   
-  /* Ensure dropdown content is visible */
   [data-radix-popper-content-wrapper] {
     z-index: 9999 !important;
   }
   
-  /* Smooth scrolling for dropdown menus on mobile */
   [data-radix-dropdown-menu-content],
   [data-radix-select-content],
   [data-radix-popover-content] {
@@ -156,7 +149,6 @@
     overscroll-behavior: contain;
   }
   
-  /* Better scrollbar visibility on mobile */
   @media (max-width: 768px) {
     [data-radix-dropdown-menu-content]::-webkit-scrollbar,
     [data-radix-select-content]::-webkit-scrollbar,

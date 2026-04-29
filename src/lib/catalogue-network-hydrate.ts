@@ -1,8 +1,3 @@
-/**
- * Fetches full catalogue pages from the API into Dexie when local cache is empty for the current store.
- * Listing hooks read only Dexie; without this, a missed sync or purge leaves the UI empty until manual sync.
- */
-
 import { catalogueApi } from "@/lib/api/catalogue";
 import { customersApi } from "@/lib/api/customers";
 import type { ApiCategory, ApiProduct } from "@/types/catalogue";
@@ -212,7 +207,6 @@ export async function pullAllCustomersFromApi(
   return saved;
 }
 
-/** Shape GET /products for React Query (handles `{ data, meta }` or a raw array). */
 export function parseProductsListResponse(
   response: Awaited<ReturnType<typeof catalogueApi.products.getAll>>,
   page: number,
@@ -234,7 +228,6 @@ export function parseProductsListResponse(
   };
 }
 
-/** Shape GET /categories for React Query (handles `{ data, meta }` or a raw array). */
 export function parseCategoriesListResponse(
   response: Awaited<ReturnType<typeof catalogueApi.categories.getAll>>,
   page: number,

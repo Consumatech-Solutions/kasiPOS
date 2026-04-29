@@ -17,18 +17,10 @@ import {
 } from "@/lib/cart-storage";
 import { feedback } from "@/lib/feedback";
 
-/**
- * Cart state is persisted in localStorage so the payment cart stays operational
- * when navigating to other pages, refreshing, or returning to Home. Cleared only
- * after checkout completes or when the user explicitly clears the cart.
- * In-memory cache ensures cart survives provider remount (e.g. Next.js navigation).
- */
 type CartMap = Map<string, TransactionItem>;
 
-/** Cache persisting across CartProvider remounts (same tab). */
 let cartMemoryCache: CartMap | null = null;
 
-/** Clears the in-memory cart cache (used by Vitest so cases do not leak state). */
 export function resetCartMemoryCacheForTests(): void {
   cartMemoryCache = null;
 }
@@ -40,18 +32,14 @@ interface CartContextValue {
   updateQuantity: (productId: string, newQuantity: number) => void;
   clearCart: () => void;
   cartItemCount: number;
-  /** True once cart has been restored from sessionStorage (avoids showing "empty" during load). */
   isCartHydrated: boolean;
 }
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-/** Set in Cypress `visitApp('/')` `onBeforeLoad` so POS mounts with a clean cart for each navigation. */
 const E2E_RESET_CART_FLAG = "__kasi_pos_e2e_reset_cart";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  // Always start with empty cart so server and client render the same (avoids hydration mismatch in production).
-  // Cart is restored from storage only in useLayoutEffect (client-only).
   const [cart, setCartState] = useState<CartMap>(() => new Map());
   const [hydrated, setHydrated] = useState(false);
 
@@ -72,7 +60,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setHydrated(true);
       return;
     }
-    // Empty sentinel map: Cypress reset path above — skip Dexie restore (avoids Strict Mode re-read race).
     if (cartMemoryCache && cartMemoryCache.size === 0) {
       setCartState(new Map(cartMemoryCache));
       setHydrated(true);

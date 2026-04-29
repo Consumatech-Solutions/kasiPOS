@@ -12,13 +12,6 @@ import type {
 } from "@/types";
 import { db, getDb } from "@/lib/db";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import {
@@ -29,13 +22,10 @@ import {
   Ticket,
   Search,
   QrCode,
-  CreditCard,
   LayoutGrid,
   List,
   Percent,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import {
   Carousel,
   CarouselContent,
@@ -78,7 +68,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { getProductInitials } from "@/lib/utils/product-initials";
-import { cn } from "@/lib/utils";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useCart } from "@/components/providers/cart-provider";
 import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
@@ -96,7 +85,6 @@ import {
 
 export default function PosPage() {
   const { settings } = useSettings();
-  const { currentStore: settingsStore } = settings;
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
@@ -144,7 +132,6 @@ export default function PosPage() {
     setIsClearCartDialogOpen(false);
   };
 
-  // API Hooks
   const { categories: apiCategories, loading: categoriesLoading } =
     useCategories(1, 1000, {
       storeIdForOffline: settings?.currentStore?.id ?? undefined,
@@ -159,16 +146,13 @@ export default function PosPage() {
 
   const products = apiProducts;
 
-  // Memoize categoryId lookup to prevent infinite loops
   const categoryId = useMemo(() => {
     if (!activeCategory || !apiCategories) return undefined;
     return apiCategories.find((c) => c.name === activeCategory)?.id;
   }, [activeCategory, apiCategories]);
 
-  // Track previous categoryId to prevent unnecessary updates
   const prevCategoryIdRef = useRef<string | undefined>(undefined);
 
-  // Debounce search and update filters
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((prev: any) => ({ ...prev, search: productSearch }));
@@ -176,7 +160,6 @@ export default function PosPage() {
     return () => clearTimeout(timer);
   }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update category filter only when categoryId actually changes
   useEffect(() => {
     if (categoryId !== prevCategoryIdRef.current) {
       prevCategoryIdRef.current = categoryId;
@@ -196,7 +179,6 @@ export default function PosPage() {
     );
   }, [allCategories, categorySearch]);
 
-  // Use API hook for customers
   const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
 
   const customers = allCustomersList || [];
@@ -241,8 +223,6 @@ export default function PosPage() {
   const cartTotal = cartSubtotal - appliedDiscount - manualDiscountAmount;
   const VAT_RATE = 15;
   const showVatInCheckout = settings.showVatInCheckout !== false;
-  // VAT on: add VAT to total (Total = Subtotal + VAT)
-  // VAT off: VAT is included in the total (no addition)
   const vatAmount = showVatInCheckout ? cartTotal * (VAT_RATE / 100) : 0;
   const amountToPay = showVatInCheckout ? cartTotal + vatAmount : cartTotal;
 
@@ -333,11 +313,9 @@ export default function PosPage() {
   };
 
   const handleBarcodeScan = (barcode: string) => {
-    // First, try to find product by barcode
     const productByBarcode = products?.find((p) => p.barCode === barcode);
 
     if (productByBarcode) {
-      // Product found by barcode - add to cart
       const currentQty = cart.get(productByBarcode.id)?.quantity ?? 0;
       const stock = productByBarcode.stock ?? null;
       if (typeof stock === "number" && stock < currentQty + 1) {
@@ -347,7 +325,6 @@ export default function PosPage() {
         });
         return;
       }
-      // Convert ApiProduct to Product format for addToCart
       const productForCart = {
         id: productByBarcode.id,
         name: productByBarcode.name,
@@ -365,9 +342,8 @@ export default function PosPage() {
         `${productByBarcode.name} added to cart.`,
       );
     } else {
-      // Product not found - set search term to barcode for user to see results
       setProductSearch(barcode);
-      setCategoryView("carousel"); // Switch to product view
+      setCategoryView("carousel");
       feedback.success(
         "Barcode scanned",
         `No product found with barcode "${barcode}". Showing search results.`,
@@ -409,7 +385,7 @@ export default function PosPage() {
         voucherCode: appliedVoucherCode,
         discountAmount: appliedDiscount,
         discount: manualDiscount ?? undefined,
-        total: amountToPay, // VAT on = cartTotal + VAT, VAT off = cartTotal
+        total: amountToPay,
         storeId: currentStore.id!,
         idempotencyKey,
       };
@@ -419,7 +395,7 @@ export default function PosPage() {
           storeName: currentStore.name,
           saleId,
           items: newTransaction.items,
-          subtotal: cartTotal, // Ex-VAT subtotal when VAT on, otherwise same as total
+          subtotal: cartTotal,
           discountAmount: appliedDiscount + manualDiscountAmount,
           total: amountToPay,
           paymentMethod: newTransaction.paymentMethod,
@@ -429,7 +405,6 @@ export default function PosPage() {
         });
 
       if (isOnline) {
-        // ONLINE: Use API - backend will update stock. Resolve temp IDs before sending.
         try {
           const mappings = await getDb().syncIdMapping.toArray();
           const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
@@ -586,10 +561,8 @@ export default function PosPage() {
           }
         }
       } else {
-        // OFFLINE: Optimistically update and queue for later sync
         const previousStockMap = new Map<string, number>();
         try {
-          // Snapshot stock before optimistic decrement (for rollback if save/queue fails offline)
           const listQueriesSnapshot = queryClient.getQueriesData<{
             data: { id?: string; stock?: number | null }[];
           }>({ queryKey: productKeys.lists() });

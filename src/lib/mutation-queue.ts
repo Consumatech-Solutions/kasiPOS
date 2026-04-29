@@ -16,7 +16,6 @@ export interface QueuedMutation {
   timestamp: number;
   retries: number;
   status?: "pending" | "syncing" | "completed" | "failed";
-  /** Same sale / same Idempotency-Key as sent to POST /transactions */
   idempotencyKey?: string;
 }
 
@@ -51,7 +50,6 @@ type StatusChangeCallback = (status: SyncStatusData) => void;
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1 second
-/** Max concurrent mutations within the same priority phase (categories, then products, etc.) */
 const BATCH_SIZE = 3;
 
 type SingleMutationOutcome =
@@ -60,7 +58,6 @@ type SingleMutationOutcome =
   | "server_retry"
   | "failed_removed";
 
-/** Stable JSON string for comparing queued mutation payloads (sorted keys at every object level). */
 function stableStringify(value: unknown): string {
   if (value === null) return "null";
   const t = typeof value;
@@ -96,7 +93,6 @@ function hashVariables(variables: unknown): string {
   }
 }
 
-/** Priority for sync order: categories before products (products reference categories), then customers, then others */
 function getMutationPriority(m: QueuedMutation): number {
   const [type, action] = m.mutationKey;
   if (!type || !action) return 999;
@@ -104,7 +100,7 @@ function getMutationPriority(m: QueuedMutation): number {
   if (key.startsWith("categories/")) return 1;
   if (key.startsWith("products/")) return 2;
   if (key.startsWith("customers/")) return 3;
-  return 4; // transactions, stockAdjustments, vouchers, etc.
+  return 4;
 }
 
 class MutationQueue {
@@ -120,7 +116,6 @@ class MutationQueue {
   private restorePromise: Promise<void> | null = null;
 
   constructor() {
-    // Restore queue from Dexie (async)
     this.restorePromise = this.restoreQueue();
     this.setupOnlineListener();
   }
@@ -138,9 +133,7 @@ class MutationQueue {
 
   subscribe(callback: StatusChangeCallback): () => void {
     this.statusChangeCallbacks.push(callback);
-    // Immediately call with current status
     callback(this.getStatus());
-    // Return unsubscribe function
     return () => {
       const index = this.statusChangeCallbacks.indexOf(callback);
       if (index > -1) {
@@ -178,7 +171,6 @@ class MutationQueue {
 
   private setupOnlineListener() {
     if (typeof window !== "undefined") {
-      // Observe connectivity only; scheduled/manual sync triggers processing.
       const unsubscribe = offlineDetector.subscribe((offline) => {
         if (!offline && this.queue.length > 0) {
           console.log(
@@ -187,7 +179,6 @@ class MutationQueue {
         }
       });
 
-      // Fallback native event: log only.
       const onNativeOnline = () => {
         window.setTimeout(() => {
           checkOfflineStatus(true).then((offline) => {
@@ -201,7 +192,6 @@ class MutationQueue {
       };
       window.addEventListener("online", onNativeOnline);
 
-      // Cleanup: unsubscribe detector and remove native listener
       this.onlineHandler = () => {
         unsubscribe();
         window.removeEventListener("online", onNativeOnline);
@@ -236,7 +226,6 @@ class MutationQueue {
         );
         this.notifyStatusChange();
       }
-      // Migration: if Dexie was empty, try legacy localStorage and migrate
       if (records.length === 0 && typeof localStorage !== "undefined") {
         const stored = localStorage.getItem("kasipos-mutation-queue");
         if (stored) {
@@ -262,7 +251,6 @@ class MutationQueue {
           }
         }
       }
-      // Push to cloud runs on schedule (6h, 12h, 18h) and when the network comes back — not on every app open.
     } catch (error) {
       console.error("[MutationQueue] Failed to restore queue:", error);
     }
@@ -273,7 +261,7 @@ class MutationQueue {
       const pa = getMutationPriority(a);
       const pb = getMutationPriority(b);
       if (pa !== pb) return pa - pb;
-      return a.timestamp - b.timestamp; // FIFO within same group
+      return a.timestamp - b.timestamp;
     });
     void this.persistQueue();
   }
@@ -316,10 +304,6 @@ class MutationQueue {
     );
   }
 
-  /**
-   * Runs mutationFn with the same retry semantics as the legacy serial loop.
-   * Mutations in a parallel batch are not on `this.queue` until the batch finishes (already shifted out).
-   */
   private async processSingleMutationWithRetries(
     mutation: QueuedMutation,
   ): Promise<SingleMutationOutcome> {
@@ -379,10 +363,6 @@ class MutationQueue {
     }
   }
 
-  /**
-   * Runs a batch concurrently; re-queues network/5xx failures at the front in FIFO order.
-   * Returns how many succeeded and whether the outer processor should stop.
-   */
   private async processBatchConcurrent(batch: QueuedMutation[]): Promise<{
     successes: number;
     stopReason: ProcessQueueResult["stoppedReason"] | null;
@@ -417,7 +397,6 @@ class MutationQueue {
           });
         }
       } else if (outcome === "failed_removed") {
-        // Dropped after max retries; not re-queued
       } else if (outcome === "network_pause" || outcome === "server_retry") {
         failuresOrdered.push(mutation);
       }
@@ -442,9 +421,7 @@ class MutationQueue {
   setQueryClient(queryClient: QueryClient) {
     this.queryClient = queryClient;
     if (typeof window === "undefined") return;
-    this.restorePromise?.then(() => {
-      // Scheduled / reconnect sync only — see cloud sync scheduler and setupOnlineListener.
-    });
+    this.restorePromise?.then(() => {});
   }
 
   add(
@@ -518,7 +495,6 @@ class MutationQueue {
     this.queue.push(queuedMutation);
     void this.persistQueue();
 
-    // Update status if not preloading
     if (this.currentStatus !== "preloading") {
       this.currentStatus = "idle";
     }
@@ -550,7 +526,6 @@ class MutationQueue {
       };
     }
 
-    // Processing window runs online; restore offline-first in finally.
     offlineDetector.setOfflineFirstActive(false);
 
     if (!force && offlineDetector.getOfflineFirstActive()) {
@@ -565,8 +540,6 @@ class MutationQueue {
       };
     }
 
-    // Check if we're online before processing.
-    // For forced sync windows, use a direct connectivity probe that bypasses offline-first gating.
     if (typeof window !== "undefined") {
       if (force) {
         const hasConnectivity = await offlineDetector.forceCheck();
@@ -612,7 +585,6 @@ class MutationQueue {
           this.queue.length > 0 &&
           getMutationPriority(this.queue[0]) === priority
         ) {
-          // Re-check online status before each batch (using enhanced offline detection)
           if (typeof window !== "undefined") {
             const isOfflineStatus = isOffline();
             if (isOfflineStatus) {
@@ -701,7 +673,6 @@ class MutationQueue {
 
   destroy() {
     if (typeof window !== "undefined" && this.onlineHandler) {
-      // onlineHandler is now an unsubscribe function from offlineDetector
       if (typeof this.onlineHandler === "function") {
         this.onlineHandler();
       }

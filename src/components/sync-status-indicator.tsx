@@ -9,16 +9,12 @@ import { Loader2, Download, FolderSync, Cloud } from "lucide-react";
 import { SyncStatusModal } from "./sync-status-modal";
 
 export function SyncStatusIndicator() {
-  // ALL HOOKS MUST BE CALLED FIRST - in the same order every render
-  // Hook 1: useSyncStatus (contains useState and useEffect internally)
   const syncStatus = useSyncStatus();
 
   const { settings } = useSettings();
 
-  // Hook 2: useState
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Hook 3: useMemo for icon
   const icon = useMemo(() => {
     const isPreloading = syncStatus?.isPreloading ?? false;
     const isSyncing = syncStatus?.isSyncing ?? false;
@@ -40,7 +36,6 @@ export function SyncStatusIndicator() {
     syncStatus?.pendingCount,
   ]);
 
-  // Hook 4: useMemo for colorClass
   const colorClass = useMemo(() => {
     const isPreloading = syncStatus?.isPreloading ?? false;
     const isSyncing = syncStatus?.isSyncing ?? false;
@@ -59,7 +54,6 @@ export function SyncStatusIndicator() {
     syncStatus?.pendingCount,
   ]);
 
-  // Extract values with defaults to handle undefined case (after all hooks)
   const status = syncStatus?.status ?? "idle";
   const pendingCount = syncStatus?.pendingCount ?? 0;
   const isPreloading = syncStatus?.isPreloading ?? false;

@@ -8,7 +8,7 @@ import {
 } from "@/lib/query-persist-policy";
 
 const QUERY_CACHE_KEY = "REACT_QUERY_OFFLINE_CACHE";
-const MAX_CACHE_SIZE = 5 * 1024 * 1024; // 5MB limit
+const MAX_CACHE_SIZE = 5 * 1024 * 1024;
 
 type PersistedQuery = PersistedClient["clientState"]["queries"][number];
 
@@ -26,10 +26,6 @@ function getDataUpdatedAt(query: PersistedQuery): number {
   return typeof updatedAt === "number" ? updatedAt : 0;
 }
 
-/**
- * Drops whole queries only (preserves each remaining query's data shape).
- * Evicts non-protected queries first: excluded dehydrate roots, then oldest, then largest.
- */
 function shrinkPersistedClientByDroppingQueries(
   persistedClient: PersistedClient,
   maxCacheSize: number,
@@ -95,10 +91,6 @@ function shrinkPersistedClientIfOversized(
   return shrinkPersistedClientByDroppingQueries(persistedClient, maxCacheSize);
 }
 
-/**
- * Creates an IndexedDB persister for TanStack Query using Dexie keyVal table
- * Compatible with @tanstack/query-persist-client-core
- */
 export function createIDBPersister() {
   return {
     persistClient: async (persistedClient: PersistedClient) => {
@@ -163,9 +155,6 @@ export function createIDBPersister() {
   };
 }
 
-/**
- * Setup query persistence for a QueryClient
- */
 export async function setupQueryPersistence(queryClient: QueryClient) {
   const persister = createIDBPersister();
 
@@ -173,6 +162,6 @@ export async function setupQueryPersistence(queryClient: QueryClient) {
     queryClient,
     persister,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    buster: "v1", // Change this to invalidate cache on app updates
+    buster: "v1",
   });
 }

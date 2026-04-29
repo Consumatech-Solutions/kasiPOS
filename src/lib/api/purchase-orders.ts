@@ -1,6 +1,6 @@
-import { api } from './core';
-import type { PurchaseOrder } from '@/types';
-import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
+import { api } from "./core";
+import type { PurchaseOrder } from "@/types";
+import type { PaginatedResponse, PaginationParams } from "@/types/pagination";
 
 export interface CreatePurchaseOrderDto {
   items: Array<{
@@ -14,28 +14,22 @@ export interface CreatePurchaseOrderDto {
   subtotal: number;
   deliveryFee: number;
   total: number;
-  deliveryMethod: 'delivery' | 'collection';
+  deliveryMethod: "delivery" | "collection";
 }
 
 export interface UpdatePurchaseOrderDto {
-  status?: 'pending' | 'completed' | 'cancelled';
+  status?: "pending" | "completed" | "cancelled";
 }
 
 export interface GetPurchaseOrdersParams extends PaginationParams {
-  // Can add filters here later if needed
+  // add filters here
 }
 
 export const purchaseOrdersApi = {
-  /**
-   * Create a purchase order
-   */
   create: (data: CreatePurchaseOrderDto) => {
-    return api.post<PurchaseOrder>('/purchase-orders', data);
+    return api.post<PurchaseOrder>("/purchase-orders", data);
   },
 
-  /**
-   * Get all purchase orders with pagination
-   */
   getAll: (params?: GetPurchaseOrdersParams) => {
     const requestParams: Record<string, number | string> = {};
     if (params?.page !== undefined) {
@@ -45,21 +39,19 @@ export const purchaseOrdersApi = {
       requestParams.limit = params.limit;
     }
 
-    return api.get<PaginatedResponse<PurchaseOrder> | PurchaseOrder[]>('/purchase-orders', {
-      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
-    });
+    return api.get<PaginatedResponse<PurchaseOrder> | PurchaseOrder[]>(
+      "/purchase-orders",
+      {
+        params:
+          Object.keys(requestParams).length > 0 ? requestParams : undefined,
+      },
+    );
   },
 
-  /**
-   * Get a purchase order by ID
-   */
   getById: (id: string) => {
     return api.get<PurchaseOrder>(`/purchase-orders/${id}`);
   },
 
-  /**
-   * Update purchase order status
-   */
   updateStatus: (id: string, data: UpdatePurchaseOrderDto) => {
     return api.patch<PurchaseOrder>(`/purchase-orders/${id}`, data);
   },

@@ -12,14 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { TransactionItem } from "@/types";
-import {
-  Printer,
-  Download,
-  Mail,
-  MessageCircle,
-  Settings,
-  Loader2,
-} from "lucide-react";
+import { Printer, Download, Mail, MessageCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DeviceSelector } from "@/components/device-selector";
 import { PrinterSetupModal } from "@/components/hardware-setup/PrinterSetupModal";
@@ -196,12 +189,9 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
 
     setIsPrinting(true);
     try {
-      // Check for stored printer device
       const deviceId = getStoredDevice("printer");
 
-      // If no device stored, show device selector
       if (!deviceId) {
-        // Check if devices are available
         try {
           const devices = await getDevices("printer");
           if (devices.length === 0) {
@@ -218,7 +208,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             setIsPrinting(false);
             return;
           }
-          // Show device selector
           setShowDeviceSelector(true);
           setIsPrinting(false);
           return;
@@ -233,10 +222,8 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         }
       }
 
-      // Build thermal receipt
       const receiptData = await buildThermalReceipt(data);
 
-      // Print to device
       await printReceipt(deviceId, receiptData);
 
       toast({
@@ -267,8 +254,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   };
 
   const handleDeviceSelect = async (deviceId: string) => {
-    // Device is already stored by DeviceSelector component
-    // Now print with the selected device
     if (data) {
       setIsPrinting(true);
       setShowDeviceSelector(false);
@@ -365,8 +350,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
       "SMS receipt delivery will be available in a future update.",
     );
   };
-
-  const VAT_RATE = 15;
 
   return (
     <Dialog
