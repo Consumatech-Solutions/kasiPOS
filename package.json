@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "husky",
     "dev": "next dev -p 9002",
     "dev:turbo": "next dev -p 9002 --turbo",
     "dev:webpack": "next dev -p 9002",
@@ -13,9 +14,27 @@
     "build": "cross-env NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run",
+    "e2e": "cypress run",
+    "coverage": "vitest run --coverage",
+    "cy:run": "cypress run",
+    "cy:run:mock": "cross-env CYPRESS_TEST_MODE=mock cypress run",
+    "cy:run:real": "cross-env CYPRESS_TEST_MODE=real cypress run --spec \"cypress/e2e/11-real-auth-smoke.cy.ts\"",
+    "test:e2e": "start-server-and-test dev http://localhost:9002 cy:run"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write",
+      "vitest related --run"
+    ]
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.20.0",
@@ -75,14 +94,34 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@eslint/eslintrc": "^3.3.1",
+    "@testing-library/cypress": "^10.1.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
+    "@vitest/coverage-v8": "^2.1.0",
     "cross-env": "^10.1.0",
+    "cypress": "^15.13.1",
+    "cypress-wait-until": "^3.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "15.5.9",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-cypress": "^4.1.0",
+    "fake-indexeddb": "^6.2.5",
     "genkit-cli": "^1.20.0",
+    "husky": "^9.1.0",
+    "jest": "^30.3.0",
     "jsdom": "^25.0.0",
+    "lint-staged": "^15.4.0",
     "postcss": "^8",
+    "prettier": "^3.4.2",
+    "start-server-and-test": "^2.0.10",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
     "vitest": "^2.1.0"

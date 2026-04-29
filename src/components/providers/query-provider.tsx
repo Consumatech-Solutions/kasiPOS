@@ -1,14 +1,12 @@
-'use client';
+"use client";
 
-import { QueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createIDBPersister } from '@/lib/query-persister';
-import { mutationQueue } from '@/lib/mutation-queue';
-import { offlineDetector, isOffline } from '@/lib/offline-detector';
-
-// Optional devtools - only load in development
-// Using dynamic import to avoid build-time errors if package is not installed
+import { QueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createIDBPersister } from "@/lib/query-persister";
+import { shouldDehydrateQueryForIndexedDB } from "@/lib/query-persist-policy";
+import { mutationQueue } from "@/lib/mutation-queue";
+import { offlineDetector, isOffline } from "@/lib/offline-detector";
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -16,58 +14,58 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            networkMode: 'offlineFirst', // Try cache first, then network
-            staleTime: 30 * 60 * 1000, // 30 minutes - longer to support offline use
-            gcTime: 24 * 60 * 60 * 1000, // 24 hours - keep data in memory longer for offline
+            networkMode: "offlineFirst",
+            staleTime: 30 * 60 * 1000,
+            gcTime: 24 * 60 * 60 * 1000,
             retry: (failureCount, error: any) => {
-              // Don't retry if we're offline
               if (isOffline()) {
                 return false;
               }
-              // Don't retry on 4xx errors
-              if (error?.response?.status >= 400 && error?.response?.status < 500) {
+              if (
+                error?.response?.status >= 400 &&
+                error?.response?.status < 500
+              ) {
                 return false;
               }
-              // Don't retry on network errors when offline
               if (
-                (error?.code === 'ERR_NETWORK' || 
-                 error?.message === 'Network Error' ||
-                 error?.isOffline ||
-                 error?.isNetworkError) &&
+                (error?.code === "ERR_NETWORK" ||
+                  error?.message === "Network Error" ||
+                  error?.isOffline ||
+                  error?.isNetworkError) &&
                 isOffline()
               ) {
                 return false;
               }
-              // Retry up to 3 times for network errors
               return failureCount < 3;
             },
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            retryDelay: (attemptIndex) =>
+              Math.min(1000 * 2 ** attemptIndex, 30000),
           },
           mutations: {
-            networkMode: 'offlineFirst',
+            networkMode: "offlineFirst",
             retry: (failureCount, error: any) => {
-              // Don't retry if we're offline
               if (isOffline()) {
                 return false;
               }
-              // Don't retry mutations on 4xx errors
-              if (error?.response?.status >= 400 && error?.response?.status < 500) {
+              if (
+                error?.response?.status >= 400 &&
+                error?.response?.status < 500
+              ) {
                 return false;
               }
-              // Don't retry on network errors when offline
               if (
-                (error?.code === 'ERR_NETWORK' || 
-                 error?.message === 'Network Error' ||
-                 error?.isOffline ||
-                 error?.isNetworkError) &&
+                (error?.code === "ERR_NETWORK" ||
+                  error?.message === "Network Error" ||
+                  error?.isOffline ||
+                  error?.isNetworkError) &&
                 isOffline()
               ) {
                 return false;
               }
-              // Retry mutations up to 2 times
               return failureCount < 2;
             },
-            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+            retryDelay: (attemptIndex) =>
+              Math.min(1000 * 2 ** attemptIndex, 30000),
           },
         },
       })
@@ -78,7 +76,6 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = offlineDetector.subscribe((offline) => {
       if (!offline) {
         queryClient.resumePausedMutations();
-        // Catalogue and lists use Dexie when online; cloud pull runs on schedule or manually (see DataPreloader).
       }
     });
     return () => unsubscribe();
@@ -89,17 +86,10 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
       client={queryClient}
       persistOptions={{
         persister: createIDBPersister(),
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        // Bump when persisted cache shape or catalogue behavior changes (avoids stale empty lists clobbering UI).
-        buster: 'v2',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        buster: "v3",
         dehydrateOptions: {
-          // Persist only successful queries. Pending/error queries can reject after hydration
-          // and trigger noisy dev warnings (e.g. vouchers list when offline).
-          shouldDehydrateQuery: (query) => {
-            if (query.state.status !== 'success') return false;
-            const root = query.queryKey[0];
-            return root !== 'products' && root !== 'categories';
-          },
+          shouldDehydrateQuery: shouldDehydrateQueryForIndexedDB,
         },
       }}
     >

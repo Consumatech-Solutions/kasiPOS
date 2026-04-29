@@ -1,11 +1,12 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  outputFileTracingRoot: require('path').join(__dirname),
+  outputFileTracingRoot: path.join(__dirname),
   // Avoid ChunkLoadError with double /_next/ in chunk URLs (basePath/assetPrefix must be consistent)
-  basePath: '',
-  assetPrefix: '',
+  basePath: "",
+  assetPrefix: "",
   // Increase chunk load timeout to avoid ChunkLoadError when dev server is slow (e.g. first load or Windows)
   webpack: (config, { isServer, dev }) => {
     if (!isServer && config.output) {
@@ -13,7 +14,7 @@ const nextConfig: NextConfig = {
     }
     if (dev) {
       // Avoid UNKNOWN/open webpack.js and "incorrect header check" on .pack.gz (Windows)
-      config.cache = { type: 'memory' };
+      config.cache = { type: "memory" };
     }
     return config;
   },
@@ -26,28 +27,28 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "placehold.co",
+        port: "",
+        pathname: "/**",
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        port: "",
+        pathname: "/**",
       },
       {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "picsum.photos",
+        port: "",
+        pathname: "/**",
       },
       {
-        protocol: 'https',
-        hostname: 'ai-mobile.sfo3.digitaloceanspaces.com',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "ai-mobile.sfo3.digitaloceanspaces.com",
+        port: "",
+        pathname: "/**",
       },
     ],
     dangerouslyAllowSVG: true,
@@ -57,24 +58,24 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/sw.js',
+        source: "/sw.js",
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate',
+            key: "Cache-Control",
+            value: "public, max-age=0, must-revalidate",
           },
           {
-            key: 'Service-Worker-Allowed',
-            value: '/',
+            key: "Service-Worker-Allowed",
+            value: "/",
           },
         ],
       },
       {
-        source: '/manifest.json',
+        source: "/manifest.json",
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
           },
         ],
       },
@@ -84,12 +85,12 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/sw.js',
-        destination: '/sw.js',
+        source: "/sw.js",
+        destination: "/sw.js",
       },
       {
-        source: '/favicon.ico',
-        destination: '/icons/icon-192x192.svg',
+        source: "/favicon.ico",
+        destination: "/icons/icon-192x192.svg",
       },
     ];
   },

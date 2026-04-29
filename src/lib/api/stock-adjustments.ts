@@ -1,6 +1,6 @@
-import { api } from './core';
-import type { StockAdjustment, StockAdjustmentReason } from '@/types';
-import type { PaginatedResponse, PaginationParams } from '@/types/pagination';
+import { api } from "./core";
+import type { StockAdjustment, StockAdjustmentReason } from "@/types";
+import type { PaginatedResponse, PaginationParams } from "@/types/pagination";
 
 export interface CreateStockAdjustmentDto {
   productId: string;
@@ -14,16 +14,10 @@ export interface GetStockAdjustmentsParams extends PaginationParams {
 }
 
 export const stockAdjustmentsApi = {
-  /**
-   * Create a stock adjustment.
-   */
   create: (data: CreateStockAdjustmentDto) => {
-    return api.post<StockAdjustment>('/stock-adjustments', data);
+    return api.post<StockAdjustment>("/stock-adjustments", data);
   },
 
-  /**
-   * Get all stock adjustments with pagination
-   */
   getAll: (params?: GetStockAdjustmentsParams) => {
     const requestParams: Record<string, number | string> = {};
     if (params?.page !== undefined) {
@@ -36,15 +30,18 @@ export const stockAdjustmentsApi = {
       requestParams.productId = params.productId;
     }
 
-    return api.get<PaginatedResponse<StockAdjustment> | StockAdjustment[]>('/stock-adjustments', {
-      params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
-    });
+    return api.get<PaginatedResponse<StockAdjustment> | StockAdjustment[]>(
+      "/stock-adjustments",
+      {
+        params:
+          Object.keys(requestParams).length > 0 ? requestParams : undefined,
+      }
+    );
   },
 
-  /**
-   * Get stock adjustments for a specific product
-   */
   getByProduct: (productId: string) => {
-    return api.get<StockAdjustment[]>(`/stock-adjustments/product/${productId}`);
+    return api.get<StockAdjustment[]>(
+      `/stock-adjustments/product/${productId}`
+    );
   },
 };

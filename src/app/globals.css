@@ -13,14 +13,15 @@
 }
 
 @layer base {
-  html, body {
+  html,
+  body {
     overflow: hidden;
     height: 100%;
     width: 100%;
     max-width: 100vw;
     position: relative;
   }
-  
+
   #__next {
     height: 100%;
     overflow: hidden;
@@ -55,7 +56,7 @@
     --chart-4: 30 80% 55%;
     --chart-5: 280 65% 60%;
     --radius: 0.5rem;
-    --font-inter: 'Inter', sans-serif;
+    --font-inter: "Inter", sans-serif;
   }
   .dark {
     --background: 222 79% 5%; /* #020817 */
@@ -95,15 +96,13 @@
 }
 
 .bottom-nav {
-  box-shadow: 0 -4px 12px 0 rgba(0,0,0,0.05);
+  box-shadow: 0 -4px 12px 0 rgba(0, 0, 0, 0.05);
 }
 .dark .bottom-nav {
-    border-top-color: hsl(var(--border));
+  border-top-color: hsl(var(--border));
 }
 
-/* Mobile-specific utilities */
 @layer utilities {
-  /* Safe area insets for notched devices */
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -116,8 +115,7 @@
   .safe-right {
     padding-right: env(safe-area-inset-right);
   }
-  
-  /* Touch-friendly sizing */
+
   .touch-target {
     min-height: 44px;
     min-width: 44px;
@@ -127,27 +125,23 @@
     min-height: 44px;
     min-width: 0px;
   }
-  
-  /* Prevent text size adjustment on iOS */
+
   @supports (-webkit-touch-callout: none) {
     input,
     textarea,
     select {
-      font-size: 16px; /* Prevents zoom on iOS */
+      font-size: 16px;
     }
   }
-  
-  /* Ensure dropdowns and popovers are visible on mobile */
+
   [data-radix-portal] {
     z-index: 9999 !important;
   }
-  
-  /* Ensure dropdown content is visible */
+
   [data-radix-popper-content-wrapper] {
     z-index: 9999 !important;
   }
-  
-  /* Smooth scrolling for dropdown menus on mobile */
+
   [data-radix-dropdown-menu-content],
   [data-radix-select-content],
   [data-radix-popover-content] {
@@ -155,15 +149,14 @@
     scroll-behavior: smooth;
     overscroll-behavior: contain;
   }
-  
-  /* Better scrollbar visibility on mobile */
+
   @media (max-width: 768px) {
     [data-radix-dropdown-menu-content]::-webkit-scrollbar,
     [data-radix-select-content]::-webkit-scrollbar,
     [data-radix-popover-content]::-webkit-scrollbar {
       width: 4px;
     }
-    
+
     [data-radix-dropdown-menu-content]::-webkit-scrollbar-thumb,
     [data-radix-select-content]::-webkit-scrollbar-thumb,
     [data-radix-popover-content]::-webkit-scrollbar-thumb {
@@ -172,4 +165,3 @@
     }
   }
 }
-

@@ -1,27 +1,27 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Loader2, Search, ChevronLeft } from 'lucide-react';
-import { catalogueApi } from '@/lib/api/catalogue';
-import type { ProductTemplate } from '@/types/catalogue';
-import { feedback } from '@/lib/feedback';
+} from "@/components/ui/accordion";
+import { Loader2, Search, ChevronLeft } from "lucide-react";
+import { catalogueApi } from "@/lib/api/catalogue";
+import type { ProductTemplate } from "@/types/catalogue";
+import { feedback } from "@/lib/feedback";
 
 const STEP_1 = 1;
 const STEP_2 = 2;
@@ -30,8 +30,7 @@ const STEP_3 = 3;
 export interface AddTemplatesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Optional; no longer used (backend get-or-creates categories by template name). Kept for backward compatibility. */
-  storeCategories?: ApiCategory[];
+  storeCategories?: any[];
   onSuccess?: () => void;
 }
 
@@ -47,19 +46,29 @@ export function AddTemplatesModal({
   onSuccess,
 }: AddTemplatesModalProps) {
   const [step, setStep] = useState(STEP_1);
-  const [categorySearch, setCategorySearch] = useState('');
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
-  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
+  const [categorySearch, setCategorySearch] = useState("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(
+    new Set()
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: categoryTemplatesList = [], isLoading: categoryTemplatesLoading } = useQuery({
-    queryKey: ['category-templates'],
+  const {
+    data: categoryTemplatesList = [],
+    isLoading: categoryTemplatesLoading,
+  } = useQuery({
+    queryKey: ["category-templates"],
     queryFn: () => catalogueApi.categoryTemplates.getAll(),
     enabled: open,
   });
 
-  const { data: productTemplatesList = [], isLoading: productTemplatesLoading } = useQuery({
-    queryKey: ['product-templates'],
+  const {
+    data: productTemplatesList = [],
+    isLoading: productTemplatesLoading,
+  } = useQuery({
+    queryKey: ["product-templates"],
     queryFn: () => catalogueApi.productTemplates.getAll(),
     enabled: open,
   });
@@ -70,12 +79,15 @@ export function AddTemplatesModal({
         (pt) =>
           pt.categoryTemplateId === ct.id ||
           pt.categoryTemplate?.id === ct.id ||
-          (pt.category?.id === ct.id)
+          pt.category?.id === ct.id
       );
       return {
         id: ct.id,
         name: ct.name,
-        templates: (ct.productTemplates?.length ?? 0) > 0 ? (ct.productTemplates ?? []) : templates,
+        templates:
+          (ct.productTemplates?.length ?? 0) > 0
+            ? (ct.productTemplates ?? [])
+            : templates,
       };
     });
   }, [categoryTemplatesList, productTemplatesList]);
@@ -85,8 +97,8 @@ export function AddTemplatesModal({
   const filteredCategories = useMemo(() => {
     if (!categorySearch.trim()) return categoriesWithTemplates;
     const q = categorySearch.trim().toLowerCase();
-    return categoriesWithTemplates.filter(
-      (c) => c.name.toLowerCase().includes(q)
+    return categoriesWithTemplates.filter((c) =>
+      c.name.toLowerCase().includes(q)
     );
   }, [categoriesWithTemplates, categorySearch]);
 
@@ -131,7 +143,6 @@ export function AddTemplatesModal({
 
   const totalSelectedCount = selectedTemplateIds.size;
 
-  /** Categories that have at least one selected product (for Step 3) */
   const selectedCategoriesWithProducts = useMemo(
     () =>
       selectedCategories.filter((cat) =>
@@ -142,7 +153,9 @@ export function AddTemplatesModal({
 
   const handleNextFromStep1 = useCallback(() => {
     const templateIds = new Set<string>();
-    selectedCategories.forEach((c) => c.templates.forEach((t) => templateIds.add(t.id)));
+    selectedCategories.forEach((c) =>
+      c.templates.forEach((t) => templateIds.add(t.id))
+    );
     setSelectedTemplateIds(templateIds);
     setStep(STEP_2);
   }, [selectedCategories]);
@@ -158,34 +171,55 @@ export function AddTemplatesModal({
       .filter((item) => item.productTemplateIds.length > 0);
 
     if (items.length === 0) {
-      feedback.error('Invalid selection', 'Select at least one product to add.', 'Go back and select products.');
+      feedback.error(
+        "Invalid selection",
+        "Select at least one product to add.",
+        "Go back and select products."
+      );
       return;
     }
     setIsSubmitting(true);
     try {
       const created = await catalogueApi.products.addTemplate({ items });
       const count = Array.isArray(created) ? created.length : 0;
-      feedback.success('Products added', `${count} product(s) added to your catalogue. Categories are created if needed.`);
+      feedback.success(
+        "Products added",
+        `${count} product(s) added to your catalogue. Categories are created if needed.`
+      );
       onOpenChange(false);
       onSuccess?.();
       setStep(STEP_1);
       setSelectedCategoryIds(new Set());
       setSelectedTemplateIds(new Set());
     } catch (err: unknown) {
-      const e = err as { response?: { status?: number; data?: { message?: string; error?: string } } };
+      const e = err as {
+        response?: {
+          status?: number;
+          data?: { message?: string; error?: string };
+        };
+      };
       const status = e?.response?.status;
       const data = e?.response?.data;
-      const message = data?.message || (typeof data?.error === 'string' ? data.error : undefined);
+      const message =
+        data?.message ||
+        (typeof data?.error === "string" ? data.error : undefined);
       if (status === 400) {
-        feedback.error('No store', message || 'Your account has no store assigned.', 'Contact support.');
+        feedback.error(
+          "No store",
+          message || "Your account has no store assigned.",
+          "Contact support."
+        );
       } else if (status === 403) {
-        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+        if (
+          typeof window !== "undefined" &&
+          process.env.NODE_ENV === "development"
+        ) {
           try {
-            const userStr = localStorage.getItem('user');
+            const userStr = localStorage.getItem("user");
             const user = userStr ? JSON.parse(userStr) : null;
             console.warn(
-              '[Add Templates] 403 Forbidden. Your app sees role:',
-              user?.role ?? '(none)',
+              "[Add Templates] 403 Forbidden. Your app sees role:",
+              user?.role ?? "(none)",
               '— Backend must allow role "store_admin" on GET /product-templates/for-store and POST /products/add-template; JWT must include this role.'
             );
           } catch {
@@ -193,21 +227,38 @@ export function AddTemplatesModal({
           }
         }
         feedback.error(
-          'Not allowed',
-          message || 'The server rejected access (Store Admin only).',
-          'If you are Store Admin: the backend must allow your role on the template and add-template endpoints. Otherwise contact support.'
+          "Not allowed",
+          message || "The server rejected access (Store Admin only).",
+          "If you are Store Admin: the backend must allow your role on the template and add-template endpoints. Otherwise contact support."
         );
       } else if (status === 404) {
-        feedback.error('Not found', message || 'Category or template not found.', 'Refresh and try again.');
+        feedback.error(
+          "Not found",
+          message || "Category or template not found.",
+          "Refresh and try again."
+        );
       } else if (status === 409) {
-        feedback.error('Duplicate', message || 'Some products already exist (template already added).', 'Edit or remove existing products.');
+        feedback.error(
+          "Duplicate",
+          message || "Some products already exist (template already added).",
+          "Edit or remove existing products."
+        );
       } else {
-        feedback.fromError(err, 'Failed to add products', 'Check your connection and try again.');
+        feedback.fromError(
+          err,
+          "Failed to add products",
+          "Check your connection and try again."
+        );
       }
     } finally {
       setIsSubmitting(false);
     }
-  }, [selectedCategoriesWithProducts, selectedTemplateIds, onOpenChange, onSuccess]);
+  }, [
+    selectedCategoriesWithProducts,
+    selectedTemplateIds,
+    onOpenChange,
+    onSuccess,
+  ]);
 
   const handleBack = useCallback(() => {
     setStep((s) => Math.max(STEP_1, s - 1));
@@ -217,7 +268,7 @@ export function AddTemplatesModal({
     (open: boolean) => {
       if (!open) {
         setStep(STEP_1);
-        setCategorySearch('');
+        setCategorySearch("");
         setSelectedCategoryIds(new Set());
         setSelectedTemplateIds(new Set());
       }
@@ -231,14 +282,17 @@ export function AddTemplatesModal({
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {step === STEP_1 && 'Add Templates'}
-            {step === STEP_2 && 'Select products'}
-            {step === STEP_3 && 'Summary'}
+            {step === STEP_1 && "Add Templates"}
+            {step === STEP_2 && "Select products"}
+            {step === STEP_3 && "Summary"}
           </DialogTitle>
           <DialogDescription>
-            {step === STEP_1 && 'Choose category templates (with their product templates), then click Next.'}
-            {step === STEP_2 && 'Select which products to add. You can expand each category.'}
-            {step === STEP_3 && 'Review and confirm. Categories will be created in your store by template name.'}
+            {step === STEP_1 &&
+              "Choose category templates (with their product templates), then click Next."}
+            {step === STEP_2 &&
+              "Select which products to add. You can expand each category."}
+            {step === STEP_3 &&
+              "Review and confirm. Categories will be created in your store by template name."}
           </DialogDescription>
         </DialogHeader>
 
@@ -259,7 +313,9 @@ export function AddTemplatesModal({
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : filteredCategories.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4">No template categories found.</p>
+                <p className="text-sm text-muted-foreground py-4">
+                  No template categories found.
+                </p>
               ) : (
                 <ul className="border rounded-md divide-y max-h-[280px] overflow-y-auto">
                   {filteredCategories.map((cat) => (
@@ -274,7 +330,9 @@ export function AddTemplatesModal({
                         onClick={(e) => e.stopPropagation()}
                       />
                       <span className="flex-1 font-medium">{cat.name}</span>
-                      <span className="text-xs text-muted-foreground">{cat.templates.length} product(s)</span>
+                      <span className="text-xs text-muted-foreground">
+                        {cat.templates.length} product(s)
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -294,7 +352,9 @@ export function AddTemplatesModal({
             <>
               <Accordion type="multiple" className="w-full">
                 {selectedCategories.map((cat) => {
-                  const allSelected = cat.templates.every((t) => selectedTemplateIds.has(t.id));
+                  const allSelected = cat.templates.every((t) =>
+                    selectedTemplateIds.has(t.id)
+                  );
                   return (
                     <AccordionItem key={cat.id} value={cat.id}>
                       <div className="flex items-center gap-2">
@@ -308,23 +368,29 @@ export function AddTemplatesModal({
                         <AccordionTrigger className="flex-1 hover:no-underline text-left">
                           <span>{cat.name}</span>
                           <span className="text-muted-foreground text-sm font-normal ml-1">
-                            ({cat.templates.filter((t) => selectedTemplateIds.has(t.id)).length}/{cat.templates.length})
+                            (
+                            {
+                              cat.templates.filter((t) =>
+                                selectedTemplateIds.has(t.id)
+                              ).length
+                            }
+                            /{cat.templates.length})
                           </span>
                         </AccordionTrigger>
                       </div>
                       <AccordionContent>
                         <ul className="pl-6 space-y-2">
                           {cat.templates.map((t) => (
-                            <li
-                              key={t.id}
-                              className="flex items-center gap-2"
-                            >
+                            <li key={t.id} className="flex items-center gap-2">
                               <Checkbox
                                 id={`tpl-${t.id}`}
                                 checked={selectedTemplateIds.has(t.id)}
                                 onCheckedChange={() => toggleTemplate(t.id)}
                               />
-                              <label htmlFor={`tpl-${t.id}`} className="text-sm cursor-pointer flex-1">
+                              <label
+                                htmlFor={`tpl-${t.id}`}
+                                className="text-sm cursor-pointer flex-1"
+                              >
                                 {t.name}
                               </label>
                             </li>
@@ -339,7 +405,10 @@ export function AddTemplatesModal({
                 <Button variant="outline" onClick={handleBack}>
                   <ChevronLeft className="h-4 w-4 mr-1" /> Go Back
                 </Button>
-                <Button onClick={() => setStep(STEP_3)} disabled={totalSelectedCount === 0}>
+                <Button
+                  onClick={() => setStep(STEP_3)}
+                  disabled={totalSelectedCount === 0}
+                >
                   Next
                 </Button>
               </div>
@@ -350,22 +419,31 @@ export function AddTemplatesModal({
             <>
               <div className="rounded-md border p-3 space-y-2">
                 <p className="text-sm font-medium">Summary</p>
-                <p className="text-xs text-muted-foreground">Total: {totalSelectedCount} product(s) from {selectedCategoriesWithProducts.length} category template(s)</p>
+                <p className="text-xs text-muted-foreground">
+                  Total: {totalSelectedCount} product(s) from{" "}
+                  {selectedCategoriesWithProducts.length} category template(s)
+                </p>
               </div>
               <ul className="space-y-2">
                 {selectedCategoriesWithProducts.map((cat) => {
-                  const selectedTemplates = cat.templates.filter((t) => selectedTemplateIds.has(t.id));
+                  const selectedTemplates = cat.templates.filter((t) =>
+                    selectedTemplateIds.has(t.id)
+                  );
                   const count = selectedTemplates.length;
                   return (
                     <li key={cat.id} className="rounded-md border p-3">
                       <p className="text-sm font-medium truncate">{cat.name}</p>
-                      <p className="text-xs text-muted-foreground">{count} product(s)</p>
+                      <p className="text-xs text-muted-foreground">
+                        {count} product(s)
+                      </p>
                     </li>
                   );
                 })}
               </ul>
               <p className="text-xs text-muted-foreground">
-                Categories will be created in your store by template name; products will use names like &quot;Template name - Your store name&quot;.
+                Categories will be created in your store by template name;
+                products will use names like &quot;Template name - Your store
+                name&quot;.
               </p>
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={handleBack}>
@@ -375,7 +453,9 @@ export function AddTemplatesModal({
                   onClick={handleFinish}
                   disabled={totalSelectedCount === 0 || isSubmitting}
                 >
-                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {isSubmitting && (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  )}
                   Finish and Add
                 </Button>
               </div>

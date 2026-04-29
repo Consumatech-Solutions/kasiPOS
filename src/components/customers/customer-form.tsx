@@ -1,18 +1,29 @@
-'use client';
+"use client";
 
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import type { Customer, CreateCustomerDto, UpdateCustomerDto } from '@/types';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "@/types";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 const customerSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   contact: z.string().min(1, { message: "Contact is required." }),
-  loyaltyPoints: z.coerce.number().int().min(0, { message: "Loyalty points cannot be negative." }).optional(),
+  loyaltyPoints: z.coerce
+    .number()
+    .int()
+    .min(0, { message: "Loyalty points cannot be negative." })
+    .optional(),
 });
 
 interface CustomerFormProps {
@@ -23,12 +34,18 @@ interface CustomerFormProps {
   isLoading?: boolean;
 }
 
-export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, isLoading = false }: CustomerFormProps) {
+export function CustomerForm({
+  customer,
+  onSubmit,
+  onCancel,
+  disabled = false,
+  isLoading = false,
+}: CustomerFormProps) {
   const form = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
-      name: customer?.name || '',
-      contact: customer?.contact || '',
+      name: customer?.name || "",
+      contact: customer?.contact || "",
       loyaltyPoints: customer?.loyaltyPoints || 0,
     },
   });
@@ -51,7 +68,11 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, i
             <FormItem>
               <FormLabel>Customer Name *</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="e.g. John Doe" disabled={disabled} />
+                <Input
+                  {...field}
+                  placeholder="e.g. John Doe"
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -64,7 +85,11 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, i
             <FormItem>
               <FormLabel>Contact (Phone/Email) *</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="e.g. +1234567890" disabled={disabled} />
+                <Input
+                  {...field}
+                  placeholder="e.g. +1234567890"
+                  disabled={disabled}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -84,12 +109,28 @@ export function CustomerForm({ customer, onSubmit, onCancel, disabled = false, i
           )}
         />
         <div className="flex gap-2 justify-end">
-          <Button type="button" variant="secondary" onClick={onCancel} disabled={disabled || isLoading} className="min-h-[44px] touch-target">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={disabled || isLoading}
+            className="min-h-[44px] touch-target"
+          >
             Cancel
           </Button>
-          <Button type="submit" disabled={disabled || isLoading} className="min-h-[44px] touch-target">
+          <Button
+            type="submit"
+            disabled={disabled || isLoading}
+            className="min-h-[44px] touch-target"
+          >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {customer ? (isLoading ? 'Updating...' : 'Update') : (isLoading ? 'Creating...' : 'Create')}
+            {customer
+              ? isLoading
+                ? "Updating..."
+                : "Update"
+              : isLoading
+                ? "Creating..."
+                : "Create"}
           </Button>
         </div>
       </form>

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "txn-001",
+    "customerId": "cust-001",
+    "items": [
+      {
+        "productId": "prod-cola-001",
+        "productName": "Cola 330ml",
+        "quantity": 2,
+        "unitPrice": 12.5,
+        "totalPrice": 25,
+        "imageUrl": ""
+      }
+    ],
+    "total": 25,
+    "paymentMethod": "Cash",
+    "voucherCode": null,
+    "discountAmount": null,
+    "storeId": "store-e2e-001",
+    "date": "2026-04-12T09:15:00.000Z",
+    "createdAt": "2026-04-12T09:15:00.000Z"
+  },
+  {
+    "id": "txn-002",
+    "customerId": "cust-002",
+    "items": [
+      {
+        "productId": "prod-water-001",
+        "productName": "Still Water 500ml",
+        "quantity": 1,
+        "unitPrice": 10,
+        "totalPrice": 10,
+        "imageUrl": ""
+      },
+      {
+        "productId": "prod-chips-001",
+        "productName": "Salted Chips",
+        "quantity": 1,
+        "unitPrice": 18,
+        "totalPrice": 18,
+        "imageUrl": ""
+      }
+    ],
+    "total": 28,
+    "paymentMethod": "Card",
+    "voucherCode": null,
+    "discountAmount": null,
+    "storeId": "store-e2e-001",
+    "date": "2026-04-13T10:45:00.000Z",
+    "createdAt": "2026-04-13T10:45:00.000Z"
+  }
+]
