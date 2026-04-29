@@ -117,7 +117,7 @@ describe("runCloudDataPull", () => {
     expect(setLastSyncAt).toHaveBeenCalledWith("products", expect.any(String));
     expect(setLastSyncAt).toHaveBeenCalledWith(
       "categories",
-      expect.any(String),
+      expect.any(String)
     );
     expect(setLastSyncAt).toHaveBeenCalledWith("customers", expect.any(String));
   });

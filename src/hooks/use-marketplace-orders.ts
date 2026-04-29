@@ -1,23 +1,32 @@
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { marketplaceOrdersApi, type GetMarketplaceOrdersParams, type MarketplaceOrder, type CreateMarketplaceOrderDto } from '@/lib/api/marketplace-orders';
-import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  marketplaceOrdersApi,
+  type GetMarketplaceOrdersParams,
+  type MarketplaceOrder,
+  type CreateMarketplaceOrderDto,
+} from "@/lib/api/marketplace-orders";
+import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
 
 interface UseMarketplaceOrdersOptions extends GetMarketplaceOrdersParams {
   autoLoad?: boolean;
 }
 
 export const marketplaceOrderKeys = {
-  all: ['marketplaceOrders'] as const,
-  lists: () => [...marketplaceOrderKeys.all, 'list'] as const,
-  list: (filters?: GetMarketplaceOrdersParams) => [...marketplaceOrderKeys.lists(), filters] as const,
-  details: () => [...marketplaceOrderKeys.all, 'detail'] as const,
+  all: ["marketplaceOrders"] as const,
+  lists: () => [...marketplaceOrderKeys.all, "list"] as const,
+  list: (filters?: GetMarketplaceOrdersParams) =>
+    [...marketplaceOrderKeys.lists(), filters] as const,
+  details: () => [...marketplaceOrderKeys.all, "detail"] as const,
   detail: (id: string) => [...marketplaceOrderKeys.details(), id] as const,
-  search: (code: string) => [...marketplaceOrderKeys.all, 'search', code] as const,
+  search: (code: string) =>
+    [...marketplaceOrderKeys.all, "search", code] as const,
 };
 
-function normalizeMarketplaceOrderResponse(response: MarketplaceOrder[] | PaginatedResponse<MarketplaceOrder>): { data: MarketplaceOrder[]; meta: PaginationMeta } {
+function normalizeMarketplaceOrderResponse(
+  response: MarketplaceOrder[] | PaginatedResponse<MarketplaceOrder>
+): { data: MarketplaceOrder[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
       data: response,
@@ -29,11 +38,11 @@ function normalizeMarketplaceOrderResponse(response: MarketplaceOrder[] | Pagina
       },
     };
   }
-  
-  if ('data' in response && 'meta' in response) {
+
+  if ("data" in response && "meta" in response) {
     return response;
   }
-  
+
   return {
     data: [],
     meta: {
@@ -45,10 +54,12 @@ function normalizeMarketplaceOrderResponse(response: MarketplaceOrder[] | Pagina
   };
 }
 
-export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) {
+export function useMarketplaceOrders(
+  options: UseMarketplaceOrdersOptions = {}
+) {
   const { autoLoad = true, ...params } = options;
   const queryClient = useQueryClient();
-  
+
   const queryKey = marketplaceOrderKeys.list(params);
 
   const query = useQuery({
@@ -57,14 +68,20 @@ export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) 
       const response = await marketplaceOrdersApi.getAll(params);
       return normalizeMarketplaceOrderResponse(response.data);
     },
-    enabled: true, // Always enabled - we'll control loading via refetch
+    enabled: true,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateMarketplaceOrderDto) => marketplaceOrdersApi.create(data),
+    mutationFn: (data: CreateMarketplaceOrderDto) =>
+      marketplaceOrdersApi.create(data),
     onMutate: async (newOrder) => {
-      await queryClient.cancelQueries({ queryKey: marketplaceOrderKeys.lists() });
-      const previousData = queryClient.getQueryData<{ data: MarketplaceOrder[]; meta: PaginationMeta }>(queryKey);
+      await queryClient.cancelQueries({
+        queryKey: marketplaceOrderKeys.lists(),
+      });
+      const previousData = queryClient.getQueryData<{
+        data: MarketplaceOrder[];
+        meta: PaginationMeta;
+      }>(queryKey);
 
       if (previousData) {
         const optimisticOrder: MarketplaceOrder = {
@@ -79,11 +96,14 @@ export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) 
           serviceFee: newOrder.serviceFee || 0,
           total: newOrder.total,
           paymentMethod: newOrder.paymentMethod,
-          status: 'pending',
+          status: "pending",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        queryClient.setQueryData<{ data: MarketplaceOrder[]; meta: PaginationMeta }>(queryKey, {
+        queryClient.setQueryData<{
+          data: MarketplaceOrder[];
+          meta: PaginationMeta;
+        }>(queryKey, {
           ...previousData,
           data: [optimisticOrder, ...previousData.data],
           meta: {
@@ -102,11 +122,16 @@ export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) 
     },
     onSuccess: (response) => {
       const newOrder = response.data;
-      queryClient.setQueryData<{ data: MarketplaceOrder[]; meta: PaginationMeta }>(queryKey, (old) => {
+      queryClient.setQueryData<{
+        data: MarketplaceOrder[];
+        meta: PaginationMeta;
+      }>(queryKey, (old) => {
         if (!old) return old;
         return {
           ...old,
-          data: old.data.map(o => (o.id && String(o.id).startsWith('temp-')) ? newOrder : o),
+          data: old.data.map((o) =>
+            o.id && String(o.id).startsWith("temp-") ? newOrder : o
+          ),
         };
       });
       queryClient.invalidateQueries({ queryKey: marketplaceOrderKeys.lists() });
@@ -116,7 +141,10 @@ export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) 
   const findByOrderCodeMutation = useMutation({
     mutationFn: (code: string) => marketplaceOrdersApi.findByOrderCode(code),
     onSuccess: (response, code) => {
-      queryClient.setQueryData(marketplaceOrderKeys.search(code), response.data);
+      queryClient.setQueryData(
+        marketplaceOrderKeys.search(code),
+        response.data
+      );
     },
   });
 
@@ -135,13 +163,17 @@ export function useMarketplaceOrders(options: UseMarketplaceOrdersOptions = {}) 
     },
     loading: query.isLoading,
     searchLoading: findByOrderCodeMutation.isPending,
-    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    error: query.error
+      ? (query.error as any)?.response?.data?.message || query.error.message
+      : null,
     createOrder: createMutation.mutateAsync,
     findByOrderCode,
     isCreating: createMutation.isPending,
     refresh: () => query.refetch(),
     loadOrders: (loadParams?: GetMarketplaceOrdersParams) => {
-      queryClient.invalidateQueries({ queryKey: marketplaceOrderKeys.list({ ...params, ...loadParams }) });
+      queryClient.invalidateQueries({
+        queryKey: marketplaceOrderKeys.list({ ...params, ...loadParams }),
+      });
     },
   };
 }

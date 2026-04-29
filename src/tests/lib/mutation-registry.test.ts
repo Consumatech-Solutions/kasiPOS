@@ -148,7 +148,7 @@ describe("executeMutation", () => {
         ]),
         customerId: "real-cust",
       }),
-      expect.objectContaining({ idempotencyKey: undefined }),
+      expect.objectContaining({ idempotencyKey: undefined })
     );
   });
 
@@ -183,10 +183,10 @@ describe("executeMutation", () => {
       _tempId: "temp-prod",
     });
     expect(mocks.productsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ categoryId: "cid-1", _tempId: "temp-prod" }),
+      expect.objectContaining({ categoryId: "cid-1", _tempId: "temp-prod" })
     );
     expect((await getDb().syncIdMapping.get("temp-prod"))?.serverId).toBe(
-      "srv-p1",
+      "srv-p1"
     );
   });
 
@@ -200,7 +200,7 @@ describe("executeMutation", () => {
     });
     expect(mocks.categoriesGetAll).toHaveBeenCalled();
     expect(mocks.productsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ categoryId: "resolved-cat" }),
+      expect.objectContaining({ categoryId: "resolved-cat" })
     );
   });
 
@@ -217,7 +217,7 @@ describe("executeMutation", () => {
     });
     expect(mocks.productsUpdate).toHaveBeenCalledWith(
       "pid",
-      expect.objectContaining({ categoryId: "resolved-cat" }),
+      expect.objectContaining({ categoryId: "resolved-cat" })
     );
   });
 
@@ -246,7 +246,7 @@ describe("executeMutation", () => {
     });
     expect(mocks.customersCreate).toHaveBeenCalled();
     expect((await getDb().syncIdMapping.get("temp-cu"))?.serverId).toBe(
-      "cust-srv",
+      "cust-srv"
     );
     await executeMutation(["customers", "update"], {
       id: "1",
@@ -269,7 +269,7 @@ describe("executeMutation", () => {
       reason: "New stock received",
     });
     expect(mocks.stockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ productId: "real-pr", newStock: 5 }),
+      expect.objectContaining({ productId: "real-pr", newStock: 5 })
     );
   });
 
@@ -281,7 +281,7 @@ describe("executeMutation", () => {
       deliveryMethod: "collection",
     });
     expect(mocks.poCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ deliveryFee: 0, deliveryMethod: "collection" }),
+      expect.objectContaining({ deliveryFee: 0, deliveryMethod: "collection" })
     );
     await executeMutation(["purchaseOrders", "create"], {
       cart: [],
@@ -290,7 +290,7 @@ describe("executeMutation", () => {
       deliveryMethod: "delivery",
     });
     expect(mocks.poCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ deliveryFee: 150, deliveryMethod: "delivery" }),
+      expect.objectContaining({ deliveryFee: 150, deliveryMethod: "delivery" })
     );
     await executeMutation(["purchaseOrders", "updateStatus"], {
       id: "o1",
@@ -335,7 +335,7 @@ describe("executeMutation", () => {
     });
     expect(mocks.settingsPatch).toHaveBeenCalledWith(
       { receiptHeader: "H" },
-      "st",
+      "st"
     );
   });
 
@@ -359,7 +359,7 @@ describe("executeMutation", () => {
 
   it("throws on unknown mutation key", async () => {
     await expect(executeMutation(["unknown", "op"], {})).rejects.toThrow(
-      "Unknown mutation",
+      "Unknown mutation"
     );
   });
 });

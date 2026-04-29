@@ -113,10 +113,12 @@ export interface ProductRecord {
   id: string;
   name: string;
   categoryId: string;
-  category?: {
-    id: string;
-    name: string;
-  } | string; // Can be object (API) or string (local compatibility)
+  category?:
+    | {
+        id: string;
+        name: string;
+      }
+    | string; // Can be object (API) or string (local compatibility)
   price: number;
   costPrice: number;
   stock: number | null;

@@ -11,7 +11,6 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { AppSettings, User, Store } from "@/types";
-import { storesApi } from "@/lib/api/stores";
 import { authApi } from "@/lib/api/auth";
 import { isNetworkErrorLike } from "@/lib/network-error";
 
@@ -19,7 +18,7 @@ interface SettingsContextType {
   settings: AppSettings;
   setSetting: <K extends keyof AppSettings>(
     key: K,
-    value: AppSettings[K],
+    value: AppSettings[K]
   ) => void;
   isPwa: boolean;
   logout: () => Promise<void>;
@@ -27,7 +26,7 @@ interface SettingsContextType {
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(
-  undefined,
+  undefined
 );
 
 const defaultSettings: AppSettings = {
@@ -47,12 +46,9 @@ function readPersistedSettings(): AppSettings {
   try {
     const item = window.localStorage.getItem("kasi-pos-settings");
     const storedSettings = item ? JSON.parse(item) : {};
-    // Only persist currentUser from localStorage on initial load
     const itemUser = window.localStorage.getItem("user");
     const currentUser = itemUser ? JSON.parse(itemUser) : null;
 
-    // We only keep theme from settings and currentUser from its own key
-    // Store will be loaded from IndexedDB in useEffect if not in localStorage
     const currentStore = storedSettings.currentStore || null;
     const modules = currentStore?.enabledModules;
     return {
@@ -135,10 +131,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
       setSettings((prev) => ({ ...prev, [key]: value }));
     },
-    [],
+    []
   );
 
-  // Restore persisted session before paint so first client render matches storage (avoids transient logged-out UI in E2E and on hard refresh).
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -156,7 +151,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setIsInitialLoad(false);
   }, []);
 
-  // Sync store.enabledModules into settings when currentStore changes (from API or IndexedDB)
   useEffect(() => {
     const store = settings.currentStore;
     const modules = store?.enabledModules;
@@ -188,7 +182,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     });
   }, [settings.currentStore?.id, settings.currentStore?.enabledModules]);
 
-  // After load/refresh (online): ensure credit config is loaded and persisted for offline-first
   const creditFetchedForStoreIdRef = useRef<string | null>(null);
   useEffect(() => {
     const store = settings.currentStore;
@@ -219,11 +212,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [settings.currentStore, setSetting]);
 
-  // Load store from IndexedDB on initial load if not in localStorage
   useEffect(() => {
     const loadStoreFromIndexedDB = async () => {
       if (settings.currentStore || !settings.currentUser) {
-        return; // Already have store or no user
+        return;
       }
 
       try {
@@ -231,15 +223,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           await import("@/lib/store-persistence");
         const cachedStore = await loadStore(settings.currentUser.storeId);
         if (cachedStore) {
-          console.log(
-            "[SettingsProvider] Restored store from IndexedDB on initial load",
-          );
           setSetting("currentStore", cachedStore);
         }
       } catch (error) {
         console.warn(
           "[SettingsProvider] Failed to load store from IndexedDB:",
-          error,
+          error
         );
       }
     };
@@ -250,11 +239,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
 
   const logout = useCallback(async () => {
-    const theme = settings.theme; // Preserve theme across logout
+    const theme = settings.theme;
 
     const newSettings = {
       ...defaultSettings,
-      theme, // keep the theme
+      theme,
       isLoggedIn: false,
       currentUser: null,
       currentStore: null,
@@ -262,7 +251,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(
         "kasi-pos-settings",
-        JSON.stringify({ theme }),
+        JSON.stringify({ theme })
       );
       window.localStorage.removeItem("token");
       window.localStorage.removeItem("user");
@@ -281,9 +270,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router, settings.theme]);
 
-  // ...
-
-  // This effect runs on mount to check for updated user data
   useEffect(() => {
     const bootstrapData = async () => {
       if (settings.currentUser) {
@@ -296,7 +282,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               const { loadStoreFromIndexedDB } =
                 await import("@/lib/store-persistence");
               const cachedStore = await loadStoreFromIndexedDB(
-                settings.currentUser.storeId,
+                settings.currentUser.storeId
               );
               if (cachedStore) setSetting("currentStore", cachedStore);
             } catch {
@@ -306,7 +292,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         try {
-          // 1. Refresh User Profile to get latest role/storeId (skip if backend unreachable to avoid console noise)
           let freshUser = settings.currentUser;
           try {
             const userResponse = await authApi.getProfile();
@@ -315,7 +300,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem("user", JSON.stringify(freshUser));
           } catch (profileErr: any) {
             if (profileErr?.response?.status === 401) {
-              // Token expired or invalid; clear session and redirect to login
               await logout();
               return;
             }
@@ -326,25 +310,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               ) {
                 (window as any).__bootstrapNetworkWarned = true;
                 console.warn(
-                  "[SettingsProvider] Backend not reachable. Using cached user and store.",
+                  "[SettingsProvider] Backend not reachable. Using cached user and store."
                 );
               }
-              // Keep settings.currentUser; load store from IndexedDB below
             } else {
               throw profileErr;
             }
           }
 
-          // 2. Fetch Store if user has a storeId and save permanently
           if (freshUser?.storeId) {
             try {
               const { fetchAndSaveStore } =
                 await import("@/lib/store-persistence");
               const store = await fetchAndSaveStore(
                 setSetting,
-                freshUser?.storeId ?? null,
+                freshUser?.storeId ?? null
               );
-              console.log("[SettingsProvider] Fetched store:", store);
               if (store) {
                 setSetting("currentStore", store);
               }
@@ -353,7 +334,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 const { loadStoreFromIndexedDB } =
                   await import("@/lib/store-persistence");
                 const cachedStore = await loadStoreFromIndexedDB(
-                  freshUser!.storeId,
+                  freshUser!.storeId
                 );
                 if (cachedStore) setSetting("currentStore", cachedStore);
               } else if (process.env.NODE_ENV === "development") {
@@ -366,7 +347,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 await import("@/lib/store-persistence");
               const store = await fetchAndSaveStore(
                 setSetting,
-                freshUser?.storeId ?? null,
+                freshUser?.storeId ?? null
               );
               if (store) setSetting("currentStore", store);
             } catch (e) {
@@ -404,8 +385,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     root.classList.remove("light", "dark");
     root.classList.add(settings.theme);
     try {
-      // Merge into existing kasi-pos-settings so we never strip currentStore (and enabledModules)
-      // on a persist tick — that caused Strict Mode remounts to re-read incomplete LS and lose campaigns.
       let existing: Record<string, unknown> = {};
       try {
         const raw = window.localStorage.getItem("kasi-pos-settings");
@@ -426,19 +405,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (settings.currentStore) {
         next.currentStore = settings.currentStore;
       } else if (!settings.isLoggedIn || !settings.currentUser) {
-        // Logged out: clear persisted store. While logged in, keep existing currentStore if React
-        // briefly has null during hydration so we never strip enabledModules from LS.
         delete next.currentStore;
       }
       window.localStorage.setItem("kasi-pos-settings", JSON.stringify(next));
-      // Persist user explicitly as requested
       if (settings.currentUser) {
         window.localStorage.setItem(
           "user",
-          JSON.stringify(settings.currentUser),
+          JSON.stringify(settings.currentUser)
         );
       } else {
-        // Avoid clearing a just-restored user during hydration races.
         const existingUser = window.localStorage.getItem("user");
         if (!existingUser) {
           window.localStorage.removeItem("user");
@@ -451,16 +426,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isInitialLoad || !hasHydratedStorage) return;
-
-    // Check if we are blocking due to missing store?
-    // If db.stores is removed, currentStore is null.
-    // If we return here, we block redirects.
-    // Let's remove this block if we are moving away from local DB store.
-    /* 
-    if (settings.isLoggedIn && !settings.currentStore) {
-        return; 
-    }
-    */
 
     const isAuthRoute = AUTH_ROUTES.includes(pathname);
     const isSetupRoute = pathname === SETUP_ROUTE;
@@ -479,16 +444,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (isCypress || isE2eHarness) {
         return;
       }
-      // Avoid bouncing off /marketplace or /boph during E2E/hydration: session is applied in Cypress `onBeforeLoad`
-      // and React state can briefly lag localStorage. Logout still uses `router.replace('/login')`.
       if (pathname.startsWith("/marketplace") || pathname.startsWith("/boph")) {
         return;
       }
       router.push("/login");
     } else if (settings.isLoggedIn) {
-      // If we are logged in, we generally want to be in the app.
-      // If store is missing, we might want to fetch it, but effectively we shouldn't stay on login.
-
       if (isAuthRoute) {
         router.push("/");
         return;
@@ -501,7 +461,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           router.push("/");
         }
 
-        // Role-based route protection: only admin can access /settings
         if (
           settings.currentUser?.role === "staff" &&
           pathname.startsWith("/settings")
@@ -526,27 +485,23 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("token", userData.accessToken);
       }
 
-      // Explicitly save user as well
       localStorage.setItem("user", JSON.stringify(userData));
 
       setSettings((prev) => ({
         ...prev,
         currentUser: userData,
         isLoggedIn: true,
-        // currentStore: null // We don't have store details yet
       }));
 
-      // Fetch and save store immediately after login
       try {
         const { fetchAndSaveStore } = await import("@/lib/store-persistence");
         const store = await fetchAndSaveStore(
           setSetting,
-          userData?.storeId ?? null,
+          userData?.storeId ?? null
         );
         if (store) {
           setSetting("currentStore", store);
         } else {
-          // If fetch fails, try loading from IndexedDB
           const { loadStoreFromIndexedDB } =
             await import("@/lib/store-persistence");
           const cachedStore = await loadStoreFromIndexedDB(userData.storeId);
@@ -555,10 +510,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error: any) {
-        // If network fails, try loading from IndexedDB
         if (isNetworkErrorLike(error)) {
           console.log(
-            "[SettingsProvider] Network error during login - loading store from IndexedDB",
+            "[SettingsProvider] Network error during login - loading store from IndexedDB"
           );
           const { loadStoreFromIndexedDB } =
             await import("@/lib/store-persistence");
@@ -569,17 +523,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         } else {
           console.warn(
             "[SettingsProvider] Failed to fetch store after login:",
-            error,
+            error
           );
         }
       }
     },
-    [setSetting],
+    [setSetting]
   );
 
   const canRenderChildren = () => {
-    // Gate on storage hydration only; `isInitialLoad` can stay true briefly across strict-mode remounts
-    // and would otherwise keep the route shell blank while Cypress already has a seeded session.
     if (!hasHydratedStorage) return false;
     if (!settings.isLoggedIn) {
       const hasPersistedSession =
@@ -603,7 +555,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
       return AUTH_ROUTES.includes(pathname);
     }
-    // if (!settings.currentStore) return false; // Don't block if store is missing for now
     if (settings.currentStore && !settings.currentStore.isSetupComplete)
       return pathname === SETUP_ROUTE;
     return !AUTH_ROUTES.includes(pathname) && pathname !== SETUP_ROUTE;

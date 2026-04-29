@@ -7,7 +7,6 @@ import {
   getCustomersFromDexie,
   saveCustomersToDexie,
 } from "@/lib/entity-cache";
-import { pullAllCustomersFromApi } from "@/lib/catalogue-network-hydrate";
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "@/types";
 import type {
   PaginationMeta,
@@ -19,9 +18,7 @@ interface UseCustomersOptions {
   initialPage?: number;
   initialLimit?: number;
   searchQuery?: string;
-  /** Optional: for admin; scope API list/get/update/delete to this store. Omit for store admin (backend uses JWT). */
   storeId?: string | null;
-  /** Optional: when set, offline Dexie list is filtered by this store (e.g. currentStore.id for store admin). */
   storeIdForOffline?: string | null;
 }
 
@@ -60,7 +57,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   if (storeId != null && storeId !== "") params.storeId = storeId;
 
   const queryKey = customerKeys.list(
-    Object.keys(params).length > 0 ? params : undefined,
+    Object.keys(params).length > 0 ? params : undefined
   );
 
   const query = useQuery({
@@ -72,7 +69,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           initialPage,
           initialLimit,
           searchQuery?.trim() || undefined,
-          storeIdForOffline ?? undefined,
+          storeIdForOffline ?? undefined
         );
       }
 
@@ -105,7 +102,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
             limit: initialLimit,
             totalPages: Math.max(
               1,
-              Math.ceil((data.length || 1) / initialLimit),
+              Math.ceil((data.length || 1) / initialLimit)
             ),
           };
         }
@@ -119,7 +116,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
             initialPage,
             initialLimit,
             searchQuery?.trim() || undefined,
-            storeIdForOffline ?? undefined,
+            storeIdForOffline ?? undefined
           );
           if (dexieFallback.meta.total > 0) return dexieFallback;
         }
@@ -131,30 +128,9 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           initialPage,
           initialLimit,
           searchQuery?.trim() || undefined,
-          storeIdForOffline ?? undefined,
+          storeIdForOffline ?? undefined
         );
       }
-
-      let result = await getCustomersFromDexie(
-        initialPage,
-        initialLimit,
-        searchQuery?.trim() || undefined,
-        storeIdForOffline ?? undefined,
-      );
-      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
-        try {
-          await pullAllCustomersFromApi({ storeId: String(storeIdForOffline) });
-          result = await getCustomersFromDexie(
-            initialPage,
-            initialLimit,
-            searchQuery?.trim() || undefined,
-            storeIdForOffline ?? undefined,
-          );
-        } catch (e) {
-          console.warn("[useCustomers] Bulk hydrate failed", e);
-        }
-      }
-      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,
@@ -190,7 +166,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -210,10 +186,10 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           return {
             ...old,
             data: old.data.map((cust) =>
-              cust.id?.startsWith("temp-") ? newCustomer : cust,
+              cust.id?.startsWith("temp-") ? newCustomer : cust
             ),
           };
-        },
+        }
       );
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },
@@ -224,7 +200,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       customersApi.update(
         id,
         data,
-        storeId != null && storeId !== "" ? { storeId } : undefined,
+        storeId != null && storeId !== "" ? { storeId } : undefined
       ),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
@@ -241,9 +217,9 @@ export function useCustomers(options: UseCustomersOptions = {}) {
             data: previousData.data.map((cust) =>
               cust.id === id
                 ? { ...cust, ...data, updatedAt: new Date().toISOString() }
-                : cust,
+                : cust
             ),
-          },
+          }
         );
       }
 
@@ -263,7 +239,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     mutationFn: (id: string) =>
       customersApi.delete(
         id,
-        storeId != null && storeId !== "" ? { storeId } : undefined,
+        storeId != null && storeId !== "" ? { storeId } : undefined
       ),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
@@ -282,7 +258,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
               ...previousData.meta,
               total: Math.max(0, previousData.meta.total - 1),
             },
-          },
+          }
         );
       }
 

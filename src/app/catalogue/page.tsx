@@ -105,20 +105,11 @@ import { ImageUpload } from "@/components/catalogue/image-upload";
 import { ProductImage } from "@/components/catalogue/product-image";
 import { AddTemplatesModal } from "@/components/catalogue/add-templates-modal";
 
-// Zod Schemas for validation
 const categorySchema = z.object({
   name: z
     .string()
     .min(2, { message: "Category name must be at least 2 characters." }),
 });
-
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
-const ACCEPTED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-];
 
 const productSchema = z.object({
   name: z
@@ -141,7 +132,7 @@ const productSchema = z.object({
       .number()
       .int()
       .min(0, { message: "Low stock trigger can't be negative." })
-      .optional(),
+      .optional()
   ),
   category: z.string().min(1, { message: "Please select a category." }),
   barcode: z.string().optional(),
@@ -153,63 +144,43 @@ export default function CataloguePage() {
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
 
-  // Dialog states
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<
     ApiProduct | Product | null
   >(null);
   const [editingCategory, setEditingCategory] = useState<ApiCategory | null>(
-    null,
+    null
   );
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(
-    null,
+    null
   );
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(
-    null,
+    null
   );
   const [activeCatalogueTab, setActiveCatalogueTab] =
     useState<string>("products");
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
   const [addTemplatesOpen, setAddTemplatesOpen] = useState(false);
-  /** Single delete confirmation (avoids AlertDialog inside table rows; prevents crash when list updates) */
   const [deleteConfirm, setDeleteConfirm] = useState<{
     type: "product" | "category";
     id: string;
   } | null>(null);
-  /** Modal shown when user tries to add a product or category that already exists (same name) */
   const [duplicateNameModal, setDuplicateNameModal] = useState<{
     type: "product" | "category";
   } | null>(null);
   const productSubmitRef = useRef(false);
   const categorySubmitRef = useRef(false);
 
-  /** Open delete confirm after releasing focus from dropdown to avoid aria-hidden on focused element */
   const openDeleteConfirm = useCallback(
     (type: "product" | "category", id: string) => {
       (document.activeElement as HTMLElement)?.blur();
       setTimeout(() => setDeleteConfirm({ type, id }), 0);
     },
-    [],
+    []
   );
 
-  // Generate a unique barcode (EAN-13 format: 13 digits)
-  const generateBarcode = (): string => {
-    // Generate a 12-digit number (EAN-13 has 13 digits, last is check digit)
-    const base = Math.floor(
-      100000000000 + Math.random() * 900000000000,
-    ).toString();
-    // Calculate EAN-13 check digit
-    let sum = 0;
-    for (let i = 0; i < 12; i++) {
-      sum += parseInt(base[i]) * (i % 2 === 0 ? 1 : 3);
-    }
-    const checkDigit = (10 - (sum % 10)) % 10;
-    return base + checkDigit.toString();
-  };
-
-  // Hooks for data with sync and pagination
   const { settings } = useSettings();
   const {
     categories,
@@ -226,7 +197,6 @@ export default function CataloguePage() {
   } = useCategories(1, 1000, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
-  // Type assertion for callbacks
   const typedCategories: ApiCategory[] = categories || [];
   const {
     products,
@@ -262,19 +232,8 @@ export default function CataloguePage() {
     return rows;
   }, [products, productNameSortOrder]);
 
-  // Auto-generate barcodes for products that don't have one (only once per product).
-  // Depend only on product IDs + loading so we don't re-run when products array reference
-  // changes after each updateProduct (invalidateQueries), which would cause an infinite loop.
-  const processedProductsRef = useRef<Set<string | number>>(new Set());
-  const isGeneratingRef = useRef(false);
   const updateProductRef = useRef(updateProduct);
   updateProductRef.current = updateProduct;
-
-  const productIdsKey = (products ?? [])
-    .map((p) => p.id)
-    .filter(Boolean)
-    .sort()
-    .join(",");
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -296,7 +255,6 @@ export default function CataloguePage() {
     loadProductsPage,
   ]);
 
-  // Form Hooks
   const productForm = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -319,13 +277,11 @@ export default function CataloguePage() {
     },
   });
 
-  // Handlers for Products
   const openProductDialog = async (product?: ApiProduct | Product) => {
     productForm.reset();
     if (product) {
       setEditingProduct(product);
 
-      // Safe access to properties that differ between Product and ApiProduct
       const p = product as any;
       const name = p.name || "";
       const price = p.price || 0;
@@ -348,7 +304,6 @@ export default function CataloguePage() {
       productForm.setValue("imageUrl", imageUrl);
       productForm.setValue("imageHint", imageHint);
 
-      // Utiliser uniquement l'URL distante
       setProductImageUrl(imageUrl || null);
     } else {
       setEditingProduct(null);
@@ -371,7 +326,6 @@ export default function CataloguePage() {
       return;
     productSubmitRef.current = true;
     try {
-      // Use the uploaded image URL if available, otherwise use the form value
       const imageUrl = productImageUrl || values.imageUrl || "";
 
       const barCode = (values.barcode ?? "").trim() || undefined;
@@ -393,7 +347,6 @@ export default function CataloguePage() {
           await updateProduct(String(editingProduct.id), productData);
           feedback.success("Product updated", "Product updated successfully.");
         } else {
-          // Offline: optimistic update then queue
           const productId = String(editingProduct.id);
           const optimisticUpdates = {
             name: productData.name,
@@ -419,12 +372,18 @@ export default function CataloguePage() {
                 data: data.data.map((p: any) =>
                   String(p.id) === productId
                     ? { ...p, ...optimisticUpdates }
-                    : p,
+                    : p
                 ),
               });
             }
           });
-          await updateProductInDexie(productId, optimisticUpdates);
+          await updateProductInDexie(productId, {
+            ...optimisticUpdates,
+            category: {
+              id: optimisticUpdates.category,
+              name: optimisticUpdates.category,
+            },
+          });
           mutationQueue.add({
             mutationKey: ["products", "update"],
             mutationFn: () =>
@@ -433,14 +392,14 @@ export default function CataloguePage() {
           });
           feedback.success(
             "Queued",
-            "Product update queued. Will sync when online.",
+            "Product update queued. Will sync when online."
           );
         }
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
         const productExists = (products ?? []).some(
           (p: { name?: string }) =>
-            (p.name ?? "").toString().trim().toLowerCase() === nameLower,
+            (p.name ?? "").toString().trim().toLowerCase() === nameLower
         );
         if (productExists) {
           setDuplicateNameModal({ type: "product" });
@@ -451,10 +410,9 @@ export default function CataloguePage() {
           feedback.success("Product added", "Product added successfully.");
           refreshProducts();
         } else {
-          // Offline: optimistic update with temp id, then queue for sync (no custom mutationFn - registry will run on restore)
           const tempId = `temp-${Date.now()}`;
           const selectedCategory = typedCategories.find(
-            (c) => c.name === productData.category,
+            (c) => c.name === productData.category
           );
           const optimisticProduct = {
             id: tempId,
@@ -485,7 +443,7 @@ export default function CataloguePage() {
                 data: [optimisticProduct, ...old.data],
                 meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
               };
-            },
+            }
           );
           queryClient.setQueryData(
             productKeys.list({
@@ -504,7 +462,7 @@ export default function CataloguePage() {
                 data: [optimisticProduct, ...old.data],
                 meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
               };
-            },
+            }
           );
           const { getDb } = await import("@/lib/db");
           const sid = settings?.currentStore?.id;
@@ -528,12 +486,11 @@ export default function CataloguePage() {
       setProductDialogOpen(false);
       productForm.reset();
       setProductImageUrl(null);
-    } catch (error) {
-      console.error("Failed to save product:", error);
+    } catch (error: unknown) {
       feedback.fromError(
         error,
         "Failed to save product",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     } finally {
       productSubmitRef.current = false;
@@ -547,7 +504,6 @@ export default function CataloguePage() {
         await deleteProductHook(String(id));
         feedback.success("Product deleted", "Product deleted successfully.");
       } else {
-        // Offline: optimistic update then queue
         const productId = String(id);
         const productQueries = queryClient.getQueriesData<{
           data: any[];
@@ -573,22 +529,20 @@ export default function CataloguePage() {
         });
         feedback.success(
           "Queued",
-          "Product deletion queued. Will sync when online.",
+          "Product deletion queued. Will sync when online."
         );
       }
-    } catch (error) {
-      console.error("Failed to delete product:", error);
+    } catch (error: unknown) {
       feedback.fromError(
         error,
         "Failed to delete product",
-        "Try again or check your connection.",
+        "Try again or check your connection."
       );
     } finally {
       setDeletingProductId(null);
     }
   };
 
-  // Handlers for Categories
   const openCategoryDialog = (category?: ApiCategory) => {
     if (category) {
       setEditingCategory(category);
@@ -601,7 +555,7 @@ export default function CataloguePage() {
   };
 
   const handleCategorySubmit = async (
-    values: z.infer<typeof categorySchema>,
+    values: z.infer<typeof categorySchema>
   ) => {
     if (categorySubmitRef.current || isCreatingCategory || isUpdatingCategory)
       return;
@@ -612,10 +566,9 @@ export default function CataloguePage() {
           await updateCategory(String(editingCategory.id), values);
           feedback.success(
             "Category updated",
-            "Category updated successfully.",
+            "Category updated successfully."
           );
         } else {
-          // Offline: optimistic update then queue
           const updatedCategory = {
             ...editingCategory,
             ...values,
@@ -628,10 +581,10 @@ export default function CataloguePage() {
               return {
                 ...old,
                 data: old.data.map((cat) =>
-                  cat.id === editingCategory.id ? updatedCategory : cat,
+                  cat.id === editingCategory.id ? updatedCategory : cat
                 ),
               };
-            },
+            }
           );
           queryClient.setQueryData(
             categoryKeys.list({
@@ -644,10 +597,10 @@ export default function CataloguePage() {
               return {
                 ...old,
                 data: old.data.map((cat) =>
-                  cat.id === editingCategory.id ? updatedCategory : cat,
+                  cat.id === editingCategory.id ? updatedCategory : cat
                 ),
               };
-            },
+            }
           );
           await updateCategoryInDexie(String(editingCategory.id), values);
           mutationQueue.add({
@@ -655,20 +608,20 @@ export default function CataloguePage() {
             mutationFn: () =>
               catalogueApi.categories.update(
                 String(editingCategory.id),
-                values,
+                values
               ),
             variables: { id: editingCategory.id, data: values },
           });
           feedback.success(
             "Queued",
-            "Category update queued. Will sync when online.",
+            "Category update queued. Will sync when online."
           );
         }
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
         const categoryExists = (typedCategories ?? []).some(
           (c: ApiCategory) =>
-            (c.name ?? "").toString().trim().toLowerCase() === nameLower,
+            (c.name ?? "").toString().trim().toLowerCase() === nameLower
         );
         if (categoryExists) {
           setDuplicateNameModal({ type: "category" });
@@ -678,7 +631,6 @@ export default function CataloguePage() {
           await createCategory(values);
           feedback.success("Category added", "Category added successfully.");
         } else {
-          // Offline: optimistic update then queue
           const tempId = `temp-${Date.now()}`;
           const optimisticCategory: ApiCategory = {
             id: tempId,
@@ -699,7 +651,7 @@ export default function CataloguePage() {
                 data: [...old.data, optimisticCategory],
                 meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
               };
-            },
+            }
           );
           queryClient.setQueryData(
             categoryKeys.list({
@@ -718,11 +670,11 @@ export default function CataloguePage() {
                 data: [...old.data, optimisticCategory],
                 meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
               };
-            },
+            }
           );
           await saveCategoriesToDexie(
             [optimisticCategory],
-            settings?.currentStore?.id ?? undefined,
+            settings?.currentStore?.id ?? undefined
           );
           mutationQueue.add({
             mutationKey: ["categories", "create"],
@@ -735,12 +687,12 @@ export default function CataloguePage() {
       }
       setCategoryDialogOpen(false);
       categoryForm.reset();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to save category:", error);
       feedback.fromError(
         error,
         "Failed to save category",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     } finally {
       categorySubmitRef.current = false;
@@ -754,7 +706,6 @@ export default function CataloguePage() {
         await deleteCategoryHook(String(id));
         feedback.success("Category deleted", "Category deleted successfully.");
       } else {
-        // Offline: optimistic update then queue
         const idStr = String(id);
         queryClient.setQueryData(
           categoryKeys.lists(),
@@ -768,7 +719,7 @@ export default function CataloguePage() {
                 total: Math.max(0, (old.meta?.total ?? 1) - 1),
               },
             };
-          },
+          }
         );
         queryClient.setQueryData(
           categoryKeys.list({
@@ -786,7 +737,7 @@ export default function CataloguePage() {
                 total: Math.max(0, (old.meta?.total ?? 1) - 1),
               },
             };
-          },
+          }
         );
         await deleteCategoryFromDexie(String(id));
         mutationQueue.add({
@@ -796,16 +747,14 @@ export default function CataloguePage() {
         });
         feedback.success(
           "Queued",
-          "Category deletion queued. Will sync when online.",
+          "Category deletion queued. Will sync when online."
         );
       }
-      // Note: You might want to handle products in the deleted category.
     } catch (error) {
-      console.error("Failed to delete category:", error);
       feedback.fromError(
         error,
         "Failed to delete category",
-        "Try again or check your connection.",
+        "Try again or check your connection."
       );
     } finally {
       setDeletingCategoryId(null);
@@ -917,7 +866,7 @@ export default function CataloguePage() {
                           className="-mx-2 -my-1 inline-flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left font-medium hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
                           onClick={() =>
                             setProductNameSortOrder((prev) =>
-                              prev === "asc" ? "desc" : "asc",
+                              prev === "asc" ? "desc" : "asc"
                             )
                           }
                         >
@@ -1047,7 +996,7 @@ export default function CataloguePage() {
                                       )?.blur();
                                       setTimeout(
                                         () => openProductDialog(p),
-                                        50,
+                                        50
                                       );
                                     }}
                                   >
@@ -1064,9 +1013,9 @@ export default function CataloguePage() {
                                         () =>
                                           openDeleteConfirm(
                                             "product",
-                                            String(p.id),
+                                            String(p.id)
                                           ),
-                                        50,
+                                        50
                                       );
                                     }}
                                   >
@@ -1167,9 +1116,9 @@ export default function CataloguePage() {
                                       () =>
                                         openDeleteConfirm(
                                           "category",
-                                          String(c.id),
+                                          String(c.id)
                                         ),
-                                      50,
+                                      50
                                     );
                                   }}
                                 >
@@ -1294,13 +1243,13 @@ export default function CataloguePage() {
                               (
                                 c: ApiCategory,
                                 index: number,
-                                self: ApiCategory[],
+                                self: ApiCategory[]
                               ) =>
                                 // Keep only the first occurrence of each category name
                                 index ===
                                 self.findIndex(
-                                  (cat: ApiCategory) => cat.name === c.name,
-                                ),
+                                  (cat: ApiCategory) => cat.name === c.name
+                                )
                             )
                             .map((c: ApiCategory, index: number) => (
                               <SelectItem
@@ -1433,7 +1382,7 @@ export default function CataloguePage() {
                             feedback.error(
                               "Upload failed",
                               error,
-                              "Check file size (max 2MB) and format, then try again.",
+                              "Check file size (max 2MB) and format, then try again."
                             );
                           }}
                           onDelete={() => {

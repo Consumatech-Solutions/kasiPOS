@@ -1,8 +1,3 @@
-/**
- * Pull products, categories, customers, and vouchers from the API into Dexie and TanStack Query.
- * Used for scheduled sync, manual "download from cloud", and one-time initial hydration.
- */
-
 import type { QueryClient } from "@tanstack/react-query";
 import type { Voucher } from "@/types";
 import type { PaginationMeta } from "@/types/pagination";
@@ -73,7 +68,6 @@ function markSlotCompleted(slotId: string): void {
   if (typeof localStorage === "undefined") return;
   const slots = readCompletedSlots();
   slots[slotId] = true;
-  // Trim old keys (keep last ~14 days of slot ids)
   const keys = Object.keys(slots);
   if (keys.length > 42) {
     keys.sort();
@@ -82,18 +76,12 @@ function markSlotCompleted(slotId: string): void {
   localStorage.setItem(DAILY_SLOTS_STORAGE_KEY, JSON.stringify(slots));
 }
 
-/**
- * Returns a due, uncompleted scheduled slot id (6, 12, 18 local time).
- * Supports catch-up: if the app was offline at slot time, the slot remains due
- * and will run at the next online opportunity.
- */
 export function getNextDueScheduledSyncSlotId(
-  now: Date = new Date(),
+  now: Date = new Date()
 ): string | null {
   if (typeof window === "undefined") return null;
   const completed = readCompletedSlots();
 
-  // Check yesterday + today to catch up overnight/offline slots.
   for (const dayOffset of [1, 0]) {
     const day = new Date(now);
     day.setHours(0, 0, 0, 0);
@@ -112,7 +100,6 @@ export function getNextDueScheduledSyncSlotId(
   return null;
 }
 
-/** Backward-compatible alias. */
 export function getCurrentScheduledSyncSlotId(): string | null {
   return getNextDueScheduledSyncSlotId();
 }
@@ -124,17 +111,13 @@ export function markScheduledSyncSlotComplete(slotId: string): void {
 export interface RunCloudDataPullOptions {
   queryClient: QueryClient;
   storeId?: string | null;
-  /** When set, reports progress via callback (completed, total). */
   onProgress?: (completed: number, total: number) => void;
 }
 
 const DATA_STEPS = 4;
 
-/**
- * Fetches catalogue and related entities from the server, updates Dexie, and refreshes matching query cache entries.
- */
 export async function runCloudDataPull(
-  options: RunCloudDataPullOptions,
+  options: RunCloudDataPullOptions
 ): Promise<void> {
   const { queryClient, storeId, onProgress } = options;
   const storeIdString =
@@ -157,7 +140,7 @@ export async function runCloudDataPull(
       1,
       1,
       storeIdString,
-      {},
+      {}
     );
     if (productCountCheck.meta.total === 0) {
       try {
@@ -171,7 +154,7 @@ export async function runCloudDataPull(
       } catch (e) {
         console.warn(
           "[cloud-data-pull] Full product hydrate after empty Dexie failed",
-          e,
+          e
         );
       }
     }
@@ -180,7 +163,7 @@ export async function runCloudDataPull(
   const productResult = await getProductsFromDexie(1, 100, storeIdString, {});
   queryClient.setQueryData(
     productKeys.list({ page: 1, limit: 100 }),
-    productResult,
+    productResult
   );
   bump();
 
@@ -195,7 +178,7 @@ export async function runCloudDataPull(
     const categoryCountCheck = await getCategoriesFromDexie(
       1,
       1,
-      storeIdString,
+      storeIdString
     );
     if (categoryCountCheck.meta.total === 0) {
       try {
@@ -209,7 +192,7 @@ export async function runCloudDataPull(
       } catch (e) {
         console.warn(
           "[cloud-data-pull] Full category hydrate after empty Dexie failed",
-          e,
+          e
         );
       }
     }
@@ -218,7 +201,7 @@ export async function runCloudDataPull(
   const categoryResult = await getCategoriesFromDexie(1, 50, storeIdString);
   queryClient.setQueryData(
     categoryKeys.list({ page: 1, limit: 50 }),
-    categoryResult,
+    categoryResult
   );
   bump();
 
@@ -232,16 +215,16 @@ export async function runCloudDataPull(
     1,
     50,
     undefined,
-    storeIdString,
+    storeIdString
   );
   queryClient.setQueryData(
     customerKeys.list({ page: 1, limit: 50 }),
-    customerResult,
+    customerResult
   );
   bump();
 
   const purgeTemp = await purgeTempIdCatalogueRowsAfterCloudSync(
-    storeId ?? undefined,
+    storeId ?? undefined
   );
   if (
     process.env.NODE_ENV === "development" &&
@@ -251,7 +234,7 @@ export async function runCloudDataPull(
   ) {
     console.log(
       "[cloud-data-pull] Removed local temp-id catalogue rows after sync",
-      purgeTemp,
+      purgeTemp
     );
   }
 
@@ -281,28 +264,22 @@ export async function runCloudDataPull(
   }
   queryClient.setQueryData(
     voucherKeys.list({ page: 1, limit: 50, isActive: true }),
-    voucherNormalized,
+    voucherNormalized
   );
   bump();
 
-  // Refetch active queries from Dexie-backed queryFns (no network).
   await queryClient.invalidateQueries({ queryKey: productKeys.all });
   await queryClient.invalidateQueries({ queryKey: categoryKeys.all });
   await queryClient.invalidateQueries({ queryKey: customerKeys.all });
-  // Vouchers: only setQueryData above — invalidating would refetch via API in useVouchers.
 }
 
-/**
- * True when this device has never completed a product sync timestamp (first run or cleared data).
- */
 export async function needsInitialCloudHydration(): Promise<boolean> {
   const t = await getLastSyncAt("products");
   return t == null || t === "";
 }
 
-/** Upload queued changes, then download catalogue data (manual / UI). */
 export async function runManualFullCloudSync(
-  options: RunCloudDataPullOptions,
+  options: RunCloudDataPullOptions
 ): Promise<void> {
   const hasConnectivity = await offlineDetector.forceCheck();
   if (!hasConnectivity) {
@@ -317,7 +294,6 @@ export async function runManualFullCloudSync(
   }
 }
 
-/** Upload queued changes only (manual push), without toggling offline-first mode. */
 export async function runManualPushSync() {
   const hasConnectivity = await offlineDetector.forceCheck();
   if (!hasConnectivity) {

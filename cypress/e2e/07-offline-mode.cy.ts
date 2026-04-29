@@ -25,7 +25,7 @@ function ensureCloudSyncModalReady() {
           .find("button")
           .toArray()
           .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim()),
+            /sync to cloud now/i.test((el.textContent ?? "").trim())
           );
         const dialogText = ($dialog.last().text() ?? "").toLowerCase();
         const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
@@ -36,7 +36,7 @@ function ensureCloudSyncModalReady() {
       interval: 500,
       description: "wait for sync status actions",
       errorMsg: "Sync status modal never reached actionable state",
-    },
+    }
   );
 }
 
@@ -54,7 +54,7 @@ describe("Offline mode", () => {
     PosPage.addProduct("Cola 330ml", 2);
     cy.setOffline();
     cy.get('button[title*="Offline"]', { timeout: 20_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     PosPage.selectCustomerFromDialog("Alice Mokoena");
     PosPage.choosePaymentMethod("Cash");
@@ -65,13 +65,13 @@ describe("Offline mode", () => {
       });
     });
     cy.findByRole("dialog", { name: /receipt/i, timeout: 25_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     cy.contains(/cart is empty/i).should("be.visible");
     cy.findByRole("dialog", { name: /receipt/i, timeout: 15_000 }).within(
       () => {
         cy.findByRole("button", { name: /close/i }).click({ force: true });
-      },
+      }
     );
     cy.findByRole("dialog", { name: /receipt/i }).should("not.exist");
     openCloudSyncModal();
@@ -83,7 +83,7 @@ describe("Offline mode", () => {
       .invoke("text")
       .should(
         "match",
-        /sync status|downloading essential|cloud sync|scheduled at/i,
+        /sync status|downloading essential|cloud sync|scheduled at/i
       );
     cy.setOnline();
   });
@@ -105,7 +105,7 @@ describe("Offline mode", () => {
           .find("button")
           .toArray()
           .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim()),
+            /sync to cloud now/i.test((el.textContent ?? "").trim())
           );
         if (hasSyncButton) {
           cy.wrap($dialog).within(() => {
@@ -117,12 +117,12 @@ describe("Offline mode", () => {
           return;
         }
         expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
-      },
+      }
     );
     cy.get("body")
       .contains(
         /syncing|completed|pending|nothing to sync|uploaded|cloud sync/i,
-        { timeout: 20_000 },
+        { timeout: 20_000 }
       )
       .should("exist");
   });

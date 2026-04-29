@@ -4,16 +4,9 @@ import { use, useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-import type { Transaction, TransactionItem, Customer } from "@/types";
+import type { Transaction, TransactionItem } from "@/types";
 import type { ApiProduct } from "@/types/catalogue";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,14 +16,12 @@ import {
   User,
   Search,
   QrCode,
-  CreditCard,
   LayoutGrid,
   List,
   ArrowLeft,
 } from "lucide-react";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
-import { Badge } from "@/components/ui/badge";
 import {
   Carousel,
   CarouselContent,
@@ -62,6 +53,7 @@ import { useMarketplaceOrders } from "@/hooks/use-marketplace-orders";
 import { useMarketplaceStores } from "@/hooks/use-marketplace-stores";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { getProductInitials } from "@/lib/utils/product-initials";
+import { CreateMarketplaceOrderDto } from "@/lib/api/marketplace-orders";
 
 const quickAccessCategories = [
   "Bread",
@@ -101,7 +93,7 @@ export default function StorePosPage(props: PageProps) {
   >();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryView, setCategoryView] = useState<"carousel" | "grid">(
-    "carousel",
+    "carousel"
   );
   const [categorySearch, setCategorySearch] = useState("");
   const [productSearch, setProductSearch] = useState("");
@@ -111,7 +103,6 @@ export default function StorePosPage(props: PageProps) {
     "Cash" | "Card" | "Mobile Money" | null
   >(null);
 
-  // API Hooks
   const { categories: apiCategories, loading: categoriesLoading } =
     useCategories(1, 1000);
   const {
@@ -129,7 +120,6 @@ export default function StorePosPage(props: PageProps) {
 
   const products = apiProducts;
 
-  // Debounce search and update filters
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((prev) => {
@@ -141,7 +131,6 @@ export default function StorePosPage(props: PageProps) {
     return () => clearTimeout(timer);
   }, [productSearch, setFilters]);
 
-  // Update category filter (avoid new filter objects when ids are unchanged — prevents render/update loops)
   useEffect(() => {
     const categoryId = activeCategory
       ? apiCategories.find((c) => c.name === activeCategory)?.id
@@ -160,11 +149,10 @@ export default function StorePosPage(props: PageProps) {
   const filteredCategories = useMemo(() => {
     if (!allCategories) return [];
     return allCategories.filter((c) =>
-      c.toLowerCase().includes(categorySearch.toLowerCase()),
+      c.toLowerCase().includes(categorySearch.toLowerCase())
     );
   }, [allCategories, categorySearch]);
 
-  // Use API hook for customers
   const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
   const allCustomers = allCustomersList || [];
 
@@ -180,7 +168,7 @@ export default function StorePosPage(props: PageProps) {
         customer.name
           .toLowerCase()
           .includes(customerSearchTerm.toLowerCase()) ||
-        customer.contact?.includes(customerSearchTerm),
+        customer.contact?.includes(customerSearchTerm)
     );
   }, [allCustomers, customerSearchTerm]);
 
@@ -237,7 +225,7 @@ export default function StorePosPage(props: PageProps) {
   const cartItems = Array.from(cart.values());
   const cartSubtotal = cartItems.reduce(
     (acc, item) => acc + (Number(item.totalPrice) || 0),
-    0,
+    0
   );
   const vat = cartSubtotal * 0.15;
   const serviceFee = 15.0;
@@ -249,7 +237,7 @@ export default function StorePosPage(props: PageProps) {
         "Cart is empty",
         "Add products to the cart before checkout.",
         "Add items and try again.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -258,7 +246,7 @@ export default function StorePosPage(props: PageProps) {
         "No customer selected",
         "A customer is required for this marketplace order.",
         "Click Add Customer and select a customer.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -274,7 +262,7 @@ export default function StorePosPage(props: PageProps) {
   const completingOrderRef = useRef(false);
 
   const handleCompleteSale = async (
-    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">,
+    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">
   ) => {
     if (completingOrderRef.current || isCompletingOrder) return;
     if (!currentStore || !storeId) {
@@ -282,7 +270,7 @@ export default function StorePosPage(props: PageProps) {
         "Order failed",
         "Store context was not found.",
         "Refresh the page and try again.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -292,7 +280,7 @@ export default function StorePosPage(props: PageProps) {
         "Order failed",
         "No customer was selected.",
         "Select a customer and try again.",
-        { code: ERROR_CODES.MARKETPLACE_ORDER },
+        { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
@@ -323,25 +311,21 @@ export default function StorePosPage(props: PageProps) {
         paymentMethod: transactionDetails.paymentMethod,
       };
 
-      const response = await createOrder(orderData);
+      const response = await createOrder(
+        orderData as CreateMarketplaceOrderDto
+      );
       const createdOrder = response.data;
 
       feedback.success(
         "Order created",
-        `Marketplace order ${createdOrder.orderCode} has been created successfully.`,
+        `Marketplace order ${createdOrder.orderCode} has been created successfully.`
       );
 
-      // Clear cart and reset state
       setCart(new Map());
       setSelectedCustomerId(undefined);
       setActivePaymentMethod(null);
     } catch (error: unknown) {
-      feedback.fromError(
-        error,
-        "Order failed",
-        "Check your connection and try again.",
-        ERROR_CODES.MARKETPLACE_ORDER,
-      );
+      console.error("Failed to create order:", error);
     } finally {
       completingOrderRef.current = false;
       setIsCompletingOrder(false);
@@ -351,7 +335,6 @@ export default function StorePosPage(props: PageProps) {
   return (
     <>
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-2 sm:gap-4 h-full p-2 sm:p-4 bg-slate-50">
-        {/* Product Selection */}
         <div className="lg:col-span-1 xl:col-span-3 bg-white rounded-lg p-2 sm:p-4 flex flex-col">
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -382,7 +365,7 @@ export default function StorePosPage(props: PageProps) {
               className="h-10 w-10 touch-target"
               onClick={() =>
                 setCategoryView((prev) =>
-                  prev === "carousel" ? "grid" : "carousel",
+                  prev === "carousel" ? "grid" : "carousel"
                 )
               }
             >
@@ -562,9 +545,7 @@ export default function StorePosPage(props: PageProps) {
           )}
         </div>
 
-        {/* Cart Section */}
         <div className="lg:col-span-1 xl:col-span-2 bg-white rounded-lg flex flex-col h-full lg:sticky lg:top-16">
-          {/* Child 1: Header */}
           <div className="p-2 sm:p-4 border-b shrink-0">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
               <div className="flex items-center gap-2">
@@ -646,7 +627,6 @@ export default function StorePosPage(props: PageProps) {
             </div>
           </div>
 
-          {/* Child 2: Cart Items */}
           <div style={{ height: "35%" }}>
             <ScrollArea className="h-full">
               {cartItems.length === 0 ? (
@@ -738,7 +718,6 @@ export default function StorePosPage(props: PageProps) {
             </ScrollArea>
           </div>
 
-          {/* Child 3: Payment Section */}
           {cartItems.length > 0 && (
             <div className="pt-4 p-4 border-t" style={{ height: "65%" }}>
               <div className="text-sm space-y-2 mb-4">

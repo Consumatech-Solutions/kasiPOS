@@ -167,7 +167,7 @@ export default function VoucherModal({
                     value={amountToApply}
                     onChange={(e) =>
                       setAmountToApply(
-                        Math.min(Number(e.target.value) || 0, cartTotal),
+                        Math.min(Number(e.target.value) || 0, cartTotal)
                       )
                     }
                     className="text-xl h-12 font-bold"

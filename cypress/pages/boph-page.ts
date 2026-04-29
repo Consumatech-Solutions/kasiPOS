@@ -19,7 +19,7 @@ export const BophPage = {
       .should("be.visible")
       .and("not.be.disabled");
     cy.findByRole("tab", { name: /incoming/i }, { timeout: 25_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     return this;
   },

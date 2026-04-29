@@ -12,7 +12,6 @@ import type {
   Store,
 } from "@/types";
 
-/** Isolated DB name in Vitest (see vitest.config.ts env) so dev data is not touched. */
 export const KASIPOS_INDEXEDDB_NAME =
   typeof process !== "undefined" && process.env.KASIPOS_TEST_DB === "1"
     ? "kasiPosDatabaseTest"
@@ -20,7 +19,7 @@ export const KASIPOS_INDEXEDDB_NAME =
 
 export interface ProductImageRecord {
   id: string;
-  productId: string; // Always stored as string to avoid IndexedDB type issues
+  productId: string;
   imageData: Blob;
   mimeType: string;
   size: number;
@@ -30,7 +29,6 @@ export interface ProductImageRecord {
   updatedAt: string;
 }
 
-// Interfaces for IndexedDB records with sync
 export interface CustomerRecord extends Customer {
   synced?: boolean;
   lastSyncedAt?: string;
@@ -48,12 +46,11 @@ export interface KeyValRecord {
 
 export interface MutationQueueRecord {
   id?: number;
-  mutationKey: string; // JSON string of string[]
+  mutationKey: string;
   variables: unknown;
   timestamp: number;
   retries: number;
   status?: string;
-  /** Stable per offline/queued sale; required for transaction dedupe and server Idempotency-Key */
   idempotencyKey?: string;
 }
 
@@ -236,12 +233,12 @@ export class KasiPosDexie extends Dexie {
           const customersTable = tx.table("customers");
           await customersTable.clear();
           console.log(
-            "Version 10: Cleared customers table to prepare for primary key change",
+            "Version 10: Cleared customers table to prepare for primary key change"
           );
         } catch (error) {
           // Table might not exist, which is OK
           console.log(
-            "Version 10: Customers table already removed or does not exist",
+            "Version 10: Customers table already removed or does not exist"
           );
         }
       });
@@ -312,7 +309,7 @@ export class KasiPosDexie extends Dexie {
           // Ignore errors - stores are now managed via API
           console.warn(
             "Store migration skipped (stores now managed via API):",
-            error,
+            error
           );
         }
       });
@@ -382,18 +379,12 @@ export class KasiPosDexie extends Dexie {
   }
 }
 
-// Singleton database instance
 let dbInstance: KasiPosDexie | null = null;
 
-/** Clears the singleton so the next getDb() opens a fresh connection (Vitest only). */
 export function resetKasiPosDbSingleton(): void {
   dbInstance = null;
 }
 
-/**
- * Close singleton and delete the IndexedDB database (Vitest isolation).
- * Prefer this over resetKasiPosDbSingleton alone when tests need a clean schema.
- */
 export async function resetDbInstanceForTests(): Promise<void> {
   if (typeof indexedDB === "undefined") return;
   if (dbInstance) {
@@ -407,12 +398,7 @@ export async function resetDbInstanceForTests(): Promise<void> {
   await Dexie.delete(KASIPOS_INDEXEDDB_NAME);
 }
 
-/**
- * Get the database instance. Must be called on the client (browser) only.
- * @throws {Error} If called on the server
- */
 export function getDb(): KasiPosDexie {
-  // Ensure we are on the client
   if (typeof window === "undefined") {
     throw new Error("Database can only be accessed on the client side");
   }
@@ -424,5 +410,4 @@ export function getDb(): KasiPosDexie {
   return dbInstance;
 }
 
-// Export for backward compatibility; uses getDb() to avoid SSR issues
 export const db = typeof window !== "undefined" ? getDb() : (null as any);

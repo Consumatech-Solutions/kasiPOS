@@ -68,7 +68,7 @@ describe("Vouchers", () => {
     cy.setOnline();
     PosPage.waitUntilLoaded();
     cy.findByRole("button", { name: /add customer/i, timeout: 30_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     cy.location("pathname").should("eq", "/");
     PosPage.ensureProductCarouselView();
@@ -85,7 +85,7 @@ describe("Vouchers", () => {
       .should("have.property", "valid", true);
     cy.findByRole("alert", { timeout: 15_000 }).should(
       "contain.text",
-      "Voucher Found!",
+      "Voucher Found!"
     );
     cy.findByRole("button", { name: /apply discount/i })
       .should("be.enabled")
@@ -102,7 +102,7 @@ describe("Vouchers", () => {
     cy.setOnline();
     PosPage.waitUntilLoaded();
     cy.findByRole("button", { name: /add customer/i, timeout: 30_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     cy.location("pathname").should("eq", "/");
     PosPage.ensureProductCarouselView();

@@ -12,14 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { TransactionItem } from "@/types";
-import {
-  Printer,
-  Download,
-  Mail,
-  MessageCircle,
-  Settings,
-  Loader2,
-} from "lucide-react";
+import { Printer, Download, Mail, MessageCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DeviceSelector } from "@/components/device-selector";
 import { PrinterSetupModal } from "@/components/hardware-setup/PrinterSetupModal";
@@ -95,7 +88,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             <td style="text-align:center">${item.quantity}</td>
             <td style="text-align:right">R ${(item.unitPrice ?? 0).toFixed(2)}</td>
             <td style="text-align:right">R ${(item.totalPrice ?? 0).toFixed(2)}</td>
-          </tr>`,
+          </tr>`
       )
       .join("");
     const discountRow =
@@ -132,7 +125,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   };
 
   const buildThermalReceipt = async (
-    receiptData: ReceiptData,
+    receiptData: ReceiptData
   ): Promise<Uint8Array> => {
     const formattedDate = formatReceiptDate(receiptData.timestamp);
 
@@ -187,7 +180,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         <Text align="center">Thank you for your purchase</Text>
         <Br />
         <Cut />
-      </ThermalPrinter>,
+      </ThermalPrinter>
     );
   };
 
@@ -196,12 +189,9 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
 
     setIsPrinting(true);
     try {
-      // Check for stored printer device
       const deviceId = getStoredDevice("printer");
 
-      // If no device stored, show device selector
       if (!deviceId) {
-        // Check if devices are available
         try {
           const devices = await getDevices("printer");
           if (devices.length === 0) {
@@ -218,7 +208,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             setIsPrinting(false);
             return;
           }
-          // Show device selector
           setShowDeviceSelector(true);
           setIsPrinting(false);
           return;
@@ -233,10 +222,8 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         }
       }
 
-      // Build thermal receipt
       const receiptData = await buildThermalReceipt(data);
 
-      // Print to device
       await printReceipt(deviceId, receiptData);
 
       toast({
@@ -267,8 +254,6 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   };
 
   const handleDeviceSelect = async (deviceId: string) => {
-    // Device is already stored by DeviceSelector component
-    // Now print with the selected device
     if (data) {
       setIsPrinting(true);
       setShowDeviceSelector(false);
@@ -310,7 +295,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
       feedback.error(
         "Print blocked",
         "Your browser blocked the print window.",
-        "Allow pop-ups for this site and try again.",
+        "Allow pop-ups for this site and try again."
       );
       return;
     }
@@ -347,7 +332,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const handleDownloadPdf = () => {
     feedback.success(
       "Save as PDF",
-      'Use the print dialog and choose "Save as PDF" as the destination.',
+      'Use the print dialog and choose "Save as PDF" as the destination.'
     );
     handlePrint();
   };
@@ -355,18 +340,16 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const handleEmailReceipt = () => {
     feedback.success(
       "Coming soon",
-      "Email receipt delivery will be available in a future update.",
+      "Email receipt delivery will be available in a future update."
     );
   };
 
   const handleSmsReceipt = () => {
     feedback.success(
       "Coming soon",
-      "SMS receipt delivery will be available in a future update.",
+      "SMS receipt delivery will be available in a future update."
     );
   };
-
-  const VAT_RATE = 15;
 
   return (
     <Dialog

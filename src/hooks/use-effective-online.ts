@@ -1,25 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { offlineDetector } from '@/lib/offline-detector';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { offlineDetector } from "@/lib/offline-detector";
 
 const PROBE_INTERVAL_MS = 20000;
 
-/**
- * True when the browser reports online and a HEAD probe to the API base URL succeeds.
- * Bypasses offline-first mode (uses offlineDetector.forceCheck). For UI gating only —
- * use useNetworkStatus for React Query pause/resume semantics.
- */
 export function useEffectiveOnline() {
   const [hasBrowserOnline, setHasBrowserOnline] = useState(
-    typeof window !== 'undefined' ? navigator.onLine : true
+    typeof window !== "undefined" ? navigator.onLine : true
   );
   const [backendReachable, setBackendReachable] = useState(false);
   const [isProbing, setIsProbing] = useState(false);
   const mountedRef = useRef(true);
 
   const runProbe = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === "undefined") return false;
     if (!navigator.onLine) {
       if (mountedRef.current) setBackendReachable(false);
       return false;
@@ -46,8 +41,8 @@ export function useEffectiveOnline() {
       setBackendReachable(false);
     };
 
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
     setHasBrowserOnline(navigator.onLine);
     if (navigator.onLine) void runProbe();
 
@@ -57,8 +52,8 @@ export function useEffectiveOnline() {
 
     return () => {
       mountedRef.current = false;
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
       window.clearInterval(intervalId);
     };
   }, [runProbe]);

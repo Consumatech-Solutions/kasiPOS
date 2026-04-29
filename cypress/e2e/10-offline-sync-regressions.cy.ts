@@ -21,7 +21,7 @@ function triggerManualSync() {
           .find("button")
           .toArray()
           .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim()),
+            /sync to cloud now/i.test((el.textContent ?? "").trim())
           );
         const dialogText = ($dialog.last().text() ?? "").toLowerCase();
         const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
@@ -32,7 +32,7 @@ function triggerManualSync() {
       interval: 500,
       description: "wait for sync action button",
       errorMsg: "Sync action button was not rendered in cloud sync modal",
-    },
+    }
   );
   // CI can validly settle in a terminal sync state where no manual action button is shown.
   cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).then(
@@ -49,7 +49,7 @@ function triggerManualSync() {
         return;
       }
       expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
-    },
+    }
   );
 }
 
@@ -132,17 +132,17 @@ describe("Offline sync regressions", () => {
     cy.wait("@createCategory", { timeout: 30_000 }).then((interception) => {
       expect(interception.response?.statusCode).to.eq(201);
       expect(interception.request.body?.name).to.match(
-        new RegExp(categoryName, "i"),
+        new RegExp(categoryName, "i")
       );
     });
     cy.wait("@createProduct", { timeout: 30_000 }).then((interception) => {
       expect(interception.response?.statusCode).to.eq(201);
       expect(String(interception.request.body?.name ?? "")).to.match(
-        new RegExp(productName, "i"),
+        new RegExp(productName, "i")
       );
       expect(interception.request.body?.categoryId).to.be.a("string");
       expect(
-        String(interception.request.body?.categoryId ?? "").length,
+        String(interception.request.body?.categoryId ?? "").length
       ).to.be.greaterThan(0);
     });
 

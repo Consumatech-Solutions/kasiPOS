@@ -1,8 +1,3 @@
-/**
- * Fetches full catalogue pages from the API into Dexie when local cache is empty for the current store.
- * Listing hooks read only Dexie; without this, a missed sync or purge leaves the UI empty until manual sync.
- */
-
 import { catalogueApi } from "@/lib/api/catalogue";
 import { customersApi } from "@/lib/api/customers";
 import type { ApiCategory, ApiProduct } from "@/types/catalogue";
@@ -15,7 +10,7 @@ import {
 } from "@/lib/entity-cache";
 
 export function normalizeProducts(
-  response: Awaited<ReturnType<typeof catalogueApi.products.getAll>>,
+  response: Awaited<ReturnType<typeof catalogueApi.products.getAll>>
 ): ApiProduct[] {
   if (
     response &&
@@ -30,7 +25,7 @@ export function normalizeProducts(
 }
 
 export function productsMetaFromResponse(
-  response: Awaited<ReturnType<typeof catalogueApi.products.getAll>>,
+  response: Awaited<ReturnType<typeof catalogueApi.products.getAll>>
 ): PaginationMeta | null {
   if (
     response &&
@@ -50,7 +45,7 @@ type PullAllOptions = {
 };
 
 function normalizeCategories(
-  response: Awaited<ReturnType<typeof catalogueApi.categories.getAll>>,
+  response: Awaited<ReturnType<typeof catalogueApi.categories.getAll>>
 ): ApiCategory[] {
   if (
     response &&
@@ -65,7 +60,7 @@ function normalizeCategories(
 }
 
 function categoriesMeta(
-  response: Awaited<ReturnType<typeof catalogueApi.categories.getAll>>,
+  response: Awaited<ReturnType<typeof catalogueApi.categories.getAll>>
 ): PaginationMeta | null {
   if (
     response &&
@@ -80,7 +75,7 @@ function categoriesMeta(
 
 export async function pullAllProductsFromApi(
   storeIdForDexie: string,
-  options?: PullAllOptions,
+  options?: PullAllOptions
 ): Promise<number> {
   const useStoreParam = options?.storeIdQueryParam !== false;
   const updatedAtAfter = options?.updatedAtAfter;
@@ -113,7 +108,7 @@ export async function pullAllProductsFromApi(
 
 export async function pullAllCategoriesFromApi(
   storeIdForDexie: string,
-  options?: PullAllOptions,
+  options?: PullAllOptions
 ): Promise<number> {
   const useStoreParam = options?.storeIdQueryParam !== false;
   const updatedAtAfter = options?.updatedAtAfter;
@@ -145,7 +140,7 @@ export async function pullAllCategoriesFromApi(
 }
 
 function normalizeCustomers(
-  response: Awaited<ReturnType<typeof customersApi.getAll>>["data"],
+  response: Awaited<ReturnType<typeof customersApi.getAll>>["data"]
 ): Customer[] {
   if (
     response &&
@@ -160,7 +155,7 @@ function normalizeCustomers(
 }
 
 function customersMetaFromResponse(
-  response: Awaited<ReturnType<typeof customersApi.getAll>>["data"],
+  response: Awaited<ReturnType<typeof customersApi.getAll>>["data"]
 ): PaginationMeta | null {
   if (
     response &&
@@ -180,7 +175,7 @@ type PullAllCustomersOptions = {
 };
 
 export async function pullAllCustomersFromApi(
-  options?: PullAllCustomersOptions,
+  options?: PullAllCustomersOptions
 ): Promise<number> {
   const storeId = options?.storeId;
   const updatedAtAfter = options?.updatedAtAfter;
@@ -212,11 +207,10 @@ export async function pullAllCustomersFromApi(
   return saved;
 }
 
-/** Shape GET /products for React Query (handles `{ data, meta }` or a raw array). */
 export function parseProductsListResponse(
   response: Awaited<ReturnType<typeof catalogueApi.products.getAll>>,
   page: number,
-  limit: number,
+  limit: number
 ): { data: ApiProduct[]; meta: PaginationMeta } {
   const data = normalizeProducts(response);
   const metaFromApi = productsMetaFromResponse(response);
@@ -234,11 +228,10 @@ export function parseProductsListResponse(
   };
 }
 
-/** Shape GET /categories for React Query (handles `{ data, meta }` or a raw array). */
 export function parseCategoriesListResponse(
   response: Awaited<ReturnType<typeof catalogueApi.categories.getAll>>,
   page: number,
-  limit: number,
+  limit: number
 ): { data: ApiCategory[]; meta: PaginationMeta } {
   const data = normalizeCategories(response);
   const metaFromApi = categoriesMeta(response);

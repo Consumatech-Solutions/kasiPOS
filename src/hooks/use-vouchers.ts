@@ -26,7 +26,7 @@ export const voucherKeys = {
 };
 
 function normalizeVoucherResponse(
-  response: Voucher[] | PaginatedResponse<Voucher>,
+  response: Voucher[] | PaginatedResponse<Voucher>
 ): { data: Voucher[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
@@ -102,7 +102,7 @@ export function useVouchers(options: UseVouchersOptions = {}) {
               ...previousData.meta,
               total: previousData.meta.total + 1,
             },
-          },
+          }
         );
       }
 
@@ -122,10 +122,10 @@ export function useVouchers(options: UseVouchersOptions = {}) {
           return {
             ...old,
             data: old.data.map((v) =>
-              v.id?.startsWith("temp-") ? newVoucher : v,
+              v.id?.startsWith("temp-") ? newVoucher : v
             ),
           };
-        },
+        }
       );
       queryClient.invalidateQueries({ queryKey: voucherKeys.lists() });
     },
@@ -149,9 +149,9 @@ export function useVouchers(options: UseVouchersOptions = {}) {
             data: previousData.data.map((v) =>
               v.id === id
                 ? { ...v, ...data, updatedAt: new Date().toISOString() }
-                : v,
+                : v
             ),
-          },
+          }
         );
       }
 
@@ -186,7 +186,7 @@ export function useVouchers(options: UseVouchersOptions = {}) {
               ...previousData.meta,
               total: Math.max(0, previousData.meta.total - 1),
             },
-          },
+          }
         );
       }
 
@@ -204,7 +204,7 @@ export function useVouchers(options: UseVouchersOptions = {}) {
 
   const validateMutation = useMutation({
     mutationFn: async (
-      data: ValidateVoucherDto,
+      data: ValidateVoucherDto
     ): Promise<ValidateVoucherResponse> => {
       const response = await vouchersApi.validate(data);
       return response.data;

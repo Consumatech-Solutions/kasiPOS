@@ -1,10 +1,3 @@
-/**
- * Transactions API – aligned with backend spec:
- *
- * POST   /transactions        Create a transaction (sale). Body: application/json. 201 = created.
- * GET    /transactions        List transactions. Query: page (default 1), limit (default 10, max 100), date (ISO), customerId (UUID), search (transaction ID). 200 = ok, 401 = unauthorized.
- * GET    /transactions/{id}   Get transaction by ID (UUID). 200 = ok, 401 = unauthorized, 404 = not found.
- */
 import { api } from "./core";
 import type {
   Transaction,
@@ -23,35 +16,25 @@ export type CreateTransactionItemDto = {
 };
 
 export type CreateTransactionDto = {
-  /** Store ID: UUID string from backend. */
   storeId: string;
   customerId?: string;
   items: CreateTransactionItemDto[];
   total: number;
   paymentMethod: "Cash" | "Card" | "Mobile Money" | "Credit";
   voucherCode?: string;
-  /** @deprecated Prefer discount object. */
   discountAmount?: number;
-  /** Structured discount (manual apply discount). Optional. */
   discount?: TransactionDiscount;
-  /** Required when paymentMethod is 'Credit'. */
   creditDetails?: TransactionCreditDetails;
 };
 
 export interface GetTransactionsParams extends PaginationParams {
-  /** Page number (default 1) */
   page?: number;
-  /** Items per page (default 10, max 100) */
   limit?: number;
-  /** Filter by date (ISO date string, e.g. 2024-01-15) */
   date?: string;
-  /** Filter by customer ID (UUID) */
   customerId?: string;
-  /** Search by transaction ID */
   search?: string;
 }
 
-/** Normalize transaction-like data into CreateTransactionDto (storeId as UUID string, productId string, no extra fields). */
 export function toCreateTransactionDto(raw: {
   storeId: string | number;
   customerId?: string | null;
@@ -122,7 +105,7 @@ export function toCreateTransactionDto(raw: {
 export const transactionsApi = {
   create: (
     data: CreateTransactionDto,
-    options?: { idempotencyKey?: string },
+    options?: { idempotencyKey?: string }
   ) => {
     const headers =
       options?.idempotencyKey != null && options.idempotencyKey !== ""
@@ -131,13 +114,10 @@ export const transactionsApi = {
     return api.post<Transaction>(
       "/transactions",
       data,
-      headers ? { headers } : undefined,
+      headers ? { headers } : undefined
     );
   },
 
-  /**
-   * Get all transactions with pagination and filters
-   */
   getAll: (params?: GetTransactionsParams) => {
     const requestParams: Record<string, number | string> = {};
     if (params?.page !== undefined) requestParams.page = params.page;
@@ -155,7 +135,7 @@ export const transactionsApi = {
       {
         params:
           Object.keys(requestParams).length > 0 ? requestParams : undefined,
-      },
+      }
     );
   },
 

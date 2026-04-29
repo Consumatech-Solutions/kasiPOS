@@ -69,7 +69,7 @@ describe("Customers", () => {
     PosPage.addProduct("Cola 330ml", 2);
     PosPage.selectCustomerFromDialog("Alice Mokoena");
     cy.findByRole("button", { name: /alice mokoena/i, timeout: 15_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     PosPage.choosePaymentMethod("Cash");
     cy.get("body").then(($body) => {
@@ -92,11 +92,11 @@ describe("Customers", () => {
     });
     cy.wait("@createTransaction").then((interception) => {
       const total = Number(
-        (interception.request.body as { total?: number }).total ?? 0,
+        (interception.request.body as { total?: number }).total ?? 0
       );
       const earnedPoints = Math.max(1, Math.floor(total / 10));
       cy.wrap(startingPoints + earnedPoints, { log: false }).as(
-        "expectedPoints",
+        "expectedPoints"
       );
     });
 
@@ -126,7 +126,7 @@ describe("Customers", () => {
     cy.findByRole("button", { name: /^create$/i }).click();
     cy.wait("@customerCreateFailure");
     cy.findByRole("dialog", { name: /add customer/i, timeout: 15_000 }).should(
-      "be.visible",
+      "be.visible"
     );
     cy.contains("tr", /failure user/i).should("not.exist");
   });

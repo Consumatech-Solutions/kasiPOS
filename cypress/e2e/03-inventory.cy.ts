@@ -54,7 +54,7 @@ describe("Inventory", () => {
       .last()
       .within(() => {
         cy.get('input[type="number"]', { timeout: 15_000 }).should(
-          "be.visible",
+          "be.visible"
         );
         cy.get('input[type="number"]', { timeout: 15_000 }).clear();
         cy.get('input[type="number"]', { timeout: 15_000 }).type("15");

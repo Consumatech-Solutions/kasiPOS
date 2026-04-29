@@ -1,63 +1,91 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Transaction, TransactionItem, Customer } from '@/types';
-import { Separator } from '@/components/ui/separator';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Phone, Loader2, CreditCard, CheckCircle2, XCircle, Settings } from 'lucide-react';
-import { DeviceSelector } from '@/components/device-selector';
-import { getStoredDevice, connectPos, getDevices } from '@/lib/device-service';
-import { useToast } from '@/hooks/use-toast';
-
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Transaction, TransactionItem, Customer } from "@/types";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Phone,
+  Loader2,
+  CreditCard,
+  CheckCircle2,
+  XCircle,
+  Settings,
+} from "lucide-react";
+import { DeviceSelector } from "@/components/device-selector";
+import { getStoredDevice, connectPos, getDevices } from "@/lib/device-service";
+import { useToast } from "@/hooks/use-toast";
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  method: 'Cash' | 'Card' | 'Mobile Money' | null;
+  method: "Cash" | "Card" | "Mobile Money" | null;
   cartTotal: number;
   cartItems: TransactionItem[];
-  onCompleteSale: (transaction: Omit<Transaction, 'id' | 'date' | 'storeId'>) => void;
+  onCompleteSale: (
+    transaction: Omit<Transaction, "id" | "date" | "storeId">
+  ) => void;
   customer: Customer | null | undefined;
   isLoading?: boolean;
 }
 
-const mobileMoneyOptions = ['MTN MoMo', 'Vodacom VodaPay', 'InstantMoney (Standard Bank)', 'eWallet (FNB)', 'CashSend (ABSA)', 'Imali (Nedbank)'];
+const mobileMoneyOptions = [
+  "MTN MoMo",
+  "Vodacom VodaPay",
+  "InstantMoney (Standard Bank)",
+  "eWallet (FNB)",
+  "CashSend (ABSA)",
+  "Imali (Nedbank)",
+];
 
-export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartItems, onCompleteSale, customer, isLoading = false }: PaymentModalProps) {
-  const [tendered, setTendered] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [selectedMobileProvider, setSelectedMobileProvider] = useState('');
+export default function PaymentModal({
+  isOpen,
+  onClose,
+  method,
+  cartTotal,
+  cartItems,
+  onCompleteSale,
+  customer,
+  isLoading = false,
+}: PaymentModalProps) {
+  const [tendered, setTendered] = useState("");
+  const [mobileNumber, setMobileNumber] = useState("");
+  const [selectedMobileProvider, setSelectedMobileProvider] = useState("");
   const [showPosDeviceSelector, setShowPosDeviceSelector] = useState(false);
   const [posConnected, setPosConnected] = useState(false);
   const [isConnectingPos, setIsConnectingPos] = useState(false);
   const { toast } = useToast();
 
   const tenderedAmount = parseFloat(tendered) || 0;
-  // Prevent negative change on initial load or when amount tendered is insufficient
   const change = Math.max(0, tenderedAmount - cartTotal);
   const canCompleteCashSale = tenderedAmount >= cartTotal;
   const isInsufficient = tenderedAmount > 0 && tenderedAmount < cartTotal;
-  const canCompleteMobileSale = (customer?.contact || mobileNumber.length > 10) && selectedMobileProvider;
-
+  const canCompleteMobileSale =
+    (customer?.contact || mobileNumber.length > 10) && selectedMobileProvider;
 
   useEffect(() => {
-    // Reset local state when modal opens or method changes
     if (isOpen) {
-      setTendered('');
-      setMobileNumber(customer?.contact || '');
-      setSelectedMobileProvider('');
+      setTendered("");
+      setMobileNumber(customer?.contact || "");
+      setSelectedMobileProvider("");
       setPosConnected(false);
-      
-      // Check for POS device when Card payment is selected
-      if (method === 'Card') {
-        const deviceId = getStoredDevice('pos');
+
+      if (method === "Card") {
+        const deviceId = getStoredDevice("pos");
         if (deviceId) {
-          // Try to connect to POS device
           handleConnectPos(deviceId);
         }
       }
@@ -70,15 +98,15 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
       await connectPos(deviceId);
       setPosConnected(true);
       toast({
-        title: 'POS device connected',
-        description: 'Card reader is ready to process payments.',
+        title: "POS device connected",
+        description: "Card reader is ready to process payments.",
       });
     } catch (error: any) {
       setPosConnected(false);
       toast({
-        variant: 'destructive',
-        title: 'POS connection failed',
-        description: error.message || 'Failed to connect to POS device.',
+        variant: "destructive",
+        title: "POS connection failed",
+        description: error.message || "Failed to connect to POS device.",
       });
     } finally {
       setIsConnectingPos(false);
@@ -86,16 +114,15 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
   };
 
   const handlePosDeviceSelect = async (deviceId: string) => {
-    // Device is already stored by DeviceSelector component
     await handleConnectPos(deviceId);
   };
-  
+
   const handleKeyPress = (key: string) => {
-    if (key === '.' && tendered.includes('.')) return;
+    if (key === "." && tendered.includes(".")) return;
     setTendered(tendered + key);
   };
-  
-  const handleClear = () => setTendered('');
+
+  const handleClear = () => setTendered("");
   const handleBackspace = () => setTendered(tendered.slice(0, -1));
 
   const handleCompleteCashSale = () => {
@@ -103,13 +130,13 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
     onCompleteSale({
       items: cartItems,
       total: cartTotal,
-      paymentMethod: 'Cash',
+      paymentMethod: "Cash",
     });
   };
 
   const handlePlaceholderComplete = () => {
     if (isLoading || !method) return;
-    if (method === 'Mobile Money' && !canCompleteMobileSale) return;
+    if (method === "Mobile Money" && !canCompleteMobileSale) return;
     onCompleteSale({
       items: cartItems,
       total: cartTotal,
@@ -119,13 +146,24 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
 
   const renderContent = () => {
     switch (method) {
-      case 'Cash':
+      case "Cash":
         const quickBills = [50, 100, 200];
-        const keypadKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0'];
+        const keypadKeys = [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          ".",
+          "0",
+        ];
 
         return (
           <div className="grid grid-cols-2 gap-6">
-            {/* Left Column: Totals */}
             <div className="flex flex-col">
               <DialogHeader className="mb-4">
                 <DialogTitle className="text-2xl">Cash Payment</DialogTitle>
@@ -137,14 +175,18 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Items:</span>
-                  <span className="font-bold">{cartItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                  <span className="font-bold">
+                    {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                  </span>
                 </div>
               </div>
               <Separator className="my-6" />
               <div className="space-y-4 text-lg">
-                 <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Tendered:</span>
-                  <span className="font-bold text-primary">R {tenderedAmount.toFixed(2)}</span>
+                  <span className="font-bold text-primary">
+                    R {tenderedAmount.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Change:</span>
@@ -154,68 +196,119 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                 </div>
                 {tenderedAmount === 0 && (
                   <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-                    No amount entered. Enter the amount received from the customer.
+                    No amount entered. Enter the amount received from the
+                    customer.
                   </p>
                 )}
                 {isInsufficient && (
                   <p className="text-sm text-destructive">
-                    Amount insufficient. Add R {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
+                    Amount insufficient. Add R{" "}
+                    {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Right Column: Input & Keypad */}
             <div>
               <div className="mb-4">
-                <label htmlFor="tendered" className="text-sm text-muted-foreground">Amount Tendered</label>
-                <Input 
-                  id="tendered" 
-                  value={tendered ? `R ${tendered}`: ''} 
-                  placeholder="R 0.00" 
-                  className="text-2xl h-14 text-right font-mono" 
-                  readOnly 
+                <label
+                  htmlFor="tendered"
+                  className="text-sm text-muted-foreground"
+                >
+                  Amount Tendered
+                </label>
+                <Input
+                  id="tendered"
+                  value={tendered ? `R ${tendered}` : ""}
+                  placeholder="R 0.00"
+                  className="text-2xl h-14 text-right font-mono"
+                  readOnly
                 />
               </div>
               <div className="grid grid-cols-4 gap-2 mb-4">
-                {quickBills.map(bill => (
-                    <Button key={bill} type="button" variant="outline" className="h-12" onClick={() => setTendered(bill.toString())} disabled={isLoading}>R{bill}</Button>
+                {quickBills.map((bill) => (
+                  <Button
+                    key={bill}
+                    type="button"
+                    variant="outline"
+                    className="h-12"
+                    onClick={() => setTendered(bill.toString())}
+                    disabled={isLoading}
+                  >
+                    R{bill}
+                  </Button>
                 ))}
-                 <Button type="button" variant="outline" className="h-12" onClick={() => setTendered(cartTotal.toFixed(2))} disabled={isLoading}>EXACT</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12"
+                  onClick={() => setTendered(cartTotal.toFixed(2))}
+                  disabled={isLoading}
+                >
+                  EXACT
+                </Button>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                {keypadKeys.map(key => (
-                    <Button key={key} type="button" variant="outline" className="h-12 text-xl" onClick={() => handleKeyPress(key)} disabled={isLoading}>{key}</Button>
+                {keypadKeys.map((key) => (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant="outline"
+                    className="h-12 text-xl"
+                    onClick={() => handleKeyPress(key)}
+                    disabled={isLoading}
+                  >
+                    {key}
+                  </Button>
                 ))}
-                <Button type="button" variant="outline" className="h-12 text-xl" onClick={handleBackspace} disabled={isLoading}>&larr;</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 text-xl"
+                  onClick={handleBackspace}
+                  disabled={isLoading}
+                >
+                  &larr;
+                </Button>
               </div>
               <DialogFooter className="mt-4 gap-2">
-                  <Button type="button" variant="secondary" className="w-full h-14 touch-target" onClick={handleClear} disabled={isLoading}>Clear</Button>
-                  <Button
-                    type="button"
-                    className="w-full h-14 touch-target px-4"
-                    onClick={handleCompleteCashSale}
-                    disabled={!canCompleteCashSale || isLoading}
-                    aria-busy={isLoading}
-                    aria-disabled={!canCompleteCashSale || isLoading}
-                  >
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
-                    {isLoading ? 'Processing...' : 'Complete Sale'}
-                  </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full h-14 touch-target"
+                  onClick={handleClear}
+                  disabled={isLoading}
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  className="w-full h-14 touch-target px-4"
+                  onClick={handleCompleteCashSale}
+                  disabled={!canCompleteCashSale || isLoading}
+                  aria-busy={isLoading}
+                  aria-disabled={!canCompleteCashSale || isLoading}
+                >
+                  {isLoading && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
+                  )}
+                  {isLoading ? "Processing..." : "Complete Sale"}
+                </Button>
               </DialogFooter>
             </div>
           </div>
         );
-      case 'Card':
-        const posDeviceId = getStoredDevice('pos');
+      case "Card":
+        const posDeviceId = getStoredDevice("pos");
         return (
           <div>
             <DialogHeader className="text-center mb-6">
-                <DialogTitle className="text-2xl">Card Payment</DialogTitle>
-                <DialogDescription>Total amount to be charged to the card.</DialogDescription>
+              <DialogTitle className="text-2xl">Card Payment</DialogTitle>
+              <DialogDescription>
+                Total amount to be charged to the card.
+              </DialogDescription>
             </DialogHeader>
-            
-            {/* POS Device Connection Status */}
+
             <div className="mb-6">
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
                 <div className="flex items-center gap-3">
@@ -223,7 +316,7 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                   <div>
                     <p className="font-semibold text-sm">POS Device</p>
                     <p className="text-xs text-muted-foreground">
-                      {posDeviceId ? 'Device selected' : 'No device selected'}
+                      {posDeviceId ? "Device selected" : "No device selected"}
                     </p>
                   </div>
                 </div>
@@ -231,17 +324,23 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                   {isConnectingPos ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Connecting...</span>
+                      <span className="text-xs text-muted-foreground">
+                        Connecting...
+                      </span>
                     </>
                   ) : posConnected ? (
                     <>
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <span className="text-xs text-green-600 font-medium">Connected</span>
+                      <span className="text-xs text-green-600 font-medium">
+                        Connected
+                      </span>
                     </>
                   ) : (
                     <>
                       <XCircle className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">Not Connected</span>
+                      <span className="text-xs text-muted-foreground">
+                        Not Connected
+                      </span>
                     </>
                   )}
                   <Button
@@ -252,89 +351,132 @@ export default function PaymentModal({ isOpen, onClose, method, cartTotal, cartI
                     disabled={isConnectingPos}
                   >
                     <Settings className="h-4 w-4 mr-1" />
-                    {posDeviceId ? 'Change' : 'Select'}
+                    {posDeviceId ? "Change" : "Select"}
                   </Button>
                 </div>
               </div>
             </div>
 
-             <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
-                <p className="text-4xl font-bold text-foreground">R {cartTotal.toFixed(2)}</p>
-                <p className="mt-2">
-                  {posConnected 
-                    ? 'Waiting for card machine interaction...' 
-                    : posDeviceId 
-                      ? 'Connect to POS device to process payment'
-                      : 'Select a POS device to process payment'}
-                </p>
+            <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
+              <p className="text-4xl font-bold text-foreground">
+                R {cartTotal.toFixed(2)}
+              </p>
+              <p className="mt-2">
+                {posConnected
+                  ? "Waiting for card machine interaction..."
+                  : posDeviceId
+                    ? "Connect to POS device to process payment"
+                    : "Select a POS device to process payment"}
+              </p>
             </div>
             <DialogFooter className="mt-6">
-                <DialogClose asChild><Button type="button" variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
-                <Button 
-                  type="button" 
-                  onClick={handlePlaceholderComplete} 
-                  className="w-full min-h-[44px] touch-target" 
-                  disabled={isLoading || !posConnected} 
-                  aria-busy={isLoading}
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full min-h-[44px] touch-target"
+                  disabled={isLoading}
                 >
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
-                  {isLoading ? 'Processing...' : posConnected ? 'Process Payment' : 'Connect POS Device First'}
+                  Cancel
                 </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                onClick={handlePlaceholderComplete}
+                className="w-full min-h-[44px] touch-target"
+                disabled={isLoading || !posConnected}
+                aria-busy={isLoading}
+              >
+                {isLoading && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
+                )}
+                {isLoading
+                  ? "Processing..."
+                  : posConnected
+                    ? "Process Payment"
+                    : "Connect POS Device First"}
+              </Button>
             </DialogFooter>
           </div>
         );
-      case 'Mobile Money':
+      case "Mobile Money":
         return (
-            <div>
-              <DialogHeader className="mb-6">
-                  <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
-                  <DialogDescription>Select a provider and confirm the mobile number to send the USSD push to.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-6">
-                {customer ? (
-                  <Alert>
-                    <Phone className="h-4 w-4" />
-                    <AlertTitle>Confirm Customer</AlertTitle>
-                    <AlertDescription>
-                      The payment request will be sent to <strong>{customer.name}</strong> at <strong>{customer.contact}</strong>.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <div>
-                    <Label htmlFor="mobileNumber">Mobile Number</Label>
-                    <Input 
-                      id="mobileNumber" 
-                      type="tel"
-                      placeholder="Enter mobile number" 
-                      value={mobileNumber}
-                      onChange={(e) => setMobileNumber(e.target.value)}
-                    />
-                  </div>
-                )}
-                
+          <div>
+            <DialogHeader className="mb-6">
+              <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
+              <DialogDescription>
+                Select a provider and confirm the mobile number to send the USSD
+                push to.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              {customer ? (
+                <Alert>
+                  <Phone className="h-4 w-4" />
+                  <AlertTitle>Confirm Customer</AlertTitle>
+                  <AlertDescription>
+                    The payment request will be sent to{" "}
+                    <strong>{customer.name}</strong> at{" "}
+                    <strong>{customer.contact}</strong>.
+                  </AlertDescription>
+                </Alert>
+              ) : (
                 <div>
-                  <Label>Select Provider</Label>
-                  <RadioGroup 
-                    value={selectedMobileProvider}
-                    onValueChange={setSelectedMobileProvider}
-                    className="grid grid-cols-2 gap-4 mt-2"
-                  >
-                    {mobileMoneyOptions.map(option => (
-                      <div key={option} className="flex items-center space-x-2">
-                        <RadioGroupItem value={option} id={option} />
-                        <Label htmlFor={option} className="font-normal">{option}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
+                  <Label htmlFor="mobileNumber">Mobile Number</Label>
+                  <Input
+                    id="mobileNumber"
+                    type="tel"
+                    placeholder="Enter mobile number"
+                    value={mobileNumber}
+                    onChange={(e) => setMobileNumber(e.target.value)}
+                  />
                 </div>
+              )}
+
+              <div>
+                <Label>Select Provider</Label>
+                <RadioGroup
+                  value={selectedMobileProvider}
+                  onValueChange={setSelectedMobileProvider}
+                  className="grid grid-cols-2 gap-4 mt-2"
+                >
+                  {mobileMoneyOptions.map((option) => (
+                    <div key={option} className="flex items-center space-x-2">
+                      <RadioGroupItem value={option} id={option} />
+                      <Label htmlFor={option} className="font-normal">
+                        {option}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
               </div>
-              <DialogFooter className="mt-8">
-                  <DialogClose asChild><Button type="button" variant="secondary" className="w-full min-h-[44px] touch-target" disabled={isLoading}>Cancel</Button></DialogClose>
-                  <Button type="button" onClick={handlePlaceholderComplete} className="w-full min-h-[44px] touch-target px-4" disabled={!canCompleteMobileSale || isLoading} aria-busy={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />}
-                    {isLoading ? 'Processing...' : `Send Payment Request for R${cartTotal.toFixed(2)}`}
-                  </Button>
-              </DialogFooter>
+            </div>
+            <DialogFooter className="mt-8">
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full min-h-[44px] touch-target"
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                onClick={handlePlaceholderComplete}
+                className="w-full min-h-[44px] touch-target px-4"
+                disabled={!canCompleteMobileSale || isLoading}
+                aria-busy={isLoading}
+              >
+                {isLoading && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
+                )}
+                {isLoading
+                  ? "Processing..."
+                  : `Send Payment Request for R${cartTotal.toFixed(2)}`}
+              </Button>
+            </DialogFooter>
           </div>
         );
       default:

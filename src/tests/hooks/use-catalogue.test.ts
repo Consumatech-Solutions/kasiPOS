@@ -87,7 +87,7 @@ describe("useCategories", () => {
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
       {
         wrapper: createWrapper(),
-      },
+      }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.categories).toHaveLength(1);
@@ -111,7 +111,7 @@ describe("useCategories", () => {
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
       {
         wrapper: createWrapper(),
-      },
+      }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.categories).toHaveLength(1);
@@ -132,12 +132,12 @@ describe("useCategories", () => {
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
       {
         wrapper: createWrapper(),
-      },
+      }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.categories).toHaveLength(1);
     await expect(
-      result.current.createCategory({ name: "NewCat" }),
+      result.current.createCategory({ name: "NewCat" })
     ).rejects.toThrow("network");
     await waitFor(() => expect(result.current.categories).toHaveLength(1));
     expect(result.current.categories[0].name).toBe("Existing");
@@ -166,7 +166,7 @@ describe("useCategories", () => {
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
       {
         wrapper: createWrapper(),
-      },
+      }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
@@ -174,8 +174,8 @@ describe("useCategories", () => {
     });
     await waitFor(() =>
       expect(result.current.categories.some((c) => c.id === "srv-cat")).toBe(
-        true,
-      ),
+        true
+      )
     );
   });
 });
@@ -213,7 +213,7 @@ describe("useProducts", () => {
       () => useProducts(1, 10, { storeIdForOffline: "s1" }),
       {
         wrapper: createWrapper(),
-      },
+      }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.products).toHaveLength(1);
@@ -230,7 +230,7 @@ describe("useProducts", () => {
       () => useProducts(1, 10, { storeIdForOffline: "s1" }),
       {
         wrapper: createWrapper(),
-      },
+      }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.products).toHaveLength(1);

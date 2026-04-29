@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { StockAdjustmentReason, Product } from "@/types";
+import type { StockAdjustmentReason, Product, StockAdjustment } from "@/types";
 import type { ApiProduct } from "@/types/catalogue";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProducts, useCategories, productKeys } from "@/hooks/use-catalogue";
@@ -13,7 +13,6 @@ import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { executeMutation } from "@/lib/mutation-registry";
 import { updateProductStockInDexie } from "@/lib/entity-cache";
-import { stockAdjustmentsApi } from "@/lib/api/stock-adjustments";
 import { catalogueApi } from "@/lib/api/catalogue";
 import {
   Card,
@@ -98,7 +97,6 @@ export default function InventoryPage() {
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
 
-  // Products: paginated from Dexie (same as catalogue); search/category applied via filters
   const {
     products: apiProducts,
     pagination: productsPagination,
@@ -118,25 +116,21 @@ export default function InventoryPage() {
   const allProducts = apiProducts || [];
   const categories = apiCategories || [];
 
-  // Dialog states
   const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<
     ApiProduct | Product | null
   >(null);
 
-  // Filters and search
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
-  // Threshold editing state
   const [editingThresholdId, setEditingThresholdId] = useState<string | null>(
-    null,
+    null
   );
   const [thresholdValue, setThresholdValue] = useState(0);
 
-  // Use API hook for stock adjustments
   const {
     adjustments: stockAdjustments,
     loading: adjustmentsLoading,
@@ -155,7 +149,6 @@ export default function InventoryPage() {
     },
   });
 
-  // Debounce name search into product query filters (Dexie-backed pagination)
   useEffect(() => {
     const handle = window.setTimeout(() => {
       const q = searchTerm.trim();
@@ -168,22 +161,20 @@ export default function InventoryPage() {
     return () => window.clearTimeout(handle);
   }, [searchTerm]); // eslint-disable-line react-hooks/exhaustive-deps -- loadProductsPage/setProductFilters are stable
 
-  // Stable key so an empty `[]` from the hook each render does not re-fire the effect
   const categoriesFingerprint = useMemo(
     () =>
       (apiCategories ?? [])
         .map((c: { id: string; name: string }) => `${c.id}:${c.name}`)
         .join("|"),
-    [apiCategories],
+    [apiCategories]
   );
 
-  // Category filter uses categoryId so each page respects the filter
   useEffect(() => {
     const categoryId =
       selectedCategory === "all"
         ? undefined
         : (apiCategories ?? []).find(
-            (c: { name: string }) => c.name === selectedCategory,
+            (c: { name: string }) => c.name === selectedCategory
           )?.id;
     setProductFilters((prev: { search?: string; categoryId?: string }) => ({
       ...prev,
@@ -276,14 +267,14 @@ export default function InventoryPage() {
   };
 
   const handleAdjustmentSubmit = async (
-    values: z.infer<typeof adjustmentSchema>,
+    values: z.infer<typeof adjustmentSchema>
   ) => {
     if (!selectedProduct || !selectedProduct.id) return;
     if (!values.reason) {
       feedback.error(
         "Reason required",
         "Please select a reason for the adjustment.",
-        "Select a reason.",
+        "Select a reason."
       );
       return;
     }
@@ -294,7 +285,7 @@ export default function InventoryPage() {
       feedback.error(
         "Quantity required",
         "Please enter a value.",
-        "Enter the quantity or updated stock.",
+        "Enter the quantity or updated stock."
       );
       return;
     }
@@ -317,7 +308,7 @@ export default function InventoryPage() {
           feedback.error(
             "Invalid value",
             "Updated stock must be less than the current stock amount.",
-            "Enter a lower value.",
+            "Enter a lower value."
           );
           return;
         }
@@ -328,7 +319,7 @@ export default function InventoryPage() {
           feedback.error(
             "Invalid value",
             "Updated stock must be more than the current stock amount.",
-            "Enter a higher value.",
+            "Enter a higher value."
           );
           return;
         }
@@ -341,7 +332,7 @@ export default function InventoryPage() {
       feedback.error(
         "Invalid value",
         "Stock can't be negative.",
-        "Reduce the quantity.",
+        "Reduce the quantity."
       );
       return;
     }
@@ -357,19 +348,16 @@ export default function InventoryPage() {
           note: values.note,
         });
 
-        // Refresh the products list to show updated stock
         await refreshProducts();
 
         feedback.success(
           "Stock updated",
-          `Stock for ${selectedProduct.name} updated.`,
+          `Stock for ${selectedProduct.name} updated.`
         );
       } else {
-        // Offline: apply new stock locally so other transactions (e.g. POS) see it
         const productId = String(selectedProduct.id);
         offlineRollback = { productId, previousStock: cur };
 
-        // 1. Update all product list queries in TanStack Query cache
         const queriesData = queryClient.getQueriesData<{
           data: { id?: string; stock?: number | null }[];
           meta?: unknown;
@@ -379,17 +367,15 @@ export default function InventoryPage() {
             const updated = {
               ...data,
               data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: newStock } : p,
+                String(p.id) === productId ? { ...p, stock: newStock } : p
               ),
             };
             queryClient.setQueryData(queryKey, updated);
           }
         });
 
-        // 2. Update Dexie productCache so POS and others see new stock after reload
         await updateProductStockInDexie(productId, newStock);
 
-        // 3. Queue for sync when online
         const variables = {
           productId: selectedProduct.id!,
           newStock,
@@ -405,7 +391,7 @@ export default function InventoryPage() {
 
         feedback.success(
           "Queued",
-          "Stock updated locally. Will sync when online.",
+          "Stock updated locally. Will sync when online."
         );
       }
       setAdjustmentDialogOpen(false);
@@ -422,7 +408,7 @@ export default function InventoryPage() {
             const updated = {
               ...data,
               data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: previousStock } : p,
+                String(p.id) === productId ? { ...p, stock: previousStock } : p
               ),
             };
             queryClient.setQueryData(queryKey, updated);
@@ -430,11 +416,10 @@ export default function InventoryPage() {
         });
         await updateProductStockInDexie(productId, previousStock);
       }
-      console.error("Failed to adjust stock:", error);
       feedback.fromError(
         error,
         "Failed to adjust stock",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };
@@ -444,7 +429,7 @@ export default function InventoryPage() {
       feedback.error(
         "Invalid threshold",
         "Threshold must be zero or more.",
-        "Enter a value ≥ 0.",
+        "Enter a value ≥ 0."
       );
       return;
     }
@@ -453,15 +438,13 @@ export default function InventoryPage() {
       if (isOnline) {
         await updateProduct(id, { lowStockThreshold: thresholdValue });
 
-        // Refresh the products list to show updated threshold
         await refreshProducts();
 
         feedback.success(
           "Low stock trigger updated",
-          "Low stock trigger updated.",
+          "Low stock trigger updated."
         );
       } else {
-        // Offline: queue mutation (optimistic update already done by hook)
         mutationQueue.add({
           mutationKey: ["products", "update"],
           mutationFn: () =>
@@ -472,16 +455,15 @@ export default function InventoryPage() {
         });
         feedback.success(
           "Queued",
-          "Threshold update queued. Will sync when online.",
+          "Threshold update queued. Will sync when online."
         );
       }
       setEditingThresholdId(null);
     } catch (error: any) {
-      console.error("Failed to update threshold:", error);
       feedback.fromError(
         error,
         "Failed to update threshold",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     }
   };
@@ -625,7 +607,7 @@ export default function InventoryPage() {
                         <Badge
                           variant={getStockBadgeVariant(
                             product.stock ?? 0,
-                            (product as any).lowStockThreshold,
+                            (product as any).lowStockThreshold
                           )}
                         >
                           {product.stock ?? 0}
@@ -664,7 +646,7 @@ export default function InventoryPage() {
                                 onClick={() => {
                                   setEditingThresholdId(product.id!);
                                   setThresholdValue(
-                                    (product as any).lowStockThreshold || 0,
+                                    (product as any).lowStockThreshold || 0
                                   );
                                 }}
                               >
@@ -779,9 +761,7 @@ export default function InventoryPage() {
                           value={field.value ?? ""}
                           onChange={(e) =>
                             field.onChange(
-                              e.target.value === ""
-                                ? undefined
-                                : e.target.value,
+                              e.target.value === "" ? undefined : e.target.value
                             )
                           }
                         />
@@ -837,7 +817,6 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Stock History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -864,7 +843,7 @@ export default function InventoryPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                stockAdjustments?.map((adj: any) => {
+                stockAdjustments?.map((adj: StockAdjustment) => {
                   const change = adj.newStock - adj.oldStock;
                   const adjDate = adj.createdAt
                     ? new Date(adj.createdAt)

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useRef } from "react";
 import { format, parseISO } from "date-fns";
-import type { Customer, Transaction } from "@/types";
+import type { Customer } from "@/types";
 import { feedback } from "@/lib/feedback";
 import { useSettings } from "@/components/settings-provider";
 import { useCustomers, customerKeys } from "@/hooks/use-customers";
@@ -39,11 +39,8 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogClose,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
@@ -76,10 +73,8 @@ export default function CustomersPage() {
   const { settings } = useSettings();
   const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
-  // Search state
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Use the API hook. Store admin: backend uses JWT storeId; we pass storeIdForOffline so offline list is scoped to current store.
   const {
     customers,
     pagination,
@@ -102,24 +97,19 @@ export default function CustomersPage() {
     currentUser?.role === "admin" ||
     (customers.length > 0 && customers.some((c) => c.storeId != null));
 
-  // Dialog states
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null,
+    null
   );
 
-  // Get customer transactions (still using IndexedDB for transactions)
   const customerTransactions = useLiveQuery(() => {
     if (selectedCustomer && currentStore) {
-      // customerId can be a number (old format) or string (new UUID format)
-      // Filter manually to handle both cases
       return db.transactions
         .where("storeId")
         .equals(currentStore.id!)
-        .filter((t) => {
-          // Compare with both possible formats
+        .filter((t: any) => {
           const customerId = selectedCustomer.id;
           return (
             t.customerId === customerId ||
@@ -133,7 +123,6 @@ export default function CustomersPage() {
     return [];
   }, [selectedCustomer, currentStore]);
 
-  // Handlers for Customers
   const openCustomerDialog = (customer?: Customer) => {
     if (customer) {
       setEditingCustomer(customer);
@@ -154,10 +143,9 @@ export default function CustomersPage() {
           await updateCustomer(editingCustomer.id, data);
           feedback.success(
             "Customer updated",
-            "Customer updated successfully.",
+            "Customer updated successfully."
           );
         } else {
-          // Offline: optimistic update then queue
           const updatedCustomer = {
             ...editingCustomer,
             ...data,
@@ -172,7 +160,7 @@ export default function CustomersPage() {
               queryClient.setQueryData(queryKey, {
                 ...qData,
                 data: qData.data.map((c) =>
-                  c.id === editingCustomer.id ? updatedCustomer : c,
+                  c.id === editingCustomer.id ? updatedCustomer : c
                 ),
               });
             }
@@ -185,7 +173,7 @@ export default function CustomersPage() {
           });
           feedback.success(
             "Queued",
-            "Customer update queued. Will sync when online.",
+            "Customer update queued. Will sync when online."
           );
         }
       } else {
@@ -196,10 +184,9 @@ export default function CustomersPage() {
             "Customer created",
             hasContact
               ? "A welcome SMS has been sent to the number provided."
-              : "Customer registered.",
+              : "Customer registered."
           );
         } else {
-          // Offline: optimistic update then queue
           const tempId = `temp-${Date.now()}`;
           const optimisticCustomer: Customer = {
             id: tempId,
@@ -243,11 +230,10 @@ export default function CustomersPage() {
       setCustomerDialogOpen(false);
       setEditingCustomer(null);
     } catch (error) {
-      console.error("Failed to save customer:", error);
       feedback.fromError(
         error,
         "Failed to save customer",
-        "Check your connection and try again.",
+        "Check your connection and try again."
       );
     } finally {
       customerSubmitRef.current = false;
@@ -255,7 +241,7 @@ export default function CustomersPage() {
   };
 
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(
-    null,
+    null
   );
 
   const handleDeleteCustomer = async (id: string) => {
@@ -266,7 +252,6 @@ export default function CustomersPage() {
         await deleteCustomer(id);
         feedback.success("Customer deleted", "Customer deleted successfully.");
       } else {
-        // Offline: optimistic update then queue
         const customerQueries = queryClient.getQueriesData<{
           data: Customer[];
           meta: any;
@@ -291,15 +276,14 @@ export default function CustomersPage() {
         });
         feedback.success(
           "Queued",
-          "Customer deletion queued. Will sync when online.",
+          "Customer deletion queued. Will sync when online."
         );
       }
     } catch (error) {
-      console.error("Failed to delete customer:", error);
       feedback.fromError(
         error,
         "Failed to delete customer",
-        "Try again or check your connection.",
+        "Try again or check your connection."
       );
     } finally {
       setDeletingCustomerId(null);
@@ -513,7 +497,6 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* Customer Dialog (Add/Edit) */}
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
@@ -538,7 +521,6 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Purchase History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -557,7 +539,7 @@ export default function CustomersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customerTransactions?.map((transaction) => {
+                {customerTransactions?.map((transaction: any) => {
                   const txDate =
                     transaction.date instanceof Date
                       ? transaction.date

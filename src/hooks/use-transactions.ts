@@ -1,27 +1,36 @@
-'use client';
+"use client";
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { transactionsApi, type GetTransactionsParams, type CreateTransactionDto } from '@/lib/api/transactions';
-import { checkOfflineStatus } from '@/lib/offline-detector';
-import { getTransactionsFromDexie, saveTransactionsToDexie } from '@/lib/entity-cache';
-import type { Transaction } from '@/types';
-import type { PaginationMeta, PaginatedResponse } from '@/types/pagination';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  transactionsApi,
+  type GetTransactionsParams,
+  type CreateTransactionDto,
+} from "@/lib/api/transactions";
+import { checkOfflineStatus } from "@/lib/offline-detector";
+import {
+  getTransactionsFromDexie,
+  saveTransactionsToDexie,
+} from "@/lib/entity-cache";
+import type { Transaction } from "@/types";
+import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
 
 interface UseTransactionsOptions extends GetTransactionsParams {
   autoLoad?: boolean;
-  /** When set, offline Dexie list is filtered by this store (e.g. currentStore.id for store admin). */
   storeIdForOffline?: string | null;
 }
 
 export const transactionKeys = {
-  all: ['transactions'] as const,
-  lists: () => [...transactionKeys.all, 'list'] as const,
-  list: (filters?: GetTransactionsParams) => [...transactionKeys.lists(), filters] as const,
-  details: () => [...transactionKeys.all, 'detail'] as const,
+  all: ["transactions"] as const,
+  lists: () => [...transactionKeys.all, "list"] as const,
+  list: (filters?: GetTransactionsParams) =>
+    [...transactionKeys.lists(), filters] as const,
+  details: () => [...transactionKeys.all, "detail"] as const,
   detail: (id: string) => [...transactionKeys.details(), id] as const,
 };
 
-function normalizeTransactionResponse(response: Transaction[] | PaginatedResponse<Transaction>): { data: Transaction[]; meta: PaginationMeta } {
+function normalizeTransactionResponse(
+  response: Transaction[] | PaginatedResponse<Transaction>
+): { data: Transaction[]; meta: PaginationMeta } {
   if (Array.isArray(response)) {
     return {
       data: response,
@@ -33,11 +42,11 @@ function normalizeTransactionResponse(response: Transaction[] | PaginatedRespons
       },
     };
   }
-  
-  if ('data' in response && 'meta' in response) {
+
+  if ("data" in response && "meta" in response) {
     return response;
   }
-  
+
   return {
     data: [],
     meta: {
@@ -73,14 +82,17 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       }
       return normalized;
     },
-    enabled: true, // Always enabled - we'll control loading via refetch
+    enabled: true,
   });
 
   const createMutation = useMutation({
     mutationFn: (data: CreateTransactionDto) => transactionsApi.create(data),
     onMutate: async (newTransaction) => {
       await queryClient.cancelQueries({ queryKey: transactionKeys.lists() });
-      const previousData = queryClient.getQueryData<{ data: Transaction[]; meta: PaginationMeta }>(queryKey);
+      const previousData = queryClient.getQueryData<{
+        data: Transaction[];
+        meta: PaginationMeta;
+      }>(queryKey);
 
       if (previousData) {
         const optimisticTransaction: Transaction = {
@@ -94,14 +106,17 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           storeId: newTransaction.storeId,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueryData<{ data: Transaction[]; meta: PaginationMeta }>(queryKey, {
-          ...previousData,
-          data: [optimisticTransaction, ...previousData.data],
-          meta: {
-            ...previousData.meta,
-            total: previousData.meta.total + 1,
-          },
-        });
+        queryClient.setQueryData<{ data: Transaction[]; meta: PaginationMeta }>(
+          queryKey,
+          {
+            ...previousData,
+            data: [optimisticTransaction, ...previousData.data],
+            meta: {
+              ...previousData.meta,
+              total: previousData.meta.total + 1,
+            },
+          }
+        );
       }
 
       return { previousData };
@@ -113,13 +128,18 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
     },
     onSuccess: (response) => {
       const newTransaction = response.data;
-      queryClient.setQueryData<{ data: Transaction[]; meta: PaginationMeta }>(queryKey, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          data: old.data.map(t => (t.id && String(t.id).startsWith('temp-')) ? newTransaction : t),
-        };
-      });
+      queryClient.setQueryData<{ data: Transaction[]; meta: PaginationMeta }>(
+        queryKey,
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: old.data.map((t) =>
+              t.id && String(t.id).startsWith("temp-") ? newTransaction : t
+            ),
+          };
+        }
+      );
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
     },
   });
@@ -133,16 +153,16 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       totalPages: 0,
     },
     loading: query.isLoading,
-    error: query.error ? (query.error as any)?.response?.data?.message || query.error.message : null,
+    error: query.error
+      ? (query.error as any)?.response?.data?.message || query.error.message
+      : null,
     createTransaction: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
     refresh: () => query.refetch(),
     loadTransactions: async (loadParams?: GetTransactionsParams) => {
       const newParams = { ...params, ...loadParams };
       const newQueryKey = transactionKeys.list(newParams);
-      // Refetch with new params
       await queryClient.refetchQueries({ queryKey: newQueryKey });
-      // Also update the current query key if params changed
       if (JSON.stringify(newParams) !== JSON.stringify(params)) {
         await queryClient.refetchQueries({ queryKey });
       }

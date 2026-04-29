@@ -29,7 +29,6 @@ export function useEnsureStore() {
     const jwtStoreId = settings.currentUser?.storeId;
     const current = settings.currentStore;
 
-    // Prefer JWT store so POS and Settings (credit config) use the same store
     if (current && jwtStoreId && current.id !== jwtStoreId) {
       if (typeof window !== "undefined" && !navigator.onLine) {
         const cached = await loadStoreFromIndexedDB(jwtStoreId);
@@ -67,28 +66,22 @@ export function useEnsureStore() {
           }
         }
         setIsLoading(false);
-        // Fall back to current store if fetch fails
         return current;
       }
     }
 
-    // If store already exists and matches JWT (or no JWT storeId), return it
     if (current) {
       return current;
     }
 
-    // If we're offline, try loading from IndexedDB
     if (typeof window !== "undefined" && !navigator.onLine) {
-      console.log(
-        "[useEnsureStore] Offline - attempting to load store from IndexedDB",
-      );
       const cachedStore = await loadCachedStore(settings.currentUser?.storeId);
       if (cachedStore) return cachedStore;
       feedback.error(
         "Offline",
         "Cannot fetch store while offline.",
         "Check your connection and try again.",
-        { code: ERROR_CODES.STORE },
+        { code: ERROR_CODES.STORE }
       );
       return null;
     }
@@ -98,7 +91,6 @@ export function useEnsureStore() {
       const response = await storesApi.getMyStore();
       const store = response.data;
 
-      // Save store permanently to both localStorage and IndexedDB
       await saveStorePermanently(store, setSetting);
 
       setIsLoading(false);
@@ -106,18 +98,14 @@ export function useEnsureStore() {
     } catch (error: unknown) {
       setIsLoading(false);
 
-      // If network error, try loading from IndexedDB
       if (isNetworkErrorLike(error)) {
-        console.log(
-          "[useEnsureStore] Network error - attempting to load store from IndexedDB",
-        );
         const cachedStore = await loadCachedStore(
-          settings.currentUser?.storeId,
+          settings.currentUser?.storeId
         );
         if (cachedStore) {
           feedback.success(
             "Using cached store",
-            "Loaded store from offline cache.",
+            "Loaded store from offline cache."
           );
           return cachedStore;
         }
@@ -126,7 +114,7 @@ export function useEnsureStore() {
         error,
         "Failed to load store",
         "Check your connection and try again.",
-        ERROR_CODES.STORE,
+        ERROR_CODES.STORE
       );
       return null;
     }

@@ -20,17 +20,17 @@ export const PosPage = {
     this.ensureProductCarouselView();
     cy.get('[data-testid="pos-product-table"]', { timeout: 90_000 }).should(
       "not.contain",
-      "Loading products",
+      "Loading products"
     );
     return this;
   },
 
   searchProducts(term: string) {
     cy.findByPlaceholderText(
-      /scan barcode or search item|search categories/i,
+      /scan barcode or search item|search categories/i
     ).clear();
     cy.findByPlaceholderText(
-      /scan barcode or search item|search categories/i,
+      /scan barcode or search item|search categories/i
     ).type(term, { delay: 0 });
     return this;
   },
@@ -58,7 +58,7 @@ export const PosPage = {
               .should("be.visible")
               .click({ force: true });
           });
-        },
+        }
       );
     }
     return this;

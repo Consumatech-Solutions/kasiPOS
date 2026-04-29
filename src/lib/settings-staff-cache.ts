@@ -1,5 +1,5 @@
-import { getDb } from '@/lib/db';
-import type { User } from '@/types';
+import { getDb } from "@/lib/db";
+import type { User } from "@/types";
 
 function cacheKey(storeId: string, page: number): string {
   return `settings_staff:${storeId}:${page}`;
@@ -17,14 +17,20 @@ export async function writeStaffPageCache(
   users: User[],
   totalPages: number
 ): Promise<void> {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   const db = getDb();
   const payload: StaffPageCache = { users, totalPages, updatedAt: Date.now() };
-  await db.keyVal.put({ key: cacheKey(storeId, page), value: JSON.stringify(payload) });
+  await db.keyVal.put({
+    key: cacheKey(storeId, page),
+    value: JSON.stringify(payload),
+  });
 }
 
-export async function readStaffPageCache(storeId: string, page: number): Promise<StaffPageCache | null> {
-  if (typeof window === 'undefined') return null;
+export async function readStaffPageCache(
+  storeId: string,
+  page: number
+): Promise<StaffPageCache | null> {
+  if (typeof window === "undefined") return null;
   const db = getDb();
   const row = await db.keyVal.get(cacheKey(storeId, page));
   if (!row?.value) return null;

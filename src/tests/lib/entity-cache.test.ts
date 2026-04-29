@@ -92,18 +92,18 @@ describe("entity-cache", () => {
         category(1, "2024-01-02T00:00:00.000Z"),
         category(2, "2024-01-01T00:00:00.000Z"),
       ],
-      "store-a",
+      "store-a"
     );
     await saveCategoriesToDexie(
       [category(3, "2024-01-03T00:00:00.000Z")],
-      "store-b",
+      "store-b"
     );
     const p1 = await getCategoriesFromDexie(1, 1, "store-a");
     expect(p1.meta.total).toBe(2);
     expect(p1.data).toHaveLength(1);
     const p2 = await getCategoriesFromDexie(1, 10, "store-a");
     expect(p2.data.map((c) => c.id).sort((a, b) => a.localeCompare(b))).toEqual(
-      ["cid-1", "cid-2"],
+      ["cid-1", "cid-2"]
     );
   });
 
@@ -117,7 +117,7 @@ describe("entity-cache", () => {
           updatedAt: "2024-01-01T00:00:00.000Z",
         },
       ],
-      "s1",
+      "s1"
     );
     const p1 = product(1, "2024-01-01T00:00:00.000Z", "s1");
     p1.categoryId = "cat-x";
@@ -165,7 +165,7 @@ describe("entity-cache", () => {
   it("updateCategoryInDexie and deleteCategoryFromDexie", async () => {
     await saveCategoriesToDexie(
       [category(1, "2024-01-01T00:00:00.000Z")],
-      "s1",
+      "s1"
     );
     await updateCategoryInDexie("cid-1", { name: "NewName" });
     expect((await getDb().categoryCache.get("cid-1"))?.name).toBe("NewName");
@@ -179,7 +179,7 @@ describe("entity-cache", () => {
       customer("2", "2024-02-02T00:00:00.000Z", "st1"),
     ]);
     await getDb().customers.put(
-      customer("3", "2024-02-03T00:00:00.000Z", "st2"),
+      customer("3", "2024-02-03T00:00:00.000Z", "st2")
     );
 
     const st1 = await getCustomersFromDexie(1, 10, undefined, "st1");
@@ -261,12 +261,12 @@ describe("entity-cache", () => {
         product(1, "2020-01-01T00:00:00.000Z", "s-cap"),
         product(2, "2021-01-01T00:00:00.000Z", "s-cap"),
       ],
-      "s-cap",
+      "s-cap"
     );
     expect(await getDb().productCache.count()).toBe(3);
     await saveProductsToDexie(
       [product(3, "2022-01-01T00:00:00.000Z", "s-cap")],
-      "s-cap",
+      "s-cap"
     );
     expect(await getDb().productCache.count()).toBe(3);
     expect(await getDb().productCache.get("pid-0")).toBeUndefined();
@@ -328,7 +328,7 @@ describe("entity-cache", () => {
           updatedAt: "2020-01-01T00:00:00.000Z",
         },
       ],
-      "st",
+      "st"
     );
     expect(await getDb().categoryCache.count()).toBe(2);
     expect(await getDb().categoryCache.get("c-old")).toBeUndefined();

@@ -1,14 +1,13 @@
+"use client";
 
-'use client';
-
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { navItems as allNavItems, OFFLINE_FIRST_PATHS } from '@/lib/nav-config';
-import { Button } from '../ui/button';
-import { useSettings } from '../settings-provider';
-import { useEffectiveOnline } from '@/hooks/use-effective-online';
-import { useMemo } from 'react';
-import { cn } from '@/lib/utils';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { navItems as allNavItems, OFFLINE_FIRST_PATHS } from "@/lib/nav-config";
+import { Button } from "../ui/button";
+import { useSettings } from "../settings-provider";
+import { useEffectiveOnline } from "@/hooks/use-effective-online";
+import { useMemo } from "react";
+import { cn } from "@/lib/utils";
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -17,19 +16,16 @@ export default function BottomNav() {
 
   const navItems = useMemo(() => {
     const userRole = settings.currentUser?.role;
-    return allNavItems.filter(item => {
-      // Hide based on feature flag
+    return allNavItems.filter((item) => {
       if (item.featureFlag && !settings[item.featureFlag]) {
         return false;
       }
-      // Hide based on role
       if (item.roles && (!userRole || !item.roles.includes(userRole))) {
         return false;
       }
       return true;
     });
   }, [settings]);
-
 
   return (
     <nav className="sticky bottom-0 left-0 z-30 w-full max-w-full min-w-0 h-16 bg-card border-t bottom-nav pb-[env(safe-area-inset-bottom)]">
@@ -38,19 +34,22 @@ export default function BottomNav() {
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
-            const offlineFirst = (OFFLINE_FIRST_PATHS as readonly string[]).includes(item.href);
-            const settingsPath = item.href === '/settings';
+            const offlineFirst = (
+              OFFLINE_FIRST_PATHS as readonly string[]
+            ).includes(item.href);
+            const settingsPath = item.href === "/settings";
             const needsCloud = !offlineFirst && !settingsPath;
             const isGreyed = needsCloud && !effectiveOnline;
             return (
               <Button
                 key={item.label}
-                variant={isActive ? 'secondary' : 'ghost'}
+                variant={isActive ? "secondary" : "ghost"}
                 asChild
                 className={cn(
-                  'flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2',
-                  isActive ? 'border-destructive' : 'border-transparent',
-                  isGreyed && 'opacity-50 pointer-events-none cursor-not-allowed'
+                  "flex-col h-full px-4 text-xs whitespace-nowrap flex-shrink-0 rounded-none border-b-2",
+                  isActive ? "border-destructive" : "border-transparent",
+                  isGreyed &&
+                    "opacity-50 pointer-events-none cursor-not-allowed"
                 )}
               >
                 <Link href={item.href} aria-disabled={isGreyed}>

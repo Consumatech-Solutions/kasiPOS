@@ -24,7 +24,7 @@ function clone<T>(value: T): T {
 function paginate<T>(
   rows: T[],
   page = 1,
-  limit = rows.length || 10,
+  limit = rows.length || 10
 ): { data: T[]; meta: Meta } {
   const safeLimit = Math.max(1, Number(limit) || rows.length || 10);
   const safePage = Math.max(1, Number(page) || 1);
@@ -48,7 +48,7 @@ function isoNow() {
 
 function isVoucherValid(
   voucher: VoucherRecord,
-  cartTotal: number,
+  cartTotal: number
 ): { valid: boolean; message?: string } {
   if (!voucher.isActive)
     return { valid: false, message: "Voucher is inactive." };
@@ -93,7 +93,7 @@ function e2eCorsHeaders(): Record<string, string> {
 
 function corsReply(
   req: { reply: (r: Record<string, unknown>) => void },
-  reply: Record<string, unknown>,
+  reply: Record<string, unknown>
 ): void {
   const { headers: replyHeaders, ...rest } = reply as {
     headers?: Record<string, string>;
@@ -167,7 +167,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
 
   const productBelongsToCategory = (
     product: Record<string, unknown>,
-    categoryName: string | undefined,
+    categoryName: string | undefined
   ) => {
     if (!categoryName) return false;
     const raw = product.category;
@@ -178,7 +178,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const categoryId = product.categoryId as string | undefined;
     if (!categoryId) return false;
     const row = state.categories.find(
-      (c) => String(c.id) === String(categoryId),
+      (c) => String(c.id) === String(categoryId)
     );
     return row?.name === categoryName;
   };
@@ -231,7 +231,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         state.categories,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 1000),
+        Number(req.query.limit ?? 1000)
       ),
     });
   }).as("getCategories");
@@ -267,7 +267,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: isoNow(),
     };
     state.categories = state.categories.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("updateCategory");
@@ -277,7 +277,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const id = String(req.url.split("/").pop());
     const category = state.categories.find((row) => String(row.id) === id);
     const hasProducts = state.products.some((p) =>
-      productBelongsToCategory(p as Record<string, unknown>, category?.name),
+      productBelongsToCategory(p as Record<string, unknown>, category?.name)
     );
     if (hasProducts) {
       corsReply(req, {
@@ -301,7 +301,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       rows = rows.filter((row) => row.name.toLowerCase().includes(querySearch));
     if (queryCategoryId) {
       const category = state.categories.find(
-        (row) => String(row.id) === queryCategoryId,
+        (row) => String(row.id) === queryCategoryId
       );
       if (category) rows = rows.filter((row) => row.category === category.name);
     }
@@ -310,7 +310,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         rows,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 1000),
+        Number(req.query.limit ?? 1000)
       ),
     });
   }).as("getProducts");
@@ -354,7 +354,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: isoNow(),
     };
     state.products = state.products.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("updateProduct");
@@ -380,7 +380,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       ? state.customers.filter(
           (row) =>
             row.name.toLowerCase().includes(q) ||
-            row.contact.toLowerCase().includes(q),
+            row.contact.toLowerCase().includes(q)
         )
       : state.customers;
     corsReply(req, {
@@ -388,7 +388,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         rows,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 1000),
+        Number(req.query.limit ?? 1000)
       ),
     });
   }).as("getCustomers");
@@ -427,7 +427,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: isoNow(),
     };
     state.customers = state.customers.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("updateCustomer");
@@ -454,14 +454,14 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     if (date)
       rows = rows.filter((row) => String(row.createdAt ?? "").startsWith(date));
     rows.sort((a, b) =>
-      String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")),
+      String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? ""))
     );
     corsReply(req, {
       statusCode: 200,
       body: paginate(
         rows,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 10),
+        Number(req.query.limit ?? 10)
       ),
     });
   }).as("getTransactions");
@@ -519,7 +519,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
                 Math.max(1, Math.floor(Number(payload.total) / 10)),
               updatedAt: isoNow(),
             }
-          : row,
+          : row
       );
     }
 
@@ -537,7 +537,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     let rows = [...state.vouchers];
     if (typeof isActiveParam !== "undefined") {
       rows = rows.filter(
-        (row) => row.isActive === (String(isActiveParam) === "true"),
+        (row) => row.isActive === (String(isActiveParam) === "true")
       );
     }
     corsReply(req, {
@@ -545,7 +545,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         rows,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 20),
+        Number(req.query.limit ?? 20)
       ),
     });
   }).as("getVouchers");
@@ -590,7 +590,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: isoNow(),
     };
     state.vouchers = state.vouchers.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("updateVoucher");
@@ -607,7 +607,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const payload = req.body as { code: string; cartTotal: number };
     const voucher = state.vouchers.find(
       (row) =>
-        row.code.toUpperCase() === String(payload.code ?? "").toUpperCase(),
+        row.code.toUpperCase() === String(payload.code ?? "").toUpperCase()
     );
     if (!voucher) {
       corsReply(req, {
@@ -629,7 +629,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const discountAmount =
       voucher.type === "percentage"
         ? Math.round(
-            ((Number(payload.cartTotal) * voucher.value) / 100) * 100,
+            ((Number(payload.cartTotal) * voucher.value) / 100) * 100
           ) / 100
         : Math.min(Number(payload.cartTotal), voucher.value);
     corsReply(req, {
@@ -654,7 +654,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         state.stockAdjustments,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 50),
+        Number(req.query.limit ?? 50)
       ),
     });
   }).as("getStockAdjustments");
@@ -665,7 +665,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     corsReply(req, {
       statusCode: 200,
       body: state.stockAdjustments.filter(
-        (row) => String(row.productId) === productId,
+        (row) => String(row.productId) === productId
       ),
     });
   }).as("getStockAdjustmentsByProduct");
@@ -679,7 +679,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       note?: string;
     };
     const product = state.products.find(
-      (row) => String(row.id) === String(payload.productId),
+      (row) => String(row.id) === String(payload.productId)
     );
     const adjustment = {
       id: `adj-${Date.now()}`,
@@ -697,7 +697,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       state.products = state.products.map((row) =>
         String(row.id) === String(payload.productId)
           ? { ...row, stock: Number(payload.newStock), updatedAt: isoNow() }
-          : row,
+          : row
       );
     }
     corsReply(req, { statusCode: 201, body: adjustment });
@@ -715,7 +715,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
           row.deliveryNumber.toLowerCase().includes(search) ||
           String(row.collectionCode ?? "")
             .toLowerCase()
-            .includes(search),
+            .includes(search)
       );
     }
     corsReply(req, {
@@ -723,7 +723,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         rows,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 50),
+        Number(req.query.limit ?? 50)
       ),
     });
   }).as("getParcels");
@@ -780,7 +780,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: now,
     };
     state.parcels = state.parcels.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("receiveParcel");
@@ -822,7 +822,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: now,
     };
     state.parcels = state.parcels.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("collectParcel");
@@ -844,7 +844,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       updatedAt: isoNow(),
     };
     state.parcels = state.parcels.map((row) =>
-      String(row.id) === id ? updated : row,
+      String(row.id) === id ? updated : row
     );
     corsReply(req, { statusCode: 200, body: updated });
   }).as("updateParcel");
@@ -869,7 +869,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     if (replyOfflineIfNeeded(req)) return;
     const code = String(req.query.code ?? "").toUpperCase();
     const found = state.marketplaceOrders.find(
-      (row) => row.orderCode.toUpperCase() === code,
+      (row) => row.orderCode.toUpperCase() === code
     );
     if (!found) {
       corsReply(req, { statusCode: 404, body: { message: "Order not found" } });
@@ -887,7 +887,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       rows = rows.filter((row) => row.orderCode.toUpperCase().includes(search));
     if (marketplaceStoreId)
       rows = rows.filter(
-        (row) => row.marketplaceStoreId === marketplaceStoreId,
+        (row) => row.marketplaceStoreId === marketplaceStoreId
       );
     rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     corsReply(req, {
@@ -895,7 +895,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       body: paginate(
         rows,
         Number(req.query.page ?? 1),
-        Number(req.query.limit ?? 20),
+        Number(req.query.limit ?? 20)
       ),
     });
   }).as("getMarketplaceOrders");

@@ -27,7 +27,7 @@ let mockControls: { setOffline: (value: boolean) => void } | null = null;
 function ensureMockMode(commandName: string): void {
   if (!IS_REAL_MODE) return;
   throw new Error(
-    `${commandName}() is only available in mock mode. Current mode: real.`,
+    `${commandName}() is only available in mock mode. Current mode: real.`
   );
 }
 
@@ -35,7 +35,7 @@ function ensureRealCredentials(): void {
   if (!IS_REAL_MODE) return;
   if (!REAL_AUTH_PHONE || !REAL_AUTH_PASSWORD) {
     throw new Error(
-      "Real mode requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD.",
+      "Real mode requires REAL_AUTH_PHONE and REAL_AUTH_PASSWORD."
     );
   }
 }
@@ -45,7 +45,7 @@ function applySessionToStorage(win: Window, session: SeedAuthSession) {
   win.localStorage.setItem("user", JSON.stringify(session.user));
   win.localStorage.setItem(
     "kasi-pos-settings",
-    JSON.stringify(session.settings),
+    JSON.stringify(session.settings)
   );
   win.localStorage.setItem("kasiPOS_hardwareSetupCompleted", "true");
   win.localStorage.setItem("__kasi_pos_e2e", "1");
@@ -75,14 +75,14 @@ function loginWithRealCredentials(): Cypress.Chainable<void> {
           timeout: 30_000,
           interval: 250,
           description: "wait for post-login route transition",
-        },
+        }
       );
       cy.waitForAppReady(
         REAL_POST_LOGIN_PATH.startsWith("/")
           ? new RegExp(
-              `^${REAL_POST_LOGIN_PATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+              `^${REAL_POST_LOGIN_PATH.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`
             )
-          : REAL_POST_LOGIN_PATH,
+          : REAL_POST_LOGIN_PATH
       );
     })
     .then(() => {
@@ -92,7 +92,7 @@ function loginWithRealCredentials(): Cypress.Chainable<void> {
         const rawSettings = win.localStorage.getItem("kasi-pos-settings");
         if (!token || !rawUser || !rawSettings) {
           throw new Error(
-            "Real login succeeded but auth/session keys were not found in localStorage.",
+            "Real login succeeded but auth/session keys were not found in localStorage."
           );
         }
         const user = JSON.parse(rawUser) as SeedAuthSession["user"];
@@ -139,7 +139,7 @@ function loginWithRealCredentials(): Cypress.Chainable<void> {
             marketplaceStores: [],
             marketplaceOrders: [],
           } as SeedData,
-          { log: false },
+          { log: false }
         ).as("seedData");
       });
     });
@@ -166,7 +166,7 @@ function ensureReadyDatabase(win: Window): Promise<IDBDatabase> {
 function seedObjectStore(
   tx: IDBTransaction,
   storeName: string,
-  rows: unknown[],
+  rows: unknown[]
 ) {
   if (!tx.objectStoreNames.contains(storeName)) return;
   const store = tx.objectStore(storeName);
@@ -177,7 +177,7 @@ function seedObjectStore(
 function writeSeedToIndexedDb(
   win: Window,
   seed: SeedData,
-  session: SeedAuthSession,
+  session: SeedAuthSession
 ): Promise<void> {
   return ensureReadyDatabase(win).then(
     (db: IDBDatabase) =>
@@ -193,7 +193,7 @@ function writeSeedToIndexedDb(
             "stockAdjustments",
             "parcels",
           ],
-          "readwrite",
+          "readwrite"
         );
 
         tx.onerror = () =>
@@ -211,7 +211,7 @@ function writeSeedToIndexedDb(
         seedObjectStore(tx, "categories", seed.categories);
         seedObjectStore(tx, "stockAdjustments", seed.stockAdjustments);
         seedObjectStore(tx, "parcels", seed.parcels);
-      }),
+      })
   );
 }
 
@@ -302,7 +302,7 @@ Cypress.Commands.add("setOnline", () => {
   ensureMockMode("setOnline");
   if (!mockControls) {
     throw new Error(
-      "setOnline() called before cy.setupScenario() — API mocks are not registered.",
+      "setOnline() called before cy.setupScenario() — API mocks are not registered."
     );
   }
   mockControls.setOffline(false);
@@ -331,14 +331,14 @@ Cypress.Commands.add("setOnline", () => {
         )
           return true;
         return !doc.querySelector(
-          ".opacity-60.pointer-events-none.select-none",
+          ".opacity-60.pointer-events-none.select-none"
         );
       }),
     {
       timeout: 20_000,
       interval: 250,
       description: "wait for online-interactable marketplace or BOPH UI",
-    },
+    }
   );
 });
 
@@ -355,7 +355,7 @@ Cypress.Commands.add(
         timeout: 20_000,
         interval: 250,
         description: "wait for auth bootstrap",
-      },
+      }
     );
 
     cy.waitUntil(
@@ -370,7 +370,7 @@ Cypress.Commands.add(
         timeout: 20_000,
         interval: 250,
         description: "wait for expected route",
-      },
+      }
     );
 
     cy.waitUntil(
@@ -388,9 +388,9 @@ Cypress.Commands.add(
         timeout: 20_000,
         interval: 250,
         description: "wait for app shell",
-      },
+      }
     );
-  },
+  }
 );
 
 Cypress.Commands.add("visitApp", (path = "/") => {
@@ -435,7 +435,7 @@ Cypress.Commands.add("visitApp", (path = "/") => {
     ) {
       cy.location("pathname", { log: false, timeout: 20_000 }).should(
         "eq",
-        normalized,
+        normalized
       );
       load();
     }

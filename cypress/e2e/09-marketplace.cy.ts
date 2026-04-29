@@ -65,7 +65,7 @@ describe("Marketplace", () => {
     cy.findByRole("button", { name: /complete sale/i }).click({ force: true });
     cy.wait("@createMarketplaceOrder", { timeout: 30_000 });
     cy.contains(/order created|created successfully|marketplace order/i).should(
-      "be.visible",
+      "be.visible"
     );
   });
 
@@ -73,7 +73,7 @@ describe("Marketplace", () => {
     cy.setOffline();
     cy.reload();
     cy.contains(/cloud unavailable|requires an internet connection/i).should(
-      "be.visible",
+      "be.visible"
     );
   });
 });
