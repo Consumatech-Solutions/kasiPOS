@@ -62,7 +62,6 @@ import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 import { useVouchers } from "@/hooks/use-vouchers";
 import { useNetworkStatus } from "@/hooks/use-network-status";
-import { RequireOnlineBanner } from "@/components/require-online-banner";
 import { cn } from "@/lib/utils";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { vouchersApi } from "@/lib/api/vouchers";
@@ -85,7 +84,7 @@ const voucherSchema = z.object({
 });
 
 export default function VouchersPage() {
-  const { isOnline } = useNetworkStatus();
+  const { isOnline, hasInternet } = useNetworkStatus();
   const {
     vouchers,
     loading,
@@ -246,10 +245,9 @@ export default function VouchersPage() {
 
   return (
     <div className="p-2 sm:p-4 overflow-y-auto h-full">
-      <RequireOnlineBanner />
       <div
         className={cn(
-          !isOnline && "opacity-60 pointer-events-none select-none"
+          !hasInternet && "opacity-60 pointer-events-none select-none"
         )}
       >
         <Card>

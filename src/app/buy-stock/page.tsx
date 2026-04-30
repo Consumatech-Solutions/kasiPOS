@@ -7,7 +7,6 @@ import { ERROR_CODES } from "@/lib/error-codes";
 import { useSettings } from "@/components/settings-provider";
 import { useProducts } from "@/hooks/use-catalogue";
 import { useNetworkStatus } from "@/hooks/use-network-status";
-import { RequireOnlineBanner } from "@/components/require-online-banner";
 import { cn } from "@/lib/utils";
 
 import {
@@ -34,7 +33,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function BuyStockPage() {
   const { settings } = useSettings();
-  const { isOnline } = useNetworkStatus();
+  const { hasInternet } = useNetworkStatus();
   const { currentStore } = settings;
 
   const { products: apiProducts, loading: productsLoading } = useProducts(
@@ -120,10 +119,9 @@ export default function BuyStockPage() {
 
   return (
     <div className="p-2 sm:p-4 space-y-4 sm:space-y-6">
-      <RequireOnlineBanner />
       <div
         className={cn(
-          !isOnline && "opacity-60 pointer-events-none select-none"
+          !hasInternet && "opacity-60 pointer-events-none select-none"
         )}
       >
         <Card>

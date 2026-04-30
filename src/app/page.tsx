@@ -72,6 +72,8 @@ import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useCart } from "@/components/providers/cart-provider";
 import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
 import { updateProductStockInDexie } from "@/lib/entity-cache";
+import { catalogueApi } from "@/lib/api/catalogue";
+import { Pagination } from "@/components/ui/pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -138,9 +140,11 @@ export default function PosPage() {
     });
   const {
     products: apiProducts,
+    pagination: productsPagination,
     loading: productsLoading,
     setFilters,
-  } = useProducts(1, 1000, {
+    loadPage,
+  } = useProducts(1, 20, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
 
@@ -156,16 +160,18 @@ export default function PosPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((prev: any) => ({ ...prev, search: productSearch }));
+      loadPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [productSearch, loadPage, setFilters]);
 
   useEffect(() => {
     if (categoryId !== prevCategoryIdRef.current) {
       prevCategoryIdRef.current = categoryId;
       setFilters((prev: any) => ({ ...prev, categoryId }));
+      loadPage(1);
     }
-  }, [categoryId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [categoryId, loadPage, setFilters]);
 
   const allCategories = useMemo(() => {
     if (!apiCategories) return [];
@@ -312,43 +318,70 @@ export default function PosPage() {
     setCustomerDialogOpen(false);
   };
 
-  const handleBarcodeScan = (barcode: string) => {
+  const addScannedProductToCart = (productByBarcode: any) => {
+    const currentQty = cart.get(productByBarcode.id)?.quantity ?? 0;
+    const stock = productByBarcode.stock ?? null;
+    if (typeof stock === "number" && stock < currentQty + 1) {
+      setInsufficientStockPopup({
+        open: true,
+        message: `Insufficient stock for "${productByBarcode.name}". Available stock: ${stock}.`,
+      });
+      return;
+    }
+    const productForCart = {
+      id: productByBarcode.id,
+      name: productByBarcode.name,
+      price: productByBarcode.price,
+      costPrice: productByBarcode.costPrice,
+      stock: productByBarcode.stock ?? 0,
+      category:
+        typeof productByBarcode.category === "string"
+          ? productByBarcode.category
+          : productByBarcode.category?.name || "",
+      barCode: productByBarcode.barCode || undefined,
+      imageUrl: productByBarcode.productImage || "",
+      productImage: productByBarcode.productImage || undefined,
+    } as Product;
+    addToCart(productForCart);
+    feedback.success(
+      "Product added",
+      `${productByBarcode.name} added to cart.`
+    );
+  };
+
+  const handleBarcodeScan = async (barcode: string) => {
     const productByBarcode = products?.find((p) => p.barCode === barcode);
 
     if (productByBarcode) {
-      const currentQty = cart.get(productByBarcode.id)?.quantity ?? 0;
-      const stock = productByBarcode.stock ?? null;
-      if (typeof stock === "number" && stock < currentQty + 1) {
-        setInsufficientStockPopup({
-          open: true,
-          message: `Insufficient stock for "${productByBarcode.name}". Available stock: ${stock}.`,
-        });
+      addScannedProductToCart(productByBarcode);
+      return;
+    }
+
+    try {
+      const response = await catalogueApi.products.getAll({
+        page: 1,
+        limit: 20,
+        search: barcode,
+      });
+      const remoteProducts = Array.isArray(response)
+        ? response
+        : (response.data ?? []);
+      const exactMatch = remoteProducts.find((p) => p.barCode === barcode);
+      if (exactMatch) {
+        addScannedProductToCart(exactMatch);
         return;
       }
-      const productForCart = {
-        id: productByBarcode.id,
-        name: productByBarcode.name,
-        price: productByBarcode.price,
-        costPrice: productByBarcode.costPrice,
-        stock: productByBarcode.stock ?? 0,
-        category: productByBarcode.category?.name || "",
-        barCode: productByBarcode.barCode || undefined,
-        imageUrl: productByBarcode.productImage || "",
-        productImage: productByBarcode.productImage || undefined,
-      } as Product;
-      addToCart(productForCart);
-      feedback.success(
-        "Product added",
-        `${productByBarcode.name} added to cart.`
-      );
-    } else {
-      setProductSearch(barcode);
-      setCategoryView("carousel");
-      feedback.success(
-        "Barcode scanned",
-        `No product found with barcode "${barcode}". Showing search results.`
-      );
+    } catch {
+      // Fallback to existing UX if lookup fails.
     }
+
+    setProductSearch(barcode);
+    setCategoryView("carousel");
+    loadPage(1);
+    feedback.success(
+      "Barcode scanned",
+      `No product found with barcode "${barcode}". Showing search results.`
+    );
   };
 
   const [isCompletingSale, setIsCompletingSale] = useState(false);
@@ -1018,6 +1051,14 @@ export default function PosPage() {
                     </Table>
                   </div>
                 </ScrollArea>
+                {productsPagination.totalPages > 0 ? (
+                  <div className="pt-3 border-t mt-2">
+                    <Pagination
+                      meta={productsPagination}
+                      onPageChange={loadPage}
+                    />
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

@@ -55,6 +55,12 @@ function DbProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const isE2E = isKasiPosE2eRuntime();
+    if (isE2E) {
+      // In Cypress we avoid blocking app shell render on IndexedDB init.
+      setIsDbReady(true);
+    }
+
     const initDb = async () => {
       try {
         const db = getDb();
@@ -77,10 +83,14 @@ function DbProvider({ children }: { children: React.ReactNode }) {
 
         await seedDatabase();
 
-        setIsDbReady(true);
+        if (!isE2E) {
+          setIsDbReady(true);
+        }
       } catch (error) {
         console.error("Failed to initialize database:", error);
-        setIsDbReady(true);
+        if (!isE2E) {
+          setIsDbReady(true);
+        }
       }
     };
     initDb();
