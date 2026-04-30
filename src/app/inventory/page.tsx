@@ -12,7 +12,10 @@ import { useStockAdjustments } from "@/hooks/use-stock-adjustments";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { executeMutation } from "@/lib/mutation-registry";
-import { updateProductStockInDexie } from "@/lib/entity-cache";
+import {
+  updateProductInDexie,
+  updateProductStockInDexie,
+} from "@/lib/entity-cache";
 import { catalogueApi } from "@/lib/api/catalogue";
 import {
   Card,
@@ -425,7 +428,10 @@ export default function InventoryPage() {
   };
 
   const handleThresholdUpdate = async (id: string) => {
-    if (thresholdValue < 0) {
+    const normalizedThreshold = Number.isFinite(thresholdValue)
+      ? Math.max(0, Math.trunc(thresholdValue))
+      : 0;
+    if (normalizedThreshold < 0) {
       feedback.error(
         "Invalid threshold",
         "Threshold must be zero or more.",
@@ -434,9 +440,34 @@ export default function InventoryPage() {
       return;
     }
 
+    const previousThreshold = Number(
+      allProducts.find((p: any) => String(p.id) === String(id))
+        ?.lowStockThreshold ?? 0
+    );
+
+    const applyThresholdToCaches = async (nextThreshold: number) => {
+      const queriesData = queryClient.getQueriesData<{
+        data: Array<{ id?: string; lowStockThreshold?: number | null }>;
+        meta?: unknown;
+      }>({ queryKey: productKeys.lists() });
+      queriesData.forEach(([queryKey, data]) => {
+        if (!data?.data || !Array.isArray(data.data)) return;
+        queryClient.setQueryData(queryKey, {
+          ...data,
+          data: data.data.map((p) =>
+            String(p.id) === String(id)
+              ? { ...p, lowStockThreshold: nextThreshold }
+              : p
+          ),
+        });
+      });
+      await updateProductInDexie(id, { lowStockThreshold: nextThreshold });
+    };
+
     try {
+      await applyThresholdToCaches(normalizedThreshold);
       if (isOnline) {
-        await updateProduct(id, { lowStockThreshold: thresholdValue });
+        await updateProduct(id, { lowStockThreshold: normalizedThreshold });
 
         await refreshProducts();
 
@@ -449,9 +480,9 @@ export default function InventoryPage() {
           mutationKey: ["products", "update"],
           mutationFn: () =>
             catalogueApi.products.update(id, {
-              lowStockThreshold: thresholdValue,
+              lowStockThreshold: normalizedThreshold,
             } as any),
-          variables: { id, data: { lowStockThreshold: thresholdValue } },
+          variables: { id, data: { lowStockThreshold: normalizedThreshold } },
         });
         feedback.success(
           "Queued",
@@ -465,6 +496,7 @@ export default function InventoryPage() {
         "Failed to update threshold",
         "Check your connection and try again."
       );
+      await applyThresholdToCaches(previousThreshold);
     }
   };
 
@@ -592,7 +624,7 @@ export default function InventoryPage() {
                             </Badge>
                           </span>
                           <span className="text-xs text-muted-foreground lg:hidden">
-                            Threshold: {(product as any).lowStockThreshold || 0}
+                            Threshold: {(product as any).lowStockThreshold ?? 0}
                           </span>
                         </div>
                       </TableCell>
@@ -621,9 +653,12 @@ export default function InventoryPage() {
                                 type="number"
                                 className="w-24 h-8"
                                 value={thresholdValue}
-                                onChange={(e) =>
-                                  setThresholdValue(Number(e.target.value))
-                                }
+                                onChange={(e) => {
+                                  const parsed = Number(e.target.value);
+                                  setThresholdValue(
+                                    Number.isFinite(parsed) ? parsed : 0
+                                  );
+                                }}
                                 onBlur={() =>
                                   handleThresholdUpdate(product.id!)
                                 }
@@ -637,7 +672,7 @@ export default function InventoryPage() {
                           ) : (
                             <div className="flex items-center gap-2">
                               <span>
-                                {(product as any).lowStockThreshold || 0}
+                                {(product as any).lowStockThreshold ?? 0}
                               </span>
                               <Button
                                 variant="ghost"
@@ -646,7 +681,7 @@ export default function InventoryPage() {
                                 onClick={() => {
                                   setEditingThresholdId(product.id!);
                                   setThresholdValue(
-                                    (product as any).lowStockThreshold || 0
+                                    (product as any).lowStockThreshold ?? 0
                                   );
                                 }}
                               >

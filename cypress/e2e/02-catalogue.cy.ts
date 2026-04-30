@@ -2,6 +2,7 @@ import { CataloguePage } from "../pages/catalogue-page";
 
 function clickRowAction(rowLabel: RegExp, actionLabel: "Edit" | "Delete") {
   const itemRegex = new RegExp(`^\\s*${actionLabel}\\s*$`, "i");
+  const menuItemSelector = '[role="menuitem"], [data-radix-collection-item]';
   const targetRow = () => cy.contains("tr", rowLabel, { timeout: 20_000 });
 
   const clickActionsButtonInRow = () => {
@@ -17,22 +18,35 @@ function clickRowAction(rowLabel: RegExp, actionLabel: "Edit" | "Delete") {
   const openActionsMenu = (remainingAttempts = 2) =>
     clickActionsButtonInRow().then(() => {
       cy.get("body").then(($body) => {
-        const hasVisibleMenu =
-          $body.find('[data-radix-menu-content]:visible, [role="menu"]:visible')
-            .length > 0;
-        if (hasVisibleMenu || remainingAttempts <= 0) return;
+        const hasVisibleActionItem =
+          $body.find(`${menuItemSelector}:visible`).length > 0;
+        if (hasVisibleActionItem || remainingAttempts <= 0) return;
         return openActionsMenu(remainingAttempts - 1);
       });
     });
 
-  openActionsMenu();
+  const clickMenuItem = (remainingAttempts = 4): Cypress.Chainable => {
+    return openActionsMenu().then(() => {
+      return cy.get("body").then(($body) => {
+        const candidate = $body
+          .find(`${menuItemSelector}:visible`)
+          .toArray()
+          .find((el) => itemRegex.test((el.textContent ?? "").trim()));
 
-  cy.get('[data-radix-menu-content]:visible, [role="menu"]:visible', {
-    timeout: 15_000,
-  })
-    .last()
-    .contains('[role="menuitem"]', itemRegex, { timeout: 10_000 })
-    .click({ force: true });
+        if (candidate) {
+          return cy.wrap(candidate).click({ force: true });
+        }
+
+        if (remainingAttempts <= 0) {
+          throw new Error(`Could not find visible ${actionLabel} menu item`);
+        }
+
+        return clickMenuItem(remainingAttempts - 1);
+      });
+    });
+  };
+
+  clickMenuItem();
 }
 
 function openCategoriesTab() {
@@ -171,6 +185,7 @@ describe("Catalogue", () => {
     }).should("be.visible");
     CataloguePage.getActiveDialog(CataloguePage.categoryDialogSelector)
       .find('input[name="name"]')
+      .should("not.be.disabled")
       .clear()
       .type("Home Care Updated");
     cy.setOnline();
