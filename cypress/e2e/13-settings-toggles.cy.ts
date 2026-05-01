@@ -1,5 +1,19 @@
 import { PosPage } from "../pages/pos-page";
 
+function waitForLocalAppReady() {
+  // Running the full suite can leave Next.js recompiling between specs; probe /
+  // before cy.visitApp to avoid transient ESOCKETTIMEDOUT on first navigation.
+  cy.request({
+    url: "/",
+    method: "GET",
+    failOnStatusCode: false,
+    retryOnNetworkFailure: true,
+    timeout: 90_000,
+  }).then((response) => {
+    expect(response.status, "dev server responds on /").to.be.gte(200);
+  });
+}
+
 function addFirstVisibleProductToCart() {
   cy.get('[data-testid="pos-product-table"]', { timeout: 60_000 })
     .find("button[aria-label]", { timeout: 60_000 })
@@ -11,17 +25,22 @@ function addFirstVisibleProductToCart() {
       if (!btn) {
         throw new Error('No "Add <product>" button found in product table.');
       }
-      cy.wrap(btn).scrollIntoView().click({ force: true });
+      cy.wrap(btn).scrollIntoView();
+      cy.wrap(btn).click({ force: true });
     });
 }
 
 describe("Settings toggles affect POS (VAT / tax)", () => {
   const isRealMode =
-    String(Cypress.env("TEST_MODE") ?? "mock").toLowerCase().trim() === "real";
+    String(Cypress.env("TEST_MODE") ?? "mock")
+      .toLowerCase()
+      .trim() === "real";
 
   beforeEach(() => {
+    Cypress.config("pageLoadTimeout", 120_000);
     cy.setupScenario();
     if (!isRealMode) {
+      waitForLocalAppReady();
       // seedIndexedDb needs an active window context (cy.window()).
       cy.visitApp("/");
       cy.seedIndexedDb();
@@ -37,7 +56,13 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
     const setPersistedVat = (nextChecked: boolean) => {
       cy.window().then((win) => {
         const raw = win.localStorage.getItem("kasi-pos-settings");
-        const parsed = raw ? (JSON.parse(raw) as any) : {};
+        type Persisted = {
+          showVatInCheckout?: boolean;
+          currentStore?: {
+            enabledModules?: { showVatInCheckout?: boolean };
+          };
+        };
+        const parsed: Persisted = raw ? (JSON.parse(raw) as Persisted) : {};
         parsed.showVatInCheckout = nextChecked;
         if (parsed.currentStore?.enabledModules) {
           parsed.currentStore.enabledModules.showVatInCheckout = nextChecked;
@@ -48,7 +73,10 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
 
     if (isRealMode) {
       // Real mode: drive via UI (server-backed).
-      cy.get("#show-vat-toggle").should("exist").and("not.be.disabled").click({ force: true });
+      cy.get("#show-vat-toggle")
+        .should("exist")
+        .and("not.be.disabled")
+        .click({ force: true });
     } else {
       // Mock mode: avoid server reachability races; persist locally and reload.
       setPersistedVat(true);
@@ -97,7 +125,10 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
     cy.visitApp("/settings");
     cy.waitForAppReady("/settings");
     if (isRealMode) {
-      cy.get("#show-vat-toggle").should("exist").and("not.be.disabled").click({ force: true });
+      cy.get("#show-vat-toggle")
+        .should("exist")
+        .and("not.be.disabled")
+        .click({ force: true });
     } else {
       setPersistedVat(false);
       cy.reload();
@@ -141,4 +172,3 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
       });
   });
 });
-
