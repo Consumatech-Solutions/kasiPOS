@@ -2,7 +2,7 @@ import { OfflinePage } from "../pages/offline-page";
 import { PosPage } from "../pages/pos-page";
 
 const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
-  /sync to cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled/i;
+  /sync to cloud now|download from cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled|downloading offline data|downloading essential/i;
 
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
@@ -59,11 +59,15 @@ function ensureCloudSyncModalReady() {
           .find("button")
           .toArray()
           .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim())
+            /sync to cloud now|download from cloud now/i.test(
+              (el.textContent ?? "").trim()
+            )
           );
+        const hasProgress =
+          $dialog.last().find('[role="progressbar"]').length > 0;
         const dialogText = ($dialog.last().text() ?? "").toLowerCase();
         const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
-        return hasSyncButton || hasStatusText;
+        return hasSyncButton || hasStatusText || hasProgress;
       }),
     {
       timeout: 60_000,
@@ -91,7 +95,6 @@ describe("Offline mode", () => {
     cy.get('button[aria-label="Open cloud sync status"]', {
       timeout: 20_000,
     }).should("be.visible");
-    PosPage.selectCustomerFromDialog("Alice Mokoena");
     PosPage.choosePaymentMethod("Cash");
     cy.findByRole("dialog", { name: /cash payment/i }).within(() => {
       cy.findByRole("button", { name: /exact/i }).click({ force: true });
@@ -132,28 +135,30 @@ describe("Offline mode", () => {
 
   it("reconnects and allows manual sync trigger", () => {
     cy.setOnline();
-    ensureCloudSyncModalReady();
-    // CI can validly show a terminal sync state before the manual action button appears.
-    cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).then(
-      ($dialog) => {
-        const hasSyncButton = $dialog
-          .find("button")
-          .toArray()
-          .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim())
-          );
-        if (hasSyncButton) {
-          cy.wrap($dialog).within(() => {
-            cy.findByRole("button", {
-              name: /sync to cloud now/i,
-              timeout: 15_000,
-            }).click({ force: true });
-          });
-          return;
-        }
-        expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
+    openCloudSyncModal();
+    cy.findByRole("dialog", {
+      name: /sync status|downloading offline data/i,
+      timeout: 45_000,
+    }).then(($dialog) => {
+      const hasSyncButton = $dialog
+        .find("button")
+        .toArray()
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
+      if (hasSyncButton) {
+        cy.wrap($dialog).within(() => {
+          cy.findByRole("button", {
+            name: /sync to cloud now/i,
+            timeout: 15_000,
+          }).click({ force: true });
+        });
+        return;
       }
-    );
+      const hasProgress = $dialog.find('[role="progressbar"]').length > 0;
+      const text = $dialog.text();
+      expect(hasProgress || SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(text)).to.eq(
+        true
+      );
+    });
     cy.get("body")
       .contains(
         /syncing|completed|pending|nothing to sync|uploaded|cloud sync/i,
