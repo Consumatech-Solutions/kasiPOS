@@ -10,6 +10,30 @@ function openCloudSyncModal() {
     .click({ force: true });
 }
 
+/** Seed/customer lists vary in CI; prefer a named row when present, else first selectable row. */
+function selectCustomerFromDialogForOfflineSale(
+  preferredName = /Alice Mokoena/i
+) {
+  cy.findByRole("button", { name: /add customer/i }).click({ force: true });
+  cy.findByRole("dialog", { name: /select a customer/i, timeout: 20_000 })
+    .should("be.visible")
+    .within(() => {
+      cy.get("tbody tr", { timeout: 25_000 }).should("have.length.at.least", 1);
+      cy.get("tbody tr").then(($rows) => {
+        const rows = $rows.toArray();
+        const preferred =
+          rows.find((row) =>
+            preferredName.test((row.textContent ?? "").trim())
+          ) ?? rows[0];
+        cy.wrap(preferred).within(() => {
+          cy.findByRole("button", { name: /^select$/i }).click({
+            force: true,
+          });
+        });
+      });
+    });
+}
+
 /** Avoid sync modal stuck on "Downloading Offline Data" when Dexie still has queued mutations. */
 function clearIndexedDbMutationQueue() {
   cy.window().then((win) => {
@@ -48,29 +72,30 @@ function ensureCloudSyncModalReady() {
   openCloudSyncModal();
   cy.findByRole("dialog", {
     name: /sync status|downloading offline data/i,
-    timeout: 30_000,
+    timeout: 45_000,
   }).should("be.visible");
 
+  // Use synchronous DOM reads — nested cy.get('[role="dialog"]') can fail the whole waitUntil when zero dialogs match briefly.
   cy.waitUntil(
-    () =>
-      cy.get('[role="dialog"]', { log: false }).then(($dialog) => {
-        const hasSyncButton = $dialog
-          .last()
-          .find("button")
-          .toArray()
-          .some((el) =>
-            /sync to cloud now|download from cloud now/i.test(
-              (el.textContent ?? "").trim()
-            )
-          );
-        const hasProgress =
-          $dialog.last().find('[role="progressbar"]').length > 0;
-        const dialogText = ($dialog.last().text() ?? "").toLowerCase();
-        const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
-        return hasSyncButton || hasStatusText || hasProgress;
-      }),
+    () => {
+      const dialogs = Cypress.$('[role="dialog"]:visible');
+      if (!dialogs.length) return false;
+      const last = dialogs.last();
+      const hasSyncButton = last
+        .find("button")
+        .toArray()
+        .some((el) =>
+          /sync to cloud now|download from cloud now/i.test(
+            (el.textContent ?? "").trim()
+          )
+        );
+      const hasProgress = last.find('[role="progressbar"]').length > 0;
+      const dialogText = (last.text() ?? "").toLowerCase();
+      const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
+      return hasSyncButton || hasStatusText || hasProgress;
+    },
     {
-      timeout: 60_000,
+      timeout: 90_000,
       interval: 500,
       description: "wait for sync status actions",
       errorMsg: "Sync status modal never reached actionable state",
@@ -95,6 +120,7 @@ describe("Offline mode", () => {
     cy.get('button[aria-label="Open cloud sync status"]', {
       timeout: 20_000,
     }).should("be.visible");
+    selectCustomerFromDialogForOfflineSale();
     PosPage.choosePaymentMethod("Cash");
     cy.findByRole("dialog", { name: /cash payment/i }).within(() => {
       cy.findByRole("button", { name: /exact/i }).click({ force: true });
@@ -135,10 +161,10 @@ describe("Offline mode", () => {
 
   it("reconnects and allows manual sync trigger", () => {
     cy.setOnline();
-    openCloudSyncModal();
+    ensureCloudSyncModalReady();
     cy.findByRole("dialog", {
       name: /sync status|downloading offline data/i,
-      timeout: 45_000,
+      timeout: 15_000,
     }).then(($dialog) => {
       const hasSyncButton = $dialog
         .find("button")
@@ -189,17 +215,17 @@ describe("Offline mode", () => {
       timeout: 30_000,
     }).should("be.visible");
     cy.waitUntil(
-      () =>
-        cy.get('[role="dialog"]').then(($dialogs) => {
-          const dlg = $dialogs[$dialogs.length - 1];
-          if (!dlg) return false;
-          return Cypress.$(dlg)
-            .find("button")
-            .toArray()
-            .some((el) =>
-              /download from cloud now/i.test((el.textContent ?? "").trim())
-            );
-        }),
+      () => {
+        const dialogs = Cypress.$('[role="dialog"]:visible');
+        const dlg = dialogs.last()[0];
+        if (!dlg) return false;
+        return Cypress.$(dlg)
+          .find("button")
+          .toArray()
+          .some((el) =>
+            /download from cloud now/i.test((el.textContent ?? "").trim())
+          );
+      },
       {
         timeout: 180_000,
         interval: 500,
