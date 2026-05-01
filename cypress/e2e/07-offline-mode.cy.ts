@@ -73,6 +73,21 @@ function clearIndexedDbMutationQueue() {
   });
 }
 
+/**
+ * DataPreloader only shows "Sync Status" actions (incl. Download) when preload is complete.
+ * In Cypress runtime this can be forced by marking the current preload version in localStorage.
+ */
+function markPreloadAsReady() {
+  cy.window().then((win) => {
+    try {
+      win.localStorage.setItem("kasipos-preload-version", "kasipos-v4");
+      win.localStorage.setItem("kasipos-preload-timestamp", String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
 function getOpenRoleDialogs(): JQuery<HTMLElement> {
   const withState = Cypress.$('[role="dialog"][data-state="open"]');
   if (withState.length) return withState;
@@ -242,6 +257,7 @@ describe("Offline mode", () => {
     PosPage.visit();
     PosPage.waitUntilLoaded();
     clearIndexedDbMutationQueue();
+    markPreloadAsReady();
     PosPage.visit();
     PosPage.waitUntilLoaded();
     // After POS is ready so DataPreloader iframe passes still hit default mocks, not 503.
