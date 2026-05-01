@@ -145,6 +145,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     });
   }
   const state = {
+    store: clone(options.seedAuth.store),
     products: clone(options.seedData.products),
     categories: clone(options.seedData.categories),
     customers: clone(options.seedData.customers),
@@ -205,12 +206,27 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
 
   cy.intercept("GET", `${apiBaseUrl}/stores/my-store`, (req) => {
     if (replyOfflineIfNeeded(req)) return;
-    corsReply(req, { statusCode: 200, body: clone(options.seedAuth.store) });
+    corsReply(req, { statusCode: 200, body: clone(state.store) });
   }).as("getMyStore");
   cy.intercept("GET", `${apiBaseUrl}/stores/*`, (req) => {
     if (replyOfflineIfNeeded(req)) return;
-    corsReply(req, { statusCode: 200, body: clone(options.seedAuth.store) });
+    corsReply(req, { statusCode: 200, body: clone(state.store) });
   });
+
+  cy.intercept("PATCH", `${apiBaseUrl}/stores/*`, (req) => {
+    if (replyOfflineIfNeeded(req)) return;
+    const payload = (req.body ?? {}) as Record<string, unknown>;
+    const enabledModules = payload.enabledModules as
+      | Record<string, unknown>
+      | undefined;
+    const now = isoNow();
+    state.store = {
+      ...state.store,
+      ...(enabledModules ? { enabledModules } : {}),
+      updatedAt: now,
+    };
+    corsReply(req, { statusCode: 200, body: clone(state.store) });
+  }).as("patchStore");
   cy.intercept("GET", `${apiBaseUrl}/settings*`, (req) => {
     // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
     if (isDocumentNavigation(req)) {

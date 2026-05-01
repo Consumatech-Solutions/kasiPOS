@@ -11,6 +11,7 @@ import {
   getTransactionsFromDexie,
   saveTransactionsToDexie,
 } from "@/lib/entity-cache";
+import { mutationQueue } from "@/lib/mutation-queue";
 import type { Transaction } from "@/types";
 import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
 
@@ -67,26 +68,31 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const isOffline = await checkOfflineStatus();
-      if (isOffline) {
-        return getTransactionsFromDexie(
-          params.page ?? 1,
-          params.limit ?? 10,
-          storeIdForOffline ?? undefined
-        );
-      }
-      const response = await transactionsApi.getAll(params);
-      const normalized = normalizeTransactionResponse(response.data);
-      if (normalized.data?.length) {
-        await saveTransactionsToDexie(normalized.data);
-      }
-      return normalized;
+      return getTransactionsFromDexie(
+        params.page ?? 1,
+        params.limit ?? 10,
+        storeIdForOffline ?? undefined
+      );
     },
     enabled: true,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateTransactionDto) => transactionsApi.create(data),
+    mutationFn: async (data: CreateTransactionDto) => {
+      const tempId = `temp-${Date.now()}`;
+      mutationQueue.add({
+        mutationKey: ["transactions", "create"],
+        variables: data,
+        idempotencyKey: tempId,
+      });
+      return {
+        data: {
+          id: tempId,
+          ...data,
+          createdAt: new Date().toISOString(),
+        } as Transaction,
+      };
+    },
     onMutate: async (newTransaction) => {
       await queryClient.cancelQueries({ queryKey: transactionKeys.lists() });
       const previousData = queryClient.getQueryData<{

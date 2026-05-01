@@ -390,10 +390,7 @@ export default function CataloguePage() {
               catalogueApi.products.update(productId, productData),
             variables: { id: editingProduct.id, data: productData },
           });
-          feedback.success(
-            "Queued",
-            "Product update queued. Will sync when online."
-          );
+          feedback.success("Product updated", "Product updated successfully.");
         }
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
@@ -480,7 +477,7 @@ export default function CataloguePage() {
               }),
             variables: { ...productData, _tempId: tempId },
           });
-          feedback.success("Queued", "Product added. Will sync when online.");
+          feedback.success("Product added", "Product added successfully.");
         }
       }
       setProductDialogOpen(false);
@@ -527,10 +524,7 @@ export default function CataloguePage() {
           mutationFn: () => catalogueApi.products.delete(productId),
           variables: { id },
         });
-        feedback.success(
-          "Queued",
-          "Product deletion queued. Will sync when online."
-        );
+        feedback.success("Product deleted", "Product deleted successfully.");
       }
     } catch (error: unknown) {
       feedback.fromError(
@@ -562,61 +556,11 @@ export default function CataloguePage() {
     categorySubmitRef.current = true;
     try {
       if (editingCategory && editingCategory.id) {
-        if (isOnline) {
-          await updateCategory(String(editingCategory.id), values);
-          feedback.success(
-            "Category updated",
-            "Category updated successfully."
-          );
-        } else {
-          const updatedCategory = {
-            ...editingCategory,
-            ...values,
-            updatedAt: new Date().toISOString(),
-          };
-          queryClient.setQueryData(
-            categoryKeys.lists(),
-            (old: { data: ApiCategory[]; meta: any } | undefined) => {
-              if (!old) return old;
-              return {
-                ...old,
-                data: old.data.map((cat) =>
-                  cat.id === editingCategory.id ? updatedCategory : cat
-                ),
-              };
-            }
-          );
-          queryClient.setQueryData(
-            categoryKeys.list({
-              page: 1,
-              limit: 1000,
-              storeIdForOffline: settings?.currentStore?.id ?? undefined,
-            }),
-            (old: { data: ApiCategory[]; meta: any } | undefined) => {
-              if (!old) return old;
-              return {
-                ...old,
-                data: old.data.map((cat) =>
-                  cat.id === editingCategory.id ? updatedCategory : cat
-                ),
-              };
-            }
-          );
-          await updateCategoryInDexie(String(editingCategory.id), values);
-          mutationQueue.add({
-            mutationKey: ["categories", "update"],
-            mutationFn: () =>
-              catalogueApi.categories.update(
-                String(editingCategory.id),
-                values
-              ),
-            variables: { id: editingCategory.id, data: values },
-          });
-          feedback.success(
-            "Queued",
-            "Category update queued. Will sync when online."
-          );
-        }
+        await updateCategory(String(editingCategory.id), values);
+        feedback.success(
+          "Category updated",
+          "Category updated successfully."
+        );
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
         const categoryExists = (typedCategories ?? []).some(
@@ -627,63 +571,8 @@ export default function CataloguePage() {
           setDuplicateNameModal({ type: "category" });
           return;
         }
-        if (isOnline) {
-          await createCategory(values);
-          feedback.success("Category added", "Category added successfully.");
-        } else {
-          const tempId = `temp-${Date.now()}`;
-          const optimisticCategory: ApiCategory = {
-            id: tempId,
-            name: values.name,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          queryClient.setQueryData(
-            categoryKeys.lists(),
-            (old: { data: ApiCategory[]; meta: any } | undefined) => {
-              if (!old)
-                return {
-                  data: [optimisticCategory],
-                  meta: { total: 1, page: 1, limit: 1000, totalPages: 1 },
-                };
-              return {
-                ...old,
-                data: [...old.data, optimisticCategory],
-                meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
-              };
-            }
-          );
-          queryClient.setQueryData(
-            categoryKeys.list({
-              page: 1,
-              limit: 1000,
-              storeIdForOffline: settings?.currentStore?.id ?? undefined,
-            }),
-            (old: { data: ApiCategory[]; meta: any } | undefined) => {
-              if (!old)
-                return {
-                  data: [optimisticCategory],
-                  meta: { total: 1, page: 1, limit: 1000, totalPages: 1 },
-                };
-              return {
-                ...old,
-                data: [...old.data, optimisticCategory],
-                meta: { ...old.meta, total: (old.meta?.total ?? 0) + 1 },
-              };
-            }
-          );
-          await saveCategoriesToDexie(
-            [optimisticCategory],
-            settings?.currentStore?.id ?? undefined
-          );
-          mutationQueue.add({
-            mutationKey: ["categories", "create"],
-            mutationFn: () =>
-              catalogueApi.categories.create({ ...values, _tempId: tempId }),
-            variables: { ...values, _tempId: tempId },
-          });
-          feedback.success("Queued", "Category queued. Will sync when online.");
-        }
+        await createCategory(values);
+        feedback.success("Category added", "Category added successfully.");
       }
       setCategoryDialogOpen(false);
       categoryForm.reset();
@@ -702,54 +591,8 @@ export default function CataloguePage() {
   const handleDeleteCategory = async (id: string | number) => {
     setDeletingCategoryId(String(id));
     try {
-      if (isOnline) {
-        await deleteCategoryHook(String(id));
-        feedback.success("Category deleted", "Category deleted successfully.");
-      } else {
-        const idStr = String(id);
-        queryClient.setQueryData(
-          categoryKeys.lists(),
-          (old: { data: ApiCategory[]; meta: any } | undefined) => {
-            if (!old) return old;
-            return {
-              ...old,
-              data: old.data.filter((cat) => String(cat.id) !== idStr),
-              meta: {
-                ...old.meta,
-                total: Math.max(0, (old.meta?.total ?? 1) - 1),
-              },
-            };
-          }
-        );
-        queryClient.setQueryData(
-          categoryKeys.list({
-            page: 1,
-            limit: 1000,
-            storeIdForOffline: settings?.currentStore?.id ?? undefined,
-          }),
-          (old: { data: ApiCategory[]; meta: any } | undefined) => {
-            if (!old) return old;
-            return {
-              ...old,
-              data: old.data.filter((cat) => String(cat.id) !== idStr),
-              meta: {
-                ...old.meta,
-                total: Math.max(0, (old.meta?.total ?? 1) - 1),
-              },
-            };
-          }
-        );
-        await deleteCategoryFromDexie(String(id));
-        mutationQueue.add({
-          mutationKey: ["categories", "delete"],
-          mutationFn: () => catalogueApi.categories.delete(String(id)),
-          variables: { id },
-        });
-        feedback.success(
-          "Queued",
-          "Category deletion queued. Will sync when online."
-        );
-      }
+      await deleteCategoryHook(String(id));
+      feedback.success("Category deleted", "Category deleted successfully.");
     } catch (error) {
       feedback.fromError(
         error,

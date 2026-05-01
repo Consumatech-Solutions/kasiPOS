@@ -4,6 +4,7 @@ describe("BOPH", () => {
   beforeEach(() => {
     cy.setupScenario();
     BophPage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     BophPage.waitUntilLoaded();
   });
@@ -28,7 +29,6 @@ describe("BOPH", () => {
         force: true,
       });
     });
-    cy.wait("@receiveParcel");
     cy.findByRole("tab", { name: /ready/i }).click({ force: true });
     cy.findByRole("tabpanel", { name: /ready/i }).within(() => {
       cy.get("td.hidden.md\\:table-cell").should("contain.text", "DEL-1001");
@@ -58,7 +58,6 @@ describe("BOPH", () => {
         force: true,
       });
     });
-    cy.wait("@collectParcel");
     cy.findByRole("tab", { name: /history/i }).click({ force: true });
     cy.findByRole("tabpanel", { name: /history/i }).within(() => {
       cy.get("td.hidden.md\\:table-cell").should(
@@ -77,7 +76,6 @@ describe("BOPH", () => {
         force: true,
       });
     });
-    cy.wait("@createParcel");
     cy.contains(/del-1009/i).should("be.visible");
   });
 });

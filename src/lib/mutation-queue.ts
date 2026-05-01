@@ -425,7 +425,7 @@ class MutationQueue {
   }
 
   add(
-    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retries" | "status">
+    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retries" | "status" | "mutationFn"> & { mutationFn?: () => Promise<any> }
   ) {
     const [type, action] = mutation.mutationKey;
     const inferredKey =
@@ -487,6 +487,7 @@ class MutationQueue {
       timestamp: Date.now(),
       retries: 0,
       status: "pending",
+      mutationFn: mutation.mutationFn ?? (() => executeMutation(mutation.mutationKey, mutation.variables)),
       ...(inferredKey !== undefined && inferredKey !== ""
         ? { idempotencyKey: inferredKey }
         : {}),

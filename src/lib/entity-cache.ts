@@ -6,7 +6,7 @@ import {
 import type { PaginationMeta } from "@/types/pagination";
 import type { ApiProduct, ApiCategory } from "@/types/catalogue";
 import type { Customer, PurchaseOrder } from "@/types";
-import type { Transaction } from "@/types";
+import type { Transaction, Voucher, StockAdjustment, Parcel } from "@/types";
 
 const ENTITY_CAP = 10000;
 
@@ -636,3 +636,143 @@ export async function getTransactionsFromDexie(
     },
   };
 }
+
+export async function getCustomerTransactionsFromDexie(args: {
+  customerId: string;
+  storeId?: string | null;
+  limit?: number;
+}): Promise<Transaction[]> {
+  if (typeof window === "undefined") return [];
+  const { customerId, storeId, limit } = args;
+  if (!customerId) return [];
+  const db = getDb();
+  let all = await db.transactionCache.toArray();
+  if (storeId != null && storeId !== "") {
+    all = all.filter(
+      (t) =>
+        (t as unknown as Transaction & { storeId?: string | number | null })
+          .storeId != null &&
+        String(
+          (t as unknown as Transaction & { storeId?: string | number | null })
+            .storeId
+        ) === String(storeId)
+    );
+  }
+  const cid = String(customerId);
+  const filtered = (all as unknown as Transaction[]).filter((t) => {
+    const tCid = (t as unknown as { customerId?: unknown }).customerId;
+    if (tCid == null) return false;
+    return String(tCid) === cid;
+  });
+  const sorted = filtered.sort((a, b) => {
+    const aT = (a.createdAt ?? String(a.date ?? "")) as string;
+    const bT = (b.createdAt ?? String(b.date ?? "")) as string;
+    return String(bT).localeCompare(String(aT));
+  });
+  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
+    return sorted.slice(0, Math.trunc(limit));
+  }
+  return sorted;
+}
+
+export async function saveVouchersToDexie(data: Voucher[]): Promise<void> {
+  if (typeof window === "undefined" || !data.length) return;
+  const db = getDb();
+  await db.vouchers.bulkPut(data);
+}
+
+export async function getVouchersFromDexie(
+  page: number,
+  limit: number,
+  storeId?: string | null
+): Promise<{ data: Voucher[]; meta: PaginationMeta }> {
+  if (typeof window === "undefined") {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
+  const db = getDb();
+  let all = await db.vouchers.toArray();
+  if (storeId != null && storeId !== "") {
+    all = all.filter((v) => v.storeId === storeId);
+  }
+  const total = all.length;
+  const data = all.slice((page - 1) * limit, page * limit);
+  return {
+    data,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+
+export async function saveStockAdjustmentsToDexie(data: StockAdjustment[]): Promise<void> {
+  if (typeof window === "undefined" || !data.length) return;
+  const db = getDb();
+  await db.stockAdjustments.bulkPut(data);
+}
+
+export async function getStockAdjustmentsFromDexie(
+  page: number,
+  limit: number,
+  storeId?: string | null,
+  productId?: string | null
+): Promise<{ data: StockAdjustment[]; meta: PaginationMeta }> {
+  if (typeof window === "undefined") {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
+  const db = getDb();
+  let all = await db.stockAdjustments.toArray();
+  if (storeId != null && storeId !== "") {
+    all = all.filter((a) => a.storeId === storeId);
+  }
+  if (productId != null && productId !== "") {
+    all = all.filter((a) => String(a.productId) === String(productId));
+  }
+  const sorted = all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const total = sorted.length;
+  const data = sorted.slice((page - 1) * limit, page * limit);
+  return {
+    data,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+
+export async function saveParcelsToDexie(data: Parcel[]): Promise<void> {
+  if (typeof window === "undefined" || !data.length) return;
+  const db = getDb();
+  await db.parcels.bulkPut(data);
+}
+
+export async function getParcelsFromDexie(
+  page: number,
+  limit: number,
+  storeId?: string | null
+): Promise<{ data: Parcel[]; meta: PaginationMeta }> {
+  if (typeof window === "undefined") {
+    return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
+  }
+  const db = getDb();
+  let all = await db.parcels.toArray();
+  if (storeId != null && storeId !== "") {
+    all = all.filter((p) => p.storeId === storeId);
+  }
+  const total = all.length;
+  const data = all.slice((page - 1) * limit, page * limit);
+  return {
+    data,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    },
+  };
+}
+

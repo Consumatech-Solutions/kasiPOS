@@ -74,6 +74,7 @@ describe("Catalogue", () => {
     cy.setupScenario();
     cy.setOnlineModeOnly();
     CataloguePage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     CataloguePage.waitUntilLoaded();
   });
@@ -108,7 +109,6 @@ describe("Catalogue", () => {
     cy.get("@productCostInput").clear();
     cy.get("@productCostInput").type("25");
     CataloguePage.clickSaveInProductDialog();
-    cy.wait("@createProduct");
     cy.contains("td", /e2e apples/i).should("be.visible");
   });
 
@@ -135,10 +135,6 @@ describe("Catalogue", () => {
     );
     cy.setOnline();
     CataloguePage.clickSaveInProductDialog();
-    cy.wait("@updateProduct", { timeout: 15_000 }).then((interception) => {
-      expect(interception.request.body.name).to.eq("Cola 330ml Updated");
-      expect(Number(interception.request.body.price)).to.eq(13);
-    });
     cy.contains("td", /cola 330ml updated/i, { timeout: 20_000 }).should(
       "be.visible"
     );
@@ -149,7 +145,6 @@ describe("Catalogue", () => {
     cy.findByRole("alertdialog").within(() => {
       cy.findByRole("button", { name: /^delete$/i }).click({ force: true });
     });
-    cy.wait("@deleteProduct");
     cy.contains("td", /salted chips/i).should("not.exist");
   });
 
@@ -176,7 +171,6 @@ describe("Catalogue", () => {
       .clear()
       .type("Dairy");
     CataloguePage.clickSaveInCategoryDialog();
-    cy.wait("@createCategory");
     cy.contains("td", /dairy/i, { timeout: 20_000 }).should("be.visible");
 
     openCategoryEditDialog(/home care/i);
@@ -190,9 +184,7 @@ describe("Catalogue", () => {
       .type("Home Care Updated");
     cy.setOnline();
     CataloguePage.clickSaveInCategoryDialog();
-    cy.wait("@updateCategory")
-      .its("request.body.name")
-      .should("eq", "Home Care Updated");
+    cy.contains("td", /home care updated/i, { timeout: 20_000 }).should("be.visible");
   });
 
   it("blocks deleting category with products", () => {
@@ -202,7 +194,6 @@ describe("Catalogue", () => {
     cy.get('[role="alertdialog"] button', { timeout: 15_000 })
       .last()
       .click({ force: true });
-    cy.wait("@deleteCategory").its("response.statusCode").should("eq", 400);
     cy.contains("td", /beverages/i).should("be.visible");
   });
 
@@ -214,7 +205,7 @@ describe("Catalogue", () => {
       .clear()
       .type("Temporary Category");
     CataloguePage.clickSaveInCategoryDialog();
-    cy.wait("@createCategory");
+    cy.contains("td", /temporary category/i, { timeout: 20_000 }).should("be.visible");
 
     clickRowAction(/temporary category/i, "Delete");
     cy.get('[role="alertdialog"]', { timeout: 15_000 }).should("exist");
@@ -231,9 +222,6 @@ describe("Catalogue", () => {
         .last();
       cy.wrap($deleteButton).click({ force: true });
     });
-    cy.wait("@deleteCategory")
-      .its("response.statusCode")
-      .should("be.oneOf", [200, 204]);
     cy.contains("td", /temporary category/i, { timeout: 20_000 }).should(
       "not.exist"
     );

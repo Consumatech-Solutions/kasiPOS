@@ -170,10 +170,7 @@ export default function BuyStockCartPage() {
         setCart([]);
         localStorage.removeItem("purchaseOrderCart");
 
-        feedback.success(
-          "Order queued",
-          "Order saved locally. It will sync when you are back online."
-        );
+        feedback.success("Order recorded", "Order placed successfully.");
       } catch (error: unknown) {
         feedback.fromError(
           error,

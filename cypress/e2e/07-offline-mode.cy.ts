@@ -44,6 +44,7 @@ describe("Offline mode", () => {
   beforeEach(() => {
     cy.setupScenario();
     PosPage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     PosPage.waitUntilLoaded();
   });
@@ -53,7 +54,7 @@ describe("Offline mode", () => {
     PosPage.searchProducts("Cola");
     PosPage.addProduct("Cola 330ml", 2);
     cy.setOffline();
-    cy.get('button[title*="Offline"]', { timeout: 20_000 }).should(
+    cy.get('button[aria-label="Open cloud sync status"]', { timeout: 20_000 }).should(
       "be.visible"
     );
     PosPage.selectCustomerFromDialog("Alice Mokoena");

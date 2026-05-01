@@ -70,8 +70,8 @@ const DialogContent = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           onOpenAutoFocus={(e) => {
-            // Auto-focus first focusable element to avoid aria-hidden issues with dialog buttons
-            const firstFocusable = e.currentTarget.querySelector<HTMLElement>(
+            const target = e.currentTarget as HTMLElement | null;
+            const firstFocusable = target?.querySelector<HTMLElement>(
               'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
             );
             if (firstFocusable) {

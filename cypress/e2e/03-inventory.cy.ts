@@ -4,6 +4,7 @@ describe("Inventory", () => {
   beforeEach(() => {
     cy.setupScenario();
     InventoryPage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     InventoryPage.waitUntilLoaded();
   });
@@ -64,10 +65,6 @@ describe("Inventory", () => {
           timeout: 15_000,
         }).click();
       });
-    cy.wait("@createStockAdjustment").then((interception) => {
-      const requestBody = interception.request.body as { reason?: string };
-      expect(requestBody.reason).to.eq("New stock received");
-    });
     cy.contains("td", /still water 500ml/i, { timeout: 15_000 })
       .parents("tr")
       .first()

@@ -50,5 +50,16 @@ declare namespace Cypress {
         marketplaceOrders: string;
       }>;
     }): Chainable<void>;
+
+    readIndexedDbStore<T = unknown>(
+      storeName: string,
+      options?: { dbName?: string }
+    ): Chainable<T[]>;
+
+    waitForIndexedDbStore(
+      storeName: string,
+      predicate: (rows: unknown[]) => boolean,
+      options?: { timeoutMs?: number; intervalMs?: number; dbName?: string }
+    ): Chainable<void>;
   }
 }

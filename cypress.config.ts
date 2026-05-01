@@ -121,7 +121,11 @@ export default defineConfig({
     specPattern: "cypress/e2e/**/*.cy.ts",
     viewportWidth: 1280,
     viewportHeight: 800,
-    video: Boolean(process.env.CI),
+    // Always record videos for E2E runs (especially staging / real mode).
+    // If you need to disable locally, set CYPRESS_VIDEO=false.
+    video:
+      String(process.env.CYPRESS_VIDEO ?? "true").toLowerCase().trim() !==
+      "false",
     screenshotOnRunFailure: true,
     defaultCommandTimeout: 15_000,
     pageLoadTimeout: 120_000,
