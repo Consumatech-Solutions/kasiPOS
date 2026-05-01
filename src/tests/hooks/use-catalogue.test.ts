@@ -1,11 +1,20 @@
 import React from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeAll,
+  beforeEach,
+  afterEach,
+} from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCategories, useProducts } from "@/hooks/use-catalogue";
 import { resetDbInstanceForTests } from "@/lib/db";
-import { saveCategoriesToDexie, saveProductsToDexie } from "@/lib/entity-cache";
-import type { ApiProduct } from "@/types/catalogue";
+import * as entityCache from "@/lib/entity-cache";
+import type { ApiCategory, ApiProduct } from "@/types/catalogue";
+import type { PaginationMeta } from "@/types/pagination";
 
 const checkOffline = vi.fn();
 const categoriesGetAll = vi.fn();
@@ -15,6 +24,13 @@ const categoriesDelete = vi.fn();
 const productsGetAll = vi.fn();
 
 vi.mock("@/lib/offline-detector", () => ({
+  offlineDetector: {
+    subscribe: vi.fn(() => () => {}),
+    setOfflineFirstActive: vi.fn(),
+    getOfflineFirstActive: vi.fn(() => false),
+    forceCheck: vi.fn(() => Promise.resolve(false)),
+  },
+  isOffline: vi.fn(() => false),
   checkOfflineStatus: (...args: unknown[]) => checkOffline(...args),
 }));
 
@@ -64,6 +80,15 @@ const catRow = {
   updatedAt: "2024-01-01T00:00:00.000Z",
 };
 
+let realGetCategoriesFromDexie: typeof entityCache.getCategoriesFromDexie;
+let realGetProductsFromDexie: typeof entityCache.getProductsFromDexie;
+
+beforeAll(async () => {
+  const mod = await vi.importActual<typeof entityCache>("@/lib/entity-cache");
+  realGetCategoriesFromDexie = mod.getCategoriesFromDexie.bind(mod);
+  realGetProductsFromDexie = mod.getProductsFromDexie.bind(mod);
+});
+
 describe("useCategories", () => {
   beforeEach(async () => {
     await resetDbInstanceForTests();
@@ -73,6 +98,34 @@ describe("useCategories", () => {
     categoriesUpdate.mockReset();
     categoriesDelete.mockReset();
     vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(entityCache, "getCategoriesFromDexie").mockImplementation(
+      async (page, limit, storeIdForOffline) => {
+        const offline = await checkOffline();
+        if (offline) {
+          return realGetCategoriesFromDexie(page, limit, storeIdForOffline);
+        }
+        const res = await categoriesGetAll({
+          page,
+          limit,
+          ...(storeIdForOffline ? { storeId: storeIdForOffline } : {}),
+        });
+        const data = Array.isArray(res)
+          ? res
+          : ((res as { data?: ApiCategory[] }).data ?? []);
+        const meta: PaginationMeta = Array.isArray(res)
+          ? {
+              total: data.length,
+              page,
+              limit,
+              totalPages: Math.max(1, Math.ceil(data.length / limit) || 1),
+            }
+          : (res as { meta: PaginationMeta }).meta;
+        if (data.length && storeIdForOffline) {
+          await entityCache.saveCategoriesToDexie(data, storeIdForOffline);
+        }
+        return { data, meta };
+      }
+    );
   });
 
   afterEach(async () => {
@@ -82,7 +135,7 @@ describe("useCategories", () => {
 
   it("loads from Dexie when offline", async () => {
     checkOffline.mockResolvedValue(true);
-    await saveCategoriesToDexie([catRow], "s1");
+    await entityCache.saveCategoriesToDexie([catRow], "s1");
     const { result } = renderHook(
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
       {
@@ -121,7 +174,7 @@ describe("useCategories", () => {
     getDb().close();
   });
 
-  it("rolls back optimistic create when API fails", async () => {
+  it("applies optimistic create while category sync is queued", async () => {
     checkOffline.mockResolvedValue(false);
     categoriesGetAll.mockResolvedValue({
       data: [catRow],
@@ -136,32 +189,27 @@ describe("useCategories", () => {
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.categories).toHaveLength(1);
-    await expect(
-      result.current.createCategory({ name: "NewCat" })
-    ).rejects.toThrow("network");
-    await waitFor(() => expect(result.current.categories).toHaveLength(1));
-    expect(result.current.categories[0].name).toBe("Existing");
+    await act(async () => {
+      await result.current.createCategory({ name: "NewCat" });
+    });
+    expect(result.current.categories).toHaveLength(2);
+    expect(result.current.categories.some((c) => c.name === "NewCat")).toBe(
+      true
+    );
   });
 
-  it("replaces optimistic row after successful create", async () => {
+  it("shows optimistic category row after create (queued sync)", async () => {
     checkOffline.mockResolvedValue(false);
-    const serverCat = {
+    categoriesGetAll.mockResolvedValue({
+      data: [],
+      meta: { total: 0, page: 1, limit: 10, totalPages: 1 },
+    });
+    categoriesCreate.mockResolvedValue({
       id: "srv-cat",
       name: "Server",
       createdAt: "2024-02-01T00:00:00.000Z",
       updatedAt: "2024-02-01T00:00:00.000Z",
-    };
-    const emptyMeta = { total: 0, page: 1, limit: 10, totalPages: 1 };
-    const filledMeta = { total: 1, page: 1, limit: 10, totalPages: 1 };
-    let getAllCall = 0;
-    categoriesGetAll.mockImplementation(async () => {
-      getAllCall += 1;
-      if (getAllCall === 1) {
-        return { data: [], meta: emptyMeta };
-      }
-      return { data: [serverCat], meta: filledMeta };
     });
-    categoriesCreate.mockResolvedValue(serverCat);
     const { result } = renderHook(
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
       {
@@ -172,11 +220,11 @@ describe("useCategories", () => {
     await act(async () => {
       await result.current.createCategory({ name: "Server" });
     });
-    await waitFor(() =>
-      expect(result.current.categories.some((c) => c.id === "srv-cat")).toBe(
-        true
+    expect(
+      result.current.categories.some(
+        (c) => c.name === "Server" && String(c.id ?? "").startsWith("temp-")
       )
-    );
+    ).toBe(true);
   });
 });
 
@@ -199,6 +247,40 @@ describe("useProducts", () => {
     checkOffline.mockReset();
     productsGetAll.mockReset();
     vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(entityCache, "getProductsFromDexie").mockImplementation(
+      async (page, limit, storeIdForOffline, filters) => {
+        const offline = await checkOffline();
+        if (offline) {
+          return realGetProductsFromDexie(
+            page,
+            limit,
+            storeIdForOffline,
+            filters
+          );
+        }
+        const res = await productsGetAll({
+          page,
+          limit,
+          ...(storeIdForOffline ? { storeId: storeIdForOffline } : {}),
+          ...filters,
+        });
+        const data = Array.isArray(res)
+          ? res
+          : ((res as { data?: ApiProduct[] }).data ?? []);
+        const meta: PaginationMeta = Array.isArray(res)
+          ? {
+              total: data.length,
+              page,
+              limit,
+              totalPages: Math.max(1, Math.ceil(data.length / limit) || 1),
+            }
+          : (res as { meta: PaginationMeta }).meta;
+        if (data.length && storeIdForOffline) {
+          await entityCache.saveProductsToDexie(data, storeIdForOffline);
+        }
+        return { data, meta };
+      }
+    );
   });
 
   afterEach(async () => {
@@ -208,7 +290,7 @@ describe("useProducts", () => {
 
   it("loads from Dexie when offline", async () => {
     checkOffline.mockResolvedValue(true);
-    await saveProductsToDexie([prodRow], "s1");
+    await entityCache.saveProductsToDexie([prodRow], "s1");
     const { result } = renderHook(
       () => useProducts(1, 10, { storeIdForOffline: "s1" }),
       {

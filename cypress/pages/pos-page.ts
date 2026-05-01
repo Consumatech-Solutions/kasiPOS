@@ -48,13 +48,14 @@ export const PosPage = {
   addProduct(name: string, times = 1) {
     this.ensureProductCarouselView();
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const addBtnPattern = new RegExp(`add ${escaped}`, "i");
     for (let i = 0; i < times; i += 1) {
       cy.get('[data-testid="pos-product-table"]', { timeout: 25_000 }).within(
         () => {
           cy.contains("tr", new RegExp(escaped, "i"), {
             timeout: 25_000,
           }).within(() => {
-            cy.findByRole("button", { name: new RegExp(`add ${name}`, "i") })
+            cy.findByRole("button", { name: addBtnPattern })
               .should("be.visible")
               .click({ force: true });
           });
@@ -65,13 +66,18 @@ export const PosPage = {
   },
 
   cartLine(name: string) {
-    return cy.get(`[data-testid="pos-cart-line"][data-product-name="${name}"]`);
+    const safe =
+      typeof CSS !== "undefined" && typeof CSS.escape === "function"
+        ? CSS.escape(name)
+        : name.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return cy.get(`[data-testid="pos-cart-line"][data-product-name="${safe}"]`);
   },
 
   selectCustomerFromDialog(customerName: string) {
+    const escaped = customerName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     cy.findByRole("button", { name: /add customer/i }).click({ force: true });
     cy.findByRole("dialog", { name: /select a customer/i }).within(() => {
-      cy.contains("tr", new RegExp(customerName, "i")).within(() => {
+      cy.contains("tr", new RegExp(escaped, "i")).within(() => {
         cy.findByRole("button", { name: /^select$/i }).click({ force: true });
       });
     });
