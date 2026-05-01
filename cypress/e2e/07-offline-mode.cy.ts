@@ -10,6 +10,40 @@ function openCloudSyncModal() {
     .click({ force: true });
 }
 
+/** Avoid sync modal stuck on "Downloading Offline Data" when Dexie still has queued mutations. */
+function clearIndexedDbMutationQueue() {
+  cy.window().then((win) => {
+    return new Cypress.Promise<void>((resolve, reject) => {
+      const req = win.indexedDB.open("kasiPosDatabase");
+      req.onerror = () =>
+        reject(req.error ?? new Error("Failed to open IndexedDB"));
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          if (!db.objectStoreNames.contains("mutationQueue")) {
+            db.close();
+            resolve();
+            return;
+          }
+          const tx = db.transaction(["mutationQueue"], "readwrite");
+          tx.objectStore("mutationQueue").clear();
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            reject(tx.error ?? new Error("mutationQueue clear failed"));
+          };
+        } catch (e) {
+          db.close();
+          reject(e);
+        }
+      };
+    });
+  });
+}
+
 function ensureCloudSyncModalReady() {
   openCloudSyncModal();
   cy.findByRole("dialog", {
@@ -54,9 +88,9 @@ describe("Offline mode", () => {
     PosPage.searchProducts("Cola");
     PosPage.addProduct("Cola 330ml", 2);
     cy.setOffline();
-    cy.get('button[aria-label="Open cloud sync status"]', { timeout: 20_000 }).should(
-      "be.visible"
-    );
+    cy.get('button[aria-label="Open cloud sync status"]', {
+      timeout: 20_000,
+    }).should("be.visible");
     PosPage.selectCustomerFromDialog("Alice Mokoena");
     PosPage.choosePaymentMethod("Cash");
     cy.findByRole("dialog", { name: /cash payment/i }).within(() => {
@@ -132,12 +166,49 @@ describe("Offline mode", () => {
     const api = (
       (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:9002"
     ).replace(/\/+$/, "");
+    cy.setOnline();
+    PosPage.visit();
+    PosPage.waitUntilLoaded();
+    clearIndexedDbMutationQueue();
+    PosPage.visit();
+    PosPage.waitUntilLoaded();
+    // After POS is ready so DataPreloader iframe passes still hit default mocks, not 503.
     cy.intercept("GET", `${api}/products*`, {
       statusCode: 503,
       body: { message: "Service unavailable" },
     }).as("products503");
-    cy.setOnline();
-    PosPage.visit();
+    // Catalogue reads from Dexie on the POS screen; network pulls happen via manual cloud sync.
+    openCloudSyncModal();
+    cy.findByRole("dialog", {
+      name: /sync status|downloading offline data/i,
+      timeout: 30_000,
+    }).should("be.visible");
+    cy.waitUntil(
+      () =>
+        cy.get('[role="dialog"]').then(($dialogs) => {
+          const dlg = $dialogs[$dialogs.length - 1];
+          if (!dlg) return false;
+          return Cypress.$(dlg)
+            .find("button")
+            .toArray()
+            .some((el) =>
+              /download from cloud now/i.test((el.textContent ?? "").trim())
+            );
+        }),
+      {
+        timeout: 180_000,
+        interval: 500,
+        description:
+          "sync modal leaves preload UI (download from cloud action visible)",
+      }
+    );
+    cy.findByRole("button", {
+      name: /download from cloud now/i,
+      timeout: 30_000,
+    })
+      .should("be.visible")
+      .and("not.be.disabled")
+      .click({ force: true });
     cy.wait("@products503", { timeout: 25_000 });
     cy.contains(/products/i).should("be.visible");
   });
