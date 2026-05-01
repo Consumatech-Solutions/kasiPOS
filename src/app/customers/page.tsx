@@ -13,6 +13,7 @@ import {
   saveCustomersToDexie,
   updateCustomerInDexie,
   deleteCustomerFromDexie,
+  getCustomerTransactionsFromDexie,
 } from "@/lib/entity-cache";
 import { useQueryClient } from "@tanstack/react-query";
 import { customersApi } from "@/lib/api/customers";
@@ -65,8 +66,7 @@ import {
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Pagination } from "@/components/ui/pagination";
-import { useLiveQuery } from "dexie-react-hooks";
-import { db } from "@/lib/db";
+import { useQuery } from "@tanstack/react-query";
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -104,24 +104,23 @@ export default function CustomersPage() {
     null
   );
 
-  const customerTransactions = useLiveQuery(() => {
-    if (selectedCustomer && currentStore) {
-      return db.transactions
-        .where("storeId")
-        .equals(currentStore.id!)
-        .filter((t: any) => {
-          const customerId = selectedCustomer.id;
-          return (
-            t.customerId === customerId ||
-            t.customerId === Number(customerId) ||
-            String(t.customerId) === String(customerId)
-          );
-        })
-        .reverse()
-        .toArray();
-    }
-    return [];
-  }, [selectedCustomer, currentStore]);
+  const customerTransactionsQuery = useQuery({
+    queryKey: [
+      "customerTransactions",
+      { customerId: selectedCustomer?.id, storeId: currentStore?.id },
+    ],
+    queryFn: async () => {
+      if (!selectedCustomer?.id) return [];
+      return getCustomerTransactionsFromDexie({
+        customerId: String(selectedCustomer.id),
+        storeId: currentStore?.id ?? undefined,
+        limit: 2000,
+      });
+    },
+    enabled: !!selectedCustomer?.id,
+    staleTime: 0,
+  });
+  const customerTransactions = customerTransactionsQuery.data ?? [];
 
   const openCustomerDialog = (customer?: Customer) => {
     if (customer) {
@@ -171,10 +170,7 @@ export default function CustomersPage() {
             mutationFn: () => customersApi.update(editingCustomer.id, data),
             variables: { id: editingCustomer.id, data },
           });
-          feedback.success(
-            "Queued",
-            "Customer update queued. Will sync when online."
-          );
+          feedback.success("Customer updated", "Customer updated successfully.");
         }
       } else {
         if (isOnline) {
@@ -224,7 +220,7 @@ export default function CustomersPage() {
               }),
             variables: { ...data, _tempId: tempId },
           });
-          feedback.success("Queued", "Customer queued. Will sync when online.");
+          feedback.success("Customer added", "Customer added successfully.");
         }
       }
       setCustomerDialogOpen(false);
@@ -274,10 +270,7 @@ export default function CustomersPage() {
           mutationFn: () => customersApi.delete(id),
           variables: { id },
         });
-        feedback.success(
-          "Queued",
-          "Customer deletion queued. Will sync when online."
-        );
+        feedback.success("Customer deleted", "Customer deleted successfully.");
       }
     } catch (error) {
       feedback.fromError(
@@ -488,8 +481,7 @@ export default function CustomersPage() {
           {pagination.totalPages > 1 && (
             <div className="mt-4">
               <Pagination
-                currentPage={pagination.page}
-                totalPages={pagination.totalPages}
+                meta={pagination}
                 onPageChange={handlePageChange}
               />
             </div>
@@ -561,9 +553,12 @@ export default function CustomersPage() {
                 })}
               </TableBody>
             </Table>
-            {(!customerTransactions || customerTransactions.length === 0) && (
+            {(customerTransactions.length === 0 ||
+              customerTransactionsQuery.isLoading) && (
               <p className="text-center text-muted-foreground py-8">
-                No purchase history for this customer.
+                {customerTransactionsQuery.isLoading
+                  ? "Loading purchase history..."
+                  : "No purchase history for this customer."}
               </p>
             )}
           </ScrollArea>

@@ -10,9 +10,12 @@ import {
   type CollectParcelDto,
 } from "@/lib/api/parcels";
 import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
+import { getParcelsFromDexie } from "@/lib/entity-cache";
+import { mutationQueue } from "@/lib/mutation-queue";
 
 interface UseParcelsOptions extends GetParcelsParams {
   autoLoad?: boolean;
+  storeIdForOffline?: string | null;
 }
 
 export const parcelKeys = {
@@ -55,7 +58,7 @@ function normalizeParcelResponse(
 }
 
 export function useParcels(options: UseParcelsOptions = {}) {
-  const { autoLoad = true, ...params } = options;
+  const { autoLoad = true, storeIdForOffline, ...params } = options;
   const queryClient = useQueryClient();
 
   const queryKey = parcelKeys.list(params);
@@ -63,14 +66,35 @@ export function useParcels(options: UseParcelsOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const response = await parcelsApi.getAll(params);
-      return normalizeParcelResponse(response.data);
+      return getParcelsFromDexie(
+        params.page ?? 1,
+        params.limit ?? 10,
+        storeIdForOffline ?? undefined
+      );
     },
     enabled: true,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateParcelDto) => parcelsApi.create(data),
+    mutationFn: async (data: CreateParcelDto) => {
+      const tempId = `temp-${Date.now()}`;
+      mutationQueue.add({
+        mutationKey: ["parcels", "create"],
+        variables: data,
+        idempotencyKey: tempId,
+      });
+      return {
+        data: {
+          id: tempId,
+          deliveryNumber: data.deliveryNumber,
+          customerName: data.customerName,
+          status: "Incoming",
+          storeId: data.storeId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Parcel,
+      };
+    },
     onMutate: async (newParcel) => {
       await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -127,8 +151,13 @@ export function useParcels(options: UseParcelsOptions = {}) {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: ReceiveParcelDto }) =>
-      parcelsApi.receive(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: ReceiveParcelDto }) => {
+      mutationQueue.add({
+        mutationKey: ["parcels", "receive"],
+        variables: { id, data },
+      });
+      return { success: true };
+    },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -169,8 +198,13 @@ export function useParcels(options: UseParcelsOptions = {}) {
   });
 
   const collectMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CollectParcelDto }) =>
-      parcelsApi.collect(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: CollectParcelDto }) => {
+      mutationQueue.add({
+        mutationKey: ["parcels", "collect"],
+        variables: { id, data },
+      });
+      return { success: true };
+    },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: parcelKeys.lists() });
       const previousData = queryClient.getQueryData<{

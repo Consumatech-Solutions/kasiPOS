@@ -81,7 +81,7 @@ export async function pullAllProductsFromApi(
   const updatedAtAfter = options?.updatedAtAfter;
   let saved = 0;
   let page = 1;
-  const limit = 100;
+  const limit = 5000;
   const maxPages = 100;
 
   while (page <= maxPages) {
@@ -114,7 +114,7 @@ export async function pullAllCategoriesFromApi(
   const updatedAtAfter = options?.updatedAtAfter;
   let saved = 0;
   let page = 1;
-  const limit = 50;
+  const limit = 5000;
   const maxPages = 100;
 
   while (page <= maxPages) {
@@ -181,7 +181,7 @@ export async function pullAllCustomersFromApi(
   const updatedAtAfter = options?.updatedAtAfter;
   let saved = 0;
   let page = 1;
-  const limit = 50;
+  const limit = 5000;
   const maxPages = 100;
 
   while (page <= maxPages) {

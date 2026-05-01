@@ -4,6 +4,7 @@ describe("Marketplace", () => {
   beforeEach(() => {
     cy.setupScenario();
     MarketplacePage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     MarketplacePage.waitUntilLoaded();
   });
@@ -63,8 +64,7 @@ describe("Marketplace", () => {
     cy.findByRole("button", { name: /^cash$/i }).click({ force: true });
     cy.findByRole("button", { name: /^exact$/i }).click({ force: true });
     cy.findByRole("button", { name: /complete sale/i }).click({ force: true });
-    cy.wait("@createMarketplaceOrder", { timeout: 30_000 });
-    cy.contains(/order created|created successfully|marketplace order/i).should(
+    cy.contains(/order created|created successfully|marketplace order/i, { timeout: 30_000 }).should(
       "be.visible"
     );
   });

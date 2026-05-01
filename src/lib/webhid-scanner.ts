@@ -45,12 +45,12 @@ export async function getWebHIDScanners(): Promise<WebHIDDevice[]> {
         );
       })
       .map((device) => ({
-        id: `webhid_${device.vendorId}_${device.productId}_${device.serialNumber || "unknown"}`,
+        id: `webhid_${device.vendorId}_${device.productId}_${(device as any).serialNumber || "unknown"}`,
         vendorId: device.vendorId,
         productId: device.productId,
-        manufacturer: device.manufacturerName,
+        manufacturer: (device as any).manufacturerName,
         product: device.productName,
-        serialNumber: device.serialNumber,
+        serialNumber: (device as any).serialNumber,
         name:
           device.productName ||
           `Scanner (${device.vendorId.toString(16)}:${device.productId.toString(16)})`,
@@ -100,7 +100,7 @@ export async function connectWebHIDScanner(
       (d) =>
         d.vendorId === vendorId &&
         d.productId === productId &&
-        (!serialNumber || d.serialNumber === serialNumber)
+        (!serialNumber || (d as any).serialNumber === serialNumber)
     );
 
     if (!device) {
@@ -262,5 +262,5 @@ export function parseWebHIDDeviceId(deviceId: string): {
 }
 
 export function createWebHIDDeviceId(device: HIDDevice): string {
-  return `webhid_${device.vendorId.toString(16)}_${device.productId.toString(16)}_${device.serialNumber || "unknown"}`;
+  return `webhid_${device.vendorId.toString(16)}_${device.productId.toString(16)}_${(device as any).serialNumber || "unknown"}`;
 }

@@ -437,6 +437,15 @@ export default function PosPage() {
           timestamp: new Date(),
         });
 
+      const soldQuantityByProduct = new Map<string, number>();
+      for (const item of newTransaction.items) {
+        const pid = String(item.productId);
+        soldQuantityByProduct.set(
+          pid,
+          (soldQuantityByProduct.get(pid) ?? 0) + item.quantity
+        );
+      }
+
       if (isOnline) {
         try {
           const mappings = await getDb().syncIdMapping.toArray();
@@ -497,10 +506,26 @@ export default function PosPage() {
             id: String(createdId),
           } as Transaction);
 
-          queryClient.invalidateQueries({
-            queryKey: productKeys.lists(),
-            refetchType: "all",
-          });
+          for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
+            const product = await getDb().productCache.get(pid);
+            if (product && typeof product.stock === "number") {
+              const newStock = Math.max(0, product.stock - soldQty);
+              await updateProductStockInDexie(pid, newStock);
+              
+              queryClient.setQueriesData(
+                { queryKey: productKeys.lists() },
+                (oldData: any) => {
+                  if (!oldData || !oldData.data) return oldData;
+                  return {
+                    ...oldData,
+                    data: oldData.data.map((p: any) => 
+                      String(p.id) === pid ? { ...p, stock: newStock } : p
+                    ),
+                  };
+                }
+              );
+            }
+          }
 
           clearCartAndResetCoupons();
           setSelectedCustomerId(undefined);
@@ -594,72 +619,26 @@ export default function PosPage() {
           }
         }
       } else {
-        const previousStockMap = new Map<string, number>();
         try {
-          const listQueriesSnapshot = queryClient.getQueriesData<{
-            data: { id?: string; stock?: number | null }[];
-          }>({ queryKey: productKeys.lists() });
-          for (const item of newTransaction.items) {
-            const pid = String(item.productId);
-            if (previousStockMap.has(pid)) continue;
-            let found: number | undefined;
-            for (const [, data] of listQueriesSnapshot) {
-              const row = data?.data?.find((p) => String(p.id) === pid);
-              if (row) {
-                found = row.stock ?? 0;
-                break;
-              }
-            }
-            previousStockMap.set(pid, found ?? 0);
-          }
-
-          const productQueryKeys = queryClient
-            .getQueryCache()
-            .getAll()
-            .map((query) => query.queryKey);
-          const productQueries = productQueryKeys.filter(
-            (key) => Array.isArray(key) && key[0] === "products"
-          );
-
-          productQueries.forEach((queryKey) => {
-            queryClient.setQueryData<{ data: any[]; meta: any }>(
-              queryKey,
-              (old) => {
-                if (!old || !old.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map((product) => {
-                    const cartItem = newTransaction.items.find(
-                      (item) => String(item.productId) === String(product.id)
-                    );
-                    if (cartItem) {
-                      const currentStock = product.stock ?? 0;
-                      const newStock = Math.max(
-                        0,
-                        currentStock - cartItem.quantity
-                      );
-                      return { ...product, stock: newStock };
-                    }
-                    return product;
-                  }),
-                };
-              }
-            );
-          });
-
-          const soldQuantityByProduct = new Map<string, number>();
-          for (const item of newTransaction.items) {
-            const pid = String(item.productId);
-            soldQuantityByProduct.set(
-              pid,
-              (soldQuantityByProduct.get(pid) ?? 0) + item.quantity
-            );
-          }
-
           for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
-            const previousStock = previousStockMap.get(pid) ?? 0;
-            const newStock = Math.max(0, previousStock - soldQty);
-            await updateProductStockInDexie(pid, newStock);
+            const product = await getDb().productCache.get(pid);
+            if (product && typeof product.stock === "number") {
+              const newStock = Math.max(0, product.stock - soldQty);
+              await updateProductStockInDexie(pid, newStock);
+              
+              queryClient.setQueriesData(
+                { queryKey: productKeys.lists() },
+                (oldData: any) => {
+                  if (!oldData || !oldData.data) return oldData;
+                  return {
+                    ...oldData,
+                    data: oldData.data.map((p: any) => 
+                      String(p.id) === pid ? { ...p, stock: newStock } : p
+                    ),
+                  };
+                }
+              );
+            }
           }
 
           await db.transactions.add(newTransaction as Transaction);
@@ -689,67 +668,14 @@ export default function PosPage() {
           setReceiptData(receiptPayload);
           setTimeout(() => setReceiptOpen(true), 0);
 
-          feedback.success(
-            "Offline sale complete!",
-            "Receipt saved. Will sync when back online."
-          );
+          feedback.success("Sale complete!", "Order recorded.");
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
             console.error("[Complete Sale] Failed (offline)", { error });
           }
           console.error("Failed to complete offline sale:", error);
 
-          const queriesData = queryClient.getQueriesData<{
-            data: { id?: string; stock?: number | null }[];
-            meta?: unknown;
-          }>({ queryKey: productKeys.lists() });
-          queriesData.forEach(([queryKey, data]) => {
-            if (!data?.data || !Array.isArray(data.data)) return;
-            queryClient.setQueryData(queryKey, {
-              ...data,
-              data: data.data.map((product) => {
-                const pid = String(product.id);
-                if (!previousStockMap.has(pid)) return product;
-                return { ...product, stock: previousStockMap.get(pid)! };
-              }),
-            });
-          });
-          const pqKeys = queryClient
-            .getQueryCache()
-            .getAll()
-            .map((q) => q.queryKey);
-          const nonListProductQueries = pqKeys.filter(
-            (key) =>
-              Array.isArray(key) &&
-              key[0] === "products" &&
-              !(key[1] === "list" || key.length < 2)
-          );
-          nonListProductQueries.forEach((queryKey) => {
-            queryClient.setQueryData<{ data: any[]; meta: any }>(
-              queryKey,
-              (old) => {
-                if (!old?.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map(
-                    (product: { id?: string; stock?: number | null }) => {
-                      const pid = String(product.id);
-                      if (!previousStockMap.has(pid)) return product;
-                      return { ...product, stock: previousStockMap.get(pid)! };
-                    }
-                  ),
-                };
-              }
-            );
-          });
-
-          for (const item of newTransaction.items) {
-            const pid = String(item.productId);
-            const prev = previousStockMap.get(pid);
-            if (prev !== undefined) {
-              await updateProductStockInDexie(pid, prev);
-            }
-          }
+          queryClient.invalidateQueries({ queryKey: productKeys.lists() });
 
           feedback.fromError(
             error,

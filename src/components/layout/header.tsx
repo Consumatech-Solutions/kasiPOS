@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -52,7 +52,6 @@ import {
 } from "@/hooks/use-notifications";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { offlineDetector } from "@/lib/offline-detector";
-import { useMemo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -126,6 +125,9 @@ export default function Header() {
     useNetworkStatus();
   const { openHardwareSetup } = useHardwareSetup();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const currentPageTitle = useMemo(() => {
     if (pageTitles[pathname]) {
       return pageTitles[pathname];
@@ -192,36 +194,7 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        <div className="relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 sm:h-10 sm:w-10 touch-target"
-            title={
-              isOnline
-                ? "Online"
-                : "Offline - Working in offline mode, syncing will be performed at 6:00 AM, 12:00 PM, and 6:00 PM"
-            }
-          >
-            <Wifi
-              className={cn(
-                "h-4 w-4 sm:h-5 sm:w-5",
-                isOnline
-                  ? "text-green-600 dark:text-green-400"
-                  : hasInternet
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-red-600 dark:text-red-400"
-              )}
-            />
-          </Button>
-          {wasOffline && (
-            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-green-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 animate-pulse">
-              Back online - Syncing...
-            </div>
-          )}
-        </div>
-
-        {process.env.NODE_ENV === "development" &&
+        {mounted && process.env.NODE_ENV === "development" &&
           offlineDetector.isDevHost() && (
             <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
               <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">

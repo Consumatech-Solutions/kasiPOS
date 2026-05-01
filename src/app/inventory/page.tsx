@@ -361,23 +361,8 @@ export default function InventoryPage() {
         const productId = String(selectedProduct.id);
         offlineRollback = { productId, previousStock: cur };
 
-        const queriesData = queryClient.getQueriesData<{
-          data: { id?: string; stock?: number | null }[];
-          meta?: unknown;
-        }>({ queryKey: productKeys.lists() });
-        queriesData.forEach(([queryKey, data]) => {
-          if (data?.data && Array.isArray(data.data)) {
-            const updated = {
-              ...data,
-              data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: newStock } : p
-              ),
-            };
-            queryClient.setQueryData(queryKey, updated);
-          }
-        });
-
         await updateProductStockInDexie(productId, newStock);
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
 
         const variables = {
           productId: selectedProduct.id!,
@@ -392,32 +377,15 @@ export default function InventoryPage() {
           variables,
         });
 
-        feedback.success(
-          "Queued",
-          "Stock updated locally. Will sync when online."
-        );
+        feedback.success("Stock adjusted", "Stock updated successfully.");
       }
       setAdjustmentDialogOpen(false);
       setSelectedProduct(null);
     } catch (error: any) {
       if (offlineRollback) {
         const { productId, previousStock } = offlineRollback;
-        const queriesData = queryClient.getQueriesData<{
-          data: { id?: string; stock?: number | null }[];
-          meta?: unknown;
-        }>({ queryKey: productKeys.lists() });
-        queriesData.forEach(([queryKey, data]) => {
-          if (data?.data && Array.isArray(data.data)) {
-            const updated = {
-              ...data,
-              data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: previousStock } : p
-              ),
-            };
-            queryClient.setQueryData(queryKey, updated);
-          }
-        });
         await updateProductStockInDexie(productId, previousStock);
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
       }
       feedback.fromError(
         error,
@@ -446,30 +414,14 @@ export default function InventoryPage() {
     );
 
     const applyThresholdToCaches = async (nextThreshold: number) => {
-      const queriesData = queryClient.getQueriesData<{
-        data: Array<{ id?: string; lowStockThreshold?: number | null }>;
-        meta?: unknown;
-      }>({ queryKey: productKeys.lists() });
-      queriesData.forEach(([queryKey, data]) => {
-        if (!data?.data || !Array.isArray(data.data)) return;
-        queryClient.setQueryData(queryKey, {
-          ...data,
-          data: data.data.map((p) =>
-            String(p.id) === String(id)
-              ? { ...p, lowStockThreshold: nextThreshold }
-              : p
-          ),
-        });
-      });
       await updateProductInDexie(id, { lowStockThreshold: nextThreshold });
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
     };
 
     try {
       await applyThresholdToCaches(normalizedThreshold);
       if (isOnline) {
         await updateProduct(id, { lowStockThreshold: normalizedThreshold });
-
-        await refreshProducts();
 
         feedback.success(
           "Low stock trigger updated",
@@ -484,10 +436,7 @@ export default function InventoryPage() {
             } as any),
           variables: { id, data: { lowStockThreshold: normalizedThreshold } },
         });
-        feedback.success(
-          "Queued",
-          "Threshold update queued. Will sync when online."
-        );
+        feedback.success("Threshold updated", "Threshold updated successfully.");
       }
       setEditingThresholdId(null);
     } catch (error: any) {

@@ -7,6 +7,8 @@ import {
   type GetStockAdjustmentsParams,
 } from "@/lib/api/stock-adjustments";
 import { getDb } from "@/lib/db";
+import { getStockAdjustmentsFromDexie } from "@/lib/entity-cache";
+import { mutationQueue } from "@/lib/mutation-queue";
 import type { StockAdjustment } from "@/types";
 import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
 
@@ -14,6 +16,7 @@ interface UseStockAdjustmentsOptions {
   productId?: string;
   initialPage?: number;
   initialLimit?: number;
+  storeIdForOffline?: string | null;
 }
 
 export const stockAdjustmentKeys = {
@@ -58,7 +61,7 @@ function normalizeStockAdjustmentResponse(
 }
 
 export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
-  const { productId, initialPage = 1, initialLimit = 10 } = options;
+  const { productId, initialPage = 1, initialLimit = 10, storeIdForOffline } = options;
   const queryClient = useQueryClient();
 
   const queryKey = productId
@@ -72,39 +75,44 @@ export function useStockAdjustments(options: UseStockAdjustmentsOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      let response: {
-        data: StockAdjustment[] | PaginatedResponse<StockAdjustment>;
-      };
-
+      let resolvedProductId: string | null | undefined = productId;
       if (productId) {
-        const resolvedProductId = String(productId).startsWith("temp-")
-          ? ((await getDb().syncIdMapping.get(String(productId)))?.serverId ??
-            null)
+        resolvedProductId = String(productId).startsWith("temp-")
+          ? ((await getDb().syncIdMapping.get(String(productId)))?.serverId ?? null)
           : productId;
-        if (!resolvedProductId) {
-          return {
-            data: [],
-            meta: { total: 0, page: 1, limit: 10, totalPages: 0 },
-          };
-        }
-        response = await stockAdjustmentsApi.getByProduct(resolvedProductId);
-        return normalizeStockAdjustmentResponse(
-          Array.isArray(response.data) ? response.data : []
-        );
-      } else {
-        const params: GetStockAdjustmentsParams = {
-          page: initialPage,
-          limit: initialLimit,
-        };
-        response = await stockAdjustmentsApi.getAll(params);
-        return normalizeStockAdjustmentResponse(response.data);
       }
+      
+      return getStockAdjustmentsFromDexie(
+        initialPage,
+        initialLimit,
+        storeIdForOffline ?? undefined,
+        resolvedProductId ?? undefined
+      );
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateStockAdjustmentDto) =>
-      stockAdjustmentsApi.create(data),
+    mutationFn: async (data: CreateStockAdjustmentDto) => {
+      const tempId = `temp-${Date.now()}`;
+      mutationQueue.add({
+        mutationKey: ["stockAdjustments", "create"],
+        variables: data,
+        idempotencyKey: tempId,
+      });
+      return {
+        data: {
+          id: tempId,
+          productId: data.productId,
+          productName: "",
+          oldStock: 0,
+          newStock: data.newStock,
+          reason: data.reason,
+          note: data.note || null,
+          storeId: storeIdForOffline ?? "",
+          createdAt: new Date().toISOString(),
+        } as StockAdjustment,
+      };
+    },
     onMutate: async (newAdjustment) => {
       await queryClient.cancelQueries({
         queryKey: stockAdjustmentKeys.lists(),

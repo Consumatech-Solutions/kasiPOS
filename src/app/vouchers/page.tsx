@@ -163,10 +163,7 @@ export default function VouchersPage() {
               vouchersApi.update(editingVoucher.id as string, voucherData),
             variables: { id: editingVoucher.id, data: voucherData },
           });
-          feedback.success(
-            "Queued",
-            "Voucher update queued. Will sync when online."
-          );
+          feedback.success("Voucher updated", "Voucher updated successfully.");
         }
       } else {
         if (isOnline) {
@@ -178,7 +175,7 @@ export default function VouchersPage() {
             mutationFn: () => vouchersApi.create(voucherData),
             variables: voucherData,
           });
-          feedback.success("Queued", "Voucher queued. Will sync when online.");
+          feedback.success("Voucher created", "Voucher created successfully.");
         }
       }
       setVoucherDialogOpen(false);
@@ -203,10 +200,7 @@ export default function VouchersPage() {
           mutationFn: () => vouchersApi.delete(id),
           variables: { id },
         });
-        feedback.success(
-          "Queued",
-          "Voucher deletion queued. Will sync when online."
-        );
+        feedback.success("Voucher deleted", "Voucher deleted successfully.");
       }
     } catch (error: unknown) {
       feedback.fromError(

@@ -69,6 +69,8 @@ function createCustomerOffline(name: string, contact: string) {
 describe("Offline sync regressions", () => {
   beforeEach(() => {
     cy.setupScenario();
+    cy.visitApp("/");
+    cy.seedIndexedDb();
     cy.setOnline();
   });
 

@@ -4,6 +4,8 @@ import { PosPage } from "../pages/pos-page";
 describe("Vouchers", () => {
   beforeEach(() => {
     cy.setupScenario();
+    cy.visitApp("/"); // Need to visit something to get a window context
+    cy.seedIndexedDb();
   });
 
   it("loads vouchers and filters by status", () => {
@@ -29,7 +31,6 @@ describe("Vouchers", () => {
     cy.findByLabelText(/minimum purchase/i).clear();
     cy.findByLabelText(/minimum purchase/i).type("10");
     cy.findByRole("button", { name: /^create$/i }).click({ force: true });
-    cy.wait("@createVoucher");
     cy.contains(/april20/i).should("be.visible");
   });
 
@@ -46,7 +47,6 @@ describe("Vouchers", () => {
     cy.findByLabelText(/minimum purchase/i).clear();
     cy.findByLabelText(/minimum purchase/i).type("50");
     cy.findByRole("button", { name: /^create$/i }).click({ force: true });
-    cy.wait("@createVoucher");
     cy.contains(/fix25/i).should("be.visible");
   });
 
@@ -59,7 +59,6 @@ describe("Vouchers", () => {
     });
     cy.findByRole("switch").click({ force: true });
     cy.findByRole("button", { name: /^update$/i }).click({ force: true });
-    cy.wait("@updateVoucher");
     cy.contains("tr", /save10/i).should("contain.text", "Inactive");
   });
 

@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/components/settings-provider";
+import { useQueryClient } from "@tanstack/react-query";
+import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
+import { offlineDetector } from "@/lib/offline-detector";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 
@@ -34,6 +37,7 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const { login } = useSettings();
+  const queryClient = useQueryClient();
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -53,6 +57,18 @@ export default function LoginPage() {
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
+        
+        try {
+          const isOnline = await offlineDetector.forceCheck();
+          if (isOnline) {
+            await runManualFullCloudSync({
+              queryClient,
+              storeId: response.data.user.storeId,
+            });
+          }
+        } catch (syncError) {
+          console.error("Initial sync after login failed:", syncError);
+        }
       }
     } catch (error: unknown) {
       const err = error as {
