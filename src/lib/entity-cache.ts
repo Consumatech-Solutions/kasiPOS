@@ -675,6 +675,40 @@ export async function getCustomerTransactionsFromDexie(args: {
   return sorted;
 }
 
+export async function getCustomerTransactionsFromTransactionsTable(args: {
+  customerId: string;
+  storeId?: string | null;
+  limit?: number;
+}): Promise<Transaction[]> {
+  if (typeof window === "undefined") return [];
+  const { customerId, storeId, limit } = args;
+  if (!customerId) return [];
+  const db = getDb();
+  let all = await db.transactions.toArray();
+  if (storeId != null && storeId !== "") {
+    all = all.filter(
+      (t) => t.storeId != null && String(t.storeId) === String(storeId)
+    );
+  }
+  const cid = String(customerId);
+  const filtered = all.filter((t) => {
+    const tCid = t.customerId;
+    const tTempCid = (t as Transaction & { tempCustomerId?: string | null })
+      .tempCustomerId;
+    if (tCid == null && tTempCid == null) return false;
+    return String(tCid ?? "") === cid || String(tTempCid ?? "") === cid;
+  });
+  const sorted = filtered.sort((a, b) => {
+    const aT = (a.createdAt ?? String(a.date ?? "")) as string;
+    const bT = (b.createdAt ?? String(b.date ?? "")) as string;
+    return String(bT).localeCompare(String(aT));
+  });
+  if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
+    return sorted.slice(0, Math.trunc(limit));
+  }
+  return sorted;
+}
+
 export async function saveVouchersToDexie(data: Voucher[]): Promise<void> {
   if (typeof window === "undefined" || !data.length) return;
   const db = getDb();
@@ -707,7 +741,9 @@ export async function getVouchersFromDexie(
   };
 }
 
-export async function saveStockAdjustmentsToDexie(data: StockAdjustment[]): Promise<void> {
+export async function saveStockAdjustmentsToDexie(
+  data: StockAdjustment[]
+): Promise<void> {
   if (typeof window === "undefined" || !data.length) return;
   const db = getDb();
   await db.stockAdjustments.bulkPut(data);
@@ -730,7 +766,9 @@ export async function getStockAdjustmentsFromDexie(
   if (productId != null && productId !== "") {
     all = all.filter((a) => String(a.productId) === String(productId));
   }
-  const sorted = all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sorted = all.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
   const total = sorted.length;
   const data = sorted.slice((page - 1) * limit, page * limit);
   return {
@@ -775,4 +813,3 @@ export async function getParcelsFromDexie(
     },
   };
 }
-

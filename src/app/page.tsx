@@ -71,7 +71,10 @@ import { getProductInitials } from "@/lib/utils/product-initials";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useCart } from "@/components/providers/cart-provider";
 import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
-import { updateProductStockInDexie } from "@/lib/entity-cache";
+import {
+  updateProductStockInDexie,
+  saveTransactionsToDexie,
+} from "@/lib/entity-cache";
 import { catalogueApi } from "@/lib/api/catalogue";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -511,14 +514,14 @@ export default function PosPage() {
             if (product && typeof product.stock === "number") {
               const newStock = Math.max(0, product.stock - soldQty);
               await updateProductStockInDexie(pid, newStock);
-              
+
               queryClient.setQueriesData(
                 { queryKey: productKeys.lists() },
                 (oldData: any) => {
                   if (!oldData || !oldData.data) return oldData;
                   return {
                     ...oldData,
-                    data: oldData.data.map((p: any) => 
+                    data: oldData.data.map((p: any) =>
                       String(p.id) === pid ? { ...p, stock: newStock } : p
                     ),
                   };
@@ -625,14 +628,14 @@ export default function PosPage() {
             if (product && typeof product.stock === "number") {
               const newStock = Math.max(0, product.stock - soldQty);
               await updateProductStockInDexie(pid, newStock);
-              
+
               queryClient.setQueriesData(
                 { queryKey: productKeys.lists() },
                 (oldData: any) => {
                   if (!oldData || !oldData.data) return oldData;
                   return {
                     ...oldData,
-                    data: oldData.data.map((p: any) => 
+                    data: oldData.data.map((p: any) =>
                       String(p.id) === pid ? { ...p, stock: newStock } : p
                     ),
                   };
@@ -642,6 +645,7 @@ export default function PosPage() {
           }
 
           await db.transactions.add(newTransaction as Transaction);
+          await saveTransactionsToDexie([newTransaction] as Transaction[]);
 
           mutationQueue.add({
             mutationKey: ["transactions", "create"],

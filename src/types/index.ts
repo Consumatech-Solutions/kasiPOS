@@ -120,6 +120,8 @@ export interface TransactionCreditDetails {
 export interface Transaction {
   id?: string; // UUID (backend)
   customerId?: string | null;
+  /** Client-only: references the customer's tempId when the customer was created offline and hasn't synced yet */
+  tempCustomerId?: string | null;
   date?: Date; // For backward compatibility
   createdAt?: string; // ISO date string from backend
   /** Client-only: sent as Idempotency-Key on POST /transactions (offline queue + dedupe) */
