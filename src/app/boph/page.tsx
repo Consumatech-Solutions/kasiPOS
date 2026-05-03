@@ -766,8 +766,8 @@ export default function BophPage() {
                         variables: payload,
                       });
                       toast({
-                        title: "Queued",
-                        description: "Parcel queued. Will sync when online.",
+                        title: "Parcel added",
+                        description: "Parcel added successfully.",
                       });
                       setIsCreateModalOpen(false);
                       createParcelForm.reset();

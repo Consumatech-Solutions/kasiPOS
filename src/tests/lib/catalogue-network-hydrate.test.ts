@@ -59,13 +59,13 @@ describe("catalogue-network-hydrate pagination", () => {
     expect(productsGetAll).toHaveBeenCalledTimes(2);
     expect(productsGetAll).toHaveBeenNthCalledWith(1, {
       page: 1,
-      limit: 100,
+      limit: 5000,
       updatedAtAfter: "2025-01-01T00:00:00.000Z",
       storeId: "store-1",
     });
     expect(productsGetAll).toHaveBeenNthCalledWith(2, {
       page: 2,
-      limit: 100,
+      limit: 5000,
       updatedAtAfter: "2025-01-01T00:00:00.000Z",
       storeId: "store-1",
     });
@@ -122,7 +122,13 @@ describe("catalogue-network-hydrate pagination", () => {
     expect(customersGetAll).toHaveBeenCalledTimes(2);
     expect(customersGetAll).toHaveBeenNthCalledWith(1, {
       page: 1,
-      limit: 50,
+      limit: 5000,
+      updatedAtAfter: "2025-01-01T00:00:00.000Z",
+      storeId: "store-1",
+    });
+    expect(customersGetAll).toHaveBeenNthCalledWith(2, {
+      page: 2,
+      limit: 5000,
       updatedAtAfter: "2025-01-01T00:00:00.000Z",
       storeId: "store-1",
     });

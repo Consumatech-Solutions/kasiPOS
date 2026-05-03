@@ -9,11 +9,14 @@ import {
   type ValidateVoucherDto,
   type ValidateVoucherResponse,
 } from "@/lib/api/vouchers";
+import { getVouchersFromDexie, saveVouchersToDexie } from "@/lib/entity-cache";
+import { mutationQueue } from "@/lib/mutation-queue";
 import type { Voucher } from "@/types";
 import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
 
 interface UseVouchersOptions extends GetVouchersParams {
   autoLoad?: boolean;
+  storeIdForOffline?: string | null;
 }
 
 export const voucherKeys = {
@@ -56,7 +59,7 @@ function normalizeVoucherResponse(
 }
 
 export function useVouchers(options: UseVouchersOptions = {}) {
-  const { autoLoad = true, ...params } = options;
+  const { autoLoad = true, storeIdForOffline, ...params } = options;
   const queryClient = useQueryClient();
 
   const queryKey = voucherKeys.list(params);
@@ -64,8 +67,11 @@ export function useVouchers(options: UseVouchersOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const response = await vouchersApi.getAll(params);
-      return normalizeVoucherResponse(response.data);
+      return getVouchersFromDexie(
+        params.page ?? 1,
+        params.limit ?? 10,
+        storeIdForOffline ?? undefined
+      );
     },
     enabled: true,
     staleTime: Number.POSITIVE_INFINITY,
@@ -74,7 +80,24 @@ export function useVouchers(options: UseVouchersOptions = {}) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateVoucherDto) => vouchersApi.create(data),
+    mutationFn: async (data: CreateVoucherDto) => {
+      const tempId = `temp-${Date.now()}`;
+      mutationQueue.add({
+        mutationKey: ["vouchers", "create"],
+        variables: data,
+        idempotencyKey: tempId,
+      });
+      return {
+        data: {
+          id: tempId,
+          ...data,
+          isActive: data.isActive ?? true,
+          storeId: storeIdForOffline ?? "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as Voucher,
+      };
+    },
     onMutate: async (newVoucher) => {
       await queryClient.cancelQueries({ queryKey: voucherKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -86,10 +109,11 @@ export function useVouchers(options: UseVouchersOptions = {}) {
         const optimisticVoucher: Voucher = {
           id: `temp-${Date.now()}`,
           code: newVoucher.code,
-          discount: newVoucher.discount,
-          discountType: newVoucher.discountType,
+          type: newVoucher.type,
+          value: newVoucher.value,
+          minPurchase: newVoucher.minPurchase,
           isActive: newVoucher.isActive ?? true,
-          storeId: newVoucher.storeId || "",
+          storeId: "",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
@@ -132,8 +156,19 @@ export function useVouchers(options: UseVouchersOptions = {}) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateVoucherDto }) =>
-      vouchersApi.update(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: UpdateVoucherDto }) => {
+      mutationQueue.add({
+        mutationKey: ["vouchers", "update"],
+        variables: { id, data },
+      });
+      return {
+        data: {
+          id,
+          ...data,
+          updatedAt: new Date().toISOString(),
+        } as unknown as Voucher,
+      };
+    },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: voucherKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -168,7 +203,13 @@ export function useVouchers(options: UseVouchersOptions = {}) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => vouchersApi.delete(id),
+    mutationFn: async (id: string) => {
+      mutationQueue.add({
+        mutationKey: ["vouchers", "delete"],
+        variables: id,
+      });
+      return { success: true };
+    },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: voucherKeys.lists() });
       const previousData = queryClient.getQueryData<{

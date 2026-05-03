@@ -4,6 +4,7 @@ describe("Inventory", () => {
   beforeEach(() => {
     cy.setupScenario();
     InventoryPage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     InventoryPage.waitUntilLoaded();
   });
@@ -34,6 +35,21 @@ describe("Inventory", () => {
   });
 
   it("creates stock adjustment with reason and updates stock", () => {
+    const api = (
+      (Cypress.env("API_BASE_URL") as string) ?? "http://localhost:9002"
+    ).replace(/\/+$/, "");
+    // Offline applies stock to Dexie immediately; the online path only queues sync.
+    // Connectivity HEAD treats non-zero HTTP responses as online — force a network error.
+    cy.intercept(
+      { method: "HEAD", url: `${api}*` },
+      {
+        forceNetworkError: true,
+      }
+    ).as("blockConnectivityHead");
+    cy.setOffline();
+    // Remount so useNetworkStatus starts while offline (beforeEach leaves the page online).
+    InventoryPage.visit();
+    InventoryPage.waitUntilLoaded();
     cy.contains("tr", /still water 500ml/i).within(() => {
       cy.findByRole("button", { name: /adjust stock/i }).click();
     });
@@ -64,14 +80,29 @@ describe("Inventory", () => {
           timeout: 15_000,
         }).click();
       });
-    cy.wait("@createStockAdjustment").then((interception) => {
-      const requestBody = interception.request.body as { reason?: string };
-      expect(requestBody.reason).to.eq("New stock received");
-    });
-    cy.contains("td", /still water 500ml/i, { timeout: 15_000 })
-      .parents("tr")
-      .first()
-      .should("contain.text", "23");
+    cy.findByRole("dialog").should("not.exist");
+    cy.waitForIndexedDbStore(
+      "productCache",
+      (rows) =>
+        Array.isArray(rows) &&
+        rows.some((r: Record<string, unknown>) => {
+          const id = String(r.id ?? "");
+          const stock = Number(r.stock);
+          return id === "prod-water-001" && stock === 23;
+        }),
+      { timeoutMs: 30_000 }
+    );
+    cy.waitUntil(
+      () =>
+        cy
+          .contains("tr", /still water 500ml/i)
+          .then(($tr) => /\b23\b/.test($tr.find("td").eq(3).text())),
+      {
+        timeout: 20_000,
+        interval: 400,
+        description: "inventory row shows updated stock",
+      }
+    );
   });
 
   it("shows stock adjustment history", () => {

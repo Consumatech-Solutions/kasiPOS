@@ -144,9 +144,9 @@ export function DeviceSelector({
             `Printer (${device.vendorId.toString(16)}:${device.productId.toString(16)})`,
           vendorId: device.vendorId,
           productId: device.productId,
-          manufacturer: device.manufacturerName,
+          manufacturer: (device as any).manufacturerName,
           product: device.productName,
-          serialNumber: device.serialNumber,
+          serialNumber: (device as any).serialNumber,
           connected: device.opened,
         };
         setDevices([...devices, newDevice]);
@@ -164,9 +164,9 @@ export function DeviceSelector({
             `Scanner (${device.vendorId.toString(16)}:${device.productId.toString(16)})`,
           vendorId: device.vendorId,
           productId: device.productId,
-          manufacturer: device.manufacturerName,
+          manufacturer: (device as any).manufacturerName,
           product: device.productName,
-          serialNumber: device.serialNumber,
+          serialNumber: (device as any).serialNumber,
           connected: device.opened,
         };
         setDevices([...devices, newDevice]);

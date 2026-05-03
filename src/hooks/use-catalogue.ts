@@ -15,6 +15,7 @@ import {
   saveCategoriesToDexie,
   deleteProductFromDexie,
 } from "@/lib/entity-cache";
+import { mutationQueue } from "@/lib/mutation-queue";
 import type {
   ApiCategory,
   ApiProduct,
@@ -63,78 +64,11 @@ export function useCategories(
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const isOffline = await checkOfflineStatus();
-
-      if (!isOffline) {
-        try {
-          const params: PaginationParams = {
-            page: initialPage,
-            limit: initialLimit,
-            ...(storeIdForOffline
-              ? { storeId: String(storeIdForOffline) }
-              : {}),
-          };
-          const response = await catalogueApi.categories.getAll(params);
-          let parsed = parseCategoriesListResponse(
-            response,
-            initialPage,
-            initialLimit
-          );
-          if (parsed.data.length === 0 && storeIdForOffline) {
-            const retry = await catalogueApi.categories.getAll({
-              page: initialPage,
-              limit: initialLimit,
-            });
-            parsed = parseCategoriesListResponse(
-              retry,
-              initialPage,
-              initialLimit
-            );
-          }
-          if (parsed.data.length > 0) {
-            await saveCategoriesToDexie(
-              parsed.data,
-              storeIdForOffline ?? undefined
-            );
-          }
-          if (parsed.data.length === 0) {
-            const dexieFallback = await getCategoriesFromDexie(
-              initialPage,
-              initialLimit,
-              storeIdForOffline
-            );
-            if (dexieFallback.meta.total > 0) return dexieFallback;
-          }
-          return parsed;
-        } catch (e) {
-          console.warn("[useCategories] API failed, using Dexie", e);
-        }
-      }
-
-      let result = await getCategoriesFromDexie(
+      return getCategoriesFromDexie(
         initialPage,
         initialLimit,
         storeIdForOffline
       );
-      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
-        try {
-          const n = await pullAllCategoriesFromApi(storeIdForOffline, {
-            storeIdQueryParam: true,
-          });
-          if (n === 0)
-            await pullAllCategoriesFromApi(storeIdForOffline, {
-              storeIdQueryParam: false,
-            });
-          result = await getCategoriesFromDexie(
-            initialPage,
-            initialLimit,
-            storeIdForOffline
-          );
-        } catch (e) {
-          console.warn("[useCategories] Bulk hydrate failed", e);
-        }
-      }
-      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,
@@ -144,8 +78,22 @@ export function useCategories(
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateCategoryDto) =>
-      catalogueApi.categories.create(data),
+    mutationFn: async (data: CreateCategoryDto) => {
+      const tempId = `temp-${Date.now()}`;
+      
+      mutationQueue.add({
+        mutationKey: ["categories", "create"],
+        variables: data,
+        idempotencyKey: tempId,
+      });
+
+      return {
+        id: tempId,
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    },
     onMutate: async (newCategory) => {
       await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
 
@@ -205,8 +153,13 @@ export function useCategories(
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateCategoryDto }) =>
-      catalogueApi.categories.update(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCategoryDto }) => {
+      mutationQueue.add({
+        mutationKey: ["categories", "update", id],
+        variables: { id, ...data },
+      });
+      return { id, ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as ApiCategory;
+    },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -247,7 +200,13 @@ export function useCategories(
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => catalogueApi.categories.delete(id),
+    mutationFn: async (id: string) => {
+      mutationQueue.add({
+        mutationKey: ["categories", "delete", id],
+        variables: { id },
+      });
+      return { id };
+    },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -347,85 +306,12 @@ export function useProducts(
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const isOffline = await checkOfflineStatus();
-
-      if (!isOffline) {
-        try {
-          const params: PaginationParams = {
-            page: currentPage,
-            limit: initialLimit,
-            ...(filters.search ? { search: filters.search } : {}),
-            ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-            ...(storeIdForOffline
-              ? { storeId: String(storeIdForOffline) }
-              : {}),
-          };
-          const response = await catalogueApi.products.getAll(params);
-          let parsed = parseProductsListResponse(
-            response,
-            currentPage,
-            initialLimit
-          );
-          if (parsed.data.length === 0 && storeIdForOffline) {
-            const retry = await catalogueApi.products.getAll({
-              page: currentPage,
-              limit: initialLimit,
-              ...(filters.search ? { search: filters.search } : {}),
-              ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
-            });
-            parsed = parseProductsListResponse(
-              retry,
-              currentPage,
-              initialLimit
-            );
-          }
-          if (parsed.data.length > 0) {
-            await saveProductsToDexie(
-              parsed.data,
-              storeIdForOffline ?? undefined
-            );
-          }
-          if (parsed.data.length === 0) {
-            const dexieFallback = await getProductsFromDexie(
-              currentPage,
-              initialLimit,
-              storeIdForOffline,
-              dexieListFilters
-            );
-            if (dexieFallback.meta.total > 0) return dexieFallback;
-          }
-          return parsed;
-        } catch (e) {
-          console.warn("[useProducts] API failed, using Dexie", e);
-        }
-      }
-
-      let result = await getProductsFromDexie(
+      return getProductsFromDexie(
         currentPage,
         initialLimit,
         storeIdForOffline,
         dexieListFilters
       );
-      if (!isOffline && storeIdForOffline && result.meta.total === 0) {
-        try {
-          const n = await pullAllProductsFromApi(storeIdForOffline, {
-            storeIdQueryParam: true,
-          });
-          if (n === 0)
-            await pullAllProductsFromApi(storeIdForOffline, {
-              storeIdQueryParam: false,
-            });
-          result = await getProductsFromDexie(
-            currentPage,
-            initialLimit,
-            storeIdForOffline,
-            dexieListFilters
-          );
-        } catch (e) {
-          console.warn("[useProducts] Bulk hydrate failed", e);
-        }
-      }
-      return result;
     },
     staleTime: Number.POSITIVE_INFINITY,
     refetchOnMount: false,
@@ -452,13 +338,10 @@ export function useProducts(
       let createDto: CreateProductDto;
 
       if ("categoryId" in data) {
-        createDto = data;
+        createDto = data as CreateProductDto;
       } else {
-        const categoriesResp = await catalogueApi.categories.getAll();
-        const categories =
-          "data" in categoriesResp
-            ? categoriesResp.data
-            : (categoriesResp as ApiCategory[]);
+        const categoriesResp = await getCategoriesFromDexie(1, 10000, storeIdForOffline);
+        const categories = categoriesResp.data;
         const category = categories.find((c) => c.name === data.category);
 
         if (!category) {
@@ -476,8 +359,24 @@ export function useProducts(
           categoryId: category.id,
         };
       }
+      
+      const tempId = `temp-${Date.now()}`;
+      
+      mutationQueue.add({
+        mutationKey: ["products", "create"],
+        variables: createDto,
+        idempotencyKey: tempId,
+      });
 
-      return catalogueApi.products.create(createDto);
+      return {
+        id: tempId,
+        ...createDto,
+        stock: createDto.stock ?? null,
+        barCode: createDto.barCode ?? null,
+        productImage: createDto.productImage ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      } as ApiProduct;
     },
     onMutate: async (newProduct) => {
       await queryClient.cancelQueries({ queryKey: productKeys.lists() });
@@ -558,11 +457,8 @@ export function useProducts(
         typeof data.category === "string" &&
         !data.categoryId
       ) {
-        const categoriesResp = await catalogueApi.categories.getAll();
-        const categories =
-          "data" in categoriesResp
-            ? categoriesResp.data
-            : (categoriesResp as ApiCategory[]);
+        const categoriesResp = await getCategoriesFromDexie(1, 10000, storeIdForOffline);
+        const categories = categoriesResp.data;
         const category = categories.find((c) => c.name === data.category);
 
         if (!category) {
@@ -582,7 +478,12 @@ export function useProducts(
         delete (updateDto as any).imageUrl;
       }
 
-      return catalogueApi.products.update(id, updateDto);
+      mutationQueue.add({
+        mutationKey: ["products", "update", id],
+        variables: { id, ...updateDto },
+      });
+      
+      return { id, ...updateDto, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as ApiProduct;
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: productKeys.lists() });
@@ -624,7 +525,13 @@ export function useProducts(
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => catalogueApi.products.delete(id),
+    mutationFn: async (id: string) => {
+      mutationQueue.add({
+        mutationKey: ["products", "delete", id],
+        variables: { id },
+      });
+      return { id };
+    },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: productKeys.lists() });
       const previousData = queryClient.getQueryData<{

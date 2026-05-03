@@ -71,7 +71,12 @@ import { getProductInitials } from "@/lib/utils/product-initials";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useCart } from "@/components/providers/cart-provider";
 import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
-import { updateProductStockInDexie } from "@/lib/entity-cache";
+import {
+  updateProductStockInDexie,
+  saveTransactionsToDexie,
+} from "@/lib/entity-cache";
+import { catalogueApi } from "@/lib/api/catalogue";
+import { Pagination } from "@/components/ui/pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -138,9 +143,11 @@ export default function PosPage() {
     });
   const {
     products: apiProducts,
+    pagination: productsPagination,
     loading: productsLoading,
     setFilters,
-  } = useProducts(1, 1000, {
+    loadPage,
+  } = useProducts(1, 20, {
     storeIdForOffline: settings?.currentStore?.id ?? undefined,
   });
 
@@ -156,16 +163,18 @@ export default function PosPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((prev: any) => ({ ...prev, search: productSearch }));
+      loadPage(1);
     }, 500);
     return () => clearTimeout(timer);
-  }, [productSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [productSearch, loadPage, setFilters]);
 
   useEffect(() => {
     if (categoryId !== prevCategoryIdRef.current) {
       prevCategoryIdRef.current = categoryId;
       setFilters((prev: any) => ({ ...prev, categoryId }));
+      loadPage(1);
     }
-  }, [categoryId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [categoryId, loadPage, setFilters]);
 
   const allCategories = useMemo(() => {
     if (!apiCategories) return [];
@@ -312,43 +321,70 @@ export default function PosPage() {
     setCustomerDialogOpen(false);
   };
 
-  const handleBarcodeScan = (barcode: string) => {
+  const addScannedProductToCart = (productByBarcode: any) => {
+    const currentQty = cart.get(productByBarcode.id)?.quantity ?? 0;
+    const stock = productByBarcode.stock ?? null;
+    if (typeof stock === "number" && stock < currentQty + 1) {
+      setInsufficientStockPopup({
+        open: true,
+        message: `Insufficient stock for "${productByBarcode.name}". Available stock: ${stock}.`,
+      });
+      return;
+    }
+    const productForCart = {
+      id: productByBarcode.id,
+      name: productByBarcode.name,
+      price: productByBarcode.price,
+      costPrice: productByBarcode.costPrice,
+      stock: productByBarcode.stock ?? 0,
+      category:
+        typeof productByBarcode.category === "string"
+          ? productByBarcode.category
+          : productByBarcode.category?.name || "",
+      barCode: productByBarcode.barCode || undefined,
+      imageUrl: productByBarcode.productImage || "",
+      productImage: productByBarcode.productImage || undefined,
+    } as Product;
+    addToCart(productForCart);
+    feedback.success(
+      "Product added",
+      `${productByBarcode.name} added to cart.`
+    );
+  };
+
+  const handleBarcodeScan = async (barcode: string) => {
     const productByBarcode = products?.find((p) => p.barCode === barcode);
 
     if (productByBarcode) {
-      const currentQty = cart.get(productByBarcode.id)?.quantity ?? 0;
-      const stock = productByBarcode.stock ?? null;
-      if (typeof stock === "number" && stock < currentQty + 1) {
-        setInsufficientStockPopup({
-          open: true,
-          message: `Insufficient stock for "${productByBarcode.name}". Available stock: ${stock}.`,
-        });
+      addScannedProductToCart(productByBarcode);
+      return;
+    }
+
+    try {
+      const response = await catalogueApi.products.getAll({
+        page: 1,
+        limit: 20,
+        search: barcode,
+      });
+      const remoteProducts = Array.isArray(response)
+        ? response
+        : (response.data ?? []);
+      const exactMatch = remoteProducts.find((p) => p.barCode === barcode);
+      if (exactMatch) {
+        addScannedProductToCart(exactMatch);
         return;
       }
-      const productForCart = {
-        id: productByBarcode.id,
-        name: productByBarcode.name,
-        price: productByBarcode.price,
-        costPrice: productByBarcode.costPrice,
-        stock: productByBarcode.stock ?? 0,
-        category: productByBarcode.category?.name || "",
-        barCode: productByBarcode.barCode || undefined,
-        imageUrl: productByBarcode.productImage || "",
-        productImage: productByBarcode.productImage || undefined,
-      } as Product;
-      addToCart(productForCart);
-      feedback.success(
-        "Product added",
-        `${productByBarcode.name} added to cart.`
-      );
-    } else {
-      setProductSearch(barcode);
-      setCategoryView("carousel");
-      feedback.success(
-        "Barcode scanned",
-        `No product found with barcode "${barcode}". Showing search results.`
-      );
+    } catch {
+      // Fallback to existing UX if lookup fails.
     }
+
+    setProductSearch(barcode);
+    setCategoryView("carousel");
+    loadPage(1);
+    feedback.success(
+      "Barcode scanned",
+      `No product found with barcode "${barcode}". Showing search results.`
+    );
   };
 
   const [isCompletingSale, setIsCompletingSale] = useState(false);
@@ -403,6 +439,15 @@ export default function PosPage() {
           voucherCode: appliedVoucherCode ?? null,
           timestamp: new Date(),
         });
+
+      const soldQuantityByProduct = new Map<string, number>();
+      for (const item of newTransaction.items) {
+        const pid = String(item.productId);
+        soldQuantityByProduct.set(
+          pid,
+          (soldQuantityByProduct.get(pid) ?? 0) + item.quantity
+        );
+      }
 
       if (isOnline) {
         try {
@@ -464,10 +509,26 @@ export default function PosPage() {
             id: String(createdId),
           } as Transaction);
 
-          queryClient.invalidateQueries({
-            queryKey: productKeys.lists(),
-            refetchType: "all",
-          });
+          for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
+            const product = await getDb().productCache.get(pid);
+            if (product && typeof product.stock === "number") {
+              const newStock = Math.max(0, product.stock - soldQty);
+              await updateProductStockInDexie(pid, newStock);
+
+              queryClient.setQueriesData(
+                { queryKey: productKeys.lists() },
+                (oldData: any) => {
+                  if (!oldData || !oldData.data) return oldData;
+                  return {
+                    ...oldData,
+                    data: oldData.data.map((p: any) =>
+                      String(p.id) === pid ? { ...p, stock: newStock } : p
+                    ),
+                  };
+                }
+              );
+            }
+          }
 
           clearCartAndResetCoupons();
           setSelectedCustomerId(undefined);
@@ -561,75 +622,30 @@ export default function PosPage() {
           }
         }
       } else {
-        const previousStockMap = new Map<string, number>();
         try {
-          const listQueriesSnapshot = queryClient.getQueriesData<{
-            data: { id?: string; stock?: number | null }[];
-          }>({ queryKey: productKeys.lists() });
-          for (const item of newTransaction.items) {
-            const pid = String(item.productId);
-            if (previousStockMap.has(pid)) continue;
-            let found: number | undefined;
-            for (const [, data] of listQueriesSnapshot) {
-              const row = data?.data?.find((p) => String(p.id) === pid);
-              if (row) {
-                found = row.stock ?? 0;
-                break;
-              }
-            }
-            previousStockMap.set(pid, found ?? 0);
-          }
-
-          const productQueryKeys = queryClient
-            .getQueryCache()
-            .getAll()
-            .map((query) => query.queryKey);
-          const productQueries = productQueryKeys.filter(
-            (key) => Array.isArray(key) && key[0] === "products"
-          );
-
-          productQueries.forEach((queryKey) => {
-            queryClient.setQueryData<{ data: any[]; meta: any }>(
-              queryKey,
-              (old) => {
-                if (!old || !old.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map((product) => {
-                    const cartItem = newTransaction.items.find(
-                      (item) => String(item.productId) === String(product.id)
-                    );
-                    if (cartItem) {
-                      const currentStock = product.stock ?? 0;
-                      const newStock = Math.max(
-                        0,
-                        currentStock - cartItem.quantity
-                      );
-                      return { ...product, stock: newStock };
-                    }
-                    return product;
-                  }),
-                };
-              }
-            );
-          });
-
-          const soldQuantityByProduct = new Map<string, number>();
-          for (const item of newTransaction.items) {
-            const pid = String(item.productId);
-            soldQuantityByProduct.set(
-              pid,
-              (soldQuantityByProduct.get(pid) ?? 0) + item.quantity
-            );
-          }
-
           for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
-            const previousStock = previousStockMap.get(pid) ?? 0;
-            const newStock = Math.max(0, previousStock - soldQty);
-            await updateProductStockInDexie(pid, newStock);
+            const product = await getDb().productCache.get(pid);
+            if (product && typeof product.stock === "number") {
+              const newStock = Math.max(0, product.stock - soldQty);
+              await updateProductStockInDexie(pid, newStock);
+
+              queryClient.setQueriesData(
+                { queryKey: productKeys.lists() },
+                (oldData: any) => {
+                  if (!oldData || !oldData.data) return oldData;
+                  return {
+                    ...oldData,
+                    data: oldData.data.map((p: any) =>
+                      String(p.id) === pid ? { ...p, stock: newStock } : p
+                    ),
+                  };
+                }
+              );
+            }
           }
 
           await db.transactions.add(newTransaction as Transaction);
+          await saveTransactionsToDexie([newTransaction] as Transaction[]);
 
           mutationQueue.add({
             mutationKey: ["transactions", "create"],
@@ -656,67 +672,14 @@ export default function PosPage() {
           setReceiptData(receiptPayload);
           setTimeout(() => setReceiptOpen(true), 0);
 
-          feedback.success(
-            "Offline sale complete!",
-            "Receipt saved. Will sync when back online."
-          );
+          feedback.success("Sale complete!", "Order recorded.");
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
             console.error("[Complete Sale] Failed (offline)", { error });
           }
           console.error("Failed to complete offline sale:", error);
 
-          const queriesData = queryClient.getQueriesData<{
-            data: { id?: string; stock?: number | null }[];
-            meta?: unknown;
-          }>({ queryKey: productKeys.lists() });
-          queriesData.forEach(([queryKey, data]) => {
-            if (!data?.data || !Array.isArray(data.data)) return;
-            queryClient.setQueryData(queryKey, {
-              ...data,
-              data: data.data.map((product) => {
-                const pid = String(product.id);
-                if (!previousStockMap.has(pid)) return product;
-                return { ...product, stock: previousStockMap.get(pid)! };
-              }),
-            });
-          });
-          const pqKeys = queryClient
-            .getQueryCache()
-            .getAll()
-            .map((q) => q.queryKey);
-          const nonListProductQueries = pqKeys.filter(
-            (key) =>
-              Array.isArray(key) &&
-              key[0] === "products" &&
-              !(key[1] === "list" || key.length < 2)
-          );
-          nonListProductQueries.forEach((queryKey) => {
-            queryClient.setQueryData<{ data: any[]; meta: any }>(
-              queryKey,
-              (old) => {
-                if (!old?.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map(
-                    (product: { id?: string; stock?: number | null }) => {
-                      const pid = String(product.id);
-                      if (!previousStockMap.has(pid)) return product;
-                      return { ...product, stock: previousStockMap.get(pid)! };
-                    }
-                  ),
-                };
-              }
-            );
-          });
-
-          for (const item of newTransaction.items) {
-            const pid = String(item.productId);
-            const prev = previousStockMap.get(pid);
-            if (prev !== undefined) {
-              await updateProductStockInDexie(pid, prev);
-            }
-          }
+          queryClient.invalidateQueries({ queryKey: productKeys.lists() });
 
           feedback.fromError(
             error,
@@ -1018,6 +981,14 @@ export default function PosPage() {
                     </Table>
                   </div>
                 </ScrollArea>
+                {productsPagination.totalPages > 0 ? (
+                  <div className="pt-3 border-t mt-2">
+                    <Pagination
+                      meta={productsPagination}
+                      onPageChange={loadPage}
+                    />
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

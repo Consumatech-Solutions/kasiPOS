@@ -140,7 +140,7 @@ export default function BuyStockHistoryPage() {
             }),
           variables: { id: orderId, status: newStatus },
         });
-        feedback.success("Status updated", "Change will sync when online.");
+        feedback.success("Status updated", "Status updated successfully.");
       }
     } catch (error: unknown) {
       feedback.fromError(

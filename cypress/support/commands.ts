@@ -186,10 +186,13 @@ function writeSeedToIndexedDb(
           [
             "stores",
             "products",
+            "productCache",
             "customers",
             "transactions",
+            "transactionCache",
             "vouchers",
             "categories",
+            "categoryCache",
             "stockAdjustments",
             "parcels",
           ],
@@ -205,10 +208,13 @@ function writeSeedToIndexedDb(
 
         seedObjectStore(tx, "stores", [session.store]);
         seedObjectStore(tx, "products", seed.products);
+        seedObjectStore(tx, "productCache", seed.products);
         seedObjectStore(tx, "customers", seed.customers);
         seedObjectStore(tx, "transactions", seed.transactions);
+        seedObjectStore(tx, "transactionCache", seed.transactions);
         seedObjectStore(tx, "vouchers", seed.vouchers);
         seedObjectStore(tx, "categories", seed.categories);
+        seedObjectStore(tx, "categoryCache", seed.categories);
         seedObjectStore(tx, "stockAdjustments", seed.stockAdjustments);
         seedObjectStore(tx, "parcels", seed.parcels);
       })
@@ -480,3 +486,73 @@ Cypress.Commands.add("setupScenario", (input = {}) => {
       });
     }) as unknown as Cypress.Chainable<void>;
 });
+
+function readAllFromObjectStore<T>(
+  win: Window,
+  dbName: string,
+  storeName: string
+): Promise<T[]> {
+  return new Cypress.Promise<T[]>((resolve, reject) => {
+    const openReq = win.indexedDB.open(dbName);
+    openReq.onerror = () =>
+      reject(openReq.error ?? new Error(`Failed to open IndexedDB: ${dbName}`));
+    openReq.onsuccess = () => {
+      const db = openReq.result;
+      try {
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.close();
+          resolve([]);
+          return;
+        }
+        const tx = db.transaction([storeName], "readonly");
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onerror = () =>
+          reject(req.error ?? new Error(`Failed to read store: ${storeName}`));
+        req.onsuccess = () => resolve((req.result ?? []) as T[]);
+        tx.oncomplete = () => db.close();
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error ?? new Error(`Transaction failed: ${storeName}`));
+        };
+      } catch (e) {
+        db.close();
+        reject(e);
+      }
+    };
+  });
+}
+
+Cypress.Commands.add(
+  "readIndexedDbStore",
+  <T = unknown>(storeName: string, options?: { dbName?: string }) => {
+    const dbName = options?.dbName ?? KASI_POS_DB_NAME;
+    return cy.window().then((win) => readAllFromObjectStore<T>(win, dbName, storeName));
+  }
+);
+
+Cypress.Commands.add(
+  "waitForIndexedDbStore",
+  (
+    storeName: string,
+    predicate: (rows: unknown[]) => boolean,
+    options?: { timeoutMs?: number; intervalMs?: number; dbName?: string }
+  ) => {
+    const timeoutMs = options?.timeoutMs ?? 20_000;
+    const intervalMs = options?.intervalMs ?? 250;
+    const dbName = options?.dbName ?? KASI_POS_DB_NAME;
+    return cy.waitUntil(
+      () =>
+        cy.window({ log: false }).then((win) =>
+          readAllFromObjectStore<unknown>(win, dbName, storeName).then((rows) =>
+            predicate(rows)
+          )
+        ),
+      {
+        timeout: timeoutMs,
+        interval: intervalMs,
+        description: `wait for IndexedDB store ${storeName}`,
+      }
+    );
+  }
+);

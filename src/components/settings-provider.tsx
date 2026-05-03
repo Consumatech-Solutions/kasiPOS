@@ -239,6 +239,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
 
   const logout = useCallback(async () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Logging out will clear your offline data. Are you sure you want to log out?"
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { db } = await import("@/lib/db");
+      await Promise.all(db.tables.map((t: any) => t.clear()));
+    } catch (e) {
+      console.error("Error clearing Dexie DB on logout", e);
+    }
+
     const theme = settings.theme;
 
     const newSettings = {
@@ -363,6 +379,50 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               await import("@/lib/store-persistence");
             const cachedStore = await loadStoreFromIndexedDB();
             if (cachedStore) setSetting("currentStore", cachedStore);
+          }
+
+          if (settings.currentStore?.id) {
+            try {
+              const { getDb } = await import("@/lib/db");
+              const db = getDb();
+              const existingCount = await db.transactions.count();
+              if (existingCount === 0) {
+                const { transactionsApi } =
+                  await import("@/lib/api/transactions");
+                let allTransactions: import("@/types").Transaction[] = [];
+                let page = 1;
+                const limit = 100;
+                while (allTransactions.length < 10000) {
+                  const res = await transactionsApi.getAll({
+                    storeId: settings.currentStore!.id,
+                    limit,
+                    page,
+                  });
+                  const raw = res.data;
+                  const data = Array.isArray(raw)
+                    ? raw
+                    : "data" in raw
+                      ? raw.data
+                      : [];
+                  if (!data.length) break;
+                  allTransactions = allTransactions.concat(data);
+                  if (data.length < limit) break;
+                  page++;
+                }
+                if (allTransactions.length > 0) {
+                  await db.transactions.bulkPut(
+                    allTransactions.map((t) => ({
+                      ...t,
+                      id: t.id ?? `server-${Date.now()}-${Math.random()}`,
+                    }))
+                  );
+                }
+              }
+            } catch (err) {
+              if (process.env.NODE_ENV === "development") {
+                console.warn("Failed to bootstrap transactions:", err);
+              }
+            }
           }
         } catch (error: any) {
           if (

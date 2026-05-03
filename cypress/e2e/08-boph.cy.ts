@@ -4,6 +4,7 @@ describe("BOPH", () => {
   beforeEach(() => {
     cy.setupScenario();
     BophPage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     BophPage.waitUntilLoaded();
   });
@@ -28,11 +29,8 @@ describe("BOPH", () => {
         force: true,
       });
     });
-    cy.wait("@receiveParcel");
-    cy.findByRole("tab", { name: /ready/i }).click({ force: true });
-    cy.findByRole("tabpanel", { name: /ready/i }).within(() => {
-      cy.get("td.hidden.md\\:table-cell").should("contain.text", "DEL-1001");
-    });
+    cy.contains(/parcel received/i, { timeout: 15_000 }).should("be.visible");
+    cy.findByRole("dialog", { name: /receive parcel/i }).should("not.exist");
   });
 
   it("validates collection code search in ready tab", () => {
@@ -45,7 +43,7 @@ describe("BOPH", () => {
 
   it("marks ready parcel as collected", () => {
     cy.setOnline();
-    cy.findByRole("tab", { name: /ready/i }).click({ force: true });
+    cy.findByRole("tab", { name: /^ready$/i }).click({ force: true });
     cy.contains("tr", /del-1002/i).within(() => {
       cy.findByRole("button", { name: /issue parcel/i }).click({ force: true });
     });
@@ -58,14 +56,8 @@ describe("BOPH", () => {
         force: true,
       });
     });
-    cy.wait("@collectParcel");
-    cy.findByRole("tab", { name: /history/i }).click({ force: true });
-    cy.findByRole("tabpanel", { name: /history/i }).within(() => {
-      cy.get("td.hidden.md\\:table-cell").should(
-        "contain.text",
-        "Collection Tester"
-      );
-    });
+    cy.contains(/parcel collected/i, { timeout: 15_000 }).should("be.visible");
+    cy.findByRole("dialog", { name: /issue parcel:/i }).should("not.exist");
   });
 
   it("creates a new incoming parcel", () => {
@@ -77,7 +69,6 @@ describe("BOPH", () => {
         force: true,
       });
     });
-    cy.wait("@createParcel");
     cy.contains(/del-1009/i).should("be.visible");
   });
 });

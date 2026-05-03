@@ -12,7 +12,10 @@ import { useStockAdjustments } from "@/hooks/use-stock-adjustments";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { executeMutation } from "@/lib/mutation-registry";
-import { updateProductStockInDexie } from "@/lib/entity-cache";
+import {
+  updateProductInDexie,
+  updateProductStockInDexie,
+} from "@/lib/entity-cache";
 import { catalogueApi } from "@/lib/api/catalogue";
 import {
   Card,
@@ -358,23 +361,8 @@ export default function InventoryPage() {
         const productId = String(selectedProduct.id);
         offlineRollback = { productId, previousStock: cur };
 
-        const queriesData = queryClient.getQueriesData<{
-          data: { id?: string; stock?: number | null }[];
-          meta?: unknown;
-        }>({ queryKey: productKeys.lists() });
-        queriesData.forEach(([queryKey, data]) => {
-          if (data?.data && Array.isArray(data.data)) {
-            const updated = {
-              ...data,
-              data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: newStock } : p
-              ),
-            };
-            queryClient.setQueryData(queryKey, updated);
-          }
-        });
-
         await updateProductStockInDexie(productId, newStock);
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
 
         const variables = {
           productId: selectedProduct.id!,
@@ -389,32 +377,15 @@ export default function InventoryPage() {
           variables,
         });
 
-        feedback.success(
-          "Queued",
-          "Stock updated locally. Will sync when online."
-        );
+        feedback.success("Stock adjusted", "Stock updated successfully.");
       }
       setAdjustmentDialogOpen(false);
       setSelectedProduct(null);
     } catch (error: any) {
       if (offlineRollback) {
         const { productId, previousStock } = offlineRollback;
-        const queriesData = queryClient.getQueriesData<{
-          data: { id?: string; stock?: number | null }[];
-          meta?: unknown;
-        }>({ queryKey: productKeys.lists() });
-        queriesData.forEach(([queryKey, data]) => {
-          if (data?.data && Array.isArray(data.data)) {
-            const updated = {
-              ...data,
-              data: data.data.map((p) =>
-                String(p.id) === productId ? { ...p, stock: previousStock } : p
-              ),
-            };
-            queryClient.setQueryData(queryKey, updated);
-          }
-        });
         await updateProductStockInDexie(productId, previousStock);
+        queryClient.invalidateQueries({ queryKey: productKeys.lists() });
       }
       feedback.fromError(
         error,
@@ -425,7 +396,10 @@ export default function InventoryPage() {
   };
 
   const handleThresholdUpdate = async (id: string) => {
-    if (thresholdValue < 0) {
+    const normalizedThreshold = Number.isFinite(thresholdValue)
+      ? Math.max(0, Math.trunc(thresholdValue))
+      : 0;
+    if (normalizedThreshold < 0) {
       feedback.error(
         "Invalid threshold",
         "Threshold must be zero or more.",
@@ -434,11 +408,20 @@ export default function InventoryPage() {
       return;
     }
 
-    try {
-      if (isOnline) {
-        await updateProduct(id, { lowStockThreshold: thresholdValue });
+    const previousThreshold = Number(
+      allProducts.find((p: any) => String(p.id) === String(id))
+        ?.lowStockThreshold ?? 0
+    );
 
-        await refreshProducts();
+    const applyThresholdToCaches = async (nextThreshold: number) => {
+      await updateProductInDexie(id, { lowStockThreshold: nextThreshold });
+      queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+    };
+
+    try {
+      await applyThresholdToCaches(normalizedThreshold);
+      if (isOnline) {
+        await updateProduct(id, { lowStockThreshold: normalizedThreshold });
 
         feedback.success(
           "Low stock trigger updated",
@@ -449,14 +432,11 @@ export default function InventoryPage() {
           mutationKey: ["products", "update"],
           mutationFn: () =>
             catalogueApi.products.update(id, {
-              lowStockThreshold: thresholdValue,
+              lowStockThreshold: normalizedThreshold,
             } as any),
-          variables: { id, data: { lowStockThreshold: thresholdValue } },
+          variables: { id, data: { lowStockThreshold: normalizedThreshold } },
         });
-        feedback.success(
-          "Queued",
-          "Threshold update queued. Will sync when online."
-        );
+        feedback.success("Threshold updated", "Threshold updated successfully.");
       }
       setEditingThresholdId(null);
     } catch (error: any) {
@@ -465,6 +445,7 @@ export default function InventoryPage() {
         "Failed to update threshold",
         "Check your connection and try again."
       );
+      await applyThresholdToCaches(previousThreshold);
     }
   };
 
@@ -592,7 +573,7 @@ export default function InventoryPage() {
                             </Badge>
                           </span>
                           <span className="text-xs text-muted-foreground lg:hidden">
-                            Threshold: {(product as any).lowStockThreshold || 0}
+                            Threshold: {(product as any).lowStockThreshold ?? 0}
                           </span>
                         </div>
                       </TableCell>
@@ -621,9 +602,12 @@ export default function InventoryPage() {
                                 type="number"
                                 className="w-24 h-8"
                                 value={thresholdValue}
-                                onChange={(e) =>
-                                  setThresholdValue(Number(e.target.value))
-                                }
+                                onChange={(e) => {
+                                  const parsed = Number(e.target.value);
+                                  setThresholdValue(
+                                    Number.isFinite(parsed) ? parsed : 0
+                                  );
+                                }}
                                 onBlur={() =>
                                   handleThresholdUpdate(product.id!)
                                 }
@@ -637,7 +621,7 @@ export default function InventoryPage() {
                           ) : (
                             <div className="flex items-center gap-2">
                               <span>
-                                {(product as any).lowStockThreshold || 0}
+                                {(product as any).lowStockThreshold ?? 0}
                               </span>
                               <Button
                                 variant="ghost"
@@ -646,7 +630,7 @@ export default function InventoryPage() {
                                 onClick={() => {
                                   setEditingThresholdId(product.id!);
                                   setThresholdValue(
-                                    (product as any).lowStockThreshold || 0
+                                    (product as any).lowStockThreshold ?? 0
                                   );
                                 }}
                               >

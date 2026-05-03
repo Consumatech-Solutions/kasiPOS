@@ -1,6 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
   BarChart,
@@ -10,7 +10,7 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-import { db } from "@/lib/db";
+import { getTransactionsFromDexie } from "@/lib/entity-cache";
 import type { Transaction } from "@/types";
 import {
   Card,
@@ -28,10 +28,17 @@ export default function ReportsPage() {
   const { settings } = useSettings();
   const { currentStore } = settings;
 
-  const transactions = useLiveQuery(() => {
-    if (!currentStore) return [];
-    return db.transactions.where("storeId").equals(currentStore.id!).toArray();
-  }, [currentStore?.id]);
+  const transactionsQuery = useQuery({
+    queryKey: ["reportsTransactions", { storeId: currentStore?.id }],
+    queryFn: async () => {
+      if (!currentStore) return [];
+      const res = await getTransactionsFromDexie(1, 10000, currentStore.id);
+      return res.data;
+    },
+    enabled: !!currentStore?.id,
+    staleTime: 0,
+  });
+  const transactions = transactionsQuery.data ?? [];
 
   const salesData = useMemo(() => {
     if (!transactions) return [];

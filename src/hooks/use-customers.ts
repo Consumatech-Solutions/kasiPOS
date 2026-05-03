@@ -1,12 +1,14 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { customersApi } from "@/lib/api/customers";
 import { checkOfflineStatus } from "@/lib/offline-detector";
 import {
   getCustomersFromDexie,
   saveCustomersToDexie,
+  updateCustomerInDexie,
+  deleteCustomerFromDexie,
 } from "@/lib/entity-cache";
+import { mutationQueue } from "@/lib/mutation-queue";
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "@/types";
 import type {
   PaginationMeta,
@@ -63,83 +65,35 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      const isOffline = await checkOfflineStatus();
-      if (isOffline) {
-        return getCustomersFromDexie(
-          initialPage,
-          initialLimit,
-          searchQuery?.trim() || undefined,
-          storeIdForOffline ?? undefined
-        );
-      }
-
-      try {
-        const requestParams: PaginationParams = {
-          page: initialPage,
-          limit: initialLimit,
-          ...(searchQuery?.trim() ? { search: searchQuery.trim() } : {}),
-          ...(storeId != null && storeId !== "" ? { storeId } : {}),
-        };
-        const response = await customersApi.getAll(requestParams);
-        const body = response.data as PaginatedResponse<Customer> | Customer[];
-
-        let data: Customer[];
-        let meta: PaginationMeta;
-
-        if (Array.isArray(body)) {
-          data = body;
-          meta = {
-            total: body.length,
-            page: initialPage,
-            limit: initialLimit,
-            totalPages: Math.max(1, Math.ceil(body.length / initialLimit)),
-          };
-        } else {
-          data = body?.data ?? [];
-          meta = body?.meta ?? {
-            total: data.length,
-            page: initialPage,
-            limit: initialLimit,
-            totalPages: Math.max(
-              1,
-              Math.ceil((data.length || 1) / initialLimit)
-            ),
-          };
-        }
-
-        if (data.length > 0) {
-          await saveCustomersToDexie(data);
-        }
-
-        if (data.length === 0) {
-          const dexieFallback = await getCustomersFromDexie(
-            initialPage,
-            initialLimit,
-            searchQuery?.trim() || undefined,
-            storeIdForOffline ?? undefined
-          );
-          if (dexieFallback.meta.total > 0) return dexieFallback;
-        }
-
-        return { data, meta };
-      } catch (e) {
-        console.warn("[useCustomers] API failed, using Dexie", e);
-        return getCustomersFromDexie(
-          initialPage,
-          initialLimit,
-          searchQuery?.trim() || undefined,
-          storeIdForOffline ?? undefined
-        );
-      }
+      return getCustomersFromDexie(
+        initialPage,
+        initialLimit,
+        searchQuery?.trim() || undefined
+        //storeIdForOffline ?? undefined
+      );
     },
-    staleTime: Number.POSITIVE_INFINITY,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    networkMode: "online",
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateCustomerDto) => customersApi.create(data),
+    mutationFn: async (data: CreateCustomerDto) => {
+      const tempId = `temp-${Date.now()}`;
+      mutationQueue.add({
+        mutationKey: ["customers", "create"],
+        variables: data,
+        idempotencyKey: tempId,
+      });
+
+      return {
+        id: tempId,
+        ...data,
+        loyaltyPoints: data.loyaltyPoints ?? 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Customer;
+    },
     onMutate: async (newCustomer) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -177,8 +131,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: (response) => {
-      const newCustomer = response.data;
+    onSuccess: async (response) => {
+      const newCustomer = response;
       queryClient.setQueryData<{ data: Customer[]; meta: PaginationMeta }>(
         queryKey,
         (old) => {
@@ -191,17 +145,30 @@ export function useCustomers(options: UseCustomersOptions = {}) {
           };
         }
       );
+      await saveCustomersToDexie([newCustomer]);
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateCustomerDto }) =>
-      customersApi.update(
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateCustomerDto;
+    }) => {
+      mutationQueue.add({
+        mutationKey: ["customers", "update", id],
+        variables: { id, ...data },
+      });
+      return {
         id,
-        data,
-        storeId != null && storeId !== "" ? { storeId } : undefined
-      ),
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Customer;
+    },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -230,17 +197,20 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: () => {
+    onSuccess: async (updated) => {
+      await updateCustomerInDexie(String(updated.id), updated);
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      customersApi.delete(
-        id,
-        storeId != null && storeId !== "" ? { storeId } : undefined
-      ),
+    mutationFn: async (id: string) => {
+      mutationQueue.add({
+        mutationKey: ["customers", "delete", id],
+        variables: { id },
+      });
+      return { id };
+    },
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
       const previousData = queryClient.getQueryData<{
@@ -269,7 +239,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         queryClient.setQueryData(queryKey, context.previousData);
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_data, id) => {
+      await deleteCustomerFromDexie(String(id));
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
     },
   });

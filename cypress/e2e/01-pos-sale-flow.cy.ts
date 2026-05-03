@@ -19,6 +19,7 @@ describe("POS sale flow", () => {
     cy.setupScenario();
     cy.setOnlineModeOnly();
     PosPage.visit();
+    cy.seedIndexedDb();
     cy.setOnline();
     PosPage.waitUntilLoaded();
   });

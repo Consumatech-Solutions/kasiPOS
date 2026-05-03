@@ -9,6 +9,7 @@ export const CustomersPage = {
   waitUntilLoaded() {
     cy.location("pathname").should("eq", this.path);
     cy.contains(/welcome back!/i).should("not.exist");
+    cy.get("body").should("not.contain", "animate-pulse rounded-md bg-muted");
     cy.findByRole("button", { name: /add customer/i, timeout: 30_000 }).should(
       "be.visible"
     );
