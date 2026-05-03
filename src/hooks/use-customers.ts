@@ -68,8 +68,8 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       return getCustomersFromDexie(
         initialPage,
         initialLimit,
-        searchQuery?.trim() || undefined,
-        storeIdForOffline ?? undefined
+        searchQuery?.trim() || undefined
+        //storeIdForOffline ?? undefined
       );
     },
     staleTime: 0,
@@ -91,7 +91,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
         ...data,
         loyaltyPoints: data.loyaltyPoints ?? 0,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       } as Customer;
     },
     onMutate: async (newCustomer) => {
@@ -151,12 +151,23 @@ export function useCustomers(options: UseCustomersOptions = {}) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateCustomerDto }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateCustomerDto;
+    }) => {
       mutationQueue.add({
         mutationKey: ["customers", "update", id],
         variables: { id, ...data },
       });
-      return { id, ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Customer;
+      return {
+        id,
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as Customer;
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: customerKeys.lists() });
