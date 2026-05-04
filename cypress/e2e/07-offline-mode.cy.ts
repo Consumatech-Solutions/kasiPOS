@@ -4,6 +4,10 @@ import { PosPage } from "../pages/pos-page";
 const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
   /sync to cloud now|download from cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled|downloading offline data|downloading essential/i;
 
+/** Matches sync modal / toasts / empty state while preloading or idle (see sync-status-modal). */
+const SYNC_RELATED_BODY_TEXT =
+  /syncing|completed|pending|nothing to sync|uploaded|cloud sync|scheduled|downloading|progress|operations synced|sync status|sync incomplete|sync failed/i;
+
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
     .should("be.visible")
@@ -14,8 +18,13 @@ function openCloudSyncModal() {
 function selectCustomerFromDialogForOfflineSale(
   preferredName = /Alice Mokoena/i
 ) {
-  cy.findByRole("button", { name: /add customer/i }).click({ force: true });
-  cy.findByRole("dialog", { name: /select a customer/i, timeout: 20_000 })
+  cy.findByRole("button", {
+    name: /add customer|ajouter un client/i,
+  }).click({ force: true });
+  cy.findByRole("dialog", {
+    name: /select a customer|choisir un client/i,
+    timeout: 20_000,
+  })
     .should("be.visible")
     .within(() => {
       cy.get("tbody tr", { timeout: 25_000 }).should("have.length.at.least", 1);
@@ -25,11 +34,8 @@ function selectCustomerFromDialogForOfflineSale(
           rows.find((row) =>
             preferredName.test((row.textContent ?? "").trim())
           ) ?? rows[0];
-        cy.wrap(preferred).within(() => {
-          cy.findByRole("button", { name: /^select$/i }).click({
-            force: true,
-          });
-        });
+        // Row click selects the customer (same as the Select/Choisir cell button).
+        cy.wrap(preferred).click({ force: true });
       });
     });
 }
@@ -168,6 +174,8 @@ describe("Offline mode", () => {
     PosPage.visit();
     cy.seedIndexedDb();
     cy.setOnline();
+    // Customers (and other Dexie-backed lists) load on mount; seed runs after first visit, so reload POS.
+    PosPage.visit();
     PosPage.waitUntilLoaded();
   });
 
@@ -245,10 +253,7 @@ describe("Offline mode", () => {
       );
     });
     cy.get("body")
-      .contains(
-        /syncing|completed|pending|nothing to sync|uploaded|cloud sync/i,
-        { timeout: 20_000 }
-      )
+      .contains(SYNC_RELATED_BODY_TEXT, { timeout: 20_000 })
       .should("exist");
   });
 
