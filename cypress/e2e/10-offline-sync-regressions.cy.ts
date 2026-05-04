@@ -2,8 +2,8 @@ import { CataloguePage } from "../pages/catalogue-page";
 import { CustomersPage } from "../pages/customers-page";
 import { PosPage } from "../pages/pos-page";
 
-const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
-  /sync to cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled/i;
+/** Matches sync-status-modal title (preloading vs idle) and body copy. */
+const SYNC_DIALOG_TITLE = /sync status|downloading offline data/i;
 
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
@@ -13,42 +13,43 @@ function openCloudSyncModal() {
 
 function triggerManualSync() {
   openCloudSyncModal();
+  cy.findByRole("dialog", { name: SYNC_DIALOG_TITLE, timeout: 60_000 }).should(
+    "be.visible"
+  );
+
+  // waitUntil must return a boolean synchronously — do not nest cy.get().then() (Chainable is always truthy).
+  // Require the real action button: description can match "scheduled" while still preloading (no button yet).
   cy.waitUntil(
-    () =>
-      cy.get('[role="dialog"]', { log: false }).then(($dialog) => {
-        const hasSyncButton = $dialog
-          .last()
-          .find("button")
-          .toArray()
-          .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim())
-          );
-        const dialogText = ($dialog.last().text() ?? "").toLowerCase();
-        const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
-        return hasSyncButton || hasStatusText;
-      }),
+    () => {
+      const $dialogs = Cypress.$('[role="dialog"]:visible');
+      const $sync = $dialogs.filter((_, el) =>
+        SYNC_DIALOG_TITLE.test(el.textContent ?? "")
+      );
+      if (!$sync.length) return false;
+      const $dlg = $sync.last();
+      const $btn = $dlg
+        .find("button")
+        .filter((_, el) =>
+          /sync to cloud now/i.test((el.textContent ?? "").trim())
+        );
+      const el = $btn[0] as HTMLButtonElement | undefined;
+      return Boolean(el && !el.disabled);
+    },
     {
-      timeout: 60_000,
+      timeout: 120_000,
       interval: 500,
-      description: "wait for sync action button",
-      errorMsg: "Sync action button was not rendered in cloud sync modal",
+      description: "enabled Sync to cloud now in cloud sync modal",
+      errorMsg:
+        "Sync to cloud now did not become available (preload may still be running)",
     }
   );
-  // CI can validly settle in a terminal sync state where no manual action button is shown.
-  cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).then(
-    ($dialog) => {
-      const hasSyncButton = $dialog
-        .find("button")
-        .toArray()
-        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
-      if (hasSyncButton) {
-        cy.wrap($dialog)
-          .contains("button", /sync to cloud now/i, { timeout: 20_000 })
-          .should("be.visible")
-          .click({ force: true });
-        return;
-      }
-      expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
+
+  cy.findByRole("dialog", { name: SYNC_DIALOG_TITLE, timeout: 45_000 }).within(
+    () => {
+      cy.findByRole("button", { name: /sync to cloud now/i, timeout: 20_000 })
+        .should("be.visible")
+        .and("not.be.disabled")
+        .click({ force: true });
     }
   );
 }
