@@ -13,6 +13,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { AppSettings, User, Store } from "@/types";
 import { authApi } from "@/lib/api/auth";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import { parseStoredAppLanguage } from "@/lib/language-code";
+import { useSyncI18nLanguage } from "@/hooks/use-sync-i18n-language";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -54,6 +56,7 @@ function readPersistedSettings(): AppSettings {
     return {
       ...defaultSettings,
       theme: storedSettings.theme || "light",
+      language: parseStoredAppLanguage(storedSettings.language),
       currentUser,
       currentStore,
       isLoggedIn: !!currentUser,
@@ -260,14 +263,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const newSettings = {
       ...defaultSettings,
       theme,
+      language: settings.language,
       isLoggedIn: false,
       currentUser: null,
       currentStore: null,
     };
     try {
+      const language = settings.language;
       window.localStorage.setItem(
         "kasi-pos-settings",
-        JSON.stringify({ theme })
+        JSON.stringify({ theme, language })
       );
       window.localStorage.removeItem("token");
       window.localStorage.removeItem("user");
@@ -284,7 +289,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Logout API call failed", error);
     }
-  }, [router, settings.theme]);
+  }, [router, settings.theme, settings.language]);
 
   useEffect(() => {
     const bootstrapData = async () => {
@@ -460,6 +465,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const next: Record<string, unknown> = {
         ...existing,
         theme: settings.theme,
+        language: settings.language,
         showVatInCheckout: settings.showVatInCheckout,
       };
       if (settings.currentStore) {
@@ -590,6 +596,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     },
     [setSetting]
   );
+
+  useSyncI18nLanguage(settings.language, hasHydratedStorage);
 
   const canRenderChildren = () => {
     if (!hasHydratedStorage) return false;
