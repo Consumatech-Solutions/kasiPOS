@@ -113,7 +113,7 @@
     "eslint": "^9.17.0",
     "eslint-config-next": "15.5.9",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-cypress": "^4.1.0",
+    "eslint-plugin-cypress": "^6.4.0",
     "fake-indexeddb": "^6.2.5",
     "genkit-cli": "^1.20.0",
     "husky": "^9.1.0",
