@@ -3,7 +3,7 @@ import { CustomersPage } from "../pages/customers-page";
 import { PosPage } from "../pages/pos-page";
 
 const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
-  /sync to cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled/i;
+  /sync to cloud now|download from cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled|downloading offline data|downloading essential/i;
 
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
@@ -13,44 +13,64 @@ function openCloudSyncModal() {
 
 function triggerManualSync() {
   openCloudSyncModal();
+
+  // Modal title is "Downloading Offline Data" while DataPreloader holds mutationQueue in preloading.
+  cy.findByRole("dialog", {
+    name: /sync status|downloading offline data/i,
+    timeout: 45_000,
+  }).should("be.visible");
+
   cy.waitUntil(
-    () =>
-      cy.get('[role="dialog"]', { log: false }).then(($dialog) => {
-        const hasSyncButton = $dialog
-          .last()
-          .find("button")
-          .toArray()
-          .some((el) =>
-            /sync to cloud now/i.test((el.textContent ?? "").trim())
-          );
-        const dialogText = ($dialog.last().text() ?? "").toLowerCase();
-        const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
-        return hasSyncButton || hasStatusText;
-      }),
-    {
-      timeout: 60_000,
-      interval: 500,
-      description: "wait for sync action button",
-      errorMsg: "Sync action button was not rendered in cloud sync modal",
-    }
-  );
-  // CI can validly settle in a terminal sync state where no manual action button is shown.
-  cy.findByRole("dialog", { name: /sync status/i, timeout: 45_000 }).then(
-    ($dialog) => {
-      const hasSyncButton = $dialog
+    () => {
+      const dialogs = Cypress.$('[role="dialog"]:visible');
+      if (!dialogs.length) return false;
+      const last = dialogs.last();
+      const hasSyncButton = last
         .find("button")
         .toArray()
         .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
-      if (hasSyncButton) {
-        cy.wrap($dialog)
-          .contains("button", /sync to cloud now/i, { timeout: 20_000 })
-          .should("be.visible")
-          .click({ force: true });
-        return;
-      }
-      expect($dialog.text()).to.match(SYNC_MODAL_ACTION_OR_STATUS_TEXT);
+      const hasProgress = last.find('[role="progressbar"]').length > 0;
+      const dialogText = (last.text() ?? "").toLowerCase();
+      const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
+      return hasSyncButton || hasStatusText || hasProgress;
+    },
+    {
+      timeout: 90_000,
+      interval: 500,
+      description: "wait for sync modal content (preload or actions)",
+      errorMsg: "Sync status modal never reached a recognizable state",
     }
   );
+
+  cy.waitUntil(
+    () => {
+      const dlg = Cypress.$('[role="dialog"]:visible').filter((_, el) => {
+        const t = el.textContent ?? "";
+        return /sync status|downloading offline data/i.test(t);
+      });
+      if (!dlg.length) return false;
+      return dlg
+        .last()
+        .find("button")
+        .toArray()
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
+    },
+    {
+      timeout: 120_000,
+      interval: 500,
+      description: 'wait for enabled "Sync to cloud now" after preload',
+      errorMsg: '"Sync to cloud now" did not appear in cloud sync modal',
+    }
+  );
+
+  cy.findByRole("dialog", {
+    name: /sync status|downloading offline data/i,
+    timeout: 45_000,
+  }).within(() => {
+    cy.contains("button", /sync to cloud now/i, { timeout: 20_000 })
+      .should("be.visible")
+      .click({ force: true });
+  });
 }
 
 function createCustomerOffline(name: string, contact: string) {
