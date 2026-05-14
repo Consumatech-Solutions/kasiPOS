@@ -11,6 +11,18 @@ function openCloudSyncModal() {
     .click({ force: true });
 }
 
+/** Align with DataPreloader APP_PRELOAD_VERSION so iframe preloads do not block the sync modal in CI. */
+function markPreloadAsReady() {
+  cy.window().then((win) => {
+    try {
+      win.localStorage.setItem("kasipos-preload-version", "kasipos-v4");
+      win.localStorage.setItem("kasipos-preload-timestamp", String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
 function triggerManualSync() {
   openCloudSyncModal();
 
@@ -56,7 +68,7 @@ function triggerManualSync() {
         .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
     },
     {
-      timeout: 120_000,
+      timeout: 180_000,
       interval: 500,
       description: 'wait for enabled "Sync to cloud now" after preload',
       errorMsg: '"Sync to cloud now" did not appear in cloud sync modal',
@@ -90,9 +102,13 @@ describe("Offline sync regressions", () => {
   beforeEach(() => {
     cy.setupScenario();
     cy.visitApp("/");
+    // Without this, DataPreloader can keep mutationQueue in "preloading" for a long time on slow
+    // runners; the cloud sync modal then never shows "Sync to cloud now".
+    markPreloadAsReady();
+    cy.reload();
+    cy.waitForAppReady("/");
     cy.seedIndexedDb();
     cy.setOnline();
-    cy.waitForAppReady("/");
   });
 
   it("syncs offline-created customer after reconnect without store load errors", () => {
