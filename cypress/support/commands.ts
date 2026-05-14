@@ -387,7 +387,8 @@ Cypress.Commands.add(
             text.includes("KasiPOS") ||
             text.includes("Home") ||
             text.includes("Catalogue") ||
-            text.includes("Transaction History")
+            text.includes("Transaction History") ||
+            text.includes("Customers")
           );
         }),
       {
@@ -527,7 +528,9 @@ Cypress.Commands.add(
   "readIndexedDbStore",
   <T = unknown>(storeName: string, options?: { dbName?: string }) => {
     const dbName = options?.dbName ?? KASI_POS_DB_NAME;
-    return cy.window().then((win) => readAllFromObjectStore<T>(win, dbName, storeName));
+    return cy
+      .window()
+      .then((win) => readAllFromObjectStore<T>(win, dbName, storeName));
   }
 );
 
@@ -543,11 +546,13 @@ Cypress.Commands.add(
     const dbName = options?.dbName ?? KASI_POS_DB_NAME;
     return cy.waitUntil(
       () =>
-        cy.window({ log: false }).then((win) =>
-          readAllFromObjectStore<unknown>(win, dbName, storeName).then((rows) =>
-            predicate(rows)
-          )
-        ),
+        cy
+          .window({ log: false })
+          .then((win) =>
+            readAllFromObjectStore<unknown>(win, dbName, storeName).then(
+              (rows) => predicate(rows)
+            )
+          ),
       {
         timeout: timeoutMs,
         interval: intervalMs,

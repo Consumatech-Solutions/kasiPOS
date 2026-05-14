@@ -92,6 +92,7 @@ describe("Offline sync regressions", () => {
     cy.visitApp("/");
     cy.seedIndexedDb();
     cy.setOnline();
+    cy.waitForAppReady("/");
   });
 
   it("syncs offline-created customer after reconnect without store load errors", () => {
