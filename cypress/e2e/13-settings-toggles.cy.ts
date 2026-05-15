@@ -59,16 +59,30 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
         type Persisted = {
           showVatInCheckout?: boolean;
           currentStore?: {
-            enabledModules?: { showVatInCheckout?: boolean };
+            enabledModules?: Record<string, unknown>;
+            [key: string]: unknown;
           };
         };
         const parsed: Persisted = raw ? (JSON.parse(raw) as Persisted) : {};
         parsed.showVatInCheckout = nextChecked;
-        if (parsed.currentStore?.enabledModules) {
-          parsed.currentStore.enabledModules.showVatInCheckout = nextChecked;
+        const store = parsed.currentStore;
+        if (store && typeof store === "object") {
+          store.enabledModules = {
+            ...(store.enabledModules ?? {}),
+            showVatInCheckout: nextChecked,
+          };
         }
         win.localStorage.setItem("kasi-pos-settings", JSON.stringify(parsed));
       });
+    };
+
+    // visitApp reapplies the seed session and overwrites kasi-pos-settings (seed has VAT off).
+    // Re-persist the desired VAT flag and reload so POS matches the settings step above.
+    const visitPosRestoringVatForMock = (vatChecked: boolean) => {
+      cy.visitApp("/");
+      setPersistedVat(vatChecked);
+      cy.reload();
+      cy.waitForAppReady("/");
     };
 
     if (isRealMode) {
@@ -88,7 +102,7 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
     if (isRealMode) {
       PosPage.visit();
     } else {
-      cy.visit("/");
+      visitPosRestoringVatForMock(true);
     }
     if (!isRealMode) cy.setOnline();
     PosPage.waitUntilLoaded();
@@ -139,7 +153,7 @@ describe("Settings toggles affect POS (VAT / tax)", () => {
     if (isRealMode) {
       PosPage.visit();
     } else {
-      cy.visit("/");
+      visitPosRestoringVatForMock(false);
     }
     if (!isRealMode) cy.setOnline();
     PosPage.waitUntilLoaded();
