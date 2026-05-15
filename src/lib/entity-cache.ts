@@ -766,9 +766,11 @@ export async function getStockAdjustmentsFromDexie(
   if (productId != null && productId !== "") {
     all = all.filter((a) => String(a.productId) === String(productId));
   }
-  const sorted = all.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const sorted = all.sort((a, b) => {
+    const aT = (a.createdAt ?? String(a.date ?? "")) as string;
+    const bT = (b.createdAt ?? String(b.date ?? "")) as string;
+    return String(bT).localeCompare(String(aT));
+  });
   const total = sorted.length;
   const data = sorted.slice((page - 1) * limit, page * limit);
   return {

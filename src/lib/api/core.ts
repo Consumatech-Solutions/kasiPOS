@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import { isAuthEndpoint, notifySessionExpired } from "@/lib/auth-session";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002";
 
@@ -87,6 +88,17 @@ api.interceptors.response.use(
       }
 
       return Promise.reject(networkError);
+    }
+
+    if (error?.response?.status === 401) {
+      const requestUrl = error.config?.url ?? "";
+      if (
+        typeof window !== "undefined" &&
+        window.localStorage.getItem("token") &&
+        !isAuthEndpoint(requestUrl)
+      ) {
+        notifySessionExpired();
+      }
     }
 
     if (error?.response?.status === 400) {
