@@ -242,17 +242,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (
       typeof window !== "undefined" &&
       !window.confirm(
-        "Logging out will clear your offline data. Are you sure you want to log out?"
+        "Are you sure you want to log out? Offline data on this device will be kept."
       )
     ) {
       return;
-    }
-
-    try {
-      const { db } = await import("@/lib/db");
-      await Promise.all(db.tables.map((t: any) => t.clear()));
-    } catch (e) {
-      console.error("Error clearing Dexie DB on logout", e);
     }
 
     const theme = settings.theme;
