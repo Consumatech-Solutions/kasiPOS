@@ -47,4 +47,6 @@ French equivalents are available under `docs/fr`.
 
 ## License
 
-License is currently not defined in this repository.
+This project is licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [LICENSE](LICENSE) in the repository root for the full license text.
+
+Copyright 2026 KasiPOS Contributors.
