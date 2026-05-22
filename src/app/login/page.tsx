@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
+import { normalizePhone } from "@/lib/phone";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,27 +30,79 @@ import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
 import { offlineDetector } from "@/lib/offline-detector";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
+import {
+  backendUnreachableRecovery,
+  isBackendConnectionError,
+} from "@/lib/backend-connection";
+import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
-const loginSchema = z.object({
-  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
-  password: z.string().min(1, { message: "Password is required." }),
-});
+const loginSchema = z
+  .object({
+    email: z.string().optional(),
+    phone: z.string().optional(),
+    password: z.string().min(1, { message: "Password is required." }),
+  })
+  .superRefine((data, ctx) => {
+    const email = data.email?.trim() ?? "";
+    const phone = normalizePhone(data.phone ?? "");
+    const hasEmail = email.length > 0;
+    const hasPhone = phone.length >= 10;
+
+    if (!hasEmail && !hasPhone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter your email or mobile number.",
+        path: ["email"],
+      });
+      return;
+    }
+
+    if (hasEmail && !z.string().email().safeParse(email).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid email address.",
+        path: ["email"],
+      });
+    }
+
+    if (hasPhone && phone.length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid mobile number (at least 10 digits).",
+        path: ["phone"],
+      });
+    }
+  });
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+function buildLoginPayload(values: LoginFormValues) {
+  const email = values.email?.trim();
+  const phone = normalizePhone(values.phone ?? "");
+  const payload: { password: string; email?: string; phone?: string } = {
+    password: values.password,
+  };
+  if (email) payload.email = email;
+  if (phone.length >= 10) payload.phone = phone;
+  return payload;
+}
 
 export default function LoginPage() {
   const { login } = useSettings();
   const queryClient = useQueryClient();
 
-  const form = useForm<z.infer<typeof loginSchema>>({
+  const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
+      email: "",
       phone: "",
       password: "",
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+  const onSubmit = async (values: LoginFormValues) => {
     try {
-      const response = await authApi.login(values.phone, values.password);
+      const response = await authApi.login(buildLoginPayload(values));
 
       if (response.data && response.data.accessToken) {
         feedback.success("Login successful", "Welcome back!");
@@ -57,7 +110,7 @@ export default function LoginPage() {
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
-        
+
         try {
           const isOnline = await offlineDetector.forceCheck();
           if (isOnline) {
@@ -88,16 +141,16 @@ export default function LoginPage() {
         });
       }
 
-      if (err?.code === "ERR_NETWORK" || err?.message === "Network Error") {
+      if (isBackendConnectionError(err)) {
         if (process.env.NODE_ENV === "development") {
           console.warn(
-            "Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:9002)."
+            `[Login] Backend not reachable at ${getConfiguredApiUrl()}`
           );
         }
         feedback.error(
-          "Connection error",
-          "Cannot reach server.",
-          "Ensure the backend is running and try again.",
+          "Backend not running",
+          `Cannot reach the API at ${getConfiguredApiUrl()}.`,
+          backendUnreachableRecovery(),
           { code: ERROR_CODES.LOGIN }
         );
         return;
@@ -110,14 +163,14 @@ export default function LoginPage() {
         (typeof (data as { msg?: string })?.msg === "string" &&
           (data as { msg: string }).msg) ||
         (status === 401
-          ? "Invalid phone number or password."
+          ? "Invalid email/phone or password."
           : "Login failed. Please try again.");
       feedback.error(
         "Login failed",
         serverMessage,
         status === 401
-          ? "Check your phone number and password."
-          : "Try again or request access if you don't have an account.",
+          ? "Check your email or phone and password."
+          : "Try again or create an account if you are new.",
         { code: ERROR_CODES.LOGIN }
       );
     }
@@ -129,7 +182,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
           <CardDescription className="text-sm">
-            Enter your details to sign in to your store
+            Sign in with your email or mobile number and password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -137,14 +190,16 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="phone"
+                name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., 0812345678"
+                        type="email"
+                        placeholder="owner@example.com"
                         className="touch-target"
+                        autoComplete="email"
                         {...field}
                       />
                     </FormControl>
@@ -152,6 +207,27 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mobile number</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., 0812345678"
+                        className="touch-target"
+                        autoComplete="tel"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter at least one of email or mobile number.
+              </p>
               <FormField
                 control={form.control}
                 name="password"
@@ -162,6 +238,7 @@ export default function LoginPage() {
                       <Input
                         type="password"
                         className="touch-target"
+                        autoComplete="current-password"
                         {...field}
                       />
                     </FormControl>
@@ -178,13 +255,22 @@ export default function LoginPage() {
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            First time here?{" "}
+            New here?{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/request-access">Request Access</Link>
+              <Link href="/signup">Create an account</Link>
+            </Button>
+            {" · "}
+            Invited by admin?{" "}
+            <Button
+              variant="link"
+              className="p-0 min-h-[44px] touch-target"
+              asChild
+            >
+              <Link href="/request-access">Request access</Link>
             </Button>
             {" · "}
             Store admin?{" "}

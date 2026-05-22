@@ -25,9 +25,16 @@ npm install
 
 ### Run
 
+Start the **KasiPOS backend API** (default `http://localhost:3001`), then the frontend:
+
 ```bash
+# Copy env and point at your backend if needed
+cp .env.example .env
+
 npm run dev
 ```
+
+The app runs at `http://localhost:9002`. API calls are proxied to `NEXT_PUBLIC_API_URL` in development.
 
 ### Verify
 

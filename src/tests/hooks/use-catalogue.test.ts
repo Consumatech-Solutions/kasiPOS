@@ -12,6 +12,7 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCategories, useProducts } from "@/hooks/use-catalogue";
 import { resetDbInstanceForTests } from "@/lib/db";
+import { mutationQueue } from "@/lib/mutation-queue";
 import * as entityCache from "@/lib/entity-cache";
 import type { ApiCategory, ApiProduct } from "@/types/catalogue";
 import type { PaginationMeta } from "@/types/pagination";
@@ -91,6 +92,7 @@ beforeAll(async () => {
 
 describe("useCategories", () => {
   beforeEach(async () => {
+    mutationQueue.clear();
     await resetDbInstanceForTests();
     checkOffline.mockReset();
     categoriesGetAll.mockReset();
@@ -204,27 +206,39 @@ describe("useCategories", () => {
       data: [],
       meta: { total: 0, page: 1, limit: 10, totalPages: 1 },
     });
-    categoriesCreate.mockResolvedValue({
-      id: "srv-cat",
-      name: "Server",
-      createdAt: "2024-02-01T00:00:00.000Z",
-      updatedAt: "2024-02-01T00:00:00.000Z",
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
     });
+    vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue(undefined);
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        children
+      );
+
     const { result } = renderHook(
       () => useCategories(1, 10, { storeIdForOffline: "s1" }),
-      {
-        wrapper: createWrapper(),
-      }
+      { wrapper }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const pendingBefore = mutationQueue.getPendingCount();
     await act(async () => {
       await result.current.createCategory({ name: "Server" });
     });
+
     expect(
       result.current.categories.some(
         (c) => c.name === "Server" && String(c.id ?? "").startsWith("temp-")
       )
     ).toBe(true);
+    expect(mutationQueue.getPendingCount()).toBeGreaterThan(pendingBefore);
   });
 });
 

@@ -92,6 +92,8 @@ function persistedSettingsMatch(a: AppSettings, b: AppSettings): boolean {
 
 const AUTH_ROUTES = [
   "/login",
+  "/signup",
+  "/signup/verify",
   "/request-access",
   "/verify-code",
   "/set-password",
