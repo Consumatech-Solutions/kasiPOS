@@ -85,9 +85,10 @@ describe("Inventory", () => {
       "productCache",
       (rows) =>
         Array.isArray(rows) &&
-        rows.some((r: Record<string, unknown>) => {
-          const id = String(r.id ?? "");
-          const stock = Number(r.stock);
+        rows.some((r: unknown) => {
+          const row = r as Record<string, unknown>;
+          const id = String(row.id ?? "");
+          const stock = Number(row.stock);
           return id === "prod-water-001" && stock === 23;
         }),
       { timeoutMs: 30_000 }
@@ -122,26 +123,37 @@ describe("Inventory", () => {
     cy.contains("td", /cola 330ml/i, { timeout: 15_000 })
       .parents("tr")
       .first()
-      .within(() => {
-        cy.get("button:has(svg.lucide-square-pen)", { timeout: 15_000 })
-          .first()
-          .click({ force: true });
-      });
-    cy.contains("td", /cola 330ml/i, { timeout: 15_000 })
-      .parents("tr")
-      .first()
+      .as("colaRow");
+    cy.get("@colaRow").within(() => {
+      // Low Stock Trigger is the 5th column (Image, Name, Category, Stock, Low Stock Trigger, Actions).
+      cy.get("td:nth-child(5) button", { timeout: 15_000 })
+        .first()
+        .click({ force: true });
+    });
+    cy.get("@colaRow")
       .find('input[type="number"]', { timeout: 15_000 })
-      .should("be.visible");
-    cy.contains("td", /cola 330ml/i, { timeout: 15_000 })
-      .parents("tr")
-      .first()
-      .find('input[type="number"]', { timeout: 15_000 })
-      .clear();
-    cy.contains("td", /cola 330ml/i, { timeout: 15_000 })
-      .parents("tr")
-      .first()
-      .find('input[type="number"]', { timeout: 15_000 })
-      .type("7{enter}");
-    cy.contains("tr", /cola 330ml/i).should("contain.text", "7");
+      .as("colaThresholdInput");
+    cy.get("@colaThresholdInput").should("be.visible");
+    cy.get("@colaThresholdInput").click();
+    cy.get("@colaThresholdInput").type("{selectall}7", { delay: 0 });
+    cy.get("@colaThresholdInput").should("have.value", "7");
+    cy.get("@colaThresholdInput").blur();
+    cy.waitForIndexedDbStore(
+      "productCache",
+      (rows) =>
+        Array.isArray(rows) &&
+        rows.some((r: unknown) => {
+          const row = r as Record<string, unknown>;
+          return (
+            String(row.id ?? "") === "prod-cola-001" &&
+            Number(row.lowStockThreshold) === 7
+          );
+        }),
+      { timeoutMs: 30_000 }
+    );
+    cy.contains("tr", /cola 330ml/i, { timeout: 20_000 }).should(
+      "contain.text",
+      "7"
+    );
   });
 });

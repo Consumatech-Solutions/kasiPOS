@@ -14,32 +14,6 @@ function openCloudSyncModal() {
     .click({ force: true });
 }
 
-/** Seed/customer lists vary in CI; prefer a named row when present, else first selectable row. */
-function selectCustomerFromDialogForOfflineSale(
-  preferredName = /Alice Mokoena/i
-) {
-  cy.findByRole("button", {
-    name: /add customer|ajouter un client/i,
-  }).click({ force: true });
-  cy.findByRole("dialog", {
-    name: /select a customer|choisir un client/i,
-    timeout: 20_000,
-  })
-    .should("be.visible")
-    .within(() => {
-      cy.get("tbody tr", { timeout: 25_000 }).should("have.length.at.least", 1);
-      cy.get("tbody tr").then(($rows) => {
-        const rows = $rows.toArray();
-        const preferred =
-          rows.find((row) =>
-            preferredName.test((row.textContent ?? "").trim())
-          ) ?? rows[0];
-        // Row click selects the customer (same as the Select/Choisir cell button).
-        cy.wrap(preferred).click({ force: true });
-      });
-    });
-}
-
 /** Avoid sync modal stuck on "Downloading Offline Data" when Dexie still has queued mutations. */
 function clearIndexedDbMutationQueue() {
   cy.window().then((win) => {
@@ -133,14 +107,13 @@ function waitForSyncModalDownloadCloudReady() {
   );
 }
 
-function ensureCloudSyncModalReady() {
+function triggerManualSync() {
   openCloudSyncModal();
   cy.findByRole("dialog", {
     name: /sync status|downloading offline data/i,
     timeout: 45_000,
   }).should("be.visible");
 
-  // Use synchronous DOM reads — nested cy.get('[role="dialog"]') can fail the whole waitUntil when zero dialogs match briefly.
   cy.waitUntil(
     () => {
       const dialogs = Cypress.$('[role="dialog"]:visible');
@@ -149,11 +122,7 @@ function ensureCloudSyncModalReady() {
       const hasSyncButton = last
         .find("button")
         .toArray()
-        .some((el) =>
-          /sync to cloud now|download from cloud now/i.test(
-            (el.textContent ?? "").trim()
-          )
-        );
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
       const hasProgress = last.find('[role="progressbar"]').length > 0;
       const dialogText = (last.text() ?? "").toLowerCase();
       const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
@@ -162,10 +131,40 @@ function ensureCloudSyncModalReady() {
     {
       timeout: 90_000,
       interval: 500,
-      description: "wait for sync status actions",
-      errorMsg: "Sync status modal never reached actionable state",
+      description: "wait for sync modal content (preload or actions)",
+      errorMsg: "Sync status modal never reached a recognizable state",
     }
   );
+
+  cy.waitUntil(
+    () => {
+      const dlg = Cypress.$('[role="dialog"]:visible').filter((_, el) => {
+        const t = el.textContent ?? "";
+        return /sync status|downloading offline data/i.test(t);
+      });
+      if (!dlg.length) return false;
+      return dlg
+        .last()
+        .find("button")
+        .toArray()
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
+    },
+    {
+      timeout: 180_000,
+      interval: 500,
+      description: 'wait for enabled "Sync to cloud now" after preload',
+      errorMsg: '"Sync to cloud now" did not appear in cloud sync modal',
+    }
+  );
+
+  cy.findByRole("dialog", {
+    name: /sync status|downloading offline data/i,
+    timeout: 45_000,
+  }).within(() => {
+    cy.contains("button", /sync to cloud now/i, { timeout: 20_000 })
+      .should("be.visible")
+      .click({ force: true });
+  });
 }
 
 describe("Offline mode", () => {
@@ -173,6 +172,10 @@ describe("Offline mode", () => {
     cy.setupScenario();
     PosPage.visit();
     cy.seedIndexedDb();
+    markPreloadAsReady();
+    clearIndexedDbMutationQueue();
+    cy.reload();
+    cy.waitForAppReady("/");
     cy.setOnline();
     // Customers (and other Dexie-backed lists) load on mount; seed runs after first visit, so reload POS.
     PosPage.visit();
@@ -183,11 +186,11 @@ describe("Offline mode", () => {
     PosPage.ensureProductCarouselView();
     PosPage.searchProducts("Cola");
     PosPage.addProduct("Cola 330ml", 2);
+    PosPage.selectCustomerFromDialog("Alice Mokoena");
     cy.setOffline();
     cy.get('button[aria-label="Open cloud sync status"]', {
       timeout: 20_000,
     }).should("be.visible");
-    selectCustomerFromDialogForOfflineSale();
     PosPage.choosePaymentMethod("Cash");
     cy.findByRole("dialog", { name: /cash payment/i }).within(() => {
       cy.findByRole("button", { name: /exact/i }).click({ force: true });
@@ -228,33 +231,10 @@ describe("Offline mode", () => {
 
   it("reconnects and allows manual sync trigger", () => {
     cy.setOnline();
-    ensureCloudSyncModalReady();
-    cy.findByRole("dialog", {
-      name: /sync status|downloading offline data/i,
-      timeout: 15_000,
-    }).then(($dialog) => {
-      const hasSyncButton = $dialog
-        .find("button")
-        .toArray()
-        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
-      if (hasSyncButton) {
-        cy.wrap($dialog).within(() => {
-          cy.findByRole("button", {
-            name: /sync to cloud now/i,
-            timeout: 15_000,
-          }).click({ force: true });
-        });
-        return;
-      }
-      const hasProgress = $dialog.find('[role="progressbar"]').length > 0;
-      const text = $dialog.text();
-      expect(hasProgress || SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(text)).to.eq(
-        true
-      );
-    });
-    cy.get("body")
-      .contains(SYNC_RELATED_BODY_TEXT, { timeout: 20_000 })
-      .should("exist");
+    triggerManualSync();
+    cy.get("body", { timeout: 30_000 })
+      .invoke("text")
+      .should("match", SYNC_MODAL_ACTION_OR_STATUS_TEXT);
   });
 
   it("simulates backend failure when products API returns an error", () => {

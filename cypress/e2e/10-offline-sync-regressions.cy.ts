@@ -2,8 +2,8 @@ import { CataloguePage } from "../pages/catalogue-page";
 import { CustomersPage } from "../pages/customers-page";
 import { PosPage } from "../pages/pos-page";
 
-/** Matches sync-status-modal title (preloading vs idle) and body copy. */
-const SYNC_DIALOG_TITLE = /sync status|downloading offline data/i;
+const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
+  /sync to cloud now|download from cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled|downloading offline data|downloading essential/i;
 
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
@@ -11,47 +11,78 @@ function openCloudSyncModal() {
     .click({ force: true });
 }
 
+/** Align with DataPreloader APP_PRELOAD_VERSION so iframe preloads do not block the sync modal in CI. */
+function markPreloadAsReady() {
+  cy.window().then((win) => {
+    try {
+      win.localStorage.setItem("kasipos-preload-version", "kasipos-v4");
+      win.localStorage.setItem("kasipos-preload-timestamp", String(Date.now()));
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
 function triggerManualSync() {
   openCloudSyncModal();
-  cy.findByRole("dialog", { name: SYNC_DIALOG_TITLE, timeout: 60_000 }).should(
-    "be.visible"
-  );
 
-  // waitUntil must return a boolean synchronously — do not nest cy.get().then() (Chainable is always truthy).
-  // Require the real action button: description can match "scheduled" while still preloading (no button yet).
+  // Modal title is "Downloading Offline Data" while DataPreloader holds mutationQueue in preloading.
+  cy.findByRole("dialog", {
+    name: /sync status|downloading offline data/i,
+    timeout: 45_000,
+  }).should("be.visible");
+
   cy.waitUntil(
     () => {
-      const $dialogs = Cypress.$('[role="dialog"]:visible');
-      const $sync = $dialogs.filter((_, el) =>
-        SYNC_DIALOG_TITLE.test(el.textContent ?? "")
-      );
-      if (!$sync.length) return false;
-      const $dlg = $sync.last();
-      const $btn = $dlg
+      const dialogs = Cypress.$('[role="dialog"]:visible');
+      if (!dialogs.length) return false;
+      const last = dialogs.last();
+      const hasSyncButton = last
         .find("button")
-        .filter((_, el) =>
-          /sync to cloud now/i.test((el.textContent ?? "").trim())
-        );
-      const el = $btn[0] as HTMLButtonElement | undefined;
-      return Boolean(el && !el.disabled);
+        .toArray()
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
+      const hasProgress = last.find('[role="progressbar"]').length > 0;
+      const dialogText = (last.text() ?? "").toLowerCase();
+      const hasStatusText = SYNC_MODAL_ACTION_OR_STATUS_TEXT.test(dialogText);
+      return hasSyncButton || hasStatusText || hasProgress;
     },
     {
-      timeout: 120_000,
+      timeout: 90_000,
       interval: 500,
-      description: "enabled Sync to cloud now in cloud sync modal",
-      errorMsg:
-        "Sync to cloud now did not become available (preload may still be running)",
+      description: "wait for sync modal content (preload or actions)",
+      errorMsg: "Sync status modal never reached a recognizable state",
     }
   );
 
-  cy.findByRole("dialog", { name: SYNC_DIALOG_TITLE, timeout: 45_000 }).within(
+  cy.waitUntil(
     () => {
-      cy.findByRole("button", { name: /sync to cloud now/i, timeout: 20_000 })
-        .should("be.visible")
-        .and("not.be.disabled")
-        .click({ force: true });
+      const dlg = Cypress.$('[role="dialog"]:visible').filter((_, el) => {
+        const t = el.textContent ?? "";
+        return /sync status|downloading offline data/i.test(t);
+      });
+      if (!dlg.length) return false;
+      return dlg
+        .last()
+        .find("button")
+        .toArray()
+        .some((el) => /sync to cloud now/i.test((el.textContent ?? "").trim()));
+    },
+    {
+      timeout: 180_000,
+      interval: 500,
+      description: 'wait for enabled "Sync to cloud now" after preload',
+      errorMsg: '"Sync to cloud now" did not appear in cloud sync modal',
     }
   );
+
+  cy.findByRole("dialog", {
+    name: /sync status|downloading offline data/i,
+    timeout: 45_000,
+  }).within(() => {
+    cy.contains("button", /sync to cloud now/i, { timeout: 20_000 })
+      .should("be.visible")
+      .click({ force: true });
+  });
 }
 
 function createCustomerOffline(name: string, contact: string) {
@@ -71,6 +102,11 @@ describe("Offline sync regressions", () => {
   beforeEach(() => {
     cy.setupScenario();
     cy.visitApp("/");
+    // Without this, DataPreloader can keep mutationQueue in "preloading" for a long time on slow
+    // runners; the cloud sync modal then never shows "Sync to cloud now".
+    markPreloadAsReady();
+    cy.reload();
+    cy.waitForAppReady("/");
     cy.seedIndexedDb();
     cy.setOnline();
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,10 @@ import {
 import { DeviceSelector } from "@/components/device-selector";
 import { getStoredDevice, connectPos, getDevices } from "@/lib/device-service";
 import { useToast } from "@/hooks/use-toast";
+import {
+  appendTenderedKey,
+  sanitizeTenderedInput,
+} from "@/lib/payment-tendered-input";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -117,22 +121,85 @@ export default function PaymentModal({
     await handleConnectPos(deviceId);
   };
 
-  const handleKeyPress = (key: string) => {
-    if (key === "." && tendered.includes(".")) return;
-    setTendered(tendered + key);
-  };
+  const handleClear = useCallback(() => setTendered(""), []);
+  const handleBackspace = useCallback(
+    () => setTendered((prev) => prev.slice(0, -1)),
+    []
+  );
 
-  const handleClear = () => setTendered("");
-  const handleBackspace = () => setTendered(tendered.slice(0, -1));
+  const handleKeyPress = useCallback((key: string) => {
+    setTendered((prev) => appendTenderedKey(prev, key));
+  }, []);
 
-  const handleCompleteCashSale = () => {
+  const handleCompleteCashSale = useCallback(() => {
     if (isLoading || !canCompleteCashSale) return;
     onCompleteSale({
       items: cartItems,
       total: cartTotal,
       paymentMethod: "Cash",
     });
-  };
+  }, [isLoading, canCompleteCashSale, onCompleteSale, cartItems, cartTotal]);
+
+  const canCompleteCashSaleRef = useRef(canCompleteCashSale);
+  canCompleteCashSaleRef.current = canCompleteCashSale;
+  const handleCompleteCashSaleRef = useRef(handleCompleteCashSale);
+  handleCompleteCashSaleRef.current = handleCompleteCashSale;
+
+  useEffect(() => {
+    if (!isOpen || method !== "Cash") return;
+
+    const isEditableTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isLoading) return;
+
+      const target = event.target;
+      const targetId = target instanceof HTMLElement ? target.id : undefined;
+
+      if (targetId === "tendered") {
+        if (event.key === "Enter" && canCompleteCashSaleRef.current) {
+          event.preventDefault();
+          handleCompleteCashSaleRef.current();
+        }
+        return;
+      }
+
+      if (isEditableTarget(target)) return;
+
+      const key = event.key;
+      if (key === "Enter") {
+        if (canCompleteCashSaleRef.current) {
+          event.preventDefault();
+          handleCompleteCashSaleRef.current();
+        }
+        return;
+      }
+
+      if (key === "Backspace") {
+        event.preventDefault();
+        handleBackspace();
+        return;
+      }
+
+      if (key === "Delete") {
+        event.preventDefault();
+        handleClear();
+        return;
+      }
+
+      if (/^\d$/.test(key) || key === ".") {
+        event.preventDefault();
+        handleKeyPress(key);
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, method, isLoading, handleBackspace, handleClear, handleKeyPress]);
 
   const handlePlaceholderComplete = () => {
     if (isLoading || !method) return;
@@ -217,13 +284,31 @@ export default function PaymentModal({
                 >
                   Amount Tendered
                 </label>
-                <Input
-                  id="tendered"
-                  value={tendered ? `R ${tendered}` : ""}
-                  placeholder="R 0.00"
-                  className="text-2xl h-14 text-right font-mono"
-                  readOnly
-                />
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
+                    R
+                  </span>
+                  <Input
+                    id="tendered"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={tendered}
+                    onChange={(e) =>
+                      setTendered(sanitizeTenderedInput(e.target.value))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canCompleteCashSale) {
+                        e.preventDefault();
+                        handleCompleteCashSale();
+                      }
+                    }}
+                    placeholder="0.00"
+                    className="text-2xl h-14 pl-8 text-right font-mono"
+                    disabled={isLoading}
+                    aria-label="Amount tendered"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-4 gap-2 mb-4">
                 {quickBills.map((bill) => (
