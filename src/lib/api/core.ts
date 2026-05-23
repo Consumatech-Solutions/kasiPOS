@@ -1,8 +1,9 @@
 import axios, { AxiosError } from "axios";
 import { isNetworkErrorLike } from "@/lib/network-error";
-import { isAuthEndpoint, notifySessionExpired } from "@/lib/auth-session";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002";
+import {
+  getConfiguredApiUrl,
+  resolveApiBaseUrl,
+} from "@/lib/api/resolve-api-base-url";
 
 const isOnline = () => {
   if (typeof navigator !== "undefined") {
@@ -18,7 +19,7 @@ export interface OfflineError extends Error {
 }
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: resolveApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
@@ -27,6 +28,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    config.baseURL = resolveApiBaseUrl();
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -79,8 +81,7 @@ api.interceptors.response.use(
           console.warn(
             "Backend not available - running in offline mode. Categories and products will be managed locally.",
             {
-              backendUrl:
-                process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002",
+              backendUrl: getConfiguredApiUrl(),
             }
           );
           (window as any).__backendNetworkErrorLogged = true;
