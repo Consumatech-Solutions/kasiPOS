@@ -11,6 +11,7 @@ import {
 } from "./webhid-scanner";
 import { getQzPrinters, printViaQz } from "./qz-tray";
 import { isAndroid } from "./platform";
+import { launchBluetoothPrint } from "./bluetooth-print";
 
 const PRINTER_SERVER_URL = "http://localhost:7788";
 
@@ -241,8 +242,27 @@ export async function getQzDevices(): Promise<Device[]> {
 
 export async function printReceipt(
   deviceId: string,
-  data: Uint8Array
+  data: Uint8Array | string
 ): Promise<PrintResponse> {
+  if (deviceId === "thermal-android") {
+    if (!isAndroid()) {
+      throw new Error(
+        "Android thermal printing is only available on Android devices"
+      );
+    }
+    if (typeof data !== "string") {
+      throw new Error(
+        "Android Bluetooth Print requires formatted receipt text"
+      );
+    }
+    launchBluetoothPrint(data);
+    return { success: true, message: "Printed via Bluetooth Print" };
+  }
+
+  if (typeof data === "string") {
+    throw new Error("Invalid print payload for this printer");
+  }
+
   if (deviceId.startsWith("webusb_")) {
     if (!isWebUSBAvailable()) {
       throw new Error("WebUSB API is not available in this browser");
@@ -253,18 +273,6 @@ export async function printReceipt(
   if (deviceId.startsWith("qz_")) {
     await printViaQz(deviceId, data);
     return { success: true, message: "Printed via QZ Tray" };
-  }
-
-  if (deviceId === "thermal-android") {
-    if (!isAndroid()) {
-      throw new Error(
-        "Android thermal printing is only available on Android devices"
-      );
-    }
-    const base64 = btoa(String.fromCharCode(...data));
-    const intentUrl = `rawbt:base64,${base64}`;
-    window.location.href = intentUrl;
-    return { success: true, message: "Printed via RawBT" };
   }
 
   try {

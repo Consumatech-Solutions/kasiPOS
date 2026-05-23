@@ -36,40 +36,52 @@ import {
 } from "@/lib/backend-connection";
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_INPUT_REGEX = /^[\d\s\-+()]+$/;
+
+type IdentifierType = "email" | "phone";
+
+function detectIdentifierType(value: string): IdentifierType | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("@") || EMAIL_REGEX.test(trimmed)) return "email";
+  if (PHONE_INPUT_REGEX.test(trimmed)) return "phone";
+  return null;
+}
+
 const loginSchema = z
   .object({
-    email: z.string().optional(),
-    phone: z.string().optional(),
+    identifier: z
+      .string()
+      .min(1, { message: "Enter your email or mobile number." }),
     password: z.string().min(1, { message: "Password is required." }),
   })
   .superRefine((data, ctx) => {
-    const email = data.email?.trim() ?? "";
-    const phone = normalizePhone(data.phone ?? "");
-    const hasEmail = email.length > 0;
-    const hasPhone = phone.length >= 10;
+    const trimmed = data.identifier.trim();
+    const type = detectIdentifierType(trimmed);
 
-    if (!hasEmail && !hasPhone) {
+    if (!type) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Enter your email or mobile number.",
-        path: ["email"],
+        message: "Enter a valid email address or mobile number.",
+        path: ["identifier"],
       });
       return;
     }
 
-    if (hasEmail && !z.string().email().safeParse(email).success) {
+    if (type === "email" && !z.string().email().safeParse(trimmed).success) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Please enter a valid email address.",
-        path: ["email"],
+        path: ["identifier"],
       });
     }
 
-    if (hasPhone && phone.length < 10) {
+    if (type === "phone" && normalizePhone(trimmed).length < 10) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Please enter a valid mobile number (at least 10 digits).",
-        path: ["phone"],
+        path: ["identifier"],
       });
     }
   });
@@ -77,13 +89,18 @@ const loginSchema = z
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 function buildLoginPayload(values: LoginFormValues) {
-  const email = values.email?.trim();
-  const phone = normalizePhone(values.phone ?? "");
+  const trimmed = values.identifier.trim();
+  const type = detectIdentifierType(trimmed);
   const payload: { password: string; email?: string; phone?: string } = {
     password: values.password,
   };
-  if (email) payload.email = email;
-  if (phone.length >= 10) payload.phone = phone;
+
+  if (type === "email") {
+    payload.email = trimmed;
+  } else if (type === "phone") {
+    payload.phone = normalizePhone(trimmed);
+  }
+
   return payload;
 }
 
@@ -94,8 +111,7 @@ export default function LoginPage() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      phone: "",
+      identifier: "",
       password: "",
     },
   });
@@ -190,16 +206,16 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="email"
+                name="identifier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email or mobile number</FormLabel>
                     <FormControl>
                       <Input
-                        type="email"
-                        placeholder="owner@example.com"
+                        type="text"
+                        placeholder="owner@example.com or 0812345678"
                         className="touch-target"
-                        autoComplete="email"
+                        autoComplete="username"
                         {...field}
                       />
                     </FormControl>
@@ -207,27 +223,6 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mobile number</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., 0812345678"
-                        className="touch-target"
-                        autoComplete="tel"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter at least one of email or mobile number.
-              </p>
               <FormField
                 control={form.control}
                 name="password"
@@ -262,24 +257,6 @@ export default function LoginPage() {
               asChild
             >
               <Link href="/signup">Create an account</Link>
-            </Button>
-            {" · "}
-            Invited by admin?{" "}
-            <Button
-              variant="link"
-              className="p-0 min-h-[44px] touch-target"
-              asChild
-            >
-              <Link href="/request-access">Request access</Link>
-            </Button>
-            {" · "}
-            Store admin?{" "}
-            <Button
-              variant="link"
-              className="p-0 min-h-[44px] touch-target"
-              asChild
-            >
-              <Link href="/set-password-store-admin">Set your password</Link>
             </Button>
           </p>
         </CardContent>
