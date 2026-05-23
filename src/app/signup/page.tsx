@@ -114,12 +114,11 @@ export default function SignupPage() {
       }
 
       const message = getErrorMessage(error);
-      const apiBase = getConfiguredApiUrl();
       if (status === 404 && /cannot post\s+\/auth\/signup/i.test(message)) {
         feedback.error(
-          "Signup API not found",
-          `POST ${apiBase}/auth/signup was not found.`,
-          "Ensure the backend exposes POST /auth/signup and NEXT_PUBLIC_API_URL matches its port.",
+          "Signup Failed, contact support",
+          "Please contact support if you continue to experience issues.",
+          undefined,
           { code: ERROR_CODES.SIGNUP }
         );
         return;

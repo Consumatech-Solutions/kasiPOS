@@ -11,13 +11,5 @@ export function getConfiguredApiUrl(): string {
  * SSR / production: full backend URL from NEXT_PUBLIC_API_URL.
  */
 export function resolveApiBaseUrl(): string {
-  const configured = getConfiguredApiUrl();
-  const proxyDisabled = process.env.NEXT_PUBLIC_API_PROXY === "false";
-  const useDevProxy =
-    process.env.NODE_ENV === "development" &&
-    !proxyDisabled &&
-    typeof window !== "undefined";
-
-  if (useDevProxy) return "";
-  return configured;
+  return getConfiguredApiUrl();
 }
