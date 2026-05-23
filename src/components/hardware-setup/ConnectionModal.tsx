@@ -10,6 +10,7 @@ import {
   Laptop2,
   AlertCircle,
   Monitor,
+  Printer,
 } from "lucide-react";
 import {
   getDevices,
@@ -20,6 +21,7 @@ import {
   type Device,
 } from "@/lib/device-service";
 import { getPrintStrategy } from "@/lib/platform";
+import { buildTestPrintString } from "@/lib/bluetooth-print";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +31,8 @@ import {
 import { Button } from "@/components/ui/button";
 
 const QZ_TRAY_DOWNLOAD_URL = "https://qz.io/download/";
-const RAWBT_PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=ru.a40243.rawbt";
-const POS_PRINTER_DRIVER_PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.fidelier.printfromweb";
+const BLUETOOTH_PRINT_PLAY_STORE_URL =
+  "https://play.google.com/store/apps/details?id=mate.bluetoothprint";
 
 interface ConnectionModalProps {
   device: HardwareDevice;
@@ -53,6 +53,10 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const [step, setStep] = useState<ModalStep>("searching");
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isBluetoothTesting, setIsBluetoothTesting] = useState(false);
+  const [bluetoothTestFeedback, setBluetoothTestFeedback] = useState<
+    string | null
+  >(null);
 
   const isPrinter = device.id === "printer";
   const printStrategy = getPrintStrategy();
@@ -67,6 +71,8 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     if (isOpen) {
       setError(null);
       setAvailableDevices([]);
+      setIsBluetoothTesting(false);
+      setBluetoothTestFeedback(null);
       if (isPrinter) {
         setStep("choice");
       } else {
@@ -117,8 +123,27 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     searchForDevices();
   };
 
-  const handlePrinterChoiceThermalAndroid = () => {
+  const handleBluetoothTestPrint = async () => {
+    setIsBluetoothTesting(true);
+    setBluetoothTestFeedback(null);
+    try {
+      await printReceipt("thermal-android", buildTestPrintString());
+      setBluetoothTestFeedback(
+        "Opening Bluetooth Print. Confirm a test receipt prints on your printer."
+      );
+    } catch (err: any) {
+      setBluetoothTestFeedback(
+        err.message ||
+          "Test print failed. Please ensure Bluetooth Print is installed and your printer is paired."
+      );
+    } finally {
+      setIsBluetoothTesting(false);
+    }
+  };
+
+  const handleBluetoothSaveSetup = () => {
     setPrinterMode("thermal");
+    storeDevice("printer", "thermal-android");
     onConnect("thermal-android", "printer");
     onClose();
   };
@@ -255,17 +280,19 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
               {printStrategy === "android" && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Thermal printer (RawBT or POS Printer Driver)
+                    Thermal printer (Bluetooth Print)
                   </p>
                   <ol className="text-sm text-slate-700 list-decimal list-inside space-y-1 mb-2">
+                    <li>Install Bluetooth Print from the Play Store</li>
                     <li>
-                      Install RawBT or POS Printer Driver from the Play Store
+                      Open the app and pair your USB or Bluetooth thermal
+                      printer
                     </li>
                     <li>
-                      Open the app and pair your Xprinter XP-P201A (or other
-                      thermal printer)
+                      Tap Test printer to send a test receipt via Bluetooth
+                      Print
                     </li>
-                    <li>Return here and complete setup</li>
+                    <li>When printing works, tap Save setup</li>
                   </ol>
                   <div className="flex flex-col gap-2">
                     <Button
@@ -275,35 +302,51 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                       asChild
                     >
                       <a
-                        href={RAWBT_PLAY_STORE_URL}
+                        href={BLUETOOTH_PRINT_PLAY_STORE_URL}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Get RawBT on Play Store
+                        Get Bluetooth Print on Play Store
                       </a>
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
                       className="min-h-[44px] touch-target"
-                      asChild
+                      onClick={handleBluetoothTestPrint}
+                      disabled={isBluetoothTesting}
                     >
-                      <a
-                        href={POS_PRINTER_DRIVER_PLAY_STORE_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Get POS Printer Driver on Play Store
-                      </a>
+                      {isBluetoothTesting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <Printer className="mr-2 h-4 w-4" />
+                          Test printer
+                        </>
+                      )}
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
                       className="min-h-[44px] touch-target"
-                      onClick={handlePrinterChoiceThermalAndroid}
+                      onClick={handleBluetoothSaveSetup}
                     >
-                      I&apos;ve installed the app, continue
+                      Save setup
                     </Button>
+                    {bluetoothTestFeedback ? (
+                      <p
+                        className={`text-xs text-left px-1 ${
+                          bluetoothTestFeedback.startsWith("Opening")
+                            ? "text-green-700"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {bluetoothTestFeedback}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}
