@@ -42,6 +42,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Printer,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
 import { useSettings } from "../settings-provider";
@@ -115,7 +116,11 @@ const getNotificationColor = (type: NotificationType) => {
   }
 };
 
-export default function Header() {
+type HeaderProps = {
+  onOpenMobileNav?: () => void;
+};
+
+export default function Header({ onOpenMobileNav }: HeaderProps) {
   const { t, i18n } = useTranslation();
   const dateLocale: Locale = i18n.language?.startsWith("fr") ? frDateFns : enUS;
   const { settings, logout } = useSettings();
@@ -170,6 +175,18 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+        {onOpenMobileNav && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="md:hidden h-9 w-9 touch-target shrink-0"
+            onClick={onOpenMobileNav}
+            aria-label={t("header.menu.navigation")}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
         <Link
           href="/"
           className="flex items-center gap-1 sm:gap-2 flex-shrink-0"
@@ -192,10 +209,12 @@ export default function Header() {
           </span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-2 text-muted-foreground">
-          <div className="h-6 w-px bg-border" />
-          <PageIcon className="h-4 w-4" />
-          <span className="text-sm font-medium">{currentPageTitle}</span>
+        <div className="flex items-center gap-2 text-muted-foreground min-w-0 flex-1 md:flex-none">
+          <div className="hidden md:block h-6 w-px bg-border" />
+          <PageIcon className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-medium truncate">
+            {currentPageTitle}
+          </span>
         </div>
 
         {currentStore && (

@@ -61,5 +61,7 @@ declare namespace Cypress {
       predicate: (rows: unknown[]) => boolean,
       options?: { timeoutMs?: number; intervalMs?: number; dbName?: string }
     ): Chainable<void>;
+
+    openMobileNav(): Chainable<void>;
   }
 }

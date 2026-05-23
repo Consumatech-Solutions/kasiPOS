@@ -156,6 +156,8 @@ export default function PaymentModal({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isLoading) return;
+      // Below lg: use the device keyboard only (no on-screen numpad).
+      if (!window.matchMedia("(min-width: 1024px)").matches) return;
 
       const target = event.target;
       const targetId = target instanceof HTMLElement ? target.id : undefined;
@@ -229,157 +231,171 @@ export default function PaymentModal({
           "0",
         ];
 
+        const cashSummary = (
+          <>
+            <div className="space-y-4 text-lg">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Due:</span>
+                <span className="font-bold">R {cartTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Items:</span>
+                <span className="font-bold">
+                  {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                </span>
+              </div>
+            </div>
+            <Separator className="my-6" />
+            <div className="space-y-4 text-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Tendered:</span>
+                <span className="font-bold text-primary">
+                  R {tenderedAmount.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Change:</span>
+                <span className="font-bold text-green-600">
+                  R {change.toFixed(2)}
+                </span>
+              </div>
+              {tenderedAmount === 0 && (
+                <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
+                  No amount entered. Enter the amount received from the
+                  customer.
+                </p>
+              )}
+              {isInsufficient && (
+                <p className="text-sm text-destructive">
+                  Amount insufficient. Add R{" "}
+                  {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
+                </p>
+              )}
+            </div>
+          </>
+        );
+
+        const tenderedInput = (
+          <div className="mb-4">
+            <label htmlFor="tendered" className="text-sm text-muted-foreground">
+              Amount Tendered
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
+                R
+              </span>
+              <Input
+                id="tendered"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                autoFocus
+                value={tendered}
+                onChange={(e) =>
+                  setTendered(sanitizeTenderedInput(e.target.value))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canCompleteCashSale) {
+                    e.preventDefault();
+                    handleCompleteCashSale();
+                  }
+                }}
+                placeholder="0.00"
+                className="text-2xl h-14 pl-8 text-right font-mono"
+                disabled={isLoading}
+                aria-label="Amount tendered"
+              />
+            </div>
+          </div>
+        );
+
+        const cashFooter = (
+          <DialogFooter className="mt-4 gap-2 sm:flex-row flex-col">
+            <Button
+              type="button"
+              variant="secondary"
+              className="hidden lg:flex w-full h-14 touch-target"
+              onClick={handleClear}
+              disabled={isLoading}
+            >
+              Clear
+            </Button>
+            <Button
+              type="button"
+              className="w-full h-14 touch-target px-4"
+              onClick={handleCompleteCashSale}
+              disabled={!canCompleteCashSale || isLoading}
+              aria-busy={isLoading}
+              aria-disabled={!canCompleteCashSale || isLoading}
+            >
+              {isLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
+              )}
+              {isLoading ? "Processing..." : "Complete Sale"}
+            </Button>
+          </DialogFooter>
+        );
+
         return (
-          <div className="grid grid-cols-2 gap-6">
+          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2">
             <div className="flex flex-col">
               <DialogHeader className="mb-4">
                 <DialogTitle className="text-2xl">Cash Payment</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 text-lg">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Due:</span>
-                  <span className="font-bold">R {cartTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Items:</span>
-                  <span className="font-bold">
-                    {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-                  </span>
-                </div>
-              </div>
-              <Separator className="my-6" />
-              <div className="space-y-4 text-lg">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Tendered:</span>
-                  <span className="font-bold text-primary">
-                    R {tenderedAmount.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Change:</span>
-                  <span className="font-bold text-green-600">
-                    R {Math.max(0, tenderedAmount - cartTotal).toFixed(2)}
-                  </span>
-                </div>
-                {tenderedAmount === 0 && (
-                  <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-                    No amount entered. Enter the amount received from the
-                    customer.
-                  </p>
-                )}
-                {isInsufficient && (
-                  <p className="text-sm text-destructive">
-                    Amount insufficient. Add R{" "}
-                    {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
-                  </p>
-                )}
-              </div>
+              {cashSummary}
             </div>
 
             <div>
-              <div className="mb-4">
-                <label
-                  htmlFor="tendered"
-                  className="text-sm text-muted-foreground"
-                >
-                  Amount Tendered
-                </label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
-                    R
-                  </span>
-                  <Input
-                    id="tendered"
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    value={tendered}
-                    onChange={(e) =>
-                      setTendered(sanitizeTenderedInput(e.target.value))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && canCompleteCashSale) {
-                        e.preventDefault();
-                        handleCompleteCashSale();
-                      }
-                    }}
-                    placeholder="0.00"
-                    className="text-2xl h-14 pl-8 text-right font-mono"
-                    disabled={isLoading}
-                    aria-label="Amount tendered"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                {quickBills.map((bill) => (
+              {tenderedInput}
+              <div className="hidden lg:block">
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {quickBills.map((bill) => (
+                    <Button
+                      key={bill}
+                      type="button"
+                      variant="outline"
+                      className="h-12"
+                      onClick={() => setTendered(bill.toString())}
+                      disabled={isLoading}
+                    >
+                      R{bill}
+                    </Button>
+                  ))}
                   <Button
-                    key={bill}
                     type="button"
                     variant="outline"
                     className="h-12"
-                    onClick={() => setTendered(bill.toString())}
+                    onClick={() => setTendered(cartTotal.toFixed(2))}
                     disabled={isLoading}
                   >
-                    R{bill}
+                    EXACT
                   </Button>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-12"
-                  onClick={() => setTendered(cartTotal.toFixed(2))}
-                  disabled={isLoading}
-                >
-                  EXACT
-                </Button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {keypadKeys.map((key) => (
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {keypadKeys.map((key) => (
+                    <Button
+                      key={key}
+                      type="button"
+                      variant="outline"
+                      className="h-12 text-xl"
+                      onClick={() => handleKeyPress(key)}
+                      disabled={isLoading}
+                    >
+                      {key}
+                    </Button>
+                  ))}
                   <Button
-                    key={key}
                     type="button"
                     variant="outline"
                     className="h-12 text-xl"
-                    onClick={() => handleKeyPress(key)}
+                    onClick={handleBackspace}
                     disabled={isLoading}
                   >
-                    {key}
+                    &larr;
                   </Button>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-12 text-xl"
-                  onClick={handleBackspace}
-                  disabled={isLoading}
-                >
-                  &larr;
-                </Button>
+                </div>
               </div>
-              <DialogFooter className="mt-4 gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full h-14 touch-target"
-                  onClick={handleClear}
-                  disabled={isLoading}
-                >
-                  Clear
-                </Button>
-                <Button
-                  type="button"
-                  className="w-full h-14 touch-target px-4"
-                  onClick={handleCompleteCashSale}
-                  disabled={!canCompleteCashSale || isLoading}
-                  aria-busy={isLoading}
-                  aria-disabled={!canCompleteCashSale || isLoading}
-                >
-                  {isLoading && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
-                  )}
-                  {isLoading ? "Processing..." : "Complete Sale"}
-                </Button>
-              </DialogFooter>
+              {cashFooter}
             </div>
           </div>
         );
@@ -572,7 +588,7 @@ export default function PaymentModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl md:min-w-[800px] min-w-[90vw]">
+        <DialogContent className="max-w-[95vw] w-[calc(100vw-2rem)] lg:max-w-4xl lg:min-w-[800px]">
           {renderContent()}
         </DialogContent>
       </Dialog>
