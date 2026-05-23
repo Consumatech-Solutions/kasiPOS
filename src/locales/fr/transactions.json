@@ -1,0 +1,14 @@
+{
+  "transactions.page.title": "Historique des transactions",
+  "transactions.page.description": "Consultez et filtrez vos ventes passées.",
+  "transactions.filter.filterByDate": "Filtrer par date",
+  "transactions.filter.searchPlaceholder": "Rechercher par n° de commande ou client",
+  "transactions.filter.clear": "Effacer les filtres",
+  "transactions.loading": "Chargement des transactions…",
+  "transactions.empty": "Aucune transaction pour les filtres sélectionnés.",
+  "transactions.notApplicable": "N/D",
+  "transactions.customerUnknown": "Inconnu",
+  "transactions.accordion.transactionNumber": "Transaction n° {{id}}",
+  "transactions.accordion.customer": "Client : {{name}}",
+  "transactions.detail.itemMeta": "({{qty}} × {{unit}} R)"
+}

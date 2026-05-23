@@ -38,6 +38,7 @@ export type SeedAuthSession = {
   };
   settings: {
     theme: "light" | "dark";
+    language?: "en" | "fr" | "sw" | "zu" | "so" | "am";
     currentStore: Record<string, unknown>;
     showVatInCheckout: boolean;
   };

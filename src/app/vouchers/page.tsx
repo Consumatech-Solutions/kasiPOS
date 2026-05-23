@@ -67,6 +67,8 @@ import { mutationQueue } from "@/lib/mutation-queue";
 import { vouchersApi } from "@/lib/api/vouchers";
 import type { Voucher } from "@/types";
 import { format } from "date-fns";
+import { enUS, fr as frDateFns } from "date-fns/locale";
+import { useTranslation } from "react-i18next";
 
 const voucherSchema = z.object({
   code: z.string().min(1, { message: "Voucher code is required" }),
@@ -84,6 +86,8 @@ const voucherSchema = z.object({
 });
 
 export default function VouchersPage() {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language?.startsWith("fr") ? frDateFns : enUS;
   const { isOnline, hasInternet } = useNetworkStatus();
   const {
     vouchers,
@@ -155,7 +159,10 @@ export default function VouchersPage() {
       if (editingVoucher?.id) {
         if (isOnline) {
           await updateVoucher(editingVoucher.id, voucherData);
-          feedback.success("Voucher updated", "Voucher updated successfully.");
+          feedback.success(
+            t("vouchers.feedback.updatedTitle"),
+            t("vouchers.feedback.updatedDesc")
+          );
         } else {
           mutationQueue.add({
             mutationKey: ["vouchers", "update"],
@@ -163,27 +170,36 @@ export default function VouchersPage() {
               vouchersApi.update(editingVoucher.id as string, voucherData),
             variables: { id: editingVoucher.id, data: voucherData },
           });
-          feedback.success("Voucher updated", "Voucher updated successfully.");
+          feedback.success(
+            t("vouchers.feedback.updatedTitle"),
+            t("vouchers.feedback.updatedDesc")
+          );
         }
       } else {
         if (isOnline) {
           await createVoucher(voucherData);
-          feedback.success("Voucher created", "Voucher created successfully.");
+          feedback.success(
+            t("vouchers.feedback.createdTitle"),
+            t("vouchers.feedback.createdDesc")
+          );
         } else {
           mutationQueue.add({
             mutationKey: ["vouchers", "create"],
             mutationFn: () => vouchersApi.create(voucherData),
             variables: voucherData,
           });
-          feedback.success("Voucher created", "Voucher created successfully.");
+          feedback.success(
+            t("vouchers.feedback.createdTitle"),
+            t("vouchers.feedback.createdDesc")
+          );
         }
       }
       setVoucherDialogOpen(false);
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to save voucher",
-        "Check your connection and try again.",
+        t("vouchers.feedback.saveFailedTitle"),
+        t("vouchers.feedback.saveFailedHint"),
         ERROR_CODES.VOUCHER
       );
     }
@@ -193,20 +209,26 @@ export default function VouchersPage() {
     try {
       if (isOnline) {
         await deleteVoucher(id);
-        feedback.success("Voucher deleted", "Voucher deleted successfully.");
+        feedback.success(
+          t("vouchers.feedback.deletedTitle"),
+          t("vouchers.feedback.deletedDesc")
+        );
       } else {
         mutationQueue.add({
           mutationKey: ["vouchers", "delete"],
           mutationFn: () => vouchersApi.delete(id),
           variables: { id },
         });
-        feedback.success("Voucher deleted", "Voucher deleted successfully.");
+        feedback.success(
+          t("vouchers.feedback.deletedTitle"),
+          t("vouchers.feedback.deletedDesc")
+        );
       }
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to delete voucher",
-        "Try again or check your connection.",
+        t("vouchers.feedback.deleteFailedTitle"),
+        t("vouchers.feedback.deleteFailedHint"),
         ERROR_CODES.VOUCHER
       );
     }
@@ -222,20 +244,31 @@ export default function VouchersPage() {
     const expiresAt = new Date(voucher.expiresAt);
     const now = new Date();
     if (expiresAt < now)
-      return { text: "Expired", variant: "destructive" as const };
+      return {
+        text: t("vouchers.expiration.expired"),
+        variant: "destructive" as const,
+      };
     const daysUntil = Math.ceil(
       (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
     );
     if (daysUntil <= 7)
       return {
-        text: `Expires in ${daysUntil} day${daysUntil !== 1 ? "s" : ""}`,
+        text:
+          daysUntil === 1
+            ? t("vouchers.expiration.expiresInOneDay")
+            : t("vouchers.expiration.expiresInDays", { count: daysUntil }),
         variant: "secondary" as const,
       };
     return {
-      text: format(expiresAt, "MMM d, yyyy"),
+      text: format(expiresAt, "PP", { locale: dateLocale }),
       variant: "outline" as const,
     };
   };
+
+  const typeLabel = (type: string) =>
+    type === "percentage"
+      ? t("vouchers.type.percentage")
+      : t("vouchers.type.fixed");
 
   return (
     <div className="p-2 sm:p-4 overflow-y-auto h-full">
@@ -249,10 +282,10 @@ export default function VouchersPage() {
             <CardHeader className="pb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle className="text-lg sm:text-xl">
-                  Voucher Management
+                  {t("vouchers.page.title")}
                 </CardTitle>
                 <CardDescription className="text-sm">
-                  Create and manage your discount vouchers.
+                  {t("vouchers.page.description")}
                 </CardDescription>
               </div>
               <Button
@@ -260,7 +293,7 @@ export default function VouchersPage() {
                 className="w-full sm:w-auto min-h-[44px] touch-target"
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Create Voucher
+                {t("vouchers.actions.create")}
               </Button>
             </CardHeader>
             <CardContent className="pt-0">
@@ -271,7 +304,7 @@ export default function VouchersPage() {
                   className="min-h-[44px] touch-target"
                   onClick={() => setFilterActive(undefined)}
                 >
-                  All
+                  {t("vouchers.filter.all")}
                 </Button>
                 <Button
                   variant={filterActive === true ? "default" : "outline"}
@@ -279,7 +312,7 @@ export default function VouchersPage() {
                   className="min-h-[44px] touch-target"
                   onClick={() => setFilterActive(true)}
                 >
-                  Active
+                  {t("vouchers.filter.active")}
                 </Button>
                 <Button
                   variant={filterActive === false ? "default" : "outline"}
@@ -287,7 +320,7 @@ export default function VouchersPage() {
                   className="min-h-[44px] touch-target"
                   onClick={() => setFilterActive(false)}
                 >
-                  Inactive
+                  {t("vouchers.filter.inactive")}
                 </Button>
               </div>
             </CardContent>
@@ -295,31 +328,33 @@ export default function VouchersPage() {
           <CardContent>
             {loading ? (
               <div className="text-center py-10 text-muted-foreground">
-                Loading vouchers...
+                {t("vouchers.loading")}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Code</TableHead>
+                      <TableHead>{t("vouchers.table.code")}</TableHead>
                       <TableHead className="hidden md:table-cell">
-                        Type
+                        {t("vouchers.table.type")}
                       </TableHead>
-                      <TableHead>Value</TableHead>
+                      <TableHead>{t("vouchers.table.value")}</TableHead>
                       <TableHead className="hidden lg:table-cell">
-                        Min. Purchase
+                        {t("vouchers.table.minPurchase")}
                       </TableHead>
                       <TableHead className="hidden md:table-cell">
-                        Expiration
+                        {t("vouchers.table.expiration")}
                       </TableHead>
                       <TableHead className="hidden lg:table-cell">
-                        Usage
+                        {t("vouchers.table.usage")}
                       </TableHead>
                       <TableHead className="hidden sm:table-cell text-right">
-                        Status
+                        {t("vouchers.table.status")}
                       </TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">
+                        {t("vouchers.table.actions")}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -333,8 +368,8 @@ export default function VouchersPage() {
                             <TableCell className="font-mono font-medium">
                               <div className="flex flex-col">
                                 <span>{voucher.code}</span>
-                                <span className="text-xs text-muted-foreground md:hidden capitalize">
-                                  {voucher.type}
+                                <span className="text-xs text-muted-foreground md:hidden">
+                                  {typeLabel(voucher.type)}
                                 </span>
                                 <span className="text-xs text-muted-foreground sm:hidden">
                                   <Badge
@@ -343,13 +378,15 @@ export default function VouchersPage() {
                                     }
                                     className="mt-1 w-fit"
                                   >
-                                    {voucher.isActive ? "Active" : "Inactive"}
+                                    {voucher.isActive
+                                      ? t("vouchers.status.active")
+                                      : t("vouchers.status.inactive")}
                                   </Badge>
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell className="hidden md:table-cell capitalize">
-                              {voucher.type}
+                            <TableCell className="hidden md:table-cell">
+                              {typeLabel(voucher.type)}
                             </TableCell>
                             <TableCell>
                               {voucher.type === "percentage"
@@ -366,18 +403,23 @@ export default function VouchersPage() {
                                 </Badge>
                               ) : (
                                 <span className="text-muted-foreground">
-                                  No expiration
+                                  {t("vouchers.expiration.noExpiration")}
                                 </span>
                               )}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               {voucher.maxUses !== null ? (
                                 <span className="text-sm">
-                                  {voucher.currentUses || 0} / {voucher.maxUses}
+                                  {t("vouchers.usage.limited", {
+                                    current: voucher.currentUses || 0,
+                                    max: voucher.maxUses,
+                                  })}
                                 </span>
                               ) : (
                                 <span className="text-sm text-muted-foreground">
-                                  {voucher.currentUses || 0} uses
+                                  {t("vouchers.usage.unlimited", {
+                                    count: voucher.currentUses || 0,
+                                  })}
                                 </span>
                               )}
                             </TableCell>
@@ -387,7 +429,9 @@ export default function VouchersPage() {
                                   voucher.isActive ? "default" : "secondary"
                                 }
                               >
-                                {voucher.isActive ? "Active" : "Inactive"}
+                                {voucher.isActive
+                                  ? t("vouchers.status.active")
+                                  : t("vouchers.status.inactive")}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
@@ -413,11 +457,10 @@ export default function VouchersPage() {
                                   <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
                                     <AlertDialogHeader>
                                       <AlertDialogTitle className="text-lg sm:text-xl">
-                                        Are you sure?
+                                        {t("vouchers.delete.title")}
                                       </AlertDialogTitle>
                                       <AlertDialogDescription className="text-sm">
-                                        This action cannot be undone. This will
-                                        permanently delete the voucher.
+                                        {t("vouchers.delete.description")}
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -425,7 +468,7 @@ export default function VouchersPage() {
                                         className="min-h-[44px] touch-target w-full sm:w-auto"
                                         disabled={isDeleting}
                                       >
-                                        Cancel
+                                        {t("vouchers.delete.cancel")}
                                       </AlertDialogCancel>
                                       <AlertDialogAction
                                         className="min-h-[44px] touch-target w-full sm:w-auto"
@@ -435,7 +478,9 @@ export default function VouchersPage() {
                                         {isDeleting && (
                                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         )}
-                                        {isDeleting ? "Deleting..." : "Delete"}
+                                        {isDeleting
+                                          ? t("vouchers.delete.deleting")
+                                          : t("vouchers.delete.confirm")}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -448,7 +493,7 @@ export default function VouchersPage() {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center h-24">
-                          No vouchers found.
+                          {t("vouchers.empty")}
                         </TableCell>
                       </TableRow>
                     )}
@@ -464,12 +509,14 @@ export default function VouchersPage() {
           <DialogContent className="max-w-[95vw] sm:max-w-[500px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
-                {editingVoucher ? "Edit Voucher" : "Create Voucher"}
+                {editingVoucher
+                  ? t("vouchers.dialog.editTitle")
+                  : t("vouchers.dialog.createTitle")}
               </DialogTitle>
               <DialogDescription className="text-sm">
                 {editingVoucher
-                  ? "Update voucher details. Code cannot be changed after creation."
-                  : "Create a new discount voucher for your store."}
+                  ? t("vouchers.dialog.editDesc")
+                  : t("vouchers.dialog.createDesc")}
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -482,11 +529,11 @@ export default function VouchersPage() {
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Voucher Code</FormLabel>
+                      <FormLabel>{t("vouchers.form.codeLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="SAVE10"
+                          placeholder={t("vouchers.form.codePlaceholder")}
                           disabled={!!editingVoucher}
                           onChange={(e) =>
                             field.onChange(e.target.value.toUpperCase())
@@ -502,19 +549,29 @@ export default function VouchersPage() {
                   name="type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Discount Type</FormLabel>
+                      <FormLabel>
+                        {t("vouchers.form.discountTypeLabel")}
+                      </FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select discount type" />
+                            <SelectValue
+                              placeholder={t(
+                                "vouchers.form.discountTypePlaceholder"
+                              )}
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="percentage">Percentage</SelectItem>
-                          <SelectItem value="fixed">Fixed Amount</SelectItem>
+                          <SelectItem value="percentage">
+                            {t("vouchers.type.percentage")}
+                          </SelectItem>
+                          <SelectItem value="fixed">
+                            {t("vouchers.type.fixed")}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -528,8 +585,8 @@ export default function VouchersPage() {
                     <FormItem>
                       <FormLabel>
                         {form.watch("type") === "percentage"
-                          ? "Percentage (%)"
-                          : "Amount (R)"}
+                          ? t("vouchers.form.percentageLabel")
+                          : t("vouchers.form.amountLabel")}
                       </FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" min="0" {...field} />
@@ -543,7 +600,9 @@ export default function VouchersPage() {
                   name="minPurchase"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Minimum Purchase (R)</FormLabel>
+                      <FormLabel>
+                        {t("vouchers.form.minPurchaseLabel")}
+                      </FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" min="0" {...field} />
                       </FormControl>
@@ -556,7 +615,9 @@ export default function VouchersPage() {
                   name="expiresAt"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Expiration Date (Optional)</FormLabel>
+                      <FormLabel>
+                        {t("vouchers.form.expirationLabel")}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="datetime-local"
@@ -577,7 +638,7 @@ export default function VouchersPage() {
                     name="maxUses"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Max Uses (Optional)</FormLabel>
+                        <FormLabel>{t("vouchers.form.maxUsesLabel")}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -591,7 +652,9 @@ export default function VouchersPage() {
                                   : null
                               )
                             }
-                            placeholder="Unlimited"
+                            placeholder={t(
+                              "vouchers.form.unlimitedPlaceholder"
+                            )}
                           />
                         </FormControl>
                         <FormMessage />
@@ -603,7 +666,9 @@ export default function VouchersPage() {
                     name="maxUsesPerCustomer"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Max Per Customer (Optional)</FormLabel>
+                        <FormLabel>
+                          {t("vouchers.form.maxPerCustomerLabel")}
+                        </FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -617,7 +682,9 @@ export default function VouchersPage() {
                                   : null
                               )
                             }
-                            placeholder="Unlimited"
+                            placeholder={t(
+                              "vouchers.form.unlimitedPlaceholder"
+                            )}
                           />
                         </FormControl>
                         <FormMessage />
@@ -631,9 +698,9 @@ export default function VouchersPage() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                       <div className="space-y-0.5">
-                        <FormLabel>Active</FormLabel>
+                        <FormLabel>{t("vouchers.form.activeLabel")}</FormLabel>
                         <div className="text-sm text-muted-foreground">
-                          Voucher can be redeemed when active
+                          {t("vouchers.form.activeHint")}
                         </div>
                       </div>
                       <FormControl>
@@ -653,7 +720,7 @@ export default function VouchersPage() {
                       className="min-h-[44px] touch-target w-full sm:w-auto"
                       disabled={isCreating || isUpdating}
                     >
-                      Cancel
+                      {t("vouchers.form.cancel")}
                     </Button>
                   </DialogClose>
                   <Button
@@ -666,11 +733,11 @@ export default function VouchersPage() {
                     )}
                     {editingVoucher
                       ? isUpdating
-                        ? "Updating..."
-                        : "Update"
+                        ? t("vouchers.form.updating")
+                        : t("vouchers.form.update")
                       : isCreating
-                        ? "Creating..."
-                        : "Create"}
+                        ? t("vouchers.form.creating")
+                        : t("vouchers.form.create")}
                   </Button>
                 </DialogFooter>
               </form>

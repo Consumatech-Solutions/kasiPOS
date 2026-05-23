@@ -4,6 +4,10 @@ import { PosPage } from "../pages/pos-page";
 const SYNC_MODAL_ACTION_OR_STATUS_TEXT =
   /sync to cloud now|download from cloud now|nothing to sync|syncing|completed|pending|uploaded|scheduled|downloading offline data|downloading essential/i;
 
+/** Matches sync modal / toasts / empty state while preloading or idle (see sync-status-modal). */
+const SYNC_RELATED_BODY_TEXT =
+  /syncing|completed|pending|nothing to sync|uploaded|cloud sync|scheduled|downloading|progress|operations synced|sync status|sync incomplete|sync failed/i;
+
 function openCloudSyncModal() {
   cy.findByRole("button", { name: /open cloud sync status/i })
     .should("be.visible")
@@ -173,6 +177,8 @@ describe("Offline mode", () => {
     cy.reload();
     cy.waitForAppReady("/");
     cy.setOnline();
+    // Customers (and other Dexie-backed lists) load on mount; seed runs after first visit, so reload POS.
+    PosPage.visit();
     PosPage.waitUntilLoaded();
   });
 

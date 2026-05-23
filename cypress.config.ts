@@ -107,6 +107,7 @@ function buildSeedAuthSession(input: SeedAuthSessionInput = {}) {
     store,
     settings: {
       theme: "light",
+      language: "en",
       currentStore: store,
       showVatInCheckout: false,
     },
@@ -124,8 +125,9 @@ export default defineConfig({
     // Always record videos for E2E runs (especially staging / real mode).
     // If you need to disable locally, set CYPRESS_VIDEO=false.
     video:
-      String(process.env.CYPRESS_VIDEO ?? "true").toLowerCase().trim() !==
-      "false",
+      String(process.env.CYPRESS_VIDEO ?? "true")
+        .toLowerCase()
+        .trim() !== "false",
     screenshotOnRunFailure: true,
     defaultCommandTimeout: 15_000,
     pageLoadTimeout: 120_000,

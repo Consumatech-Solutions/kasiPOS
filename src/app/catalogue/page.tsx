@@ -104,6 +104,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ImageUpload } from "@/components/catalogue/image-upload";
 import { ProductImage } from "@/components/catalogue/product-image";
 import { AddTemplatesModal } from "@/components/catalogue/add-templates-modal";
+import { useTranslation } from "react-i18next";
 
 const categorySchema = z.object({
   name: z
@@ -141,6 +142,7 @@ const productSchema = z.object({
 });
 
 export default function CataloguePage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
 
@@ -236,7 +238,7 @@ export default function CataloguePage() {
   updateProductRef.current = updateProduct;
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const debounceTimer = setTimeout(() => {
       setProductFilters((prev) => ({
         ...prev,
         search: productSearchTerm.trim() || undefined,
@@ -247,7 +249,7 @@ export default function CataloguePage() {
       }));
       loadProductsPage(1);
     }, 250);
-    return () => clearTimeout(t);
+    return () => clearTimeout(debounceTimer);
   }, [
     productSearchTerm,
     selectedProductCategoryId,
@@ -345,7 +347,10 @@ export default function CataloguePage() {
       if (editingProduct && editingProduct.id) {
         if (isOnline) {
           await updateProduct(String(editingProduct.id), productData);
-          feedback.success("Product updated", "Product updated successfully.");
+          feedback.success(
+            t("catalogue.feedback.productUpdatedTitle"),
+            t("catalogue.feedback.productUpdatedDesc")
+          );
         } else {
           const productId = String(editingProduct.id);
           const optimisticUpdates = {
@@ -390,7 +395,10 @@ export default function CataloguePage() {
               catalogueApi.products.update(productId, productData),
             variables: { id: editingProduct.id, data: productData },
           });
-          feedback.success("Product updated", "Product updated successfully.");
+          feedback.success(
+            t("catalogue.feedback.productUpdatedTitle"),
+            t("catalogue.feedback.productUpdatedDesc")
+          );
         }
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
@@ -404,7 +412,10 @@ export default function CataloguePage() {
         }
         if (isOnline) {
           await createProduct(productData as any);
-          feedback.success("Product added", "Product added successfully.");
+          feedback.success(
+            t("catalogue.feedback.productAddedTitle"),
+            t("catalogue.feedback.productAddedDesc")
+          );
           refreshProducts();
         } else {
           const tempId = `temp-${Date.now()}`;
@@ -477,7 +488,10 @@ export default function CataloguePage() {
               }),
             variables: { ...productData, _tempId: tempId },
           });
-          feedback.success("Product added", "Product added successfully.");
+          feedback.success(
+            t("catalogue.feedback.productAddedTitle"),
+            t("catalogue.feedback.productAddedDesc")
+          );
         }
       }
       setProductDialogOpen(false);
@@ -486,8 +500,8 @@ export default function CataloguePage() {
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to save product",
-        "Check your connection and try again."
+        t("catalogue.feedback.productSaveFailedTitle"),
+        t("catalogue.feedback.productSaveFailedHint")
       );
     } finally {
       productSubmitRef.current = false;
@@ -499,7 +513,10 @@ export default function CataloguePage() {
     try {
       if (isOnline) {
         await deleteProductHook(String(id));
-        feedback.success("Product deleted", "Product deleted successfully.");
+        feedback.success(
+          t("catalogue.feedback.productDeletedTitle"),
+          t("catalogue.feedback.productDeletedDesc")
+        );
       } else {
         const productId = String(id);
         const productQueries = queryClient.getQueriesData<{
@@ -524,13 +541,16 @@ export default function CataloguePage() {
           mutationFn: () => catalogueApi.products.delete(productId),
           variables: { id },
         });
-        feedback.success("Product deleted", "Product deleted successfully.");
+        feedback.success(
+          t("catalogue.feedback.productDeletedTitle"),
+          t("catalogue.feedback.productDeletedDesc")
+        );
       }
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to delete product",
-        "Try again or check your connection."
+        t("catalogue.feedback.productDeleteFailedTitle"),
+        t("catalogue.feedback.productDeleteFailedHint")
       );
     } finally {
       setDeletingProductId(null);
@@ -558,8 +578,8 @@ export default function CataloguePage() {
       if (editingCategory && editingCategory.id) {
         await updateCategory(String(editingCategory.id), values);
         feedback.success(
-          "Category updated",
-          "Category updated successfully."
+          t("catalogue.feedback.categoryUpdatedTitle"),
+          t("catalogue.feedback.categoryUpdatedDesc")
         );
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
@@ -572,7 +592,10 @@ export default function CataloguePage() {
           return;
         }
         await createCategory(values);
-        feedback.success("Category added", "Category added successfully.");
+        feedback.success(
+          t("catalogue.feedback.categoryAddedTitle"),
+          t("catalogue.feedback.categoryAddedDesc")
+        );
       }
       setCategoryDialogOpen(false);
       categoryForm.reset();
@@ -580,8 +603,8 @@ export default function CataloguePage() {
       console.error("Failed to save category:", error);
       feedback.fromError(
         error,
-        "Failed to save category",
-        "Check your connection and try again."
+        t("catalogue.feedback.categorySaveFailedTitle"),
+        t("catalogue.feedback.categorySaveFailedHint")
       );
     } finally {
       categorySubmitRef.current = false;
@@ -592,12 +615,15 @@ export default function CataloguePage() {
     setDeletingCategoryId(String(id));
     try {
       await deleteCategoryHook(String(id));
-      feedback.success("Category deleted", "Category deleted successfully.");
+      feedback.success(
+        t("catalogue.feedback.categoryDeletedTitle"),
+        t("catalogue.feedback.categoryDeletedDesc")
+      );
     } catch (error) {
       feedback.fromError(
         error,
-        "Failed to delete category",
-        "Try again or check your connection."
+        t("catalogue.feedback.categoryDeleteFailedTitle"),
+        t("catalogue.feedback.categoryDeleteFailedHint")
       );
     } finally {
       setDeletingCategoryId(null);
@@ -610,10 +636,10 @@ export default function CataloguePage() {
         <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="space-y-1 p-4 pb-5 sm:p-6 sm:pb-6">
             <CardTitle className="text-lg sm:text-xl">
-              Catalogue Management
+              {t("catalogue.page.title")}
             </CardTitle>
             <CardDescription className="text-sm">
-              Manage your products and categories.
+              {t("catalogue.page.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-2 pt-1 sm:px-6 sm:pb-3 sm:pt-2">
@@ -623,8 +649,12 @@ export default function CataloguePage() {
             >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 sm:gap-3">
                 <TabsList>
-                  <TabsTrigger value="products">Products</TabsTrigger>
-                  <TabsTrigger value="categories">Categories</TabsTrigger>
+                  <TabsTrigger value="products">
+                    {t("catalogue.tabs.products")}
+                  </TabsTrigger>
+                  <TabsTrigger value="categories">
+                    {t("catalogue.tabs.categories")}
+                  </TabsTrigger>
                 </TabsList>
                 <div className="flex flex-wrap items-center gap-2 order-first sm:order-none">
                   {activeCatalogueTab === "products" ? (
@@ -633,7 +663,8 @@ export default function CataloguePage() {
                       onClick={() => openProductDialog()}
                       className="min-h-[44px] touch-target"
                     >
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                      <PlusCircle className="mr-2 h-4 w-4" />{" "}
+                      {t("catalogue.actions.addProduct")}
                     </Button>
                   ) : (
                     <Button
@@ -641,7 +672,8 @@ export default function CataloguePage() {
                       onClick={() => openCategoryDialog()}
                       className="min-h-[44px] touch-target"
                     >
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Category
+                      <PlusCircle className="mr-2 h-4 w-4" />{" "}
+                      {t("catalogue.actions.addCategory")}
                     </Button>
                   )}
                   <Button
@@ -651,11 +683,12 @@ export default function CataloguePage() {
                     disabled={!isOnline}
                     title={
                       !isOnline
-                        ? "Downloading templates requires an internet connection."
+                        ? t("catalogue.actions.templatesOfflineTitle")
                         : undefined
                     }
                   >
-                    <Layers className="mr-2 h-4 w-4" /> Add Templates
+                    <Layers className="mr-2 h-4 w-4" />{" "}
+                    {t("catalogue.actions.addTemplates")}
                   </Button>
                 </div>
               </div>
@@ -677,17 +710,21 @@ export default function CataloguePage() {
                   className="h-10"
                   value={productSearchTerm}
                   onChange={(e) => setProductSearchTerm(e.target.value)}
-                  placeholder="Search by product name"
+                  placeholder={t("catalogue.products.searchPlaceholder")}
                 />
                 <Select
                   value={selectedProductCategoryId}
                   onValueChange={setSelectedProductCategoryId}
                 >
                   <SelectTrigger className="h-10 min-h-10 bg-background">
-                    <SelectValue placeholder="Filter by category" />
+                    <SelectValue
+                      placeholder={t("catalogue.products.filterPlaceholder")}
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="all">
+                      {t("catalogue.products.allCategories")}
+                    </SelectItem>
                     {typedCategories.map((c) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name}
@@ -701,7 +738,7 @@ export default function CataloguePage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">
-                        Image
+                        {t("catalogue.products.table.image")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">
                         <button
@@ -713,7 +750,7 @@ export default function CataloguePage() {
                             )
                           }
                         >
-                          <span>Name</span>
+                          <span>{t("catalogue.products.table.name")}</span>
                           <span
                             className="inline-flex shrink-0 items-center gap-1 text-foreground"
                             aria-hidden
@@ -724,35 +761,38 @@ export default function CataloguePage() {
                               <ArrowUpAZ className="h-4 w-4" />
                             )}
                             <span className="text-xs font-semibold tracking-wide">
-                              {productNameSortOrder === "asc" ? "A-Z" : "Z-A"}
+                              {productNameSortOrder === "asc"
+                                ? t("catalogue.products.sort.labelAz")
+                                : t("catalogue.products.sort.labelZa")}
                             </span>
                           </span>
                           <span className="sr-only">
-                            Sort by name, currently{" "}
-                            {productNameSortOrder === "asc"
-                              ? "A to Z"
-                              : "Z to A"}
-                            . Click to reverse.
+                            {t("catalogue.products.sort.sr", {
+                              order:
+                                productNameSortOrder === "asc"
+                                  ? t("catalogue.products.sort.orderAz")
+                                  : t("catalogue.products.sort.orderZa"),
+                            })}
                           </span>
                         </button>
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">
-                        Category
+                        {t("catalogue.products.table.category")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium">
-                        Price
+                        {t("catalogue.products.table.price")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">
-                        Cost Price
+                        {t("catalogue.products.table.costPrice")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden sm:table-cell">
-                        Stock
+                        {t("catalogue.products.table.stock")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium hidden md:table-cell">
-                        Low Stock Trigger
+                        {t("catalogue.products.table.lowStockTrigger")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))] font-medium text-right">
-                        Actions
+                        {t("catalogue.products.table.actions")}
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -760,7 +800,7 @@ export default function CataloguePage() {
                     {productsLoading ? (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center">
-                          Loading products...
+                          {t("catalogue.products.loading")}
                         </TableCell>
                       </TableRow>
                     ) : sortedProducts.length > 0 ? (
@@ -792,10 +832,12 @@ export default function CataloguePage() {
                                   {(p.category as any)?.name ||
                                     (typeof p.category === "string"
                                       ? p.category
-                                      : "No Category")}
+                                      : t("catalogue.products.noCategory"))}
                                 </span>
                                 <span className="text-xs text-muted-foreground sm:hidden">
-                                  Stock: {p.stock ?? 0}
+                                  {t("catalogue.products.stockMobile", {
+                                    stock: p.stock ?? 0,
+                                  })}
                                 </span>
                               </div>
                             </TableCell>
@@ -803,7 +845,7 @@ export default function CataloguePage() {
                               {(p.category as any)?.name ||
                                 (typeof p.category === "string"
                                   ? p.category
-                                  : "No Category")}
+                                  : t("catalogue.products.noCategory"))}
                             </TableCell>
                             <TableCell>R{price.toFixed(2)}</TableCell>
                             <TableCell className="hidden md:table-cell">
@@ -822,7 +864,9 @@ export default function CataloguePage() {
                                     variant="ghost"
                                     size="icon"
                                     className="touch-target h-9 w-9"
-                                    aria-label="Actions"
+                                    aria-label={t(
+                                      "catalogue.products.table.actions"
+                                    )}
                                   >
                                     <MoreVertical className="h-4 w-4" />
                                   </Button>
@@ -844,7 +888,7 @@ export default function CataloguePage() {
                                     }}
                                   >
                                     <Edit className="mr-2 h-4 w-4" />
-                                    Edit
+                                    {t("catalogue.products.menu.edit")}
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive"
@@ -863,7 +907,7 @@ export default function CataloguePage() {
                                     }}
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
+                                    {t("catalogue.products.menu.delete")}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -877,7 +921,7 @@ export default function CataloguePage() {
                           colSpan={9}
                           className="text-center text-muted-foreground"
                         >
-                          No products yet. Click "Add Product" to create one.
+                          {t("catalogue.products.empty")}
                         </TableCell>
                       </TableRow>
                     )}
@@ -903,10 +947,10 @@ export default function CataloguePage() {
                   <TableHeader>
                     <TableRow className="border-b bg-card">
                       <TableHead className="sticky top-0 z-20 h-12 bg-card font-medium shadow-[0_1px_0_0_hsl(var(--border))]">
-                        Category Name
+                        {t("catalogue.categories.table.name")}
                       </TableHead>
                       <TableHead className="sticky top-0 z-20 h-12 bg-card font-medium text-right shadow-[0_1px_0_0_hsl(var(--border))]">
-                        Actions
+                        {t("catalogue.categories.table.actions")}
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -914,7 +958,7 @@ export default function CataloguePage() {
                     {categoriesLoading ? (
                       <TableRow>
                         <TableCell colSpan={2} className="text-center">
-                          Loading categories...
+                          {t("catalogue.categories.loading")}
                         </TableCell>
                       </TableRow>
                     ) : typedCategories && typedCategories.length > 0 ? (
@@ -928,7 +972,9 @@ export default function CataloguePage() {
                                   variant="ghost"
                                   size="icon"
                                   className="touch-target h-9 w-9"
-                                  aria-label="Actions"
+                                  aria-label={t(
+                                    "catalogue.categories.table.actions"
+                                  )}
                                 >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
@@ -947,7 +993,7 @@ export default function CataloguePage() {
                                   }}
                                 >
                                   <Edit className="mr-2 h-4 w-4" />
-                                  Edit
+                                  {t("catalogue.products.menu.edit")}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   className="min-h-[44px] sm:min-h-0 touch-target cursor-pointer text-destructive focus:text-destructive"
@@ -966,7 +1012,7 @@ export default function CataloguePage() {
                                   }}
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
+                                  {t("catalogue.products.menu.delete")}
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -979,7 +1025,7 @@ export default function CataloguePage() {
                           colSpan={2}
                           className="text-center text-muted-foreground"
                         >
-                          No categories yet. Click "Add Category" to create one.
+                          {t("catalogue.categories.empty")}
                         </TableCell>
                       </TableRow>
                     )}
@@ -1037,12 +1083,14 @@ export default function CataloguePage() {
         >
           <DialogHeader className="flex-shrink-0 pr-8 sm:pr-10">
             <DialogTitle>
-              {editingProduct ? "Edit Product" : "Add Product"}
+              {editingProduct
+                ? t("catalogue.productDialog.titleEdit")
+                : t("catalogue.productDialog.titleAdd")}
             </DialogTitle>
             <DialogDescription>
               {editingProduct
-                ? "Update the product information below."
-                : "Fill in the details to add a new product to your catalogue."}
+                ? t("catalogue.productDialog.descEdit")
+                : t("catalogue.productDialog.descAdd")}
             </DialogDescription>
           </DialogHeader>
           {/* pl/pr inside scroll so input borders + focus rings (ring-offset) are not clipped */}
@@ -1057,7 +1105,9 @@ export default function CataloguePage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Product Name</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelName")}
+                      </FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
@@ -1070,14 +1120,20 @@ export default function CataloguePage() {
                   name="category"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Category</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelCategory")}
+                      </FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
+                            <SelectValue
+                              placeholder={t(
+                                "catalogue.productDialog.categoryPlaceholder"
+                              )}
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -1113,7 +1169,9 @@ export default function CataloguePage() {
                   name="price"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Price</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelPrice")}
+                      </FormLabel>
                       <FormControl>
                         <Input type="number" min={0} step="0.01" {...field} />
                       </FormControl>
@@ -1126,7 +1184,9 @@ export default function CataloguePage() {
                   name="costPrice"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Cost Price (Optional)</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelCostPrice")}
+                      </FormLabel>
                       <FormControl>
                         <Input required type="number" step="0.01" {...field} />
                       </FormControl>
@@ -1139,7 +1199,9 @@ export default function CataloguePage() {
                   name="stock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Stock (Optional)</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelStock")}
+                      </FormLabel>
                       <FormControl>
                         <Input type="number" min={0} step={1} {...field} />
                       </FormControl>
@@ -1152,7 +1214,9 @@ export default function CataloguePage() {
                   name="lowStockThreshold"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Low Stock Trigger (Optional)</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelLowStock")}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -1171,13 +1235,17 @@ export default function CataloguePage() {
                   name="barcode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Barcode (Optional)</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelBarcode")}
+                      </FormLabel>
                       <div className="space-y-2">
                         <div className="flex gap-2">
                           <FormControl>
                             <Input
                               {...field}
-                              placeholder="Enter or scan barcode"
+                              placeholder={t(
+                                "catalogue.productDialog.barcodePlaceholder"
+                              )}
                             />
                           </FormControl>
                           <Button
@@ -1185,7 +1253,9 @@ export default function CataloguePage() {
                             variant="outline"
                             size="icon"
                             onClick={() => setIsBarcodeScannerOpen(true)}
-                            title="Scan barcode"
+                            title={t(
+                              "catalogue.productDialog.scanBarcodeTitle"
+                            )}
                           >
                             <QrCode className="h-4 w-4" />
                           </Button>
@@ -1212,7 +1282,9 @@ export default function CataloguePage() {
                   name="imageUrl"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Product Image (Optional)</FormLabel>
+                      <FormLabel>
+                        {t("catalogue.productDialog.labelImage")}
+                      </FormLabel>
                       <FormControl>
                         <ImageUpload
                           productId={editingProduct?.id || `temp-${Date.now()}`}
@@ -1223,9 +1295,9 @@ export default function CataloguePage() {
                           }}
                           onUploadError={(error) => {
                             feedback.error(
-                              "Upload failed",
+                              t("catalogue.upload.failedTitle"),
                               error,
-                              "Check file size (max 2MB) and format, then try again."
+                              t("catalogue.upload.failedHint")
                             );
                           }}
                           onDelete={() => {
@@ -1251,7 +1323,7 @@ export default function CataloguePage() {
                 className="min-h-[44px] touch-target w-full sm:w-auto"
                 disabled={isCreatingProduct || isUpdatingProduct}
               >
-                Cancel
+                {t("catalogue.productDialog.cancel")}
               </Button>
             </DialogClose>
             <Button
@@ -1264,10 +1336,10 @@ export default function CataloguePage() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
               {isCreatingProduct
-                ? "Creating..."
+                ? t("catalogue.productDialog.creating")
                 : isUpdatingProduct
-                  ? "Updating..."
-                  : "Save"}
+                  ? t("catalogue.productDialog.updating")
+                  : t("catalogue.productDialog.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1287,12 +1359,14 @@ export default function CataloguePage() {
         >
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {editingCategory ? "Edit Category" : "Add Category"}
+              {editingCategory
+                ? t("catalogue.categoryDialog.titleEdit")
+                : t("catalogue.categoryDialog.titleAdd")}
             </DialogTitle>
             <DialogDescription className="text-sm">
               {editingCategory
-                ? "Update the category name below."
-                : "Enter a name for the new category."}
+                ? t("catalogue.categoryDialog.descEdit")
+                : t("catalogue.categoryDialog.descAdd")}
             </DialogDescription>
           </DialogHeader>
           <Form {...categoryForm}>
@@ -1305,7 +1379,9 @@ export default function CataloguePage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category Name</FormLabel>
+                    <FormLabel>
+                      {t("catalogue.categoryDialog.labelName")}
+                    </FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -1321,7 +1397,7 @@ export default function CataloguePage() {
                     className="min-h-[44px] touch-target w-full sm:w-auto"
                     disabled={isCreatingCategory || isUpdatingCategory}
                   >
-                    Cancel
+                    {t("catalogue.categoryDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button
@@ -1333,10 +1409,10 @@ export default function CataloguePage() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
                   {isCreatingCategory
-                    ? "Creating..."
+                    ? t("catalogue.categoryDialog.creating")
                     : isUpdatingCategory
-                      ? "Updating..."
-                      : "Save"}
+                      ? t("catalogue.categoryDialog.updating")
+                      : t("catalogue.categoryDialog.save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -1352,13 +1428,13 @@ export default function CataloguePage() {
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
               {duplicateNameModal?.type === "product"
-                ? "Product already exists"
-                : "Category already exists"}
+                ? t("catalogue.duplicate.productTitle")
+                : t("catalogue.duplicate.categoryTitle")}
             </DialogTitle>
             <DialogDescription className="text-sm">
               {duplicateNameModal?.type === "product"
-                ? "A product with this name already exists. Please choose a different name."
-                : "A category with this name already exists. Please choose a different name."}
+                ? t("catalogue.duplicate.productDesc")
+                : t("catalogue.duplicate.categoryDesc")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1366,7 +1442,7 @@ export default function CataloguePage() {
               className="min-h-[44px] touch-target"
               onClick={() => setDuplicateNameModal(null)}
             >
-              OK
+              {t("catalogue.duplicate.ok")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1378,10 +1454,9 @@ export default function CataloguePage() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Scan barcode</DialogTitle>
+            <DialogTitle>{t("catalogue.barcode.title")}</DialogTitle>
             <DialogDescription>
-              Use your camera or barcode scanner device to read the product
-              barcode.
+              {t("catalogue.barcode.description")}
             </DialogDescription>
           </DialogHeader>
           <BarcodeScanner
@@ -1412,12 +1487,12 @@ export default function CataloguePage() {
         <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-lg sm:text-xl">
-              Are you sure?
+              {t("catalogue.delete.title")}
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm">
               {deleteConfirm?.type === "product"
-                ? "This action cannot be undone. This will permanently delete the product."
-                : "This action cannot be undone. This will permanently delete the category. Any products in this category will not be deleted but will need to be re-categorized."}
+                ? t("catalogue.delete.productDesc")
+                : t("catalogue.delete.categoryDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -1425,7 +1500,7 @@ export default function CataloguePage() {
               className="min-h-[44px] touch-target w-full sm:w-auto"
               onClick={() => setDeleteConfirm(null)}
             >
-              Cancel
+              {t("catalogue.delete.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
               className="min-h-[44px] touch-target w-full sm:w-auto text-destructive focus:ring-destructive"
@@ -1457,8 +1532,8 @@ export default function CataloguePage() {
                   : deletingCategoryId === deleteConfirm?.id ||
                     isDeletingCategory
               )
-                ? "Deleting..."
-                : "Delete"}
+                ? t("catalogue.delete.deleting")
+                : t("catalogue.delete.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
