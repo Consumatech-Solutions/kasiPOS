@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -41,6 +42,7 @@ export function CustomerForm({
   disabled = false,
   isLoading = false,
 }: CustomerFormProps) {
+  const { t } = useTranslation();
   const form = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
@@ -66,11 +68,11 @@ export function CustomerForm({
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Customer Name *</FormLabel>
+              <FormLabel>{t("customers.form.labelName")}</FormLabel>
               <FormControl>
                 <Input
                   {...field}
-                  placeholder="e.g. John Doe"
+                  placeholder={t("customers.form.placeholderName")}
                   disabled={disabled}
                 />
               </FormControl>
@@ -83,11 +85,11 @@ export function CustomerForm({
           name="contact"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Contact (Phone/Email) *</FormLabel>
+              <FormLabel>{t("customers.form.labelContact")}</FormLabel>
               <FormControl>
                 <Input
                   {...field}
-                  placeholder="e.g. +1234567890"
+                  placeholder={t("customers.form.placeholderContact")}
                   disabled={disabled}
                 />
               </FormControl>
@@ -100,7 +102,7 @@ export function CustomerForm({
           name="loyaltyPoints"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Loyalty Points</FormLabel>
+              <FormLabel>{t("customers.form.labelLoyalty")}</FormLabel>
               <FormControl>
                 <Input type="number" min="0" {...field} disabled={disabled} />
               </FormControl>
@@ -116,7 +118,7 @@ export function CustomerForm({
             disabled={disabled || isLoading}
             className="min-h-[44px] touch-target"
           >
-            Cancel
+            {t("customers.form.cancel")}
           </Button>
           <Button
             type="submit"
@@ -126,11 +128,11 @@ export function CustomerForm({
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {customer
               ? isLoading
-                ? "Updating..."
-                : "Update"
+                ? t("customers.form.updating")
+                : t("customers.form.update")
               : isLoading
-                ? "Creating..."
-                : "Create"}
+                ? t("customers.form.creating")
+                : t("customers.form.create")}
           </Button>
         </div>
       </form>

@@ -1,0 +1,6 @@
+{
+  "requireOnlineBanner.cloudTitle": "Cloud indisponible",
+  "requireOnlineBanner.offlineTitle": "Hors ligne",
+  "requireOnlineBanner.cloudDescription": "Internet est disponible, mais le cloud / le serveur est injoignable. Cette section est temporairement désactivée.",
+  "requireOnlineBanner.offlineDescription": "Cette section nécessite une connexion Internet. Elle est désactivée hors ligne. Reconnectez-vous pour l’utiliser."
+}

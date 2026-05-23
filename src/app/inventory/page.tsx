@@ -69,6 +69,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { getProductInitials } from "@/lib/utils/product-initials";
+import { useTranslation } from "react-i18next";
 
 const REASONS: StockAdjustmentReason[] = [
   "New stock received",
@@ -78,6 +79,15 @@ const REASONS: StockAdjustmentReason[] = [
   "Damages",
   "Expired",
 ];
+
+const INVENTORY_REASON_LABEL_KEY: Record<StockAdjustmentReason, string> = {
+  "New stock received": "newStockReceived",
+  Returns: "returns",
+  Shrinkage: "shrinkage",
+  Expansion: "expansion",
+  Damages: "damages",
+  Expired: "expired",
+};
 
 const adjustmentSchema = z.object({
   reason: z
@@ -95,6 +105,7 @@ const adjustmentSchema = z.object({
 });
 
 export default function InventoryPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { currentStore } = settings;
   const queryClient = useQueryClient();
@@ -194,8 +205,8 @@ export default function InventoryPage() {
     if (!allProducts?.length) return [];
     if (!showLowStockOnly) return allProducts;
     return allProducts.filter((product: any) => {
-      const t = product.lowStockThreshold || 0;
-      return (product.stock ?? 0) <= t && t > 0;
+      const lowTh = product.lowStockThreshold || 0;
+      return (product.stock ?? 0) <= lowTh && lowTh > 0;
     });
   }, [allProducts, showLowStockOnly]);
 
@@ -242,21 +253,26 @@ export default function InventoryPage() {
   const secondFieldLabel = useMemo(() => {
     switch (reason) {
       case "New stock received":
-        return "Quantity Received";
+        return t("inventory.adjustDialog.field.quantityReceived");
       case "Returns":
-        return "Quantity Returned";
+        return t("inventory.adjustDialog.field.quantityReturned");
       case "Shrinkage":
-        return "Updated Stock Quantity (must be less than the current stock amount)";
+        return t("inventory.adjustDialog.field.updatedStockShrinkage");
       case "Expansion":
-        return "Updated Stock Quantity (must be more than the current stock amount)";
+        return t("inventory.adjustDialog.field.updatedStockExpansion");
       case "Damages":
-        return "Quantity Damaged";
+        return t("inventory.adjustDialog.field.quantityDamaged");
       case "Expired":
-        return "Quantity Expired";
+        return t("inventory.adjustDialog.field.quantityExpired");
       default:
         return "";
     }
-  }, [reason]);
+  }, [reason, t]);
+
+  const translateReason = (r: string) => {
+    const suffix = INVENTORY_REASON_LABEL_KEY[r as StockAdjustmentReason];
+    return suffix ? t(`inventory.reason.${suffix}`) : r;
+  };
 
   const showUpdatedStockAboveNotes =
     reason &&
@@ -275,9 +291,9 @@ export default function InventoryPage() {
     if (!selectedProduct || !selectedProduct.id) return;
     if (!values.reason) {
       feedback.error(
-        "Reason required",
-        "Please select a reason for the adjustment.",
-        "Select a reason."
+        t("inventory.feedback.reasonRequiredTitle"),
+        t("inventory.feedback.reasonRequiredDesc"),
+        t("inventory.feedback.reasonRequiredHint")
       );
       return;
     }
@@ -286,9 +302,9 @@ export default function InventoryPage() {
       values.quantityOrUpdated === null
     ) {
       feedback.error(
-        "Quantity required",
-        "Please enter a value.",
-        "Enter the quantity or updated stock."
+        t("inventory.feedback.quantityRequiredTitle"),
+        t("inventory.feedback.quantityRequiredDesc"),
+        t("inventory.feedback.quantityRequiredHint")
       );
       return;
     }
@@ -309,9 +325,9 @@ export default function InventoryPage() {
       case "Shrinkage":
         if (q >= cur) {
           feedback.error(
-            "Invalid value",
-            "Updated stock must be less than the current stock amount.",
-            "Enter a lower value."
+            t("inventory.feedback.invalidShrinkTitle"),
+            t("inventory.feedback.invalidShrinkDesc"),
+            t("inventory.feedback.invalidShrinkHint")
           );
           return;
         }
@@ -320,9 +336,9 @@ export default function InventoryPage() {
       case "Expansion":
         if (q <= cur) {
           feedback.error(
-            "Invalid value",
-            "Updated stock must be more than the current stock amount.",
-            "Enter a higher value."
+            t("inventory.feedback.invalidExpandTitle"),
+            t("inventory.feedback.invalidExpandDesc"),
+            t("inventory.feedback.invalidExpandHint")
           );
           return;
         }
@@ -333,9 +349,9 @@ export default function InventoryPage() {
     }
     if (newStock < 0) {
       feedback.error(
-        "Invalid value",
-        "Stock can't be negative.",
-        "Reduce the quantity."
+        t("inventory.feedback.negativeStockTitle"),
+        t("inventory.feedback.negativeStockDesc"),
+        t("inventory.feedback.negativeStockHint")
       );
       return;
     }
@@ -354,8 +370,10 @@ export default function InventoryPage() {
         await refreshProducts();
 
         feedback.success(
-          "Stock updated",
-          `Stock for ${selectedProduct.name} updated.`
+          t("inventory.feedback.stockUpdatedTitle"),
+          t("inventory.feedback.stockUpdatedDesc", {
+            name: selectedProduct.name,
+          })
         );
       } else {
         const productId = String(selectedProduct.id);
@@ -377,7 +395,10 @@ export default function InventoryPage() {
           variables,
         });
 
-        feedback.success("Stock adjusted", "Stock updated successfully.");
+        feedback.success(
+          t("inventory.feedback.stockAdjustedTitle"),
+          t("inventory.feedback.stockAdjustedDesc")
+        );
       }
       setAdjustmentDialogOpen(false);
       setSelectedProduct(null);
@@ -389,8 +410,8 @@ export default function InventoryPage() {
       }
       feedback.fromError(
         error,
-        "Failed to adjust stock",
-        "Check your connection and try again."
+        t("inventory.feedback.adjustFailedTitle"),
+        t("inventory.feedback.adjustFailedHint")
       );
     }
   };
@@ -401,9 +422,9 @@ export default function InventoryPage() {
       : 0;
     if (normalizedThreshold < 0) {
       feedback.error(
-        "Invalid threshold",
-        "Threshold must be zero or more.",
-        "Enter a value ≥ 0."
+        t("inventory.feedback.invalidThresholdTitle"),
+        t("inventory.feedback.invalidThresholdDesc"),
+        t("inventory.feedback.invalidThresholdHint")
       );
       return;
     }
@@ -424,8 +445,8 @@ export default function InventoryPage() {
         await updateProduct(id, { lowStockThreshold: normalizedThreshold });
 
         feedback.success(
-          "Low stock trigger updated",
-          "Low stock trigger updated."
+          t("inventory.feedback.lowStockTriggerTitle"),
+          t("inventory.feedback.lowStockTriggerDesc")
         );
       } else {
         mutationQueue.add({
@@ -436,14 +457,17 @@ export default function InventoryPage() {
             } as any),
           variables: { id, data: { lowStockThreshold: normalizedThreshold } },
         });
-        feedback.success("Threshold updated", "Threshold updated successfully.");
+        feedback.success(
+          t("inventory.feedback.thresholdTitle"),
+          t("inventory.feedback.thresholdDesc")
+        );
       }
       setEditingThresholdId(null);
     } catch (error: any) {
       feedback.fromError(
         error,
-        "Failed to update threshold",
-        "Check your connection and try again."
+        t("inventory.feedback.thresholdFailedTitle"),
+        t("inventory.feedback.thresholdFailedHint")
       );
       await applyThresholdToCaches(previousThreshold);
     }
@@ -455,10 +479,10 @@ export default function InventoryPage() {
         <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg sm:text-xl">
-              Inventory Management
+              {t("inventory.page.title")}
             </CardTitle>
             <CardDescription className="text-sm">
-              Manage your product inventory and set low stock alerts.
+              {t("inventory.page.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -466,7 +490,7 @@ export default function InventoryPage() {
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  placeholder="Search by product name..."
+                  placeholder={t("inventory.search.placeholder")}
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -477,10 +501,14 @@ export default function InventoryPage() {
                 onValueChange={setSelectedCategory}
               >
                 <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Filter by category" />
+                  <SelectValue
+                    placeholder={t("inventory.filter.placeholder")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="all">
+                    {t("inventory.filter.allCategories")}
+                  </SelectItem>
                   {categories?.map((c: any) => (
                     <SelectItem key={c.id} value={c.name}>
                       {c.name}
@@ -494,7 +522,9 @@ export default function InventoryPage() {
                   checked={showLowStockOnly}
                   onCheckedChange={setShowLowStockOnly}
                 />
-                <Label htmlFor="low-stock-filter">Low Stock Only</Label>
+                <Label htmlFor="low-stock-filter">
+                  {t("inventory.filter.lowStockOnly")}
+                </Label>
               </div>
             </div>
           </CardContent>
@@ -505,24 +535,26 @@ export default function InventoryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[80px] hidden sm:table-cell">
-                    Image
+                    {t("inventory.table.image")}
                   </TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>{t("inventory.table.name")}</TableHead>
                   <TableHead className="hidden md:table-cell">
-                    Category
+                    {t("inventory.table.category")}
                   </TableHead>
-                  <TableHead>Stock</TableHead>
+                  <TableHead>{t("inventory.table.stock")}</TableHead>
                   <TableHead className="hidden lg:table-cell">
-                    Low Stock Trigger
+                    {t("inventory.table.lowStockTrigger")}
                   </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">
+                    {t("inventory.table.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {productsLoading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10">
-                      Loading products...
+                      {t("inventory.table.loading")}
                     </TableCell>
                   </TableRow>
                 ) : filteredProducts && filteredProducts.length > 0 ? (
@@ -569,11 +601,13 @@ export default function InventoryPage() {
                             <Badge variant="outline" className="mt-1 w-fit">
                               {(product as any).category?.name ||
                                 (product as any).category ||
-                                "N/A"}
+                                t("inventory.table.notApplicable")}
                             </Badge>
                           </span>
                           <span className="text-xs text-muted-foreground lg:hidden">
-                            Threshold: {(product as any).lowStockThreshold ?? 0}
+                            {t("inventory.table.thresholdMobile", {
+                              value: (product as any).lowStockThreshold ?? 0,
+                            })}
                           </span>
                         </div>
                       </TableCell>
@@ -581,7 +615,7 @@ export default function InventoryPage() {
                         <Badge variant="outline">
                           {(product as any).category?.name ||
                             (product as any).category ||
-                            "N/A"}
+                            t("inventory.table.notApplicable")}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -648,7 +682,7 @@ export default function InventoryPage() {
                             className="min-h-[44px] touch-target w-full sm:w-auto"
                             onClick={() => openAdjustmentDialog(product)}
                           >
-                            Adjust Stock
+                            {t("inventory.actions.adjustStock")}
                           </Button>
                           <Button
                             size="sm"
@@ -657,7 +691,9 @@ export default function InventoryPage() {
                             onClick={() => openHistoryDialog(product)}
                           >
                             <History className="h-4 w-4 sm:mr-1" />{" "}
-                            <span className="hidden sm:inline">History</span>
+                            <span className="hidden sm:inline">
+                              {t("inventory.actions.history")}
+                            </span>
                           </Button>
                         </div>
                       </TableCell>
@@ -666,7 +702,7 @@ export default function InventoryPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center h-24">
-                      No products found.
+                      {t("inventory.table.empty")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -692,10 +728,14 @@ export default function InventoryPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              Adjust Stock for {selectedProduct?.name}
+              {t("inventory.adjustDialog.title", {
+                name: selectedProduct?.name ?? "",
+              })}
             </DialogTitle>
             <DialogDescription className="text-sm">
-              Current stock: {currentStock}.
+              {t("inventory.adjustDialog.currentStock", {
+                count: currentStock,
+              })}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -708,20 +748,24 @@ export default function InventoryPage() {
                 name="reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reason</FormLabel>
+                    <FormLabel>{t("inventory.adjustDialog.reason")}</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value ?? ""}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a reason" />
+                          <SelectValue
+                            placeholder={t(
+                              "inventory.adjustDialog.reasonPlaceholder"
+                            )}
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {REASONS.map((r) => (
                           <SelectItem key={r} value={r}>
-                            {r}
+                            {translateReason(r)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -757,7 +801,7 @@ export default function InventoryPage() {
               )}
               {showUpdatedStockAboveNotes && (
                 <p className="text-sm font-medium text-muted-foreground">
-                  Updated stock:{" "}
+                  {t("inventory.adjustDialog.updatedStock")}{" "}
                   <span className="text-foreground">{computedNewStock}</span>
                 </p>
               )}
@@ -766,7 +810,9 @@ export default function InventoryPage() {
                 name="note"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Note (Optional)</FormLabel>
+                    <FormLabel>
+                      {t("inventory.adjustDialog.noteOptional")}
+                    </FormLabel>
                     <FormControl>
                       <Textarea {...field} />
                     </FormControl>
@@ -782,7 +828,7 @@ export default function InventoryPage() {
                     className="min-h-[44px] touch-target w-full sm:w-auto"
                     disabled={isCreating}
                   >
-                    Cancel
+                    {t("inventory.adjustDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button
@@ -793,7 +839,9 @@ export default function InventoryPage() {
                   {isCreating && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {isCreating ? "Saving..." : "Save Adjustment"}
+                  {isCreating
+                    ? t("inventory.adjustDialog.saving")
+                    : t("inventory.adjustDialog.save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -805,25 +853,27 @@ export default function InventoryPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              Stock Adjustment History for {selectedProduct?.name}
+              {t("inventory.historyDialog.title", {
+                name: selectedProduct?.name ?? "",
+              })}
             </DialogTitle>
           </DialogHeader>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Old Stock</TableHead>
-                <TableHead>New Stock</TableHead>
-                <TableHead>Change</TableHead>
-                <TableHead>Note</TableHead>
+                <TableHead>{t("inventory.history.table.date")}</TableHead>
+                <TableHead>{t("inventory.history.table.reason")}</TableHead>
+                <TableHead>{t("inventory.history.table.oldStock")}</TableHead>
+                <TableHead>{t("inventory.history.table.newStock")}</TableHead>
+                <TableHead>{t("inventory.history.table.change")}</TableHead>
+                <TableHead>{t("inventory.history.table.note")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {adjustmentsLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10">
-                    Loading history...
+                    {t("inventory.history.loading")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -835,7 +885,7 @@ export default function InventoryPage() {
                   return (
                     <TableRow key={adj.id}>
                       <TableCell>{format(adjDate, "Pp")}</TableCell>
-                      <TableCell>{adj.reason}</TableCell>
+                      <TableCell>{translateReason(adj.reason)}</TableCell>
                       <TableCell>{adj.oldStock}</TableCell>
                       <TableCell>{adj.newStock}</TableCell>
                       <TableCell
@@ -854,7 +904,7 @@ export default function InventoryPage() {
           </Table>
           {(!stockAdjustments || stockAdjustments.length === 0) && (
             <p className="text-center text-muted-foreground py-8">
-              No adjustment history for this product.
+              {t("inventory.history.empty")}
             </p>
           )}
         </DialogContent>
