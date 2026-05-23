@@ -11,7 +11,7 @@ import {
 } from "./webhid-scanner";
 import { getQzPrinters, printViaQz } from "./qz-tray";
 import { isAndroid } from "./platform";
-import { launchBluetoothPrint } from "./bluetooth-print";
+import { printViaRawBt } from "./rawbt-print";
 
 const PRINTER_SERVER_URL = "http://localhost:7788";
 
@@ -193,7 +193,7 @@ export async function getDevices(
           error.message.includes("Failed to fetch")
         ) {
           throw new Error(
-            "Cannot connect to printer server. Make sure it is running on localhost:7788"
+            "Cannot connect to printer server. Make sure it is running "
           );
         }
         throw error;
@@ -242,7 +242,7 @@ export async function getQzDevices(): Promise<Device[]> {
 
 export async function printReceipt(
   deviceId: string,
-  data: Uint8Array | string
+  data: Uint8Array
 ): Promise<PrintResponse> {
   if (deviceId === "thermal-android") {
     if (!isAndroid()) {
@@ -250,17 +250,8 @@ export async function printReceipt(
         "Android thermal printing is only available on Android devices"
       );
     }
-    if (typeof data !== "string") {
-      throw new Error(
-        "Android Bluetooth Print requires formatted receipt text"
-      );
-    }
-    launchBluetoothPrint(data);
-    return { success: true, message: "Printed via Bluetooth Print" };
-  }
-
-  if (typeof data === "string") {
-    throw new Error("Invalid print payload for this printer");
+    await printViaRawBt(data);
+    return { success: true, message: "Printed via RawBT" };
   }
 
   if (deviceId.startsWith("webusb_")) {

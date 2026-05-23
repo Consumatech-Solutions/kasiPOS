@@ -53,4 +53,6 @@ export const ALL_PAGE_ROUTES = [
   "/request-access",
   "/verify-code",
   "/set-password",
+  "/offline",
+  "/print-test",
 ] as const;

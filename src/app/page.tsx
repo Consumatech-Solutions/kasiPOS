@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
+import { v4 as uuidv4 } from "uuid";
 
 import type {
   Product,
@@ -428,7 +429,7 @@ export default function PosPage() {
           isOnline: isOnline,
         });
       }
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = uuidv4();
       const newTransaction: Omit<Transaction, "id"> = {
         ...transactionDetails,
         date: new Date(),

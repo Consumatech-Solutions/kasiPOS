@@ -23,7 +23,6 @@ import {
   getPrinterMode,
 } from "@/lib/device-service";
 import { getPrintStrategy } from "@/lib/platform";
-import { receiptDataToIntentString } from "@/lib/bluetooth-print";
 import { ToastAction } from "@/components/ui/toast";
 import {
   Printer as ThermalPrinter,
@@ -199,7 +198,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             const strategy = getPrintStrategy();
             const hint =
               strategy === "android"
-                ? "Please install Bluetooth Print from the Play Store and complete printer setup in Settings."
+                ? "Install RawBT, pair your printer, and complete printer setup in Settings."
                 : "Please ensure QZ Tray (Desktop) or your printer server is running.";
             toast({
               variant: "destructive",
@@ -223,12 +222,9 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         }
       }
 
-      const printPayload =
-        deviceId === "thermal-android"
-          ? receiptDataToIntentString(data)
-          : await buildThermalReceipt(data);
+      const receiptData = await buildThermalReceipt(data);
 
-      await printReceipt(deviceId, printPayload);
+      await printReceipt(deviceId, receiptData);
 
       toast({
         title: "Print successful",
@@ -262,11 +258,8 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
       setIsPrinting(true);
       setShowDeviceSelector(false);
       try {
-        const printPayload =
-          deviceId === "thermal-android"
-            ? receiptDataToIntentString(data)
-            : await buildThermalReceipt(data);
-        await printReceipt(deviceId, printPayload);
+        const receiptData = await buildThermalReceipt(data);
+        await printReceipt(deviceId, receiptData);
         toast({
           title: "Print successful",
           description: "Receipt sent to printer.",
