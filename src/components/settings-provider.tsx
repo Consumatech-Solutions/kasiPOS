@@ -109,6 +109,7 @@ const AUTH_ROUTES = [
   "/set-password",
   "/set-password-store-admin",
 ];
+const PUBLIC_ROUTES = ["/offline", "/print-test"];
 const SETUP_ROUTE = "/store-setup";
 
 function isCypressRuntime(): boolean {
@@ -571,6 +572,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (isCypress || isE2eHarness) {
         return;
       }
+      if (PUBLIC_ROUTES.includes(pathname)) {
+        return;
+      }
       if (pathname.startsWith("/marketplace") || pathname.startsWith("/boph")) {
         return;
       }
@@ -683,6 +687,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         allowBophBootstrap
       ) {
         return !AUTH_ROUTES.includes(pathname) && pathname !== SETUP_ROUTE;
+      }
+      if (PUBLIC_ROUTES.includes(pathname)) {
+        return true;
       }
       return AUTH_ROUTES.includes(pathname);
     }

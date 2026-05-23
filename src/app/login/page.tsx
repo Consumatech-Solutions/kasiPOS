@@ -164,10 +164,7 @@ export default function LoginPage() {
           );
         }
         feedback.error(
-          "Backend not running",
-          `Cannot reach the API at ${getConfiguredApiUrl()}.`,
-          backendUnreachableRecovery(),
-          { code: ERROR_CODES.LOGIN }
+          "Login Failed, please try again with a different email or phone number"
         );
         return;
       }

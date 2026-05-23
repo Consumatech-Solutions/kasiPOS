@@ -21,7 +21,7 @@ import {
   type Device,
 } from "@/lib/device-service";
 import { getPrintStrategy } from "@/lib/platform";
-import { buildTestPrintString } from "@/lib/bluetooth-print";
+import { RAWBT_PLAY_STORE_URL } from "@/lib/rawbt-print";
 import {
   Dialog,
   DialogContent,
@@ -31,8 +31,6 @@ import {
 import { Button } from "@/components/ui/button";
 
 const QZ_TRAY_DOWNLOAD_URL = "https://qz.io/download/";
-const BLUETOOTH_PRINT_PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=mate.bluetoothprint";
 
 type PrinterStep =
   | "choice"
@@ -65,10 +63,10 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchSource, setSearchSource] = useState<SearchSource>(null);
-  const [isBluetoothTesting, setIsBluetoothTesting] = useState(false);
-  const [bluetoothTestFeedback, setBluetoothTestFeedback] = useState<
-    string | null
-  >(null);
+  const [isRawBtTesting, setIsRawBtTesting] = useState(false);
+  const [rawBtTestFeedback, setRawBtTestFeedback] = useState<string | null>(
+    null
+  );
 
   const printStrategy = getPrintStrategy();
 
@@ -78,8 +76,8 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       setAvailableDevices([]);
       setSearchSource(null);
       setStep("choice");
-      setIsBluetoothTesting(false);
-      setBluetoothTestFeedback(null);
+      setIsRawBtTesting(false);
+      setRawBtTestFeedback(null);
     }
   }, [open]);
 
@@ -155,25 +153,25 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
     searchWebUsbPrinters();
   };
 
-  const handleBluetoothTestPrint = async () => {
-    setIsBluetoothTesting(true);
-    setBluetoothTestFeedback(null);
+  const handleRawBtTestPrint = async () => {
+    setIsRawBtTesting(true);
+    setRawBtTestFeedback(null);
     try {
-      await printReceipt("thermal-android", buildTestPrintString());
-      setBluetoothTestFeedback(
-        "Opening Bluetooth Print. Confirm a test receipt prints on your printer."
+      await printReceipt("thermal-android", buildTestPrintPayload());
+      setRawBtTestFeedback(
+        "Test print sent. Confirm a receipt prints on your thermal printer."
       );
     } catch (err: any) {
-      setBluetoothTestFeedback(
+      setRawBtTestFeedback(
         err.message ||
-          "Test print failed. Please ensure Bluetooth Print is installed and your printer is paired."
+          "Test print failed. Install RawBT, pair your printer, and try again."
       );
     } finally {
-      setIsBluetoothTesting(false);
+      setIsRawBtTesting(false);
     }
   };
 
-  const handleBluetoothSaveSetup = () => {
+  const handleRawBtSaveSetup = () => {
     setPrinterMode("thermal");
     storeDevice("printer", "thermal-android");
     onSuccess?.("thermal-android");
@@ -294,18 +292,12 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
               {printStrategy === "android" && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Thermal printer (Bluetooth Print)
+                    Thermal printer (RawBT)
                   </p>
                   <ol className="text-sm text-slate-700 list-decimal list-inside space-y-1 mb-2">
-                    <li>Install Bluetooth Print from the Play Store</li>
-                    <li>
-                      Open the app and pair your USB or Bluetooth thermal
-                      printer
-                    </li>
-                    <li>
-                      Tap Test printer to send a test receipt via Bluetooth
-                      Print
-                    </li>
+                    <li>Install RawBT from the Play Store</li>
+                    <li>Open RawBT and pair your USB or Bluetooth thermal printer</li>
+                    <li>Tap Test printer to verify printing</li>
                     <li>When printing works, tap Save setup</li>
                   </ol>
                   <div className="flex flex-col gap-2">
@@ -316,21 +308,21 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                       asChild
                     >
                       <a
-                        href={BLUETOOTH_PRINT_PLAY_STORE_URL}
+                        href={RAWBT_PLAY_STORE_URL}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Get Bluetooth Print on Play Store
+                        Get RawBT on Play Store
                       </a>
                     </Button>
                     <Button
                       variant="default"
                       size="sm"
                       className="min-h-[44px] touch-target"
-                      onClick={handleBluetoothTestPrint}
-                      disabled={isBluetoothTesting}
+                      onClick={handleRawBtTestPrint}
+                      disabled={isRawBtTesting}
                     >
-                      {isBluetoothTesting ? (
+                      {isRawBtTesting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Testing...
@@ -346,19 +338,19 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                       variant="secondary"
                       size="sm"
                       className="min-h-[44px] touch-target"
-                      onClick={handleBluetoothSaveSetup}
+                      onClick={handleRawBtSaveSetup}
                     >
                       Save setup
                     </Button>
-                    {bluetoothTestFeedback ? (
+                    {rawBtTestFeedback ? (
                       <p
                         className={`text-xs text-left px-1 ${
-                          bluetoothTestFeedback.startsWith("Opening")
+                          rawBtTestFeedback.startsWith("Test print sent")
                             ? "text-green-700"
                             : "text-red-600"
                         }`}
                       >
-                        {bluetoothTestFeedback}
+                        {rawBtTestFeedback}
                       </p>
                     ) : null}
                   </div>
