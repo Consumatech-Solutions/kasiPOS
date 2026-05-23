@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import { isAuthEndpoint, notifySessionExpired } from "@/lib/auth-session";
 import {
   getConfiguredApiUrl,
   resolveApiBaseUrl,

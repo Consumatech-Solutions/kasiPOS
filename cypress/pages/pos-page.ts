@@ -62,10 +62,24 @@ export const PosPage = {
         }
       );
     }
+    this.ensureCartVisible();
+    return this;
+  },
+
+  ensureCartVisible() {
+    cy.get("body").then(($body) => {
+      if ($body.find('[data-testid="pos-cart-line"]:visible').length > 0) {
+        return;
+      }
+      if ($body.find('[data-testid="pos-mobile-cart-bar"]').length > 0) {
+        cy.get('[data-testid="pos-mobile-cart-bar"]').click({ force: true });
+      }
+    });
     return this;
   },
 
   cartLine(name: string) {
+    this.ensureCartVisible();
     const safe =
       typeof CSS !== "undefined" && typeof CSS.escape === "function"
         ? CSS.escape(name)
@@ -99,6 +113,7 @@ export const PosPage = {
   },
 
   choosePaymentMethod(method: "Cash" | "Card" | "Mobile Money") {
+    this.ensureCartVisible();
     // Match checkout row only — loose /cash/i matches e.g. "CashSend (ABSA)" in the Mobile Money form.
     const map: Record<"Cash" | "Card" | "Mobile Money", RegExp> = {
       Cash: /^CASH$/i,

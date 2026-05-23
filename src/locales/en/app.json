@@ -21,5 +21,6 @@
   "header.user.fallbackName": "User",
   "header.user.noPhone": "No phone",
   "header.menu.profile": "Profile",
+  "header.menu.navigation": "Open navigation menu",
   "header.menu.logout": "Log out"
 }

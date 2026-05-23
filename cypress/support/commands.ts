@@ -561,3 +561,13 @@ Cypress.Commands.add(
     );
   }
 );
+
+/** Opens the mobile navigation sheet (viewport should be below md / 768px). */
+Cypress.Commands.add("openMobileNav", () => {
+  cy.findByRole("button", {
+    name: /open navigation menu|ouvrir le menu/i,
+  }).click();
+  cy.findByRole("navigation", { name: /main navigation/i }).should(
+    "be.visible"
+  );
+});

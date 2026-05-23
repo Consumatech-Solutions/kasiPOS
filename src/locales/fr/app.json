@@ -21,5 +21,6 @@
   "header.user.fallbackName": "Utilisateur",
   "header.user.noPhone": "Pas de téléphone",
   "header.menu.profile": "Profil",
+  "header.menu.navigation": "Ouvrir le menu de navigation",
   "header.menu.logout": "Se déconnecter"
 }
