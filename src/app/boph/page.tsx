@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSettings } from "@/components/settings-provider";
+import { useI18n } from "@/components/i18n-provider";
 import { useParcels } from "@/hooks/use-parcels";
 import type { Parcel } from "@/types";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
@@ -72,29 +73,40 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
-const collectionFormSchema = z.object({
-  collectionCode: z
-    .string()
-    .min(1, { message: "Collection code is required." }),
-  collectingPersonName: z
-    .string()
-    .min(2, { message: "Collector's name is required." }),
-  collectingPersonPhone: z.string().optional(),
-  collectingPersonId: z
-    .string()
-    .min(5, { message: "A valid ID/Passport number is required." }),
-});
-
-const createParcelFormSchema = z.object({
-  deliveryNumber: z
-    .string()
-    .min(1, { message: "Delivery number is required." }),
-  customerName: z.string().min(2, { message: "Customer name is required." }),
-});
-
 export default function BophPage() {
   const { toast } = useToast();
+  const { t } = useI18n();
   const { settings } = useSettings();
+
+  const collectionFormSchema = useMemo(
+    () =>
+      z.object({
+        collectionCode: z
+          .string()
+          .min(1, { message: t("boph.collectionCodeRequired") }),
+        collectingPersonName: z
+          .string()
+          .min(2, { message: t("boph.collectorNameRequired") }),
+        collectingPersonPhone: z.string().optional(),
+        collectingPersonId: z
+          .string()
+          .min(5, { message: t("boph.collectorIdRequired") }),
+      }),
+    [t]
+  );
+
+  const createParcelFormSchema = useMemo(
+    () =>
+      z.object({
+        deliveryNumber: z
+          .string()
+          .min(1, { message: t("boph.deliveryRequired") }),
+        customerName: z
+          .string()
+          .min(2, { message: t("boph.customerNameRequired") }),
+      }),
+    [t]
+  );
   const { currentStore: settingsStore } = settings;
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
@@ -184,7 +196,10 @@ export default function BophPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copied!", description: "Code copied to clipboard." });
+    toast({
+      title: t("common.copied"),
+      description: t("common.copiedDescription"),
+    });
   };
 
   const handleOpenReceiveModal = (parcel: Parcel) => {
@@ -202,8 +217,10 @@ export default function BophPage() {
     try {
       await receiveParcel(selectedParcel.id, { receiptCode });
       toast({
-        title: "Parcel Received",
-        description: `${selectedParcel.deliveryNumber} has been marked as received.`,
+        title: t("boph.parcelReceived"),
+        description: t("boph.parcelReceivedDescription", {
+          deliveryNumber: selectedParcel.deliveryNumber,
+        }),
       });
       setIsReceiveModalOpen(false);
       setSelectedParcel(null);
@@ -213,10 +230,10 @@ export default function BophPage() {
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
-        "Could not update the parcel status.";
+        t("boph.couldNotReceive");
       toast({
         variant: "destructive",
-        title: "Error",
+        title: t("common.error"),
         description: errorMessage,
       });
     }
@@ -239,16 +256,16 @@ export default function BophPage() {
     if (!selectedParcel || !selectedParcel.id) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "No parcel selected.",
+        title: t("common.error"),
+        description: t("boph.noParcelSelected"),
       });
       return;
     }
     if (selectedParcel.collectionCode !== values.collectionCode) {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Collection code does not match the selected parcel.",
+        title: t("common.error"),
+        description: t("boph.collectionCodeMismatch"),
       });
       return;
     }
@@ -261,8 +278,10 @@ export default function BophPage() {
         collectingPersonPhone: values.collectingPersonPhone,
       });
       toast({
-        title: "Parcel Collected",
-        description: `${selectedParcel.deliveryNumber} has been issued to the customer.`,
+        title: t("boph.parcelCollected"),
+        description: t("boph.parcelCollectedDescription", {
+          deliveryNumber: selectedParcel.deliveryNumber,
+        }),
       });
       setIsCollectModalOpen(false);
       setSelectedParcel(null);
@@ -272,10 +291,10 @@ export default function BophPage() {
       const errorMessage =
         error?.response?.data?.message ||
         error?.message ||
-        "Could not complete the collection.";
+        t("boph.couldNotCollect");
       toast({
         variant: "destructive",
-        title: "Error",
+        title: t("common.error"),
         description: errorMessage,
       });
     }
@@ -294,17 +313,17 @@ export default function BophPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <CardTitle className="text-lg sm:text-xl">
-                  BOPH - Buy Online, Pickup Here
+                  {t("boph.title")}
                 </CardTitle>
                 <CardDescription className="text-sm">
-                  Manage incoming and received parcels for customer pickup.
+                  {t("boph.description")}
                 </CardDescription>
               </div>
               <Button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="w-full sm:w-auto min-h-[44px] touch-target"
               >
-                Add Parcel
+                {t("boph.addParcel")}
               </Button>
             </div>
           </CardHeader>
@@ -312,20 +331,20 @@ export default function BophPage() {
             <Tabs defaultValue="incoming">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="incoming" className="text-xs sm:text-sm">
-                  Incoming
+                  {t("boph.tabIncoming")}
                 </TabsTrigger>
                 <TabsTrigger value="received" className="text-xs sm:text-sm">
-                  Ready
+                  {t("boph.tabReady")}
                 </TabsTrigger>
                 <TabsTrigger value="collected" className="text-xs sm:text-sm">
-                  History
+                  {t("boph.tabHistory")}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="incoming">
                 {loading ? (
                   <div className="text-center py-16 text-muted-foreground">
-                    <p>Loading parcels...</p>
+                    <p>{t("boph.loadingParcels")}</p>
                   </div>
                 ) : (
                   <>
@@ -333,12 +352,12 @@ export default function BophPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Delivery #</TableHead>
+                            <TableHead>{t("boph.deliveryNumber")}</TableHead>
                             <TableHead className="hidden sm:table-cell">
-                              Customer
+                              {t("boph.customer")}
                             </TableHead>
                             <TableHead className="text-right">
-                              Actions
+                              {t("common.actions")}
                             </TableHead>
                           </TableRow>
                         </TableHeader>
@@ -373,7 +392,7 @@ export default function BophPage() {
                                   >
                                     <Edit className="h-4 w-4 sm:mr-1" />
                                     <span className="hidden sm:inline">
-                                      Edit
+                                      {t("common.edit")}
                                     </span>
                                   </Button>
                                   <Button
@@ -387,7 +406,7 @@ export default function BophPage() {
                                   >
                                     <Trash2 className="h-4 w-4 sm:mr-1" />
                                     <span className="hidden sm:inline">
-                                      Delete
+                                      {t("common.delete")}
                                     </span>
                                   </Button>
                                   <Button
@@ -397,7 +416,7 @@ export default function BophPage() {
                                       handleOpenReceiveModal(parcel)
                                     }
                                   >
-                                    Receive
+                                    {t("boph.receive")}
                                   </Button>
                                 </div>
                               </TableCell>
@@ -408,7 +427,7 @@ export default function BophPage() {
                     </div>
                     {incomingParcels.length === 0 && (
                       <div className="text-center py-16 text-muted-foreground">
-                        <p>No parcels are currently expected.</p>
+                        <p>{t("boph.noIncoming")}</p>
                       </div>
                     )}
                   </>
@@ -419,7 +438,7 @@ export default function BophPage() {
                 <div className="relative my-4 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
-                    placeholder="Search by collection code..."
+                    placeholder={t("boph.searchCollection")}
                     className="pl-10"
                     value={collectionCodeInput}
                     onChange={(e) => setCollectionCodeInput(e.target.value)}
@@ -427,7 +446,7 @@ export default function BophPage() {
                 </div>
                 {loading ? (
                   <div className="text-center py-16 text-muted-foreground">
-                    <p>Loading parcels...</p>
+                    <p>{t("boph.loadingParcels")}</p>
                   </div>
                 ) : (
                   <>
@@ -435,17 +454,19 @@ export default function BophPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Collection #</TableHead>
+                            <TableHead>{t("boph.collectionNumber")}</TableHead>
                             <TableHead className="hidden md:table-cell">
-                              Delivery #
+                              {t("boph.deliveryNumber")}
                             </TableHead>
                             <TableHead className="hidden sm:table-cell">
-                              Customer
+                              {t("boph.customer")}
                             </TableHead>
                             <TableHead className="hidden lg:table-cell">
-                              Date Received
+                              {t("boph.dateReceived")}
                             </TableHead>
-                            <TableHead className="text-right">Action</TableHead>
+                            <TableHead className="text-right">
+                              {t("boph.action")}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -453,7 +474,9 @@ export default function BophPage() {
                             <TableRow key={parcel.id}>
                               <TableCell className="font-mono">
                                 <div className="flex flex-col">
-                                  <span>{parcel.collectionCode || "N/A"}</span>
+                                  <span>
+                                    {parcel.collectionCode || t("common.na")}
+                                  </span>
                                   <span className="text-xs text-muted-foreground md:hidden">
                                     {parcel.deliveryNumber}
                                   </span>
@@ -466,7 +489,7 @@ export default function BophPage() {
                                           new Date(parcel.dateReceived),
                                           "PPP"
                                         )
-                                      : "N/A"}
+                                      : t("common.na")}
                                   </span>
                                 </div>
                               </TableCell>
@@ -487,7 +510,7 @@ export default function BophPage() {
                                   className="min-h-[44px] touch-target w-full sm:w-auto"
                                   onClick={() => handleOpenCollectModal(parcel)}
                                 >
-                                  Issue Parcel
+                                  {t("boph.issueParcel")}
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -498,9 +521,9 @@ export default function BophPage() {
                     {receivedParcels.length === 0 && (
                       <div className="text-center py-16 text-muted-foreground">
                         {collectionCodeInput ? (
-                          <p>No parcel found with that collection code.</p>
+                          <p>{t("boph.noCollectionCode")}</p>
                         ) : (
-                          <p>No parcels are currently ready for collection.</p>
+                          <p>{t("boph.noReady")}</p>
                         )}
                       </div>
                     )}
@@ -510,7 +533,7 @@ export default function BophPage() {
               <TabsContent value="collected">
                 {loading ? (
                   <div className="text-center py-16 text-muted-foreground">
-                    <p>Loading parcels...</p>
+                    <p>{t("boph.loadingParcels")}</p>
                   </div>
                 ) : (
                   <>
@@ -518,14 +541,14 @@ export default function BophPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Delivery #</TableHead>
+                            <TableHead>{t("boph.deliveryNumber")}</TableHead>
                             <TableHead className="hidden sm:table-cell">
-                              Customer
+                              {t("boph.customer")}
                             </TableHead>
                             <TableHead className="hidden md:table-cell">
-                              Collected By
+                              {t("boph.collectedBy")}
                             </TableHead>
-                            <TableHead>Date Collected</TableHead>
+                            <TableHead>{t("boph.dateCollected")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -538,7 +561,7 @@ export default function BophPage() {
                                     {parcel.customerName}
                                   </span>
                                   <span className="text-xs text-muted-foreground md:hidden">
-                                    {parcel.collectingPersonName || "N/A"}
+                                    {parcel.collectingPersonName || t("common.na")}
                                   </span>
                                 </div>
                               </TableCell>
@@ -554,7 +577,7 @@ export default function BophPage() {
                                       new Date(parcel.dateCollected),
                                       "PPP p"
                                     )
-                                  : "N/A"}
+                                  : t("common.na")}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -563,7 +586,7 @@ export default function BophPage() {
                     </div>
                     {collectedParcels.length === 0 && (
                       <div className="text-center py-16 text-muted-foreground">
-                        <p>No parcels have been collected yet.</p>
+                        <p>{t("boph.noCollectedYet")}</p>
                       </div>
                     )}
                   </>
@@ -577,16 +600,17 @@ export default function BophPage() {
           <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
-                Receive Parcel: {selectedParcel?.deliveryNumber}
+                {t("boph.receiveParcel", {
+                  deliveryNumber: selectedParcel?.deliveryNumber ?? "",
+                })}
               </DialogTitle>
               <DialogDescription className="text-sm">
-                Provide the following code to the courier to confirm the
-                handover. Once confirmed, the parcel will be marked as received.
+                {t("boph.receiveDescription")}
               </DialogDescription>
             </DialogHeader>
             <div className="py-6 text-center">
               <p className="text-sm text-muted-foreground">
-                Courier Receipt Code
+                {t("boph.courierReceiptCode")}
               </p>
               <div className="flex items-center justify-center gap-2 mt-2">
                 <p className="text-4xl font-bold tracking-widest font-mono p-4 bg-muted rounded-lg">
@@ -608,7 +632,7 @@ export default function BophPage() {
                 onClick={() => setIsReceiveModalOpen(false)}
                 disabled={isReceiving}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 className="min-h-[44px] touch-target w-full sm:w-auto"
@@ -618,7 +642,7 @@ export default function BophPage() {
                 {isReceiving && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {isReceiving ? "Receiving..." : "Confirm & Receive"}
+                {isReceiving ? t("boph.receiving") : t("boph.confirmReceive")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -628,11 +652,10 @@ export default function BophPage() {
           <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
-                Issue Parcel to Customer
+                {t("boph.issueToCustomer")}
               </DialogTitle>
               <DialogDescription className="text-sm">
-                Confirm collection code and capture the details of the person
-                collecting the parcel.
+                {t("boph.issueDescription")}
               </DialogDescription>
             </DialogHeader>
             <Form {...collectionForm}>
@@ -645,7 +668,7 @@ export default function BophPage() {
                   name="collectionCode"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Collection Code</FormLabel>
+                      <FormLabel>{t("boph.collectionCode")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -662,7 +685,7 @@ export default function BophPage() {
                   name="collectingPersonName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Collector's Full Name</FormLabel>
+                      <FormLabel>{t("boph.collectorFullName")}</FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
@@ -675,9 +698,7 @@ export default function BophPage() {
                   name="collectingPersonPhone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        Collector's Mobile Number (Optional)
-                      </FormLabel>
+                      <FormLabel>{t("boph.collectorMobileOptional")}</FormLabel>
                       <FormControl>
                         <Input type="tel" {...field} />
                       </FormControl>
@@ -690,7 +711,7 @@ export default function BophPage() {
                   name="collectingPersonId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Collector's ID / Passport Number</FormLabel>
+                      <FormLabel>{t("boph.collectorIdNumber")}</FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>
@@ -706,7 +727,7 @@ export default function BophPage() {
                       className="min-h-[44px] touch-target w-full sm:w-auto"
                       disabled={isCollecting}
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </DialogClose>
                   <Button
@@ -717,7 +738,9 @@ export default function BophPage() {
                     {isCollecting && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {isCollecting ? "Collecting..." : "Confirm Collection"}
+                    {isCollecting
+                      ? t("boph.collecting")
+                      : t("boph.confirmCollection")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -729,10 +752,10 @@ export default function BophPage() {
           <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
-                Add New Parcel
+                {t("boph.addNewParcel")}
               </DialogTitle>
               <DialogDescription className="text-sm">
-                Create a new incoming parcel for customer pickup.
+                {t("boph.addNewDescription")}
               </DialogDescription>
             </DialogHeader>
             <Form {...createParcelForm}>
@@ -753,8 +776,10 @@ export default function BophPage() {
                     if (isOnline) {
                       await createParcel(payload);
                       toast({
-                        title: "Parcel Added",
-                        description: `Parcel ${values.deliveryNumber} has been added successfully.`,
+                        title: t("boph.parcelAdded"),
+                        description: t("boph.parcelAddedDescription", {
+                          deliveryNumber: values.deliveryNumber,
+                        }),
                       });
                       setIsCreateModalOpen(false);
                       createParcelForm.reset();
@@ -766,8 +791,8 @@ export default function BophPage() {
                         variables: payload,
                       });
                       toast({
-                        title: "Parcel added",
-                        description: "Parcel added successfully.",
+                        title: t("boph.parcelAddedOffline"),
+                        description: t("boph.parcelAddedOfflineDescription"),
                       });
                       setIsCreateModalOpen(false);
                       createParcelForm.reset();
@@ -776,10 +801,10 @@ export default function BophPage() {
                     const errorMessage =
                       error?.response?.data?.message ||
                       error?.message ||
-                      "Could not create the parcel.";
+                      t("boph.couldNotCreate");
                     toast({
                       variant: "destructive",
-                      title: "Error",
+                      title: t("common.error"),
                       description: errorMessage,
                     });
                   }
@@ -791,11 +816,11 @@ export default function BophPage() {
                   name="deliveryNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Delivery Number</FormLabel>
+                      <FormLabel>{t("boph.deliveryNumberLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="e.g., DHL123456789"
+                          placeholder={t("boph.deliveryPlaceholder")}
                           className="font-mono"
                         />
                       </FormControl>
@@ -808,9 +833,12 @@ export default function BophPage() {
                   name="customerName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer Name</FormLabel>
+                      <FormLabel>{t("boph.customerNameLabel")}</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Customer full name" />
+                        <Input
+                          {...field}
+                          placeholder={t("boph.customerPlaceholder")}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -824,7 +852,7 @@ export default function BophPage() {
                       className="min-h-[44px] touch-target w-full sm:w-auto"
                       disabled={isCreating}
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </DialogClose>
                   <Button
@@ -835,7 +863,7 @@ export default function BophPage() {
                     {isCreating && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    {isCreating ? "Creating..." : "Create Parcel"}
+                    {isCreating ? t("boph.creating") : t("boph.createParcel")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -847,10 +875,10 @@ export default function BophPage() {
           <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
-                Edit Parcel
+                {t("boph.editParcel")}
               </DialogTitle>
               <DialogDescription className="text-sm">
-                Update the parcel information.
+                {t("boph.editDescription")}
               </DialogDescription>
             </DialogHeader>
             <Form {...editParcelForm}>
@@ -864,8 +892,10 @@ export default function BophPage() {
                       customerName: values.customerName,
                     });
                     toast({
-                      title: "Parcel Updated",
-                      description: `Parcel ${values.deliveryNumber} has been updated successfully.`,
+                      title: t("boph.parcelUpdated"),
+                      description: t("boph.parcelUpdatedDescription", {
+                        deliveryNumber: values.deliveryNumber,
+                      }),
                     });
                     setIsEditModalOpen(false);
                     setSelectedParcel(null);
@@ -875,10 +905,10 @@ export default function BophPage() {
                     const errorMessage =
                       error?.response?.data?.message ||
                       error?.message ||
-                      "Could not update the parcel.";
+                      t("boph.couldNotUpdate");
                     toast({
                       variant: "destructive",
-                      title: "Error",
+                      title: t("common.error"),
                       description: errorMessage,
                     });
                   }
@@ -890,11 +920,11 @@ export default function BophPage() {
                   name="deliveryNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Delivery Number</FormLabel>
+                      <FormLabel>{t("boph.deliveryNumberLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="e.g., DHL123456789"
+                          placeholder={t("boph.deliveryPlaceholder")}
                           className="font-mono"
                         />
                       </FormControl>
@@ -907,9 +937,12 @@ export default function BophPage() {
                   name="customerName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer Name</FormLabel>
+                      <FormLabel>{t("boph.customerNameLabel")}</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Customer full name" />
+                        <Input
+                          {...field}
+                          placeholder={t("boph.customerPlaceholder")}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -922,14 +955,14 @@ export default function BophPage() {
                       variant="secondary"
                       className="min-h-[44px] touch-target w-full sm:w-auto"
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </DialogClose>
                   <Button
                     type="submit"
                     className="min-h-[44px] touch-target w-full sm:w-auto"
                   >
-                    Update Parcel
+                    {t("boph.updateParcel")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -944,19 +977,13 @@ export default function BophPage() {
           <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-lg sm:text-xl">
-                Are you sure?
+                {t("boph.deleteTitle")}
               </AlertDialogTitle>
               <AlertDialogDescription className="text-sm">
-                This action cannot be undone. This will permanently delete the
-                parcel{" "}
-                <span className="font-mono font-semibold">
-                  {parcelToDelete?.deliveryNumber}
-                </span>{" "}
-                for customer{" "}
-                <span className="font-semibold">
-                  {parcelToDelete?.customerName}
-                </span>
-                .
+                {t("boph.deleteDescription", {
+                  deliveryNumber: parcelToDelete?.deliveryNumber ?? "",
+                  customerName: parcelToDelete?.customerName ?? "",
+                })}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -966,7 +993,7 @@ export default function BophPage() {
                   setParcelToDelete(null);
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </AlertDialogCancel>
               <AlertDialogAction
                 className="min-h-[44px] touch-target w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -976,8 +1003,10 @@ export default function BophPage() {
                   try {
                     await deleteParcel(parcelToDelete.id);
                     toast({
-                      title: "Parcel Deleted",
-                      description: `Parcel ${parcelToDelete.deliveryNumber} has been deleted successfully.`,
+                      title: t("boph.parcelDeleted"),
+                      description: t("boph.parcelDeletedDescription", {
+                        deliveryNumber: parcelToDelete.deliveryNumber,
+                      }),
                     });
                     setIsDeleteDialogOpen(false);
                     setParcelToDelete(null);
@@ -986,10 +1015,10 @@ export default function BophPage() {
                     const errorMessage =
                       error?.response?.data?.message ||
                       error?.message ||
-                      "Could not delete the parcel.";
+                      t("boph.couldNotDelete");
                     toast({
                       variant: "destructive",
-                      title: "Error",
+                      title: t("common.error"),
                       description: errorMessage,
                     });
                   }
@@ -999,7 +1028,7 @@ export default function BophPage() {
                 {isDeleting && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {isDeleting ? "Deleting..." : "Delete"}
+                {isDeleting ? t("boph.deleting") : t("common.delete")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

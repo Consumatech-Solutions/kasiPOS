@@ -34,6 +34,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/components/settings-provider";
+import { useI18n } from "@/components/i18n-provider";
 import { usersApi, settingsApi } from "@/lib/api";
 import { storesApi } from "@/lib/api/stores";
 import { saveStorePermanently } from "@/lib/store-persistence";
@@ -126,6 +127,7 @@ const passwordSchema = z
 
 export default function SettingsPage() {
   const { settings, setSetting, logout } = useSettings();
+  const { t } = useI18n();
   const { openHardwareSetup } = useHardwareSetup();
   const { currentUser, currentStore: settingsStore } = settings;
   const isAdmin =
@@ -929,10 +931,10 @@ export default function SettingsPage() {
                   ) : (
                     <Sun className="w-5 h-5" />
                   )}
-                  Theme
+                  {t("settings.theme")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Switch between light and dark mode.
+                  {t("settings.themeDescription")}
                 </p>
               </div>
               <Switch
@@ -951,23 +953,24 @@ export default function SettingsPage() {
                   className="font-semibold flex items-center gap-2"
                 >
                   <Languages className="w-5 h-5" />
-                  Language
+                  {t("settings.language")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Choose your preferred language (coming soon).
+                  {t("settings.languageDescription")}
                 </p>
               </div>
-              <Select defaultValue="en" disabled>
+              <Select
+                value={settings.language === "fr" ? "fr" : "en"}
+                onValueChange={(value) =>
+                  setSetting("language", value === "fr" ? "fr" : "en")
+                }
+              >
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Language" />
+                  <SelectValue placeholder={t("settings.language")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="fr">French</SelectItem>
-                  <SelectItem value="sw">Swahili</SelectItem>
-                  <SelectItem value="zu">Zulu</SelectItem>
-                  <SelectItem value="so">Somali</SelectItem>
-                  <SelectItem value="am">Amharic</SelectItem>
+                  <SelectItem value="en">{t("settings.languageEnglish")}</SelectItem>
+                  <SelectItem value="fr">{t("settings.languageFrench")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

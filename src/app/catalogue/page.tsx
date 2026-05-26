@@ -9,6 +9,7 @@ import type { ApiProduct, ApiCategory } from "@/types/catalogue";
 import { feedback } from "@/lib/feedback";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSettings } from "@/components/settings-provider";
+import { useI18n } from "@/components/i18n-provider";
 import {
   useCategories,
   useProducts,
@@ -105,44 +106,45 @@ import { ImageUpload } from "@/components/catalogue/image-upload";
 import { ProductImage } from "@/components/catalogue/product-image";
 import { AddTemplatesModal } from "@/components/catalogue/add-templates-modal";
 
-const categorySchema = z.object({
-  name: z
-    .string()
-    .min(2, { message: "Category name must be at least 2 characters." }),
-});
-
-const productSchema = z.object({
-  name: z
-    .string()
-    .min(2, { message: "Product name must be at least 2 characters." }),
-  price: z.coerce
-    .number()
-    .positive({ message: "Price must be a positive number." }),
-  costPrice: z.coerce
-    .number()
-    .min(0, { message: "Cost price can't be negative." }),
-  stock: z.coerce
-    .number()
-    .int()
-    .min(0, { message: "Stock can't be negative." })
-    .optional(),
-  lowStockThreshold: z.preprocess(
-    (v) => (v === "" || v == null ? undefined : v),
-    z.coerce
-      .number()
-      .int()
-      .min(0, { message: "Low stock trigger can't be negative." })
-      .optional()
-  ),
-  category: z.string().min(1, { message: "Please select a category." }),
-  barcode: z.string().optional(),
-  imageUrl: z.string().optional(),
-  imageHint: z.string().optional(),
-});
-
 export default function CataloguePage() {
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
+  const { t } = useI18n();
+
+  const categorySchema = useMemo(
+    () =>
+      z.object({
+        name: z.string().min(2, { message: t("catalogue.categoryNameMin") }),
+      }),
+    [t]
+  );
+
+  const productSchema = useMemo(
+    () =>
+      z.object({
+        name: z.string().min(2, { message: t("catalogue.productNameMin") }),
+        price: z.coerce.number().positive({ message: t("catalogue.pricePositive") }),
+        costPrice: z.coerce.number().min(0, { message: t("catalogue.costNotNegative") }),
+        stock: z.coerce
+          .number()
+          .int()
+          .min(0, { message: t("catalogue.stockNotNegative") })
+          .optional(),
+        lowStockThreshold: z.preprocess(
+          (v) => (v === "" || v == null ? undefined : v),
+          z.coerce
+            .number()
+            .int()
+            .min(0, { message: t("catalogue.lowStockNotNegative") })
+            .optional()
+        ),
+        category: z.string().min(1, { message: t("catalogue.selectCategory") }),
+        barcode: z.string().optional(),
+        imageUrl: z.string().optional(),
+        imageHint: z.string().optional(),
+      }),
+    [t]
+  );
 
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -345,7 +347,10 @@ export default function CataloguePage() {
       if (editingProduct && editingProduct.id) {
         if (isOnline) {
           await updateProduct(String(editingProduct.id), productData);
-          feedback.success("Product updated", "Product updated successfully.");
+          feedback.success(
+            t("catalogue.productUpdated"),
+            t("catalogue.productUpdatedDesc")
+          );
         } else {
           const productId = String(editingProduct.id);
           const optimisticUpdates = {
@@ -390,7 +395,10 @@ export default function CataloguePage() {
               catalogueApi.products.update(productId, productData),
             variables: { id: editingProduct.id, data: productData },
           });
-          feedback.success("Product updated", "Product updated successfully.");
+          feedback.success(
+            t("catalogue.productUpdated"),
+            t("catalogue.productUpdatedDesc")
+          );
         }
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
@@ -404,7 +412,10 @@ export default function CataloguePage() {
         }
         if (isOnline) {
           await createProduct(productData as any);
-          feedback.success("Product added", "Product added successfully.");
+          feedback.success(
+            t("catalogue.productAdded"),
+            t("catalogue.productAddedDesc")
+          );
           refreshProducts();
         } else {
           const tempId = `temp-${Date.now()}`;
@@ -477,7 +488,10 @@ export default function CataloguePage() {
               }),
             variables: { ...productData, _tempId: tempId },
           });
-          feedback.success("Product added", "Product added successfully.");
+          feedback.success(
+            t("catalogue.productAdded"),
+            t("catalogue.productAddedDesc")
+          );
         }
       }
       setProductDialogOpen(false);
@@ -486,8 +500,8 @@ export default function CataloguePage() {
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to save product",
-        "Check your connection and try again."
+        t("catalogue.failedSaveProduct"),
+        t("catalogue.retryConnection")
       );
     } finally {
       productSubmitRef.current = false;
@@ -499,7 +513,10 @@ export default function CataloguePage() {
     try {
       if (isOnline) {
         await deleteProductHook(String(id));
-        feedback.success("Product deleted", "Product deleted successfully.");
+        feedback.success(
+          t("catalogue.productDeleted"),
+          t("catalogue.productDeletedDesc")
+        );
       } else {
         const productId = String(id);
         const productQueries = queryClient.getQueriesData<{
@@ -524,13 +541,16 @@ export default function CataloguePage() {
           mutationFn: () => catalogueApi.products.delete(productId),
           variables: { id },
         });
-        feedback.success("Product deleted", "Product deleted successfully.");
+        feedback.success(
+          t("catalogue.productDeleted"),
+          t("catalogue.productDeletedDesc")
+        );
       }
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to delete product",
-        "Try again or check your connection."
+        t("catalogue.failedDeleteProduct"),
+        t("catalogue.retryDelete")
       );
     } finally {
       setDeletingProductId(null);
@@ -558,8 +578,8 @@ export default function CataloguePage() {
       if (editingCategory && editingCategory.id) {
         await updateCategory(String(editingCategory.id), values);
         feedback.success(
-          "Category updated",
-          "Category updated successfully."
+          t("catalogue.categoryUpdated"),
+          t("catalogue.categoryUpdatedDesc")
         );
       } else {
         const nameLower = (values.name ?? "").toString().trim().toLowerCase();
@@ -572,7 +592,10 @@ export default function CataloguePage() {
           return;
         }
         await createCategory(values);
-        feedback.success("Category added", "Category added successfully.");
+        feedback.success(
+          t("catalogue.categoryAdded"),
+          t("catalogue.categoryAddedDesc")
+        );
       }
       setCategoryDialogOpen(false);
       categoryForm.reset();
@@ -580,8 +603,8 @@ export default function CataloguePage() {
       console.error("Failed to save category:", error);
       feedback.fromError(
         error,
-        "Failed to save category",
-        "Check your connection and try again."
+        t("catalogue.failedSaveCategory"),
+        t("catalogue.retryConnection")
       );
     } finally {
       categorySubmitRef.current = false;
@@ -592,12 +615,12 @@ export default function CataloguePage() {
     setDeletingCategoryId(String(id));
     try {
       await deleteCategoryHook(String(id));
-      feedback.success("Category deleted", "Category deleted successfully.");
+      feedback.success(t("catalogue.categoryDeleted"));
     } catch (error) {
       feedback.fromError(
         error,
-        "Failed to delete category",
-        "Try again or check your connection."
+        t("catalogue.failedDeleteProduct"),
+        t("catalogue.retryDelete")
       );
     } finally {
       setDeletingCategoryId(null);
@@ -610,10 +633,10 @@ export default function CataloguePage() {
         <div className="sticky top-0 z-30 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="space-y-1 p-4 pb-5 sm:p-6 sm:pb-6">
             <CardTitle className="text-lg sm:text-xl">
-              Catalogue Management
+              {t("nav.catalogue")}
             </CardTitle>
             <CardDescription className="text-sm">
-              Manage your products and categories.
+              {t("catalogue.updateProductInfo")}
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 pb-2 pt-1 sm:px-6 sm:pb-3 sm:pt-2">
@@ -623,8 +646,8 @@ export default function CataloguePage() {
             >
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 sm:gap-3">
                 <TabsList>
-                  <TabsTrigger value="products">Products</TabsTrigger>
-                  <TabsTrigger value="categories">Categories</TabsTrigger>
+                  <TabsTrigger value="products">{t("nav.catalogue")}</TabsTrigger>
+                  <TabsTrigger value="categories">{t("home.searchCategories")}</TabsTrigger>
                 </TabsList>
                 <div className="flex flex-wrap items-center gap-2 order-first sm:order-none">
                   {activeCatalogueTab === "products" ? (
@@ -633,7 +656,8 @@ export default function CataloguePage() {
                       onClick={() => openProductDialog()}
                       className="min-h-[44px] touch-target"
                     >
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                      <PlusCircle className="mr-2 h-4 w-4" />{" "}
+                      {t("catalogue.addProduct")}
                     </Button>
                   ) : (
                     <Button

@@ -71,6 +71,7 @@ import { getProductInitials } from "@/lib/utils/product-initials";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useCart } from "@/components/providers/cart-provider";
 import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
+import { useI18n } from "@/components/i18n-provider";
 import {
   updateProductStockInDexie,
   saveTransactionsToDexie,
@@ -90,6 +91,7 @@ import {
 
 export default function PosPage() {
   const { settings } = useSettings();
+  const { t } = useI18n();
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
@@ -238,9 +240,9 @@ export default function PosPage() {
   const handleOpenVoucherModal = () => {
     if (cartSubtotal < 5) {
       feedback.error(
-        "Cannot redeem voucher",
-        "You need a cart total of at least R5 to redeem a voucher.",
-        "Add more items to the cart."
+        t("home.cannotRedeemVoucherTitle"),
+        t("home.cannotRedeemVoucherReason"),
+        t("home.cannotRedeemVoucherRecovery")
       );
       return;
     }
@@ -254,18 +256,18 @@ export default function PosPage() {
   ) => {
     if (cart.size === 0) {
       feedback.error(
-        "Cart is empty",
-        "Please add products to the cart before checkout.",
-        "Add products and try again."
+        t("home.cartEmptyTitle"),
+        t("home.cartEmptyReason"),
+        t("home.cartEmptyRecovery")
       );
       return;
     }
     if (method === "Credit") {
       if (!creditConfigured) {
         feedback.error(
-          "Credit not configured",
-          "Set the customer credit limit in Store settings to allow sales on credit.",
-          "Open Settings"
+          t("home.creditNotConfiguredTitle"),
+          t("home.creditNotConfiguredReason"),
+          t("home.openSettings")
         );
         return;
       }
@@ -299,7 +301,7 @@ export default function PosPage() {
     setAppliedVoucherCode(code);
     setAppliedDiscount(amount);
     feedback.success(
-      "Voucher applied",
+      t("home.voucherApplied"),
       `Discount of R${amount.toFixed(2)} applied.`
     );
   };
@@ -311,7 +313,7 @@ export default function PosPage() {
         ? (cartSubtotal * discount.discountAmount) / 100
         : discount.discountAmount;
     feedback.success(
-      "Discount applied",
+      t("home.discountApplied"),
       `Discount of R${amount.toFixed(2)} applied.`
     );
   };
@@ -542,7 +544,10 @@ export default function PosPage() {
               createdId: resData?.id ?? resData?.data?.id,
             });
           }
-          feedback.success("Sale complete!", "View your receipt below.");
+          feedback.success(
+            t("home.saleCompleteTitle"),
+            t("home.saleCompleteReceipt")
+          );
         } catch (error: unknown) {
           const err = error as {
             message?: string;
@@ -601,11 +606,11 @@ export default function PosPage() {
               messageForUser
             );
           const popupMessage = isStoreIdError
-            ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
+            ? t("home.storeConfigError")
             : isCreditNotConfigured
-              ? "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term."
+              ? t("home.creditNotConfiguredHelp")
               : messageForUser ||
-                "Something went wrong. Check the items and store.";
+                t("home.genericSaleError");
           if (showInPopup) {
             setInsufficientStockPopup({
               open: true,
@@ -614,10 +619,10 @@ export default function PosPage() {
           } else {
             feedback.fromError(
               error,
-              "Failed to complete the sale",
+              t("home.failedSaleTitle"),
               messageForUser
                 ? `${messageForUser} Try again or check your connection.`
-                : "Check your connection and try again."
+                : t("home.failedSaleRecoveryOnline")
             );
           }
         }
@@ -672,7 +677,7 @@ export default function PosPage() {
           setReceiptData(receiptPayload);
           setTimeout(() => setReceiptOpen(true), 0);
 
-          feedback.success("Sale complete!", "Order recorded.");
+          feedback.success(t("home.saleCompleteTitle"), t("home.saleCompleteOffline"));
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
             console.error("[Complete Sale] Failed (offline)", { error });
@@ -683,8 +688,8 @@ export default function PosPage() {
 
           feedback.fromError(
             error,
-            "Failed to save the sale locally",
-            "Try again or check storage."
+            t("home.failedSaveLocalTitle"),
+            t("home.failedSaveLocalRecovery")
           );
         }
       }
@@ -705,8 +710,8 @@ export default function PosPage() {
               <Input
                 placeholder={
                   categoryView === "grid"
-                    ? "Search categories..."
-                    : "Scan barcode or search item..."
+                    ? t("home.searchCategories")
+                    : t("home.scanOrSearch")
                 }
                 className="pl-10 pr-10 h-12"
                 value={categoryView === "grid" ? categorySearch : productSearch}
@@ -720,7 +725,7 @@ export default function PosPage() {
                 type="button"
                 onClick={() => setIsBarcodeScannerOpen(true)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                title="Scan barcode"
+                title={t("home.scanBarcode")}
               >
                 <QrCode className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
               </button>
@@ -1017,20 +1022,20 @@ export default function PosPage() {
                       <span className="truncate max-w-[120px] sm:max-w-none">
                         {selectedCustomer
                           ? selectedCustomer.name
-                          : "Add Customer"}
+                            : t("home.addCustomer")}
                       </span>
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
                     <DialogHeader>
-                      <DialogTitle>Select a Customer</DialogTitle>
+                      <DialogTitle>{t("nav.customers")}</DialogTitle>
                       <DialogDescription className="sr-only">
                         Search and select a customer for this sale
                       </DialogDescription>
                       <div className="relative mt-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                         <Input
-                          placeholder="Search by name or phone number..."
+                          placeholder={t("home.searchCustomers")}
                           className="pl-10"
                           value={customerSearchTerm}
                           onChange={(e) =>

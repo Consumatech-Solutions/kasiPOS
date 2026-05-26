@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,20 +25,26 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/components/settings-provider";
+import { useI18n } from "@/components/i18n-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
 import { offlineDetector } from "@/lib/offline-detector";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 
-const loginSchema = z.object({
-  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
-  password: z.string().min(1, { message: "Password is required." }),
-});
-
 export default function LoginPage() {
   const { login } = useSettings();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
+
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        phone: z.string().min(10, { message: t("auth.phoneInvalid") }),
+        password: z.string().min(1, { message: t("auth.passwordRequired") }),
+      }),
+    [t]
+  );
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -52,12 +59,12 @@ export default function LoginPage() {
       const response = await authApi.login(values.phone, values.password);
 
       if (response.data && response.data.accessToken) {
-        feedback.success("Login successful", "Welcome back!");
+        feedback.success(t("auth.loginSuccess"), t("auth.welcomeBackToast"));
         await login({
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
-        
+
         try {
           const isOnline = await offlineDetector.forceCheck();
           if (isOnline) {
@@ -95,9 +102,9 @@ export default function LoginPage() {
           );
         }
         feedback.error(
-          "Connection error",
-          "Cannot reach server.",
-          "Ensure the backend is running and try again.",
+          t("auth.connectionError"),
+          t("auth.cannotReachServer"),
+          t("auth.ensureBackend"),
           { code: ERROR_CODES.LOGIN }
         );
         return;
@@ -110,14 +117,14 @@ export default function LoginPage() {
         (typeof (data as { msg?: string })?.msg === "string" &&
           (data as { msg: string }).msg) ||
         (status === 401
-          ? "Invalid phone number or password."
-          : "Login failed. Please try again.");
+          ? t("auth.invalidCredentials")
+          : t("auth.loginFailedRetry"));
       feedback.error(
-        "Login failed",
+        t("auth.loginFailed"),
         serverMessage,
         status === 401
-          ? "Check your phone number and password."
-          : "Try again or request access if you don't have an account.",
+          ? t("auth.checkCredentials")
+          : t("auth.noAccount"),
         { code: ERROR_CODES.LOGIN }
       );
     }
@@ -127,9 +134,11 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">
+            {t("auth.welcomeBack")}
+          </CardTitle>
           <CardDescription className="text-sm">
-            Enter your details to sign in to your store
+            {t("auth.signInDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -140,10 +149,10 @@ export default function LoginPage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel>{t("auth.mobileNumber")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., 0812345678"
+                        placeholder={t("auth.mobilePlaceholder")}
                         className="touch-target"
                         {...field}
                       />
@@ -157,7 +166,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("auth.password")}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -173,27 +182,29 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                Sign In
+                {t("auth.signIn")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            First time here?{" "}
+            {t("auth.firstTime")}{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/request-access">Request Access</Link>
+              <Link href="/request-access">{t("auth.requestAccess")}</Link>
             </Button>
             {" · "}
-            Store admin?{" "}
+            {t("auth.storeAdmin")}{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/set-password-store-admin">Set your password</Link>
+              <Link href="/set-password-store-admin">
+                {t("auth.setPassword")}
+              </Link>
             </Button>
           </p>
         </CardContent>

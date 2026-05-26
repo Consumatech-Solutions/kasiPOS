@@ -55,19 +55,20 @@ import { offlineDetector } from "@/lib/offline-detector";
 import { Switch } from "@/components/ui/switch";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
-const pageTitles: Record<string, string> = {
-  "/": "Home",
-  "/catalogue": "Catalogue",
-  "/inventory": "Inventory",
-  "/transactions": "Orders",
-  "/customers": "Customers",
-  "/buy-stock": "Buy Stock",
-  "/vouchers": "Campaigns",
-  "/marketplace": "Marketplace",
-  "/boph": "BOPH",
-  "/settings": "Settings",
-  "/profile": "Profile",
+const pageTitleKeys: Record<string, string> = {
+  "/": "nav.home",
+  "/catalogue": "nav.catalogue",
+  "/inventory": "nav.inventory",
+  "/transactions": "nav.orders",
+  "/customers": "nav.customers",
+  "/buy-stock": "nav.buyStock",
+  "/vouchers": "nav.campaigns",
+  "/marketplace": "nav.marketplace",
+  "/boph": "nav.boph",
+  "/settings": "nav.settings",
+  "/profile": "header.profile",
 };
 
 const pageIcons: Record<string, React.ElementType> = {
@@ -110,6 +111,7 @@ const getNotificationColor = (type: NotificationType) => {
 
 export default function Header() {
   const { settings, logout } = useSettings();
+  const { t } = useI18n();
   const { currentUser, currentStore } = settings;
   const pathname = usePathname();
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -129,14 +131,14 @@ export default function Header() {
   useEffect(() => setMounted(true), []);
 
   const currentPageTitle = useMemo(() => {
-    if (pageTitles[pathname]) {
-      return pageTitles[pathname];
+    if (pageTitleKeys[pathname]) {
+      return t(pageTitleKeys[pathname]);
     }
     if (pathname.startsWith("/marketplace/")) {
-      return "Marketplace Store";
+      return t("header.marketplaceStore");
     }
-    return "Dashboard";
-  }, [pathname]);
+    return t("header.dashboard");
+  }, [pathname, t]);
 
   const PageIcon = pageIcons[pathname] || Store;
 
@@ -198,7 +200,7 @@ export default function Header() {
           offlineDetector.isDevHost() && (
             <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
               <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
-                Simulate offline
+                {t("header.simulateOffline")}
               </span>
               <Switch
                 checked={offlineDetector.getForceOffline()}
@@ -231,10 +233,12 @@ export default function Header() {
           <PopoverContent className="w-[90vw] sm:w-80 p-0" align="end">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-sm">Notifications</h3>
+                <h3 className="font-semibold text-sm">
+                  {t("header.notifications")}
+                </h3>
                 {unreadCount > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    {unreadCount} new
+                    {t("header.newCount", { count: unreadCount })}
                   </Badge>
                 )}
               </div>
@@ -246,7 +250,7 @@ export default function Header() {
                   onClick={markAllAsRead}
                 >
                   <CheckCheck className="h-3 w-3 mr-1" />
-                  Mark all read
+                  {t("header.markAllRead")}
                 </Button>
               )}
             </div>
@@ -255,10 +259,10 @@ export default function Header() {
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
                   <p className="text-sm text-muted-foreground">
-                    No notifications
+                    {t("header.noNotifications")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    You're all caught up!
+                    {t("header.allCaughtUp")}
                   </p>
                 </div>
               ) : (
@@ -329,10 +333,10 @@ export default function Header() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
-                  {currentUser?.name || "User"}
+                  {currentUser?.name || t("header.user")}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {currentUser?.phone || "No phone"}
+                  {currentUser?.phone || t("header.noPhone")}
                 </p>
                 {currentUser?.role && (
                   <Badge
@@ -348,7 +352,7 @@ export default function Header() {
             <Link href="/profile">
               <DropdownMenuItem className="min-h-[44px] touch-target">
                 <User className="mr-2 h-4 w-4" />
-                Profile
+                {t("header.profile")}
               </DropdownMenuItem>
             </Link>
             <DropdownMenuItem
@@ -356,7 +360,7 @@ export default function Header() {
               className="min-h-[44px] touch-target"
             >
               <Printer className="mr-2 h-4 w-4" />
-              Hardware setup
+              {t("header.hardwareSetup")}
             </DropdownMenuItem>
             {(currentUser?.role === "admin" ||
               currentStore?.ownerId === currentUser?.id ||
@@ -364,7 +368,7 @@ export default function Header() {
               <Link href="/settings">
                 <DropdownMenuItem className="min-h-[44px] touch-target">
                   <Store className="mr-2 h-4 w-4" />
-                  Settings
+                  {t("nav.settings")}
                 </DropdownMenuItem>
               </Link>
             )}
@@ -373,7 +377,7 @@ export default function Header() {
               onClick={logout}
               className="text-destructive focus:text-destructive min-h-[44px] touch-target"
             >
-              Log out
+              {t("header.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

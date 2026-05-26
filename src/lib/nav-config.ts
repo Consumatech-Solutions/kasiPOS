@@ -23,41 +23,41 @@ export const OFFLINE_FIRST_PATHS = [
 
 type NavItem = {
   href: string;
-  label: string;
+  labelKey: string;
   icon: React.ElementType;
   featureFlag?: keyof AppSettings;
   roles?: User["role"][];
 };
 
 export const navItems: NavItem[] = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/catalogue", label: "Catalogue", icon: BookOpen },
-  { href: "/inventory", label: "Inventory", icon: LayoutGrid },
-  { href: "/sale", label: "Sales", icon: DollarSign },
-  { href: "/transactions", label: "Orders", icon: ScrollText },
-  { href: "/customers", label: "Customers", icon: Users },
+  { href: "/", labelKey: "nav.home", icon: Home },
+  { href: "/catalogue", labelKey: "nav.catalogue", icon: BookOpen },
+  { href: "/inventory", labelKey: "nav.inventory", icon: LayoutGrid },
+  { href: "/sale", labelKey: "nav.sales", icon: DollarSign },
+  { href: "/transactions", labelKey: "nav.orders", icon: ScrollText },
+  { href: "/customers", labelKey: "nav.customers", icon: Users },
   {
     href: "/buy-stock",
-    label: "Buy Stock",
+    labelKey: "nav.buyStock",
     icon: ShoppingCart,
     featureFlag: "buyStock",
   },
   {
     href: "/vouchers",
-    label: "Campaigns",
+    labelKey: "nav.campaigns",
     icon: Ticket,
     featureFlag: "campaigns",
   },
   {
     href: "/marketplace",
-    label: "Marketplace",
+    labelKey: "nav.marketplace",
     icon: ShoppingBasket,
     featureFlag: "marketplace",
   },
-  { href: "/boph", label: "BOPH", icon: PackageCheck, featureFlag: "boph" },
+  { href: "/boph", labelKey: "nav.boph", icon: PackageCheck, featureFlag: "boph" },
   {
     href: "/settings",
-    label: "Settings",
+    labelKey: "nav.settings",
     icon: Settings,
     roles: ["admin", "store_admin"],
   },

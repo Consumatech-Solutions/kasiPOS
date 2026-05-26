@@ -8,10 +8,12 @@ import { useSettings } from "../settings-provider";
 import { useEffectiveOnline } from "@/hooks/use-effective-online";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 
 export default function BottomNav() {
   const pathname = usePathname();
   const { settings } = useSettings();
+  const { t } = useI18n();
   const { effectiveOnline } = useEffectiveOnline();
 
   const navItems = useMemo(() => {
@@ -42,7 +44,7 @@ export default function BottomNav() {
             const isGreyed = needsCloud && !effectiveOnline;
             return (
               <Button
-                key={item.label}
+                key={item.href}
                 variant={isActive ? "secondary" : "ghost"}
                 asChild
                 className={cn(
@@ -54,7 +56,7 @@ export default function BottomNav() {
               >
                 <Link href={item.href} aria-disabled={isGreyed}>
                   <Icon className="w-5 h-5 mb-1" />
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                 </Link>
               </Button>
             );

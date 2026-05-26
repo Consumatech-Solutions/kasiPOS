@@ -13,6 +13,9 @@ import { usePathname, useRouter } from "next/navigation";
 import type { AppSettings, User, Store } from "@/types";
 import { authApi } from "@/lib/api/auth";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import { getMessages } from "@/i18n/messages";
+import { translate } from "@/i18n/translate";
+import { resolveLocale } from "@/i18n/types";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -51,9 +54,15 @@ function readPersistedSettings(): AppSettings {
 
     const currentStore = storedSettings.currentStore || null;
     const modules = currentStore?.enabledModules;
+    const language =
+      storedSettings.language === "fr" || storedSettings.language === "en"
+        ? storedSettings.language
+        : defaultSettings.language;
+
     return {
       ...defaultSettings,
       theme: storedSettings.theme || "light",
+      language,
       currentUser,
       currentStore,
       isLoggedIn: !!currentUser,
@@ -239,20 +248,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
 
   const logout = useCallback(async () => {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(
-        "Are you sure you want to log out? Offline data on this device will be kept."
-      )
-    ) {
+    const locale = resolveLocale(settings.language);
+    const logoutConfirm = translate(
+      getMessages(locale),
+      "settings.logoutConfirm"
+    );
+    if (typeof window !== "undefined" && !window.confirm(logoutConfirm)) {
       return;
     }
 
     const theme = settings.theme;
+    const language = settings.language;
 
     const newSettings = {
       ...defaultSettings,
       theme,
+      language,
       isLoggedIn: false,
       currentUser: null,
       currentStore: null,
@@ -260,7 +271,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       window.localStorage.setItem(
         "kasi-pos-settings",
-        JSON.stringify({ theme })
+        JSON.stringify({ theme, language })
       );
       window.localStorage.removeItem("token");
       window.localStorage.removeItem("user");
@@ -277,7 +288,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Logout API call failed", error);
     }
-  }, [router, settings.theme]);
+  }, [router, settings.theme, settings.language]);
 
   useEffect(() => {
     const bootstrapData = async () => {
@@ -453,6 +464,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const next: Record<string, unknown> = {
         ...existing,
         theme: settings.theme,
+        language: settings.language,
         showVatInCheckout: settings.showVatInCheckout,
       };
       if (settings.currentStore) {
