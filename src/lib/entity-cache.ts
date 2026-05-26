@@ -766,9 +766,12 @@ export async function getStockAdjustmentsFromDexie(
   if (productId != null && productId !== "") {
     all = all.filter((a) => String(a.productId) === String(productId));
   }
-  const sorted = all.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const sorted = all.sort((a, b) => {
+    // `date` is optional for backward compatibility, so fall back to `createdAt`.
+    const aTime = a.date?.getTime() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const bTime = b.date?.getTime() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return bTime - aTime;
+  });
   const total = sorted.length;
   const data = sorted.slice((page - 1) * limit, page * limit);
   return {

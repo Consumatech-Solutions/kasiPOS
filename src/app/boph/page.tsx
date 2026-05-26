@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSettings } from "@/components/settings-provider";
 import { useParcels } from "@/hooks/use-parcels";
-import type { Parcel } from "@/lib/api/parcels";
+import type { Parcel } from "@/types";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { RequireOnlineBanner } from "@/components/require-online-banner";
@@ -856,7 +856,7 @@ export default function BophPage() {
             <Form {...editParcelForm}>
               <form
                 onSubmit={editParcelForm.handleSubmit(async (values) => {
-                  if (!selectedParcel) return;
+                  if (!selectedParcel?.id) return;
 
                   try {
                     await updateParcel(selectedParcel.id, {
@@ -971,7 +971,7 @@ export default function BophPage() {
               <AlertDialogAction
                 className="min-h-[44px] touch-target w-full sm:w-auto bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={async () => {
-                  if (!parcelToDelete) return;
+                  if (!parcelToDelete?.id) return;
 
                   try {
                     await deleteParcel(parcelToDelete.id);
