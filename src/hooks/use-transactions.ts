@@ -68,13 +68,35 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
+      const page = params.page ?? 1;
+      const limit = params.limit ?? 10;
+      const offline = await checkOfflineStatus();
+      if (!offline && storeIdForOffline) {
+        try {
+          const res = await transactionsApi.getAll({
+            ...params,
+            storeId: storeIdForOffline,
+            page,
+            limit: Math.min(100, limit),
+          });
+          const normalized = normalizeTransactionResponse(res.data);
+          if (normalized.data.length > 0) {
+            await saveTransactionsToDexie(normalized.data);
+          }
+          return normalized;
+        } catch {
+          // Fall back to local cache when API is unavailable.
+        }
+      }
       return getTransactionsFromDexie(
-        params.page ?? 1,
-        params.limit ?? 10,
+        page,
+        limit,
         storeIdForOffline ?? undefined
       );
     },
     enabled: true,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const createMutation = useMutation({

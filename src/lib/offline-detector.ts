@@ -6,10 +6,7 @@ interface OfflineState {
 
 const CONNECTIVITY_CHECK_INTERVAL_MS = 10000;
 const NETWORK_TEST_TIMEOUT = 5000;
-const BACKEND_URL =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : "http://localhost:9002";
+import { getConnectivityProbeUrl } from "@/lib/api/resolve-api-base-url";
 
 function isDevHost(): boolean {
   if (typeof window === "undefined") return false;
@@ -139,7 +136,7 @@ class OfflineDetector {
           () => controller.abort(),
           NETWORK_TEST_TIMEOUT
         );
-        const url = BACKEND_URL.replace(/\/$/, "");
+        const url = getConnectivityProbeUrl();
 
         try {
           const response = await fetch(url, {

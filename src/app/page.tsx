@@ -499,15 +499,15 @@ export default function PosPage() {
             idempotencyKey,
           });
 
-          const resData = response.data as
-            | { id?: string; data?: { id?: string } }
-            | undefined;
-          const createdId =
-            resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
-          await db.transactions.add({
+          const resData = response.data as Transaction | undefined;
+          const createdId = resData?.id ?? `TXN-${Date.now()}`;
+          const savedTx: Transaction = {
             ...newTransaction,
+            ...resData,
             id: String(createdId),
-          } as Transaction);
+          } as Transaction;
+          await db.transactions.add(savedTx);
+          await saveTransactionsToDexie([savedTx]);
 
           for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
             const product = await getDb().productCache.get(pid);
@@ -542,7 +542,18 @@ export default function PosPage() {
               createdId: resData?.id ?? resData?.data?.id,
             });
           }
-          feedback.success("Sale complete!", "View your receipt below.");
+          const creditDue =
+            newTransaction.paymentMethod === "Credit"
+              ? (resData?.creditDueAt ?? resData?.creditDetails?.dueAt ?? null)
+              : null;
+          feedback.success(
+            newTransaction.paymentMethod === "Credit"
+              ? "Credit sale recorded"
+              : "Sale complete!",
+            creditDue
+              ? `Payment due ${new Date(creditDue).toLocaleString()}. View your receipt below.`
+              : "View your receipt below."
+          );
         } catch (error: unknown) {
           const err = error as {
             message?: string;

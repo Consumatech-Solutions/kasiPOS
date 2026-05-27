@@ -27,6 +27,8 @@ export type CreateTransactionDto = {
   creditDetails?: TransactionCreditDetails;
 };
 
+export type ClearCreditRequest = { id: string };
+
 export interface GetTransactionsParams extends PaginationParams {
   page?: number;
   limit?: number;
@@ -147,4 +149,7 @@ export const transactionsApi = {
       params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
     });
   },
+
+  clearCredit: (data: ClearCreditRequest) =>
+    api.post<Transaction>("/transactions/clear-credit", data),
 };

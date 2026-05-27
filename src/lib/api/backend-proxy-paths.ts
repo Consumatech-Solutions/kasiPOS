@@ -1,0 +1,21 @@
+/** API path prefixes proxied to the backend in Next.js dev (see next.config.ts). */
+export const API_PROXY_PREFIXES = [
+  "auth",
+  "stores",
+  "users",
+  "customers",
+  "categories",
+  "products",
+  "category-templates",
+  "product-templates",
+  "files",
+  "transactions",
+  "vouchers",
+  "stock-adjustments",
+  "parcels",
+  "marketplace-orders",
+  "marketplace-stores",
+  "purchase-orders",
+  "settings",
+  "notifications",
+] as const;

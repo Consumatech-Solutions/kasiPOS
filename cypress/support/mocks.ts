@@ -227,6 +227,9 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     };
     corsReply(req, { statusCode: 200, body: clone(state.store) });
   }).as("patchStore");
+  let mockSettingsCredit: Record<string, unknown> | null =
+    (options.seedAuth.store.credit as Record<string, unknown> | null) ?? null;
+
   cy.intercept("GET", `${apiBaseUrl}/settings*`, (req) => {
     // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.
     if (isDocumentNavigation(req)) {
@@ -236,9 +239,30 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     if (replyOfflineIfNeeded(req)) return;
     corsReply(req, {
       statusCode: 200,
-      body: { credit: options.seedAuth.store.credit ?? null },
+      body: { credit: mockSettingsCredit },
     });
-  });
+  }).as("getSettings");
+
+  cy.intercept("PATCH", `${apiBaseUrl}/settings*`, (req) => {
+    if (replyOfflineIfNeeded(req)) return;
+    const body = req.body as { credit?: Record<string, unknown> | null };
+    mockSettingsCredit =
+      body.credit === undefined ? mockSettingsCredit : body.credit;
+    if (mockSettingsCredit && options.seedAuth.store) {
+      options.seedAuth.store = {
+        ...options.seedAuth.store,
+        credit: mockSettingsCredit as typeof options.seedAuth.store.credit,
+      };
+      state.store = {
+        ...state.store,
+        credit: mockSettingsCredit as typeof state.store.credit,
+      };
+    }
+    corsReply(req, {
+      statusCode: 200,
+      body: { credit: mockSettingsCredit },
+    });
+  }).as("patchSettings");
 
   cy.intercept("GET", `${apiBaseUrl}/categories*`, (req) => {
     if (replyOfflineIfNeeded(req)) return;
@@ -501,6 +525,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       storeId: string;
     };
 
+    const isCredit = payload.paymentMethod === "Credit";
     const created = {
       id: `txn-${Date.now()}`,
       customerId: payload.customerId ?? null,
@@ -511,6 +536,14 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       discountAmount: payload.discountAmount ?? null,
       storeId: payload.storeId,
       createdAt: isoNow(),
+      status: isCredit ? "pending" : "paid",
+      ...(isCredit && {
+        creditDueAt: isoNow(),
+        creditDetails: {
+          paymentDate: isoNow().slice(0, 10),
+          dueAt: isoNow(),
+        },
+      }),
     };
     state.transactions.unshift(created);
 
@@ -533,6 +566,9 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
               loyaltyPoints:
                 Number(row.loyaltyPoints) +
                 Math.max(1, Math.floor(Number(payload.total) / 10)),
+              outstandingCredit: isCredit
+                ? Number(row.outstandingCredit ?? 0) + Number(payload.total)
+                : row.outstandingCredit,
               updatedAt: isoNow(),
             }
           : row
@@ -541,6 +577,98 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
 
     corsReply(req, { statusCode: 201, body: created });
   }).as("createTransaction");
+
+  cy.intercept("POST", `${apiBaseUrl}/transactions/clear-credit`, (req) => {
+    if (replyOfflineIfNeeded(req)) return;
+    const body = req.body as { id?: string };
+    const id = String(body.id ?? "");
+    const txn = state.transactions.find((row) => String(row.id) === id);
+    if (!txn || txn.paymentMethod !== "Credit" || txn.status !== "pending") {
+      corsReply(req, {
+        statusCode: 400,
+        body: { message: "Transaction is not a pending credit sale." },
+      });
+      return;
+    }
+    const updated = {
+      ...txn,
+      status: "paid",
+      creditSettledAt: isoNow(),
+    };
+    state.transactions = state.transactions.map((row) =>
+      String(row.id) === id ? updated : row
+    );
+    if (txn.customerId) {
+      state.customers = state.customers.map((row) =>
+        String(row.id) === String(txn.customerId)
+          ? {
+              ...row,
+              outstandingCredit: Math.max(
+                0,
+                Number(row.outstandingCredit ?? 0) - Number(txn.total)
+              ),
+              updatedAt: isoNow(),
+            }
+          : row
+      );
+    }
+    corsReply(req, { statusCode: 200, body: updated });
+  }).as("clearCredit");
+
+  const mockNotifications: Array<{
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    readAt: string | null;
+    createdAt: string;
+    metadata?: Record<string, unknown>;
+  }> = [];
+
+  cy.intercept("GET", `${apiBaseUrl}/notifications/unread-count`, (req) => {
+    if (replyOfflineIfNeeded(req)) return;
+    const count = mockNotifications.filter((n) => n.readAt == null).length;
+    corsReply(req, { statusCode: 200, body: { count } });
+  }).as("notificationsUnreadCount");
+
+  cy.intercept("GET", `${apiBaseUrl}/notifications*`, (req) => {
+    if (isDocumentNavigation(req)) {
+      req.continue();
+      return;
+    }
+    if (replyOfflineIfNeeded(req)) return;
+    let rows = [...mockNotifications];
+    if (String(req.query.unreadOnly) === "true") {
+      rows = rows.filter((n) => n.readAt == null);
+    }
+    corsReply(req, {
+      statusCode: 200,
+      body: paginate(
+        rows,
+        Number(req.query.page ?? 1),
+        Number(req.query.limit ?? 20)
+      ),
+    });
+  }).as("getNotifications");
+
+  cy.intercept("PATCH", `${apiBaseUrl}/notifications/*/read`, (req) => {
+    if (replyOfflineIfNeeded(req)) return;
+    const id = String(req.url.split("/").slice(-2)[0]);
+    const row = mockNotifications.find((n) => n.id === id);
+    if (row) row.readAt = isoNow();
+    corsReply(req, { statusCode: 200, body: row ?? {} });
+  }).as("markNotificationRead");
+
+  cy.intercept("PATCH", `${apiBaseUrl}/notifications/read-all`, (req) => {
+    if (replyOfflineIfNeeded(req)) return;
+    mockNotifications.forEach((n) => {
+      n.readAt = isoNow();
+    });
+    corsReply(req, {
+      statusCode: 200,
+      body: { updated: mockNotifications.length },
+    });
+  }).as("markAllNotificationsRead");
 
   cy.intercept("GET", `${apiBaseUrl}/vouchers*`, (req) => {
     // In same-origin mock mode, let page navigations keep hitting Next.js HTML routes.

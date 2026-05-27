@@ -137,6 +137,13 @@ describe("transactionsApi.create", () => {
     expect(api.post).toHaveBeenCalledWith("/transactions", body, undefined);
   });
 
+  it("POSTs clear-credit with transaction id", async () => {
+    await transactionsApi.clearCredit({ id: "txn-uuid" });
+    expect(api.post).toHaveBeenCalledWith("/transactions/clear-credit", {
+      id: "txn-uuid",
+    });
+  });
+
   it("sends Idempotency-Key header when idempotencyKey is provided", async () => {
     const body = toCreateTransactionDto({
       storeId: "s",

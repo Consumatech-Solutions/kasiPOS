@@ -112,6 +112,24 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
   }
 }
 
+export async function updateTransactionInDexie(
+  transaction: Transaction
+): Promise<void> {
+  if (typeof window === "undefined" || !transaction.id) return;
+  const db = getDb();
+  const record = {
+    ...transaction,
+    id: String(transaction.id),
+    date:
+      (transaction as Transaction & { date?: string }).date ??
+      transaction.createdAt ??
+      new Date().toISOString(),
+  };
+  await db.transactionCache.put(
+    record as { id: string; date?: string; [k: string]: unknown }
+  );
+}
+
 export async function saveTransactionsToDexie(
   data: Transaction[]
 ): Promise<void> {

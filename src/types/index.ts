@@ -111,9 +111,13 @@ export interface TransactionDiscount {
   discountReason: string;
 }
 
+export type TransactionStatus = "pending" | "failed" | "paid";
+
 /** Credit sale details (payment date, note). */
 export interface TransactionCreditDetails {
   paymentDate?: string; // ISO 8601
+  /** UTC due datetime from backend (paymentDate + time of sale). */
+  dueAt?: string;
   note?: string;
 }
 
@@ -138,6 +142,12 @@ export interface Transaction {
   storeId: string;
   /** Present when paymentMethod is 'Credit'. */
   creditDetails?: TransactionCreditDetails | null;
+  /** paid | pending (credit) | failed (non-credit). */
+  status?: TransactionStatus;
+  /** UTC due datetime for credit sales. */
+  creditDueAt?: string | null;
+  /** Set when credit is cleared via POST /transactions/clear-credit. */
+  creditSettledAt?: string | null;
 }
 
 export interface Voucher {

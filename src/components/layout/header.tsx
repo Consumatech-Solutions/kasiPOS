@@ -34,11 +34,9 @@ import {
   BookOpen,
   Check,
   CheckCheck,
-  X,
   Home,
   AlertCircle,
   Info,
-  CheckCircle,
   AlertTriangle,
   Printer,
 } from "lucide-react";
@@ -46,10 +44,10 @@ import Link from "next/link";
 import { useSettings } from "../settings-provider";
 import { useHardwareSetup } from "@/components/hardware-setup/HardwareSetupProvider";
 import {
-  useNotifications,
-  type Notification,
-  type NotificationType,
-} from "@/hooks/use-notifications";
+  useBackendNotifications,
+  getCreditNotificationLink,
+} from "@/hooks/use-backend-notifications";
+import type { AppNotification } from "@/types/notifications";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { offlineDetector } from "@/lib/offline-detector";
 import { Switch } from "@/components/ui/switch";
@@ -82,31 +80,25 @@ const pageIcons: Record<string, React.ElementType> = {
   "/boph": PackageCheck,
 };
 
-const getNotificationIcon = (type: NotificationType) => {
-  switch (type) {
-    case "success":
-      return CheckCircle;
-    case "warning":
-      return AlertTriangle;
-    case "error":
-      return AlertCircle;
-    default:
-      return Info;
+function getNotificationIcon(notification: AppNotification) {
+  if (notification.type === "credit_payment_reminder") {
+    const overdue = (notification.metadata as { overdue?: boolean } | undefined)
+      ?.overdue;
+    return overdue ? AlertCircle : AlertTriangle;
   }
-};
+  return Info;
+}
 
-const getNotificationColor = (type: NotificationType) => {
-  switch (type) {
-    case "success":
-      return "text-green-600 dark:text-green-400";
-    case "warning":
-      return "text-yellow-600 dark:text-yellow-400";
-    case "error":
-      return "text-red-600 dark:text-red-400";
-    default:
-      return "text-blue-600 dark:text-blue-400";
+function getNotificationColor(notification: AppNotification) {
+  if (notification.type === "credit_payment_reminder") {
+    const overdue = (notification.metadata as { overdue?: boolean } | undefined)
+      ?.overdue;
+    return overdue
+      ? "text-red-600 dark:text-red-400"
+      : "text-yellow-600 dark:text-yellow-400";
   }
-};
+  return "text-blue-600 dark:text-blue-400";
+}
 
 export default function Header() {
   const { settings, logout } = useSettings();
@@ -114,19 +106,23 @@ export default function Header() {
   const pathname = usePathname();
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const {
     notifications,
     unreadCount,
     markAsRead,
     markAllAsRead,
-    removeNotification,
-  } = useNotifications();
+    refreshList,
+    loading: notificationsLoading,
+  } = useBackendNotifications({
+    enabled: mounted && Boolean(currentUser),
+    listUnreadOnly: false,
+  });
   const { isOnline, wasOffline, hasInternet, cloudUnreachable } =
     useNetworkStatus();
   const { openHardwareSetup } = useHardwareSetup();
-
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   const currentPageTitle = useMemo(() => {
     if (pageTitles[pathname]) {
@@ -140,14 +136,22 @@ export default function Header() {
 
   const PageIcon = pageIcons[pathname] || Store;
 
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.read) {
-      markAsRead(notification.id);
+  const handleNotificationClick = async (notification: AppNotification) => {
+    if (!notification.readAt) {
+      try {
+        await markAsRead(notification.id);
+      } catch {
+        // Badge will refresh on next poll.
+      }
     }
-    if (notification.link) {
+    if (getCreditNotificationLink(notification)) {
       setNotificationOpen(false);
     }
   };
+
+  useEffect(() => {
+    if (notificationOpen) refreshList();
+  }, [notificationOpen, refreshList]);
 
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
@@ -194,7 +198,8 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {mounted && process.env.NODE_ENV === "development" &&
+        {mounted &&
+          process.env.NODE_ENV === "development" &&
           offlineDetector.isDevHost() && (
             <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
               <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
@@ -210,7 +215,13 @@ export default function Header() {
             </div>
           )}
 
-        <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+        <Popover
+          open={notificationOpen}
+          onOpenChange={(open) => {
+            setNotificationOpen(open);
+            if (open) refreshList();
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
@@ -243,7 +254,7 @@ export default function Header() {
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={markAllAsRead}
+                  onClick={() => void markAllAsRead()}
                 >
                   <CheckCheck className="h-3 w-3 mr-1" />
                   Mark all read
@@ -251,33 +262,41 @@ export default function Header() {
               )}
             </div>
             <ScrollArea className="h-[400px]">
-              {notifications.length === 0 ? (
+              {notificationsLoading && notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Loading notifications...
+                  </p>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
                   <p className="text-sm text-muted-foreground">
                     No notifications
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    You're all caught up!
+                    Credit payment reminders will appear here.
                   </p>
                 </div>
               ) : (
                 <div className="divide-y">
                   {notifications.map((notification) => {
-                    const Icon = getNotificationIcon(notification.type);
-                    const colorClass = getNotificationColor(notification.type);
-                    const content = notification.link ? (
+                    const Icon = getNotificationIcon(notification);
+                    const colorClass = getNotificationColor(notification);
+                    const link = getCreditNotificationLink(notification);
+                    const content = link ? (
                       <Link
-                        href={notification.link}
-                        onClick={() => handleNotificationClick(notification)}
+                        href={link}
+                        onClick={() =>
+                          void handleNotificationClick(notification)
+                        }
                         className="block"
                       >
                         <NotificationItem
                           notification={notification}
                           Icon={Icon}
                           colorClass={colorClass}
-                          onMarkRead={() => markAsRead(notification.id)}
-                          onRemove={() => removeNotification(notification.id)}
+                          onMarkRead={() => void markAsRead(notification.id)}
                         />
                       </Link>
                     ) : (
@@ -285,8 +304,7 @@ export default function Header() {
                         notification={notification}
                         Icon={Icon}
                         colorClass={colorClass}
-                        onMarkRead={() => markAsRead(notification.id)}
-                        onRemove={() => removeNotification(notification.id)}
+                        onMarkRead={() => void markAsRead(notification.id)}
                       />
                     );
                     return <div key={notification.id}>{content}</div>;
@@ -383,11 +401,10 @@ export default function Header() {
 }
 
 interface NotificationItemProps {
-  notification: Notification;
+  notification: AppNotification;
   Icon: React.ElementType;
   colorClass: string;
   onMarkRead: () => void;
-  onRemove: () => void;
 }
 
 function NotificationItem({
@@ -395,13 +412,14 @@ function NotificationItem({
   Icon,
   colorClass,
   onMarkRead,
-  onRemove,
 }: NotificationItemProps) {
+  const isUnread = notification.readAt == null;
+  const createdAt = new Date(notification.createdAt);
   return (
     <div
       className={cn(
         "relative px-4 py-3 hover:bg-muted/50 transition-colors",
-        !notification.read && "bg-muted/30"
+        isUnread && "bg-muted/30"
       )}
     >
       <div className="flex gap-3">
@@ -411,15 +429,12 @@ function NotificationItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p
-              className={cn(
-                "text-sm font-medium",
-                !notification.read && "font-semibold"
-              )}
+              className={cn("text-sm font-medium", isUnread && "font-semibold")}
             >
               {notification.title}
             </p>
             <div className="flex items-center gap-1 flex-shrink-0">
-              {!notification.read && (
+              {isUnread && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -433,29 +448,17 @@ function NotificationItem({
                   <Check className="h-3 w-3" />
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onRemove();
-                }}
-              >
-                <X className="h-3 w-3" />
-              </Button>
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-            {notification.message}
+            {notification.body}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(createdAt, { addSuffix: true })}
           </p>
         </div>
       </div>
-      {!notification.read && (
+      {isUnread && (
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
       )}
     </div>

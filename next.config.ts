@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { API_PROXY_PREFIXES } from "./src/lib/api/backend-proxy-paths";
+
+const backendProxyTarget = (
+  process.env.BACKEND_PROXY_TARGET ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3001"
+).replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -83,7 +90,18 @@ const nextConfig: NextConfig = {
   },
   // Ensure service worker is served from root; serve favicon from stable asset to avoid 500
   async rewrites() {
+    const apiProxyRewrites = API_PROXY_PREFIXES.map((prefix) => ({
+      source: `/${prefix}/:path*`,
+      destination: `${backendProxyTarget}/${prefix}/:path*`,
+    }));
+    const apiProxyRootRewrites = API_PROXY_PREFIXES.map((prefix) => ({
+      source: `/${prefix}`,
+      destination: `${backendProxyTarget}/${prefix}`,
+    }));
+
     return [
+      ...apiProxyRewrites,
+      ...apiProxyRootRewrites,
       {
         source: "/sw.js",
         destination: "/sw.js",
