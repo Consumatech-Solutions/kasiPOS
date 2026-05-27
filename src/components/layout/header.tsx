@@ -153,6 +153,24 @@ export default function Header() {
     if (notificationOpen) refreshList();
   }, [notificationOpen, refreshList]);
 
+  const handleMarkAllReadClick = () => {
+    markAllAsRead().catch(() => {
+      // Badge will refresh on next poll.
+    });
+  };
+
+  const handleMarkOneRead = (id: string) => {
+    markAsRead(id).catch(() => {
+      // Badge will refresh on next poll.
+    });
+  };
+
+  const handleNotificationLinkClick = (notification: AppNotification) => {
+    handleNotificationClick(notification).catch(() => {
+      // Ignore; list refreshes on next open.
+    });
+  };
+
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
@@ -254,7 +272,7 @@ export default function Header() {
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={() => void markAllAsRead()}
+                  onClick={handleMarkAllReadClick}
                 >
                   <CheckCheck className="h-3 w-3 mr-1" />
                   Mark all read
@@ -288,7 +306,7 @@ export default function Header() {
                       <Link
                         href={link}
                         onClick={() =>
-                          void handleNotificationClick(notification)
+                          handleNotificationLinkClick(notification)
                         }
                         className="block"
                       >
@@ -296,7 +314,7 @@ export default function Header() {
                           notification={notification}
                           Icon={Icon}
                           colorClass={colorClass}
-                          onMarkRead={() => void markAsRead(notification.id)}
+                          onMarkRead={() => handleMarkOneRead(notification.id)}
                         />
                       </Link>
                     ) : (
@@ -304,7 +322,7 @@ export default function Header() {
                         notification={notification}
                         Icon={Icon}
                         colorClass={colorClass}
-                        onMarkRead={() => void markAsRead(notification.id)}
+                        onMarkRead={() => handleMarkOneRead(notification.id)}
                       />
                     );
                     return <div key={notification.id}>{content}</div>;

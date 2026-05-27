@@ -518,7 +518,7 @@ export default function PosPage() {
               queryClient.setQueriesData(
                 { queryKey: productKeys.lists() },
                 (oldData: any) => {
-                  if (!oldData || !oldData.data) return oldData;
+                  if (!oldData?.data) return oldData;
                   return {
                     ...oldData,
                     data: oldData.data.map((p: any) =>
@@ -539,7 +539,7 @@ export default function PosPage() {
 
           if (process.env.NODE_ENV === "development") {
             console.log("[Complete Sale] Success (online)", {
-              createdId: resData?.id ?? resData?.data?.id,
+              createdId: resData?.id,
             });
           }
           const creditDue =
@@ -643,7 +643,7 @@ export default function PosPage() {
               queryClient.setQueriesData(
                 { queryKey: productKeys.lists() },
                 (oldData: any) => {
-                  if (!oldData || !oldData.data) return oldData;
+                  if (!oldData?.data) return oldData;
                   return {
                     ...oldData,
                     data: oldData.data.map((p: any) =>

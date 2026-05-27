@@ -190,7 +190,7 @@ export async function saveCategoriesToDexie(
   data: ApiCategory[],
   storeId?: string | null
 ): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   const records = data.map((c) => ({
     id: c.id,
