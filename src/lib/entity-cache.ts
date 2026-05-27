@@ -60,10 +60,16 @@ function productCategoryHasName(cat: unknown): boolean {
   return false;
 }
 
-type ProductStoreIdSource = ApiProduct & {
-  storeId?: string | number | null;
-  store_id?: string | number | null;
+type EntityStoreId = string | number | null;
+
+type StoreScopedRow = {
+  storeId?: EntityStoreId;
 };
+
+type ProductStoreIdSource = ApiProduct &
+  StoreScopedRow & {
+    store_id?: EntityStoreId;
+  };
 
 function resolvedProductStoreId(
   p: ProductStoreIdSource,
@@ -275,7 +281,7 @@ export function isTempEntityId(id: unknown): boolean {
 }
 
 function rowMatchesStoreScope(
-  rowStoreId: string | number | null | undefined,
+  rowStoreId: EntityStoreId | undefined,
   syncStoreId: string | null | undefined
 ): boolean {
   if (syncStoreId == null || syncStoreId === "") return true;
@@ -300,12 +306,7 @@ export async function purgeTempIdCatalogueRowsAfterCloudSync(
   const products = await db.productCache.toArray();
   const productIds = products
     .filter((p) => isTempEntityId(p.id))
-    .filter((p) =>
-      rowMatchesStoreScope(
-        (p as { storeId?: string | number | null }).storeId,
-        storeId
-      )
-    )
+    .filter((p) => rowMatchesStoreScope((p as StoreScopedRow).storeId, storeId))
     .map((p) => String(p.id));
 
   const categories = await db.categoryCache.toArray();
@@ -666,12 +667,9 @@ export async function getCustomerTransactionsFromDexie(args: {
   if (storeId != null && storeId !== "") {
     all = all.filter(
       (t) =>
-        (t as unknown as Transaction & { storeId?: string | number | null })
-          .storeId != null &&
-        String(
-          (t as unknown as Transaction & { storeId?: string | number | null })
-            .storeId
-        ) === String(storeId)
+        (t as unknown as Transaction & StoreScopedRow).storeId != null &&
+        String((t as unknown as Transaction & StoreScopedRow).storeId) ===
+          String(storeId)
     );
   }
   const cid = String(customerId);
