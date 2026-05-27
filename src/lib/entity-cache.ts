@@ -35,7 +35,7 @@ export type LastSyncEntity = keyof typeof LAST_SYNC_KEYS;
 export async function getLastSyncAt(
   entity: LastSyncEntity
 ): Promise<string | null> {
-  if (typeof window === "undefined") return null;
+  if (typeof globalThis.window === "undefined") return null;
   const db = getDb();
   const record = await db.keyVal.get(LAST_SYNC_KEYS[entity]);
   return record?.value ?? null;
@@ -45,7 +45,7 @@ export async function setLastSyncAt(
   entity: LastSyncEntity,
   isoDate: string
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   await db.keyVal.put({ key: LAST_SYNC_KEYS[entity], value: isoDate });
 }
@@ -67,13 +67,10 @@ export async function saveProductsToDexie(
   data: ApiProduct[],
   storeId?: string | null
 ): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   const records = data.map((p) => {
-    const sid = resolvedProductStoreId(
-      p as ApiProduct & { storeId?: string | number | null },
-      storeId
-    );
+    const sid = resolvedProductStoreId(p, storeId);
     return {
       ...p,
       id: p.id,
@@ -95,7 +92,7 @@ export async function saveProductsToDexie(
 }
 
 export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   await db.customers.bulkPut(data);
   const count = await db.customers.count();
@@ -133,7 +130,7 @@ export async function updateTransactionInDexie(
 export async function saveTransactionsToDexie(
   data: Transaction[]
 ): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   const records = data.map((t) => ({
     ...t,
@@ -160,7 +157,7 @@ export async function updateProductStockInDexie(
   productId: string,
   newStock: number
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   const product = await db.productCache.get(productId);
   if (product) {
@@ -172,7 +169,7 @@ export async function updateProductInDexie(
   productId: string,
   updates: Partial<ApiProduct>
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   const product = await db.productCache.get(productId);
   if (product) {
@@ -181,7 +178,7 @@ export async function updateProductInDexie(
 }
 
 export async function deleteProductFromDexie(productId: string): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   await db.productCache.delete(productId);
 }
@@ -217,7 +214,7 @@ export async function getCategoriesFromDexie(
   limit: number,
   storeIdForOffline?: string | null
 ): Promise<{ data: ApiCategory[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
@@ -247,7 +244,7 @@ export async function updateCategoryInDexie(
   categoryId: string,
   updates: Partial<ApiCategory>
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   const category = await db.categoryCache.get(categoryId);
   if (category) {
@@ -258,7 +255,7 @@ export async function updateCategoryInDexie(
 export async function deleteCategoryFromDexie(
   categoryId: string
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   await db.categoryCache.delete(categoryId);
 }
@@ -287,7 +284,7 @@ export type PurgeTempIdCatalogueResult = {
 export async function purgeTempIdCatalogueRowsAfterCloudSync(
   storeId?: string | null
 ): Promise<PurgeTempIdCatalogueResult> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { productsRemoved: 0, categoriesRemoved: 0, customersRemoved: 0 };
   }
   const db = getDb();
@@ -337,7 +334,7 @@ export type PurgeUnscopedCategoriesResult = { removed: number };
 export async function purgeUnscopedProductsCacheOnce(
   storeId: string
 ): Promise<PurgeUnscopedProductsResult | null> {
-  if (typeof window === "undefined" || !storeId) return null;
+  if (typeof globalThis.window === "undefined" || !storeId) return null;
   const key = `${PURGE_UNSCOPED_PRODUCTS_KEY_PREFIX}:${storeId}`;
   try {
     if (localStorage.getItem(key) === "1") {
@@ -366,7 +363,7 @@ export async function purgeUnscopedProductsCacheOnce(
 export async function purgeUnscopedCategoriesCacheOnce(
   storeId: string
 ): Promise<PurgeUnscopedCategoriesResult | null> {
-  if (typeof window === "undefined" || !storeId) return null;
+  if (typeof globalThis.window === "undefined" || !storeId) return null;
   const key = `${PURGE_UNSCOPED_CATEGORIES_KEY_PREFIX}:${storeId}`;
   try {
     if (localStorage.getItem(key) === "1") {
@@ -408,7 +405,7 @@ export async function updateCustomerInDexie(
   customerId: string,
   updates: Partial<Customer>
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   const customer = await db.customers.get(customerId);
   if (customer) {
@@ -419,7 +416,7 @@ export async function updateCustomerInDexie(
 export async function deleteCustomerFromDexie(
   customerId: string
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   await db.customers.delete(customerId);
 }
@@ -427,7 +424,7 @@ export async function deleteCustomerFromDexie(
 export async function savePurchaseOrdersToDexie(
   orders: PurchaseOrder[]
 ): Promise<void> {
-  if (typeof window === "undefined" || !orders.length) return;
+  if (typeof globalThis.window === "undefined" || !orders.length) return;
   const db = getDb();
   const record = await db.keyVal.get(PURCHASE_ORDERS_KEY);
   const existing: PurchaseOrder[] = record?.value
@@ -455,7 +452,7 @@ export async function getPurchaseOrdersFromDexie(
   page: number = 1,
   limit: number = 10
 ): Promise<{ data: PurchaseOrder[]; total: number }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], total: 0 };
   }
   const db = getDb();
@@ -471,7 +468,7 @@ export async function updatePurchaseOrderStatusInDexie(
   orderId: string,
   newStatus: "pending" | "completed" | "cancelled"
 ): Promise<void> {
-  if (typeof window === "undefined") return;
+  if (typeof globalThis.window === "undefined") return;
   const db = getDb();
   const record = await db.keyVal.get(PURCHASE_ORDERS_KEY);
   const all: PurchaseOrder[] = record?.value ? JSON.parse(record.value) : [];
@@ -518,13 +515,13 @@ export async function getProductsFromDexie(
   storeIdForOffline?: string | null,
   filters?: ProductDexieListFilters
 ): Promise<{ data: ApiProduct[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
   const categories = await db.categoryCache.toArray();
 
-  let pool: ApiProduct[];
+  let pool: ProductCacheRecord[];
 
   if (storeIdForOffline != null && storeIdForOffline !== "") {
     const all = await db.productCache.orderBy("createdAt").reverse().toArray();
@@ -534,12 +531,9 @@ export async function getProductsFromDexie(
       if (sid == null || sid === "") return false;
       return String(sid) === storeIdStr;
     });
-    pool = filtered as unknown as ApiProduct[];
+    pool = filtered;
   } else {
-    pool = (await db.productCache
-      .orderBy("createdAt")
-      .reverse()
-      .toArray()) as unknown as ApiProduct[];
+    pool = await db.productCache.orderBy("createdAt").reverse().toArray();
   }
 
   const withCategories = pool.map((product): ApiProduct => {
@@ -556,12 +550,12 @@ export async function getProductsFromDexie(
       if (category) {
         const ac = category as ApiCategory;
         return {
-          ...(product as ApiProduct),
+          ...(product as unknown as ApiProduct),
           category: { id: ac.id, name: ac.name },
         };
       }
     }
-    return product as ApiProduct;
+    return product as unknown as ApiProduct;
   });
 
   const filtered = filterProductsInMemory(withCategories, filters);
@@ -586,7 +580,7 @@ export async function getCustomersFromDexie(
   search?: string,
   storeId?: string | null
 ): Promise<{ data: Customer[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
@@ -625,7 +619,7 @@ export async function getTransactionsFromDexie(
   limit: number,
   storeId?: string | null
 ): Promise<{ data: Transaction[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
@@ -660,7 +654,7 @@ export async function getCustomerTransactionsFromDexie(args: {
   storeId?: string | null;
   limit?: number;
 }): Promise<Transaction[]> {
-  if (typeof window === "undefined") return [];
+  if (typeof globalThis.window === "undefined") return [];
   const { customerId, storeId, limit } = args;
   if (!customerId) return [];
   const db = getDb();
@@ -677,20 +671,21 @@ export async function getCustomerTransactionsFromDexie(args: {
     );
   }
   const cid = String(customerId);
-  const filtered = (all as unknown as Transaction[]).filter((t) => {
-    const tCid = (t as unknown as { customerId?: unknown }).customerId;
-    if (tCid == null) return false;
-    return String(tCid) === cid;
+  const filtered = all.filter((t) => {
+    const raw = (t as { customerId?: string | number | null }).customerId;
+    if (raw == null || typeof raw === "object") return false;
+    return String(raw) === cid;
   });
   const sorted = filtered.sort((a, b) => {
-    const aT = (a.createdAt ?? String(a.date ?? "")) as string;
-    const bT = (b.createdAt ?? String(b.date ?? "")) as string;
-    return String(bT).localeCompare(String(aT));
+    const aT = String(a.createdAt ?? a.date ?? "");
+    const bT = String(b.createdAt ?? b.date ?? "");
+    return bT.localeCompare(aT);
   });
+  const asTransactions = sorted as unknown as Transaction[];
   if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
-    return sorted.slice(0, Math.trunc(limit));
+    return asTransactions.slice(0, Math.trunc(limit));
   }
-  return sorted;
+  return asTransactions;
 }
 
 export async function getCustomerTransactionsFromTransactionsTable(args: {
@@ -698,7 +693,7 @@ export async function getCustomerTransactionsFromTransactionsTable(args: {
   storeId?: string | null;
   limit?: number;
 }): Promise<Transaction[]> {
-  if (typeof window === "undefined") return [];
+  if (typeof globalThis.window === "undefined") return [];
   const { customerId, storeId, limit } = args;
   if (!customerId) return [];
   const db = getDb();
@@ -728,7 +723,7 @@ export async function getCustomerTransactionsFromTransactionsTable(args: {
 }
 
 export async function saveVouchersToDexie(data: Voucher[]): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   await db.vouchers.bulkPut(data);
 }
@@ -738,7 +733,7 @@ export async function getVouchersFromDexie(
   limit: number,
   storeId?: string | null
 ): Promise<{ data: Voucher[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
@@ -762,7 +757,7 @@ export async function getVouchersFromDexie(
 export async function saveStockAdjustmentsToDexie(
   data: StockAdjustment[]
 ): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   await db.stockAdjustments.bulkPut(data);
 }
@@ -773,7 +768,7 @@ export async function getStockAdjustmentsFromDexie(
   storeId?: string | null,
   productId?: string | null
 ): Promise<{ data: StockAdjustment[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();
@@ -785,7 +780,7 @@ export async function getStockAdjustmentsFromDexie(
     all = all.filter((a) => String(a.productId) === String(productId));
   }
   const sorted = all.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()
   );
   const total = sorted.length;
   const data = sorted.slice((page - 1) * limit, page * limit);
@@ -801,7 +796,7 @@ export async function getStockAdjustmentsFromDexie(
 }
 
 export async function saveParcelsToDexie(data: Parcel[]): Promise<void> {
-  if (typeof window === "undefined" || !data.length) return;
+  if (typeof globalThis.window === "undefined" || !data.length) return;
   const db = getDb();
   await db.parcels.bulkPut(data);
 }
@@ -811,7 +806,7 @@ export async function getParcelsFromDexie(
   limit: number,
   storeId?: string | null
 ): Promise<{ data: Parcel[]; meta: PaginationMeta }> {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return { data: [], meta: { total: 0, page, limit, totalPages: 0 } };
   }
   const db = getDb();

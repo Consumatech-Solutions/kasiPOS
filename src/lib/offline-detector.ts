@@ -9,8 +9,8 @@ const NETWORK_TEST_TIMEOUT = 5000;
 import { getConnectivityProbeUrl } from "@/lib/api/resolve-api-base-url";
 
 function isDevHost(): boolean {
-  if (typeof window === "undefined") return false;
-  const h = window.location.hostname;
+  if (typeof globalThis.window === "undefined") return false;
+  const h = globalThis.window.location.hostname;
   return h === "localhost" || h === "127.0.0.1";
 }
 
@@ -26,17 +26,17 @@ class OfflineDetector {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private forceOffline = false;
   private offlineFirstActive =
-    typeof window !== "undefined" &&
-    Boolean((window as Window & { Cypress?: unknown }).Cypress)
+    typeof globalThis.window !== "undefined" &&
+    Boolean((globalThis.window as Window & { Cypress?: unknown }).Cypress)
       ? false
       : true;
 
   constructor() {
-    if (typeof window !== "undefined") {
+    if (typeof globalThis.window !== "undefined") {
       this.state.isOffline = !navigator.onLine;
 
-      window.addEventListener("online", this.handleOnline);
-      window.addEventListener("offline", this.handleOffline);
+      globalThis.window.addEventListener("online", this.handleOnline);
+      globalThis.window.addEventListener("offline", this.handleOffline);
 
       this.checkConnectivity(false);
       this.intervalId = setInterval(() => {
@@ -186,9 +186,9 @@ class OfflineDetector {
   }
 
   destroy() {
-    if (typeof window !== "undefined") {
-      window.removeEventListener("online", this.handleOnline);
-      window.removeEventListener("offline", this.handleOffline);
+    if (typeof globalThis.window !== "undefined") {
+      globalThis.window.removeEventListener("online", this.handleOnline);
+      globalThis.window.removeEventListener("offline", this.handleOffline);
       if (this.intervalId != null) {
         clearInterval(this.intervalId);
         this.intervalId = null;
@@ -201,13 +201,14 @@ class OfflineDetector {
 export const offlineDetector = new OfflineDetector();
 
 function installE2eOfflineHarnessBridge(): void {
-  if (typeof window === "undefined" || !isDevHost()) return;
+  if (typeof globalThis.window === "undefined" || !isDevHost()) return;
   try {
-    if (window.localStorage.getItem("__kasi_pos_e2e") !== "1") return;
+    if (globalThis.window.localStorage.getItem("__kasi_pos_e2e") !== "1")
+      return;
   } catch {
     return;
   }
-  const win = window as Window & {
+  const win = globalThis.window as Window & {
     __KASI_POS_E2E_OFFLINE?: (forcedOffline: boolean) => void;
   };
   win.__KASI_POS_E2E_OFFLINE = (forcedOffline: boolean) => {

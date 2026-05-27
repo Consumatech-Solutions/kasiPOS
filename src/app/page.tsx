@@ -6,11 +6,9 @@ import Image from "next/image";
 import type {
   Product,
   Transaction,
-  TransactionItem,
   Customer,
   TransactionDiscount,
 } from "@/types";
-import { db, getDb } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -25,6 +23,7 @@ import {
   LayoutGrid,
   List,
   Percent,
+  Eye,
 } from "lucide-react";
 import {
   Carousel,
@@ -49,7 +48,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye } from "lucide-react";
 import PaymentModal from "@/components/pos/PaymentModal";
 import VoucherModal from "@/components/pos/VoucherModal";
 import ApplyDiscountModal from "@/components/pos/ApplyDiscountModal";
@@ -58,23 +56,14 @@ import { ReceiptModal, type ReceiptData } from "@/components/pos/ReceiptModal";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useSettings } from "@/components/settings-provider";
 import { useCustomers } from "@/hooks/use-customers";
-import { useCategories, useProducts, productKeys } from "@/hooks/use-catalogue";
-import {
-  transactionsApi,
-  toCreateTransactionDto,
-} from "@/lib/api/transactions";
+import { useCategories, useProducts } from "@/hooks/use-catalogue";
 import { feedback } from "@/lib/feedback";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNetworkStatus } from "@/hooks/use-network-status";
-import { mutationQueue } from "@/lib/mutation-queue";
 import { getProductInitials } from "@/lib/utils/product-initials";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
+import { useCompleteSale } from "@/hooks/use-complete-sale";
 import { useCart } from "@/components/providers/cart-provider";
-import { buildReceiptData as buildReceiptDataFromUtil } from "@/lib/receipt-utils";
-import {
-  updateProductStockInDexie,
-  saveTransactionsToDexie,
-} from "@/lib/entity-cache";
 import { catalogueApi } from "@/lib/api/catalogue";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -387,323 +376,30 @@ export default function PosPage() {
     );
   };
 
-  const [isCompletingSale, setIsCompletingSale] = useState(false);
-  const completingSaleRef = useRef(false);
-
-  const handleCompleteSale = async (
-    transactionDetails: Omit<Transaction, "id" | "date" | "storeId">
-  ) => {
-    if (completingSaleRef.current || isCompletingSale) return;
-    completingSaleRef.current = true;
-    setIsCompletingSale(true);
-    try {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[Complete Sale] Started", {
-          method: transactionDetails.paymentMethod,
-          items: transactionDetails.items.length,
-          total: transactionDetails.total,
-        });
-      }
-      const currentStore = await ensureStore();
-      if (!currentStore) return;
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("[Complete Sale] Store resolved", {
-          storeId: currentStore.id,
-          isOnline: isOnline,
-        });
-      }
-      const idempotencyKey = crypto.randomUUID();
-      const newTransaction: Omit<Transaction, "id"> = {
-        ...transactionDetails,
-        date: new Date(),
-        customerId: transactionDetails.customerId ?? selectedCustomerId,
-        voucherCode: appliedVoucherCode,
-        discountAmount: appliedDiscount,
-        discount: manualDiscount ?? undefined,
-        total: amountToPay,
-        storeId: currentStore.id!,
-        idempotencyKey,
-      };
-
-      const toReceiptData = (saleId: string): ReceiptData =>
-        buildReceiptDataFromUtil({
-          storeName: currentStore.name,
-          saleId,
-          items: newTransaction.items,
-          subtotal: cartTotal,
-          discountAmount: appliedDiscount + manualDiscountAmount,
-          total: amountToPay,
-          paymentMethod: newTransaction.paymentMethod,
-          showVat: showVatInCheckout,
-          voucherCode: appliedVoucherCode ?? null,
-          timestamp: new Date(),
-        });
-
-      const soldQuantityByProduct = new Map<string, number>();
-      for (const item of newTransaction.items) {
-        const pid = String(item.productId);
-        soldQuantityByProduct.set(
-          pid,
-          (soldQuantityByProduct.get(pid) ?? 0) + item.quantity
-        );
-      }
-
-      if (isOnline) {
-        try {
-          const mappings = await getDb().syncIdMapping.toArray();
-          const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
-          const unresolvedProductIds = newTransaction.items
-            .map((item) => String(item.productId))
-            .filter((id) => id.startsWith("temp-") && !map.has(id));
-          if (unresolvedProductIds.length > 0) {
-            feedback.error(
-              "Products still syncing",
-              "Some products in your cart haven't finished syncing. Please wait a moment and try again."
-            );
-            return;
-          }
-          const unresolvedCustomerId =
-            newTransaction.customerId &&
-            String(newTransaction.customerId).startsWith("temp-") &&
-            !map.has(String(newTransaction.customerId));
-          if (unresolvedCustomerId) {
-            feedback.error(
-              "Customer still syncing",
-              "The selected customer has not finished syncing yet. Please wait a moment and try again."
-            );
-            return;
-          }
-          const resolvedItems = newTransaction.items.map((item) => ({
-            ...item,
-            productId:
-              map.get(String(item.productId)) ?? String(item.productId),
-          }));
-          const resolvedCustomerId =
-            newTransaction.customerId &&
-            String(newTransaction.customerId).startsWith("temp-")
-              ? (map.get(String(newTransaction.customerId)) ??
-                newTransaction.customerId)
-              : newTransaction.customerId;
-          const resolvedTx = {
-            ...newTransaction,
-            items: resolvedItems,
-            customerId: resolvedCustomerId,
-          };
-          const payload = toCreateTransactionDto(
-            resolvedTx as Omit<Transaction, "id"> & {
-              items: Array<TransactionItem & { [k: string]: unknown }>;
-            }
-          );
-          const response = await transactionsApi.create(payload, {
-            idempotencyKey,
-          });
-
-          const resData = response.data as Transaction | undefined;
-          const createdId = resData?.id ?? `TXN-${Date.now()}`;
-          const savedTx: Transaction = {
-            ...newTransaction,
-            ...resData,
-            id: String(createdId),
-          } as Transaction;
-          await db.transactions.add(savedTx);
-          await saveTransactionsToDexie([savedTx]);
-
-          for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
-            const product = await getDb().productCache.get(pid);
-            if (product && typeof product.stock === "number") {
-              const newStock = Math.max(0, product.stock - soldQty);
-              await updateProductStockInDexie(pid, newStock);
-
-              queryClient.setQueriesData(
-                { queryKey: productKeys.lists() },
-                (oldData: any) => {
-                  if (!oldData?.data) return oldData;
-                  return {
-                    ...oldData,
-                    data: oldData.data.map((p: any) =>
-                      String(p.id) === pid ? { ...p, stock: newStock } : p
-                    ),
-                  };
-                }
-              );
-            }
-          }
-
-          clearCartAndResetCoupons();
-          setSelectedCustomerId(undefined);
-          setActivePaymentMethod(null);
-          const receiptPayload = toReceiptData(String(createdId));
-          setReceiptData(receiptPayload);
-          setTimeout(() => setReceiptOpen(true), 0);
-
-          if (process.env.NODE_ENV === "development") {
-            console.log("[Complete Sale] Success (online)", {
-              createdId: resData?.id,
-            });
-          }
-          const creditDue =
-            newTransaction.paymentMethod === "Credit"
-              ? (resData?.creditDueAt ?? resData?.creditDetails?.dueAt ?? null)
-              : null;
-          feedback.success(
-            newTransaction.paymentMethod === "Credit"
-              ? "Credit sale recorded"
-              : "Sale complete!",
-            creditDue
-              ? `Payment due ${new Date(creditDue).toLocaleString()}. View your receipt below.`
-              : "View your receipt below."
-          );
-        } catch (error: unknown) {
-          const err = error as {
-            message?: string;
-            response?: { status?: number; data?: unknown };
-          };
-          const response = err?.response as
-            | { status?: number; data?: unknown }
-            | undefined;
-          const status = response?.status;
-          const data = response?.data as Record<string, unknown> | undefined;
-          let serverMessage: string | undefined;
-          if (data && typeof data === "object") {
-            if (typeof data.message === "string") serverMessage = data.message;
-            else if (Array.isArray(data.message) && data.message[0] != null)
-              serverMessage = String(data.message[0]);
-            else if (Array.isArray(data.errors) && data.errors[0] != null)
-              serverMessage = String(data.errors[0]);
-            else if (typeof data.error === "string") serverMessage = data.error;
-            else if (typeof (data as { message?: string }).message === "string")
-              serverMessage = (data as { message?: string }).message;
-          }
-          const fallbackMessage =
-            err?.message ??
-            (error instanceof Error ? error.message : String(error));
-
-          if (process.env.NODE_ENV === "development") {
-            console.error(
-              "[Complete Sale] Failed",
-              "status:",
-              status,
-              "serverMessage:",
-              serverMessage,
-              "storeId sent:",
-              newTransaction?.storeId
-            );
-            if (data)
-              console.error(
-                "[Complete Sale] Response data:",
-                JSON.stringify(data)
-              );
-            console.error("[Complete Sale] Error:", error);
-          }
-
-          setActivePaymentMethod(null);
-          const messageForUser = serverMessage ?? fallbackMessage;
-          const showInPopup =
-            status != null &&
-            status >= 400 &&
-            status < 500 &&
-            (messageForUser || status === 400);
-          const isStoreIdError =
-            messageForUser && /storeId|integer/i.test(messageForUser);
-          const isCreditNotConfigured =
-            messageForUser &&
-            /credit.*not configured|not configured.*credit/i.test(
-              messageForUser
-            );
-          const popupMessage = isStoreIdError
-            ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
-            : isCreditNotConfigured
-              ? "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term."
-              : messageForUser ||
-                "Something went wrong. Check the items and store.";
-          if (showInPopup) {
-            setInsufficientStockPopup({
-              open: true,
-              message: popupMessage,
-            });
-          } else {
-            feedback.fromError(
-              error,
-              "Failed to complete the sale",
-              messageForUser
-                ? `${messageForUser} Try again or check your connection.`
-                : "Check your connection and try again."
-            );
-          }
-        }
-      } else {
-        try {
-          for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
-            const product = await getDb().productCache.get(pid);
-            if (product && typeof product.stock === "number") {
-              const newStock = Math.max(0, product.stock - soldQty);
-              await updateProductStockInDexie(pid, newStock);
-
-              queryClient.setQueriesData(
-                { queryKey: productKeys.lists() },
-                (oldData: any) => {
-                  if (!oldData?.data) return oldData;
-                  return {
-                    ...oldData,
-                    data: oldData.data.map((p: any) =>
-                      String(p.id) === pid ? { ...p, stock: newStock } : p
-                    ),
-                  };
-                }
-              );
-            }
-          }
-
-          await db.transactions.add(newTransaction as Transaction);
-          await saveTransactionsToDexie([newTransaction] as Transaction[]);
-
-          mutationQueue.add({
-            mutationKey: ["transactions", "create"],
-            mutationFn: () =>
-              transactionsApi.create(
-                toCreateTransactionDto(
-                  newTransaction as Omit<Transaction, "id"> & {
-                    items: Array<TransactionItem & { [k: string]: unknown }>;
-                  }
-                ),
-                { idempotencyKey }
-              ),
-            variables: newTransaction,
-          });
-
-          const localSaleId = `LOCAL-${Date.now()}`;
-          if (process.env.NODE_ENV === "development") {
-            console.log("[Complete Sale] Success (offline)", { localSaleId });
-          }
-          clearCartAndResetCoupons();
-          setSelectedCustomerId(undefined);
-          setActivePaymentMethod(null);
-          const receiptPayload = toReceiptData(localSaleId);
-          setReceiptData(receiptPayload);
-          setTimeout(() => setReceiptOpen(true), 0);
-
-          feedback.success("Sale complete!", "Order recorded.");
-        } catch (error) {
-          if (process.env.NODE_ENV === "development") {
-            console.error("[Complete Sale] Failed (offline)", { error });
-          }
-          console.error("Failed to complete offline sale:", error);
-
-          queryClient.invalidateQueries({ queryKey: productKeys.lists() });
-
-          feedback.fromError(
-            error,
-            "Failed to save the sale locally",
-            "Try again or check storage."
-          );
-        }
-      }
-    } finally {
-      completingSaleRef.current = false;
-      setIsCompletingSale(false);
-    }
-  };
+  const { handleCompleteSale, isCompletingSale } = useCompleteSale({
+    ensureStore,
+    isOnline,
+    queryClient,
+    selectedCustomerId,
+    appliedVoucherCode,
+    appliedDiscount,
+    manualDiscount,
+    manualDiscountAmount,
+    amountToPay,
+    cartTotal,
+    showVatInCheckout,
+    onClearCart: clearCartAndResetCoupons,
+    onResetCheckoutUi: () => {
+      setSelectedCustomerId(undefined);
+      setActivePaymentMethod(null);
+    },
+    onShowReceipt: (receipt) => {
+      setReceiptData(receipt);
+      setTimeout(() => setReceiptOpen(true), 0);
+    },
+    onInsufficientStock: (message) =>
+      setInsufficientStockPopup({ open: true, message }),
+  });
 
   return (
     <div className="w-full min-w-0 max-w-full min-h-[85vh] lg:h-full lg:min-h-0 lg:overflow-hidden lg:flex lg:flex-col overflow-x-hidden pb-4">
@@ -956,7 +652,9 @@ export default function PosPage() {
                                 R
                                 {(typeof product.price === "number"
                                   ? product.price
-                                  : parseFloat(product.price || 0)
+                                  : Number.parseFloat(
+                                      String(product.price || 0)
+                                    )
                                 ).toFixed(2)}
                               </TableCell>
                               <TableCell className="text-center px-2">
@@ -1171,7 +869,7 @@ export default function PosPage() {
                               R{" "}
                               {(typeof item.unitPrice === "number"
                                 ? item.unitPrice
-                                : parseFloat(String(item.unitPrice)) || 0
+                                : Number.parseFloat(String(item.unitPrice)) || 0
                               ).toFixed(2)}
                             </p>
                           </div>
@@ -1223,7 +921,7 @@ export default function PosPage() {
                           R
                           {(typeof item.totalPrice === "number"
                             ? item.totalPrice
-                            : parseFloat(String(item.totalPrice)) || 0
+                            : Number.parseFloat(String(item.totalPrice)) || 0
                           ).toFixed(2)}
                         </p>
                         <Button

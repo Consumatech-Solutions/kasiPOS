@@ -9,7 +9,7 @@ type HeaderDevOfflineToggleProps = {
 
 export function HeaderDevOfflineToggle({
   mounted,
-}: HeaderDevOfflineToggleProps) {
+}: Readonly<HeaderDevOfflineToggleProps>) {
   const [visible, setVisible] = useState(false);
   const [forceOffline, setForceOffline] = useState(false);
 

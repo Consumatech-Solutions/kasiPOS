@@ -51,7 +51,7 @@ function NotificationRow({
   notification,
   onMarkRead,
   onLinkClick,
-}: NotificationRowProps) {
+}: Readonly<NotificationRowProps>) {
   const Icon = getNotificationIcon(notification);
   const colorClass = getNotificationColor(notification);
   const link = getCreditNotificationLink(notification);
@@ -93,7 +93,7 @@ function NotificationsList({
   loading,
   onMarkRead,
   onLinkClick,
-}: NotificationsListProps) {
+}: Readonly<NotificationsListProps>) {
   if (loading && notifications.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -150,7 +150,7 @@ export function HeaderNotificationsPopover({
   onMarkAllRead,
   onMarkRead,
   onLinkClick,
-}: HeaderNotificationsPopoverProps) {
+}: Readonly<HeaderNotificationsPopoverProps>) {
   const badgeLabel = unreadCount > 9 ? "9+" : unreadCount;
 
   return (
@@ -219,7 +219,7 @@ function NotificationItem({
   Icon,
   colorClass,
   onMarkRead,
-}: NotificationItemProps) {
+}: Readonly<NotificationItemProps>) {
   const isUnread = notification.readAt == null;
   const createdAt = new Date(notification.createdAt);
 

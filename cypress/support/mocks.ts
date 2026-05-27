@@ -21,6 +21,14 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function mockBodyString(value: unknown, fallback: string): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return fallback;
+}
+
 function paginate<T>(
   rows: T[],
   page = 1,
@@ -361,12 +369,12 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const payload = req.body as Record<string, unknown>;
     const created = {
       id: `prod-${Date.now()}`,
-      name: String(payload.name ?? "New Product"),
+      name: mockBodyString(payload.name, "New Product"),
       price: Number(payload.price ?? 0),
       costPrice: Number(payload.costPrice ?? 0),
       stock: Number(payload.stock ?? 0),
-      category: String(payload.category ?? "Uncategorized"),
-      barcode: String(payload.barcode ?? ""),
+      category: mockBodyString(payload.category, "Uncategorized"),
+      barcode: mockBodyString(payload.barcode, ""),
       imageUrl: String(payload.imageUrl ?? ""),
       lowStockThreshold: Number(payload.lowStockThreshold ?? 0),
       storeId: options.seedAuth.store.id,

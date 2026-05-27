@@ -1291,7 +1291,7 @@ export default function SettingsPage() {
                                 onChange={(e) =>
                                   setCreditForm((f) => ({
                                     ...f,
-                                    term: Number(e.target.value) ?? 7,
+                                    term: Number(e.target.value) || 7,
                                   }))
                                 }
                               />

@@ -49,7 +49,7 @@ export function HeaderUserMenu({
   currentStore,
   onOpenHardwareSetup,
   onLogout,
-}: HeaderUserMenuProps) {
+}: Readonly<HeaderUserMenuProps>) {
   const initials = getUserInitials(currentUser?.name);
   const showSettings = canAccessSettings(currentUser, currentStore);
 

@@ -15,13 +15,17 @@ export function HeaderBrand({
   pageTitle,
   PageIcon,
   currentStore,
-}: HeaderBrandProps) {
+}: Readonly<HeaderBrandProps>) {
   const [logoError, setLogoError] = useState(false);
 
   return (
     <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
       <Link href="/" className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {!logoError ? (
+        {logoError ? (
+          <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
+            <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+          </div>
+        ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src="/logo.png"
@@ -29,10 +33,6 @@ export function HeaderBrand({
             className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain"
             onError={() => setLogoError(true)}
           />
-        ) : (
-          <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
-            <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-          </div>
         )}
         <span className="text-base sm:text-lg font-bold hidden sm:inline">
           kasiPOS

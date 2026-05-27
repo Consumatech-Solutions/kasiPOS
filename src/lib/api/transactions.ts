@@ -75,11 +75,7 @@ export function toCreateTransactionDto(raw: {
     ...(raw.voucherCode != null &&
       raw.voucherCode !== "" && { voucherCode: raw.voucherCode }),
   };
-  if (
-    raw.discount != null &&
-    raw.discount.discountReason != null &&
-    raw.discount.discountReason.trim() !== ""
-  ) {
+  if (raw.discount?.discountReason?.trim()) {
     dto.discount = {
       discountType: raw.discount.discountType,
       discountAmount: Number(raw.discount.discountAmount),
