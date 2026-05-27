@@ -4,6 +4,7 @@ export function getTransactionStatus(
   transaction: Transaction
 ): TransactionStatus {
   if (transaction.status) return transaction.status;
+  if (transaction.creditSettledAt) return "paid";
   if (transaction.paymentMethod === "Credit") return "pending";
   return "paid";
 }

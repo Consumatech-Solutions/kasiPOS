@@ -115,7 +115,7 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
 export async function updateTransactionInDexie(
   transaction: Transaction
 ): Promise<void> {
-  if (typeof window === "undefined" || !transaction.id) return;
+  if (typeof globalThis.window === "undefined" || !transaction.id) return;
   const db = getDb();
   const record = {
     ...transaction,

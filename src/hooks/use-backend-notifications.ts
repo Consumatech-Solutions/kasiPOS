@@ -1,10 +1,12 @@
 "use client";
 
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api/notifications";
 import type { AppNotification } from "@/types/notifications";
 import type { PaginatedResponse, PaginationMeta } from "@/types/pagination";
 import { checkOfflineStatus } from "@/lib/offline-detector";
+import { isSafeTransactionIdForLink } from "@/lib/transaction-utils";
 
 export const notificationKeys = {
   all: ["notifications"] as const,
@@ -97,8 +99,10 @@ export function useBackendNotifications(options?: {
     },
   });
 
-  const refreshList = () =>
-    queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
+  const refreshList = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: notificationKeys.lists() }),
+    [queryClient]
+  );
 
   return {
     notifications: listQuery.data?.data ?? [],
@@ -117,8 +121,10 @@ export function getCreditNotificationLink(
 ): string | undefined {
   if (notification.type !== "credit_payment_reminder") return undefined;
   const meta = notification.metadata as { transactionId?: string } | undefined;
-  if (meta?.transactionId) {
-    return `/transactions?highlight=${encodeURIComponent(meta.transactionId)}`;
+  const transactionId =
+    typeof meta?.transactionId === "string" ? meta.transactionId.trim() : "";
+  if (transactionId && isSafeTransactionIdForLink(transactionId)) {
+    return `/transactions?highlight=${encodeURIComponent(transactionId)}`;
   }
   return "/transactions?filter=pending-credit";
 }

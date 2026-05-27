@@ -32,6 +32,16 @@ describe("credit-transactions", () => {
     expect(isPendingCreditTransaction(tx)).toBe(false);
   });
 
+  it("treats credit with creditSettledAt as paid when status omitted", () => {
+    const tx = {
+      ...base,
+      paymentMethod: "Credit" as const,
+      creditSettledAt: "2026-01-02T00:00:00.000Z",
+    };
+    expect(getTransactionStatus(tx)).toBe("paid");
+    expect(isPendingCreditTransaction(tx)).toBe(false);
+  });
+
   it("resolves credit due from creditDueAt or creditDetails", () => {
     expect(
       getCreditDueAt({

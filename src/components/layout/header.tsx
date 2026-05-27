@@ -48,6 +48,7 @@ import {
   getCreditNotificationLink,
 } from "@/hooks/use-backend-notifications";
 import type { AppNotification } from "@/types/notifications";
+import { logNotificationActionError } from "@/lib/notification-errors";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { offlineDetector } from "@/lib/offline-detector";
 import { Switch } from "@/components/ui/switch";
@@ -140,8 +141,8 @@ export default function Header() {
     if (!notification.readAt) {
       try {
         await markAsRead(notification.id);
-      } catch {
-        // Badge will refresh on next poll.
+      } catch (error) {
+        logNotificationActionError("mark as read", error);
       }
     }
     if (getCreditNotificationLink(notification)) {
@@ -154,20 +155,20 @@ export default function Header() {
   }, [notificationOpen, refreshList]);
 
   const handleMarkAllReadClick = () => {
-    markAllAsRead().catch(() => {
-      // Badge will refresh on next poll.
+    markAllAsRead().catch((error) => {
+      logNotificationActionError("mark all as read", error);
     });
   };
 
   const handleMarkOneRead = (id: string) => {
-    markAsRead(id).catch(() => {
-      // Badge will refresh on next poll.
+    markAsRead(id).catch((error) => {
+      logNotificationActionError("mark as read", error);
     });
   };
 
   const handleNotificationLinkClick = (notification: AppNotification) => {
-    handleNotificationClick(notification).catch(() => {
-      // Ignore; list refreshes on next open.
+    handleNotificationClick(notification).catch((error) => {
+      logNotificationActionError("open notification", error);
     });
   };
 

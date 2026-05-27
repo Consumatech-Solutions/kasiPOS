@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import {
   Card,
   CardContent,
@@ -54,20 +54,17 @@ import {
   getTransactionStatus,
   isPendingCreditTransaction,
 } from "@/lib/credit-transactions";
+import {
+  formatCreditDueLabel,
+  formatTransactionIdShort,
+  isSafeTransactionIdForLink,
+  parseTransactionDate,
+  transactionIdString,
+} from "@/lib/transaction-utils";
 import { feedback } from "@/lib/feedback";
 import { getErrorMessage } from "@/lib/feedback";
 
 type ListFilter = "all" | "pending-credit";
-
-function formatDueLabel(iso: string | null): string | null {
-  if (!iso) return null;
-  try {
-    const d = iso.includes("T") ? parseISO(iso) : parseISO(`${iso}T12:00:00`);
-    return format(d, "PPP p");
-  } catch {
-    return iso;
-  }
-}
 
 function statusBadgeVariant(
   status: ReturnType<typeof getTransactionStatus>
@@ -77,24 +74,15 @@ function statusBadgeVariant(
   return "secondary";
 }
 
-function transactionIdString(id: string | number | undefined | null): string {
-  if (id == null || id === "") return "";
-  return String(id);
-}
-
-function formatTransactionIdShort(
-  id: string | number | undefined | null
-): string {
-  const s = transactionIdString(id);
-  if (!s) return "N/A";
-  return s.length > 8 ? s.slice(0, 8) : s;
-}
-
 function TransactionsPageContent() {
   const { settings } = useSettings();
   const { currentStore } = settings;
   const searchParams = useSearchParams();
-  const highlightId = searchParams.get("highlight");
+  const highlightParam = searchParams.get("highlight");
+  const highlightId =
+    highlightParam && isSafeTransactionIdForLink(highlightParam.trim())
+      ? highlightParam.trim()
+      : null;
   const filterParam = searchParams.get("filter");
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
@@ -295,13 +283,11 @@ function TransactionsPageContent() {
               {filteredTransactions && filteredTransactions.length > 0 ? (
                 filteredTransactions.map((transaction, index) => {
                   const txId = transactionIdString(transaction.id);
-                  const transactionDate = transaction.createdAt
-                    ? new Date(transaction.createdAt)
-                    : transaction.date
-                      ? new Date(transaction.date)
-                      : new Date();
+                  const transactionDate = parseTransactionDate(transaction);
                   const status = getTransactionStatus(transaction);
-                  const dueLabel = formatDueLabel(getCreditDueAt(transaction));
+                  const dueLabel = formatCreditDueLabel(
+                    getCreditDueAt(transaction)
+                  );
                   const isHighlighted =
                     highlightId != null &&
                     highlightId !== "" &&
