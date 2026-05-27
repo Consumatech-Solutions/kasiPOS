@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ElementType } from "react";
 import { Store } from "lucide-react";
 import type { Store as StoreType } from "@/types";
 
 type HeaderBrandProps = {
   pageTitle: string;
-  PageIcon: React.ElementType;
+  PageIcon: ElementType;
   currentStore: StoreType | null | undefined;
 };
 

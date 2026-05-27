@@ -1,7 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
-import { offlineDetector } from "@/lib/offline-detector";
 
 type HeaderDevOfflineToggleProps = {
   mounted: boolean;
@@ -10,13 +10,36 @@ type HeaderDevOfflineToggleProps = {
 export function HeaderDevOfflineToggle({
   mounted,
 }: HeaderDevOfflineToggleProps) {
-  if (
-    !mounted ||
-    process.env.NODE_ENV !== "development" ||
-    !offlineDetector.isDevHost()
-  ) {
-    return null;
-  }
+  const [visible, setVisible] = useState(false);
+  const [forceOffline, setForceOffline] = useState(false);
+
+  useEffect(() => {
+    if (!mounted || process.env.NODE_ENV !== "development") {
+      setVisible(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    void import("@/lib/offline-detector").then(({ offlineDetector }) => {
+      if (cancelled || !offlineDetector.isDevHost()) return;
+      setVisible(true);
+      setForceOffline(offlineDetector.getForceOffline());
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted]);
+
+  if (!visible) return null;
+
+  const handleToggle = (checked: boolean) => {
+    setForceOffline(checked);
+    void import("@/lib/offline-detector").then(({ offlineDetector }) => {
+      offlineDetector.setForceOffline(checked);
+    });
+  };
 
   return (
     <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
@@ -24,8 +47,8 @@ export function HeaderDevOfflineToggle({
         Simulate offline
       </span>
       <Switch
-        checked={offlineDetector.getForceOffline()}
-        onCheckedChange={(checked) => offlineDetector.setForceOffline(checked)}
+        checked={forceOffline}
+        onCheckedChange={handleToggle}
         aria-label="Simulate offline"
       />
     </div>

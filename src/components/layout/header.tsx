@@ -1,7 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  type ElementType,
+} from "react";
 import {
   Store,
   Home,
@@ -41,7 +47,7 @@ const pageTitles: Record<string, string> = {
   "/profile": "Profile",
 };
 
-const pageIcons: Record<string, React.ElementType> = {
+const pageIcons: Record<string, ElementType> = {
   "/": Home,
   "/catalogue": BookOpen,
   "/inventory": LayoutGrid,

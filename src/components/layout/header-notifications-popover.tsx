@@ -1,5 +1,6 @@
 "use client";
 
+import type { ElementType } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -208,7 +209,7 @@ export function HeaderNotificationsPopover({
 
 interface NotificationItemProps {
   notification: AppNotification;
-  Icon: React.ElementType;
+  Icon: ElementType;
   colorClass: string;
   onMarkRead: () => void;
 }
