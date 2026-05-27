@@ -872,7 +872,7 @@ export default function PosPage() {
                           R{" "}
                           {(typeof item.unitPrice === "number"
                             ? item.unitPrice
-                            : parseFloat(String(item.unitPrice)) || 0
+                            : Number.parseFloat(String(item.unitPrice)) || 0
                           ).toFixed(2)}
                         </p>
                         <div className="flex items-center justify-start gap-1 sm:gap-2 self-center">

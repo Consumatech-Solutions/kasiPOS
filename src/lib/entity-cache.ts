@@ -60,11 +60,13 @@ function productCategoryHasName(cat: unknown): boolean {
   return false;
 }
 
+type ProductStoreIdSource = ApiProduct & {
+  storeId?: string | number | null;
+  store_id?: string | number | null;
+};
+
 function resolvedProductStoreId(
-  p: ApiProduct & {
-    storeId?: string | number | null;
-    store_id?: string | number | null;
-  },
+  p: ProductStoreIdSource,
   fallback?: string | null
 ): string | undefined {
   const fromRow = p.storeId ?? p.store_id;
@@ -146,9 +148,7 @@ export async function saveTransactionsToDexie(
     date:
       (t as Transaction & { date?: string }).date ?? new Date().toISOString(),
   }));
-  await db.transactionCache.bulkPut(
-    records as { id: string; date?: string; [k: string]: unknown }[]
-  );
+  await db.transactionCache.bulkPut(records);
   const count = await db.transactionCache.count();
   const cap = entityCap();
   if (count > cap) {

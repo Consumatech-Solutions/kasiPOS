@@ -6,7 +6,7 @@ export type CreditReminderKind =
   | "AT_DUE"
   | "OVERDUE";
 
-export type AppNotificationType = "credit_payment_reminder" | string;
+export type AppNotificationType = "credit_payment_reminder";
 
 export interface CreditNotificationMetadata {
   transactionId: string;

@@ -11,7 +11,7 @@ export function getConfiguredApiUrl(): string {
  * Production / explicit direct URL: NEXT_PUBLIC_API_URL.
  */
 export function resolveApiBaseUrl(): string {
-  if (typeof globalThis.window === "undefined") {
+  if (globalThis.window === undefined) {
     return getConfiguredApiUrl();
   }
   if (
@@ -25,7 +25,7 @@ export function resolveApiBaseUrl(): string {
 
 /** URL used for connectivity probes (should match where API traffic goes). */
 export function getConnectivityProbeUrl(): string {
-  if (typeof globalThis.window !== "undefined") {
+  if (globalThis.window !== undefined) {
     const base = resolveApiBaseUrl();
     if (base === "") {
       return globalThis.window.location.origin.replace(/\/$/, "");

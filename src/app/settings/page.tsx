@@ -590,11 +590,13 @@ export default function SettingsPage() {
         code?: string;
       };
       const message = getErrorMessage(err);
-      const recovery = isNetworkErrorLike(err)
-        ? `Start the KasiPOS API (default ${getConfiguredApiUrl()}), set NEXT_PUBLIC_API_URL in .env if needed, then restart npm run dev.`
-        : ax?.response?.status === 404
-          ? "PATCH /settings is not available on the API you are using. Update the backend or check NEXT_PUBLIC_API_URL."
-          : undefined;
+      let recovery: string | undefined;
+      if (isNetworkErrorLike(err)) {
+        recovery = `Start the KasiPOS API (default ${getConfiguredApiUrl()}), set NEXT_PUBLIC_API_URL in .env if needed, then restart npm run dev.`;
+      } else if (ax?.response?.status === 404) {
+        recovery =
+          "PATCH /settings is not available on the API you are using. Update the backend or check NEXT_PUBLIC_API_URL.";
+      }
       if (process.env.NODE_ENV === "development") {
         console.error("[Credit settings] PATCH /settings failed", {
           status: ax?.response?.status,
@@ -1467,7 +1469,9 @@ export default function SettingsPage() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() => deleteUser(user.id!)}
+                                  onClick={() => {
+                                    if (user.id) deleteUser(user.id);
+                                  }}
                                 >
                                   Delete
                                 </AlertDialogAction>
@@ -1707,9 +1711,9 @@ export default function SettingsPage() {
                 <p>
                   You are transferring Store Admin to{" "}
                   <span className="font-semibold text-foreground">
-                    {transferTargetUser?.name ?? "this user"}
-                  </span>
-                  . Please confirm below. This action cannot be undone.
+                    {transferTargetUser?.name ?? "this user"}.
+                  </span>{" "}
+                  Please confirm below. This action cannot be undone.
                 </p>
                 <p>
                   After you confirm, this app signs you out and the new store

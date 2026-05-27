@@ -23,15 +23,20 @@ export function isSafeTransactionIdForLink(id: string): boolean {
   return SAFE_TRANSACTION_ID.test(id);
 }
 
+function parseTransactionDateRaw(raw: string | Date): Date {
+  if (typeof raw !== "string") {
+    return new Date(raw);
+  }
+  if (raw.includes("T")) {
+    return parseISO(raw);
+  }
+  return parseISO(`${raw}T12:00:00`);
+}
+
 export function parseTransactionDate(transaction: Transaction): Date {
   const raw = transaction.createdAt ?? transaction.date;
   if (raw == null || raw === "") return new Date();
-  const parsed =
-    typeof raw === "string"
-      ? raw.includes("T")
-        ? parseISO(raw)
-        : parseISO(`${raw}T12:00:00`)
-      : new Date(raw);
+  const parsed = parseTransactionDateRaw(raw);
   return isValid(parsed) ? parsed : new Date();
 }
 

@@ -375,7 +375,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
       stock: Number(payload.stock ?? 0),
       category: mockBodyString(payload.category, "Uncategorized"),
       barcode: mockBodyString(payload.barcode, ""),
-      imageUrl: String(payload.imageUrl ?? ""),
+      imageUrl: mockBodyString(payload.imageUrl, ""),
       lowStockThreshold: Number(payload.lowStockThreshold ?? 0),
       storeId: options.seedAuth.store.id,
       createdAt: now,
@@ -447,7 +447,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const payload = req.body as Record<string, unknown>;
     const created = {
       id: `cust-${Date.now()}`,
-      name: String(payload.name ?? "New Customer"),
+      name: mockBodyString(payload.name, "New Customer"),
       contact: mockBodyString(payload.contact, ""),
       loyaltyPoints: Number(payload.loyaltyPoints ?? 0),
       storeId: options.seedAuth.store.id,
@@ -687,7 +687,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     if (replyOfflineIfNeeded(req)) return;
     const isActiveParam = req.query.isActive;
     let rows = [...state.vouchers];
-    if (typeof isActiveParam !== "undefined") {
+    if (isActiveParam !== undefined) {
       rows = rows.filter(
         (row) => row.isActive === (String(isActiveParam) === "true")
       );
@@ -707,8 +707,10 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const payload = req.body as Record<string, unknown>;
     const created = {
       id: `vouch-${Date.now()}`,
-      code: String(payload.code ?? "").toUpperCase(),
-      type: String(payload.type ?? "percentage") as "percentage" | "fixed",
+      code: mockBodyString(payload.code, "").toUpperCase(),
+      type: mockBodyString(payload.type, "percentage") as
+        | "percentage"
+        | "fixed",
       value: Number(payload.value ?? 0),
       minPurchase: Number(payload.minPurchase ?? 0),
       isActive: Boolean(payload.isActive ?? true),

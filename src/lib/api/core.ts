@@ -4,6 +4,7 @@ import {
   getConfiguredApiUrl,
   resolveApiBaseUrl,
 } from "@/lib/api/resolve-api-base-url";
+import { getStoredAuthToken } from "@/lib/auth-token-storage";
 
 const isOnline = () => {
   if (typeof navigator !== "undefined") {
@@ -18,6 +19,19 @@ export interface OfflineError extends Error {
   retryable?: boolean;
 }
 
+function createOfflineError(
+  message: string,
+  name: string,
+  flags: Pick<OfflineError, "isOffline" | "isNetworkError" | "retryable">
+): OfflineError {
+  const error = new Error(message) as OfflineError;
+  error.name = name;
+  error.isOffline = flags.isOffline;
+  error.isNetworkError = flags.isNetworkError;
+  error.retryable = flags.retryable;
+  return error;
+}
+
 export const api = axios.create({
   baseURL: resolveApiBaseUrl(),
   headers: {
@@ -29,7 +43,7 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     config.baseURL = resolveApiBaseUrl();
-    const token = localStorage.getItem("token");
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -49,14 +63,13 @@ api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (!isOnline()) {
-      const offlineError: OfflineError = new Error(
-        "No internet connection"
-      ) as OfflineError;
-      offlineError.isOffline = true;
-      offlineError.isNetworkError = true;
-      offlineError.retryable = true;
-      offlineError.name = "OfflineError";
-      return Promise.reject(offlineError);
+      return Promise.reject(
+        createOfflineError("No internet connection", "OfflineError", {
+          isOffline: true,
+          isNetworkError: true,
+          retryable: true,
+        })
+      );
     }
 
     if (
@@ -65,26 +78,28 @@ api.interceptors.response.use(
       error.code === "ECONNABORTED" ||
       error.code === "ETIMEDOUT"
     ) {
-      const networkError: OfflineError = new Error(
-        "Network request failed. Please check your connection."
-      ) as OfflineError;
-      networkError.isNetworkError = true;
-      networkError.retryable = true;
-      networkError.name = "NetworkError";
+      const networkError = createOfflineError(
+        "Network request failed. Please check your connection.",
+        "NetworkError",
+        { isNetworkError: true, retryable: true }
+      );
 
       if (
         process.env.NODE_ENV === "development" &&
         (error?.config?.url?.includes("/categories") ||
           error?.config?.url?.includes("/products"))
       ) {
-        if (!(window as any).__backendNetworkErrorLogged) {
+        const win = globalThis.window as Window & {
+          __backendNetworkErrorLogged?: boolean;
+        };
+        if (!win.__backendNetworkErrorLogged) {
           console.warn(
             "Backend not available - running in offline mode. Categories and products will be managed locally.",
             {
               backendUrl: getConfiguredApiUrl(),
             }
           );
-          (window as any).__backendNetworkErrorLogged = true;
+          win.__backendNetworkErrorLogged = true;
         }
       }
 

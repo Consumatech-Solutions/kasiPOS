@@ -22,12 +22,7 @@ import {
   resolveTransactionForApi,
   validateSaleSyncMappings,
 } from "@/lib/pos/complete-sale-sync";
-import type {
-  Store,
-  Transaction,
-  TransactionDiscount,
-  TransactionItem,
-} from "@/types";
+import type { Store, Transaction, TransactionDiscount } from "@/types";
 
 export type CompleteSaleInput = Omit<Transaction, "id" | "date" | "storeId">;
 
@@ -49,26 +44,28 @@ export type UseCompleteSaleParams = {
   onInsufficientStock: (message: string) => void;
 };
 
-function buildReceiptPayload(
-  storeName: string,
-  saleId: string,
-  transaction: Omit<Transaction, "id">,
-  cartTotal: number,
-  discountTotal: number,
-  amountToPay: number,
-  showVat: boolean,
-  voucherCode: string | null
-): ReceiptData {
+type ReceiptPayloadInput = {
+  storeName: string;
+  saleId: string;
+  transaction: Omit<Transaction, "id">;
+  cartTotal: number;
+  discountTotal: number;
+  amountToPay: number;
+  showVat: boolean;
+  voucherCode: string | null;
+};
+
+function buildReceiptPayload(input: ReceiptPayloadInput): ReceiptData {
   return buildReceiptData({
-    storeName,
-    saleId,
-    items: transaction.items,
-    subtotal: cartTotal,
-    discountAmount: discountTotal,
-    total: amountToPay,
-    paymentMethod: transaction.paymentMethod,
-    showVat,
-    voucherCode,
+    storeName: input.storeName,
+    saleId: input.saleId,
+    items: input.transaction.items,
+    subtotal: input.cartTotal,
+    discountAmount: input.discountTotal,
+    total: input.amountToPay,
+    paymentMethod: input.transaction.paymentMethod,
+    showVat: input.showVat,
+    voucherCode: input.voucherCode,
     timestamp: new Date(),
   });
 }
@@ -90,11 +87,7 @@ async function runOnlineSale(
   }
 
   const resolvedTx = resolveTransactionForApi(newTransaction, syncResult.map);
-  const payload = toCreateTransactionDto(
-    resolvedTx as Omit<Transaction, "id"> & {
-      items: Array<TransactionItem & { [k: string]: unknown }>;
-    }
-  );
+  const payload = toCreateTransactionDto(resolvedTx);
   const response = await transactionsApi.create(payload, { idempotencyKey });
 
   const resData = response.data as Transaction | undefined;
@@ -103,7 +96,7 @@ async function runOnlineSale(
     ...newTransaction,
     ...resData,
     id: String(createdId),
-  } as Transaction;
+  };
   await db.transactions.add(savedTx);
   await saveTransactionsToDexie([savedTx]);
   await applySoldStockUpdates(soldQuantityByProduct, params.queryClient);
@@ -168,24 +161,19 @@ async function runOfflineSale(
   idempotencyKey: string
 ): Promise<void> {
   await applySoldStockUpdates(soldQuantityByProduct, params.queryClient);
-  await db.transactions.add(newTransaction as Transaction);
-  await saveTransactionsToDexie([newTransaction] as Transaction[]);
+  const localSaleId = `LOCAL-${Date.now()}`;
+  const localTx: Transaction = { ...newTransaction, id: localSaleId };
+  await db.transactions.add(localTx);
+  await saveTransactionsToDexie([localTx]);
 
   mutationQueue.add({
     mutationKey: ["transactions", "create"],
     mutationFn: () =>
-      transactionsApi.create(
-        toCreateTransactionDto(
-          newTransaction as Omit<Transaction, "id"> & {
-            items: Array<TransactionItem & { [k: string]: unknown }>;
-          }
-        ),
-        { idempotencyKey }
-      ),
+      transactionsApi.create(toCreateTransactionDto(newTransaction), {
+        idempotencyKey,
+      }),
     variables: newTransaction,
   });
-
-  const localSaleId = `LOCAL-${Date.now()}`;
   if (process.env.NODE_ENV === "development") {
     console.log("[Complete Sale] Success (offline)", { localSaleId });
   }
@@ -229,7 +217,7 @@ export function useCompleteSale(params: UseCompleteSaleParams) {
           });
         }
         const currentStore = await params.ensureStore();
-        if (!currentStore) return;
+        if (!currentStore?.id) return;
 
         if (process.env.NODE_ENV === "development") {
           console.log("[Complete Sale] Store resolved", {
@@ -248,23 +236,23 @@ export function useCompleteSale(params: UseCompleteSaleParams) {
           discountAmount: params.appliedDiscount,
           discount: params.manualDiscount ?? undefined,
           total: params.amountToPay,
-          storeId: currentStore.id!,
+          storeId: String(currentStore.id),
           idempotencyKey,
         };
 
         const discountTotal =
           params.appliedDiscount + params.manualDiscountAmount;
         const toReceipt = (saleId: string) =>
-          buildReceiptPayload(
-            currentStore.name,
+          buildReceiptPayload({
+            storeName: currentStore.name,
             saleId,
-            newTransaction,
-            params.cartTotal,
+            transaction: newTransaction,
+            cartTotal: params.cartTotal,
             discountTotal,
-            params.amountToPay,
-            params.showVatInCheckout,
-            params.appliedVoucherCode ?? null
-          );
+            amountToPay: params.amountToPay,
+            showVat: params.showVatInCheckout,
+            voucherCode: params.appliedVoucherCode ?? null,
+          });
 
         const soldQuantityByProduct = buildSoldQuantityByProduct(
           newTransaction.items
