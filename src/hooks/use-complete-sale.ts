@@ -12,10 +12,7 @@ import { db } from "@/lib/db";
 import { feedback } from "@/lib/feedback";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { buildReceiptData } from "@/lib/receipt-utils";
-import {
-  saveTransactionsToDexie,
-  updateProductStockInDexie,
-} from "@/lib/entity-cache";
+import { saveTransactionsToDexie } from "@/lib/entity-cache";
 import { parseCompleteSaleError } from "@/lib/pos/complete-sale-errors";
 import {
   applySoldStockUpdates,

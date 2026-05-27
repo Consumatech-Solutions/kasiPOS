@@ -3,12 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 
-import type {
-  Product,
-  Transaction,
-  Customer,
-  TransactionDiscount,
-} from "@/types";
+import type { Product, Customer, TransactionDiscount } from "@/types";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -126,10 +121,9 @@ export default function PosPage() {
     setIsClearCartDialogOpen(false);
   };
 
-  const { categories: apiCategories, loading: categoriesLoading } =
-    useCategories(1, 1000, {
-      storeIdForOffline: settings?.currentStore?.id ?? undefined,
-    });
+  const { categories: apiCategories } = useCategories(1, 1000, {
+    storeIdForOffline: settings?.currentStore?.id ?? undefined,
+  });
   const {
     products: apiProducts,
     pagination: productsPagination,

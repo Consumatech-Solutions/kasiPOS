@@ -175,7 +175,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
   };
 
   const productBelongsToCategory = (
-    product: Record<string, unknown>,
+    product: { category?: unknown },
     categoryName: string | undefined
   ) => {
     if (!categoryName) return false;
@@ -325,7 +325,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const id = String(req.url.split("/").pop());
     const category = state.categories.find((row) => String(row.id) === id);
     const hasProducts = state.products.some((p) =>
-      productBelongsToCategory(p as Record<string, unknown>, category?.name)
+      productBelongsToCategory(p, category?.name)
     );
     if (hasProducts) {
       corsReply(req, {
@@ -448,7 +448,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const created = {
       id: `cust-${Date.now()}`,
       name: String(payload.name ?? "New Customer"),
-      contact: String(payload.contact ?? ""),
+      contact: mockBodyString(payload.contact, ""),
       loyaltyPoints: Number(payload.loyaltyPoints ?? 0),
       storeId: options.seedAuth.store.id,
       createdAt: now,
@@ -591,7 +591,7 @@ export function registerApiMocks(options: MockApiOptions): MockApiControls {
     const body = req.body as { id?: string };
     const id = String(body.id ?? "");
     const txn = state.transactions.find((row) => String(row.id) === id);
-    if (!txn || txn.paymentMethod !== "Credit" || txn.status !== "pending") {
+    if (txn?.paymentMethod !== "Credit" || txn?.status !== "pending") {
       corsReply(req, {
         statusCode: 400,
         body: { message: "Transaction is not a pending credit sale." },

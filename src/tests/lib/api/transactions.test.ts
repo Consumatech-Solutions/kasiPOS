@@ -15,12 +15,12 @@ import { api } from "@/lib/api/core";
 describe("toCreateTransactionDto", () => {
   it("stringifies storeId and product ids and coerces numeric fields", () => {
     const dto = toCreateTransactionDto({
-      storeId: 99 as unknown as string,
+      storeId: 99,
       items: [
         {
-          productId: 1 as unknown as string,
+          productId: 1,
           productName: "A",
-          quantity: 2 as unknown as number,
+          quantity: 2,
           unitPrice: "10.5" as unknown as number,
           totalPrice: "21" as unknown as number,
         },

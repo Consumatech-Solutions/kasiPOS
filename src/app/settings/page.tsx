@@ -537,11 +537,18 @@ export default function SettingsPage() {
           if (
             verified != null &&
             typeof verified === "object" &&
-            "customerCredit" in (verified as object)
+            "customerCredit" in verified
           ) {
             updatedCredit = verified as typeof settingsStore.credit;
           }
-        } catch (_) {}
+        } catch (verifyError) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn(
+              "[Settings] Credit verify after save failed:",
+              verifyError
+            );
+          }
+        }
       }
       if (updatedCredit == null && creditForm.enabled) {
         updatedCredit = (body.credit ?? null) as typeof settingsStore.credit;
@@ -879,7 +886,7 @@ export default function SettingsPage() {
 
     setIsUpdating(true);
     try {
-      if ("caches" in window) {
+      if ("caches" in globalThis) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map((name) => caches.delete(name)));
       }

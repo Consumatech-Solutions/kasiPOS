@@ -40,11 +40,15 @@ export function parseCompleteSaleError(error: unknown): ParsedSaleError {
     Boolean(messageForUser) &&
     /credit.*not configured|not configured.*credit/i.test(messageForUser);
 
-  const popupMessage = isStoreIdError
-    ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
-    : isCreditNotConfigured
-      ? "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term."
-      : messageForUser || "Something went wrong. Check the items and store.";
+  let popupMessage =
+    messageForUser || "Something went wrong. Check the items and store.";
+  if (isStoreIdError) {
+    popupMessage =
+      "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support.";
+  } else if (isCreditNotConfigured) {
+    popupMessage =
+      "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term.";
+  }
 
   return {
     status,

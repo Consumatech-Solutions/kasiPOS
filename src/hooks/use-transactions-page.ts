@@ -13,8 +13,7 @@ import {
   isSafeTransactionIdForLink,
   transactionIdString,
 } from "@/lib/transaction-utils";
-import { feedback } from "@/lib/feedback";
-import { getErrorMessage } from "@/lib/feedback";
+import { feedback, getErrorMessage } from "@/lib/feedback";
 import type { ListFilter } from "@/components/transactions/transactions-toolbar";
 
 function filterTransactions(
