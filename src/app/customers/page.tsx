@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import type { Customer } from "@/types";
 import { feedback } from "@/lib/feedback";
 import { useSettings } from "@/components/settings-provider";
+import { useI18n } from "@/components/i18n-provider";
 import { useCustomers, customerKeys } from "@/hooks/use-customers";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
@@ -71,6 +72,7 @@ import { useQuery } from "@tanstack/react-query";
 export default function CustomersPage() {
   const queryClient = useQueryClient();
   const { settings } = useSettings();
+  const { t } = useI18n();
   const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
   const [searchTerm, setSearchTerm] = useState("");
@@ -141,8 +143,8 @@ export default function CustomersPage() {
         if (isOnline) {
           await updateCustomer(editingCustomer.id, data);
           feedback.success(
-            "Customer updated",
-            "Customer updated successfully."
+            t("customers.customerUpdated"),
+            t("customers.customerUpdatedDesc")
           );
         } else {
           const updatedCustomer = {
@@ -170,17 +172,20 @@ export default function CustomersPage() {
             mutationFn: () => customersApi.update(editingCustomer.id, data),
             variables: { id: editingCustomer.id, data },
           });
-          feedback.success("Customer updated", "Customer updated successfully.");
+          feedback.success(
+            t("customers.customerUpdated"),
+            t("customers.customerUpdatedDesc")
+          );
         }
       } else {
         if (isOnline) {
           await createCustomer(data);
           const hasContact = data?.contact?.trim();
           feedback.success(
-            "Customer created",
+            t("customers.customerCreated"),
             hasContact
-              ? "A welcome SMS has been sent to the number provided."
-              : "Customer registered."
+              ? t("customers.welcomeSms")
+              : t("customers.customerRegistered")
           );
         } else {
           const tempId = `temp-${Date.now()}`;
@@ -220,7 +225,10 @@ export default function CustomersPage() {
               }),
             variables: { ...data, _tempId: tempId },
           });
-          feedback.success("Customer added", "Customer added successfully.");
+          feedback.success(
+            t("customers.customerAdded"),
+            t("customers.customerAddedDesc")
+          );
         }
       }
       setCustomerDialogOpen(false);
@@ -228,8 +236,8 @@ export default function CustomersPage() {
     } catch (error) {
       feedback.fromError(
         error,
-        "Failed to save customer",
-        "Check your connection and try again."
+        t("customers.failedSaveCustomer"),
+        t("catalogue.retryConnection")
       );
     } finally {
       customerSubmitRef.current = false;
@@ -246,7 +254,10 @@ export default function CustomersPage() {
     try {
       if (isOnline) {
         await deleteCustomer(id);
-        feedback.success("Customer deleted", "Customer deleted successfully.");
+        feedback.success(
+          t("customers.customerDeleted"),
+          t("customers.customerDeletedDesc")
+        );
       } else {
         const customerQueries = queryClient.getQueriesData<{
           data: Customer[];
@@ -270,13 +281,16 @@ export default function CustomersPage() {
           mutationFn: () => customersApi.delete(id),
           variables: { id },
         });
-        feedback.success("Customer deleted", "Customer deleted successfully.");
+        feedback.success(
+          t("customers.customerDeleted"),
+          t("customers.customerDeletedDesc")
+        );
       }
     } catch (error) {
       feedback.fromError(
         error,
-        "Failed to delete customer",
-        "Try again or check your connection."
+        t("customers.failedDeleteCustomer"),
+        t("catalogue.retryDelete")
       );
     } finally {
       setDeletingCustomerId(null);
@@ -297,7 +311,7 @@ export default function CustomersPage() {
       <div className="p-4">
         <Card>
           <CardContent className="p-6">
-            <div className="text-center">Loading customers...</div>
+            <div className="text-center">{t("home.loading")}</div>
           </CardContent>
         </Card>
       </div>
@@ -321,9 +335,9 @@ export default function CustomersPage() {
       <Card>
         <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg sm:text-xl">Customers</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">{t("customers.title")}</CardTitle>
             <CardDescription className="text-sm">
-              Manage your customer database and loyalty program.
+              {t("customers.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -331,7 +345,7 @@ export default function CustomersPage() {
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name or contact..."
+                  placeholder={t("customers.searchPlaceholder")}
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -341,7 +355,7 @@ export default function CustomersPage() {
                 onClick={() => openCustomerDialog()}
                 className="w-full sm:w-auto min-h-[44px] touch-target"
               >
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+                <PlusCircle className="mr-2 h-4 w-4" /> {t("customers.addCustomer")}
               </Button>
             </div>
           </CardContent>
@@ -351,12 +365,12 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Loyalty Points</TableHead>
+                  <TableHead>{t("customers.customer")}</TableHead>
+                  <TableHead>{t("customers.contact")}</TableHead>
+                  <TableHead>{t("customers.loyaltyPoints")}</TableHead>
                   {showStoreColumn && (
                     <TableHead className="hidden sm:table-cell">
-                      Store
+                      {t("customers.store")}
                     </TableHead>
                   )}
                   <TableHead className="text-right">Actions</TableHead>
@@ -369,7 +383,7 @@ export default function CustomersPage() {
                       <TableCell className="font-medium">
                         {customer.name}
                       </TableCell>
-                      <TableCell>{customer.contact || "N/A"}</TableCell>
+                      <TableCell>{customer.contact || t("common.na")}</TableCell>
                       <TableCell>
                         <Badge
                           variant="secondary"
@@ -383,7 +397,7 @@ export default function CustomersPage() {
                         <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                           {customer.storeId != null
                             ? customer.storeId === currentStore?.id
-                              ? (currentStore?.name ?? "This store")
+                              ? (currentStore?.name ?? t("customers.thisStore"))
                               : customer.storeId
                             : "—"}
                         </TableCell>
@@ -420,11 +434,10 @@ export default function CustomersPage() {
                               <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle className="text-lg sm:text-xl">
-                                    Delete customer?
+                                    {t("customers.deleteCustomer")}
                                   </AlertDialogTitle>
                                   <AlertDialogDescription className="text-sm">
-                                    This cannot be undone. The customer will be
-                                    permanently removed from your store.
+                                    {t("customers.deleteCustomerDesc")}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -435,7 +448,7 @@ export default function CustomersPage() {
                                       isDeleting
                                     }
                                   >
-                                    Cancel
+                                    {t("common.cancel")}
                                   </AlertDialogCancel>
                                   <AlertDialogAction
                                     className="min-h-[44px] touch-target w-full sm:w-auto"
@@ -453,8 +466,8 @@ export default function CustomersPage() {
                                     )}
                                     {deletingCustomerId === customer.id ||
                                     isDeleting
-                                      ? "Deleting..."
-                                      : "Delete"}
+                                      ? t("customers.deleting")
+                                      : t("common.delete")}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -470,7 +483,7 @@ export default function CustomersPage() {
                       colSpan={showStoreColumn ? 5 : 4}
                       className="text-center h-24"
                     >
-                      No customers found.
+                      {t("customers.noCustomersFound")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -493,12 +506,12 @@ export default function CustomersPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {editingCustomer ? "Edit Customer" : "Add Customer"}
+              {editingCustomer ? t("customers.editCustomer") : t("customers.addCustomer")}
             </DialogTitle>
             <DialogDescription className="text-sm">
               {editingCustomer
-                ? "Edit the customer information below."
-                : "Enter the new customer information."}
+                ? t("customers.editCustomerDesc")
+                : t("customers.addCustomerDesc")}
             </DialogDescription>
           </DialogHeader>
           <CustomerForm
@@ -517,17 +530,19 @@ export default function CustomersPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              Purchase History for {selectedCustomer?.name}
+              {t("customers.purchaseHistoryFor", {
+                name: selectedCustomer?.name ?? "",
+              })}
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order #</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>{t("customers.orderNumber")}</TableHead>
+                  <TableHead>{t("customers.date")}</TableHead>
+                  <TableHead>{t("customers.items")}</TableHead>
+                  <TableHead className="text-right">{t("customers.total")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -557,8 +572,8 @@ export default function CustomersPage() {
               customerTransactionsQuery.isLoading) && (
               <p className="text-center text-muted-foreground py-8">
                 {customerTransactionsQuery.isLoading
-                  ? "Loading purchase history..."
-                  : "No purchase history for this customer."}
+                  ? t("customers.loadingPurchaseHistory")
+                  : t("customers.noPurchaseHistory")}
               </p>
             )}
           </ScrollArea>
