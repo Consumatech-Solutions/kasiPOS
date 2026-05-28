@@ -129,12 +129,22 @@ export async function runCloudDataPull(
   };
 
   const lastProducts = await getLastSyncAt("products");
-  await pullAllProductsFromApi(storeIdString ?? "", {
-    ...(storeIdString
-      ? { storeIdQueryParam: true }
-      : { storeIdQueryParam: false }),
-    ...(lastProducts ? { updatedAtAfter: lastProducts } : {}),
-  });
+  try {
+    await pullAllProductsFromApi(storeIdString ?? "", {
+      ...(storeIdString
+        ? { storeIdQueryParam: true }
+        : { storeIdQueryParam: false }),
+      ...(lastProducts ? { updatedAtAfter: lastProducts } : {}),
+    });
+  } catch (e) {
+    const status = (e as { response?: { status?: number } })?.response?.status;
+    console.warn(
+      "[cloud-data-pull] Product sync skipped:",
+      status === 404
+        ? "GET /products not found — check NEXT_PUBLIC_API_URL and API prefix (NEXT_PUBLIC_API_PATH_PREFIX=/api if needed)."
+        : e
+    );
+  }
   if (storeIdString) {
     const productCountCheck = await getProductsFromDexie(
       1,

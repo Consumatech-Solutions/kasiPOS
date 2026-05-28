@@ -13,23 +13,26 @@ import type {
 } from "@/types/catalogue";
 import type { PaginatedResponse, PaginationParams } from "@/types/pagination";
 
-const API_BASE_PATH = "";
+function catalogueListParams(params?: PaginationParams) {
+  const query: Record<string, string> = {};
+  if (params?.page != null) query.page = String(params.page);
+  if (params?.limit != null) query.limit = String(params.limit);
+  if (params?.updatedAtAfter) query.updatedAtAfter = params.updatedAtAfter;
+  if (params?.storeId != null && params.storeId !== "")
+    query.storeId = String(params.storeId);
+  if (params?.search) query.search = params.search;
+  if (params?.categoryId) query.categoryId = String(params.categoryId);
+  return Object.keys(query).length > 0 ? query : undefined;
+}
 
 export const catalogueApi = {
   categories: {
     getAll: async (
       params?: PaginationParams
     ): Promise<ApiCategory[] | PaginatedResponse<ApiCategory>> => {
-      const queryParams = new URLSearchParams();
-      if (params?.page) queryParams.append("page", params.page.toString());
-      if (params?.limit) queryParams.append("limit", params.limit.toString());
-      if (params?.updatedAtAfter)
-        queryParams.append("updatedAtAfter", params.updatedAtAfter);
-      if (params?.storeId)
-        queryParams.append("storeId", String(params.storeId));
-
-      const url = `${API_BASE_PATH}/categories${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
-      const response = await api.get(url);
+      const response = await api.get("/categories", {
+        params: catalogueListParams(params),
+      });
 
       if (response.data?.meta) {
         return response.data;
@@ -40,12 +43,12 @@ export const catalogueApi = {
     },
 
     getById: async (id: string): Promise<ApiCategory> => {
-      const response = await api.get(`${API_BASE_PATH}/categories/${id}`);
+      const response = await api.get(`/categories/${id}`);
       return response.data;
     },
 
     create: async (data: CreateCategoryDto): Promise<ApiCategory> => {
-      const response = await api.post(`${API_BASE_PATH}/categories`, data);
+      const response = await api.post("/categories", data);
       return response.data;
     },
 
@@ -53,15 +56,12 @@ export const catalogueApi = {
       id: string,
       data: UpdateCategoryDto
     ): Promise<ApiCategory> => {
-      const response = await api.patch(
-        `${API_BASE_PATH}/categories/${id}`,
-        data
-      );
+      const response = await api.patch(`/categories/${id}`, data);
       return response.data;
     },
 
     delete: async (id: string): Promise<void> => {
-      await api.delete(`${API_BASE_PATH}/categories/${id}`);
+      await api.delete(`/categories/${id}`);
     },
   },
 
@@ -69,19 +69,9 @@ export const catalogueApi = {
     getAll: async (
       params?: PaginationParams
     ): Promise<ApiProduct[] | PaginatedResponse<ApiProduct>> => {
-      const queryParams = new URLSearchParams();
-      if (params?.page) queryParams.append("page", params.page.toString());
-      if (params?.limit) queryParams.append("limit", params.limit.toString());
-      if (params?.search) queryParams.append("search", params.search);
-      if (params?.categoryId)
-        queryParams.append("categoryId", params.categoryId);
-      if (params?.updatedAtAfter)
-        queryParams.append("updatedAtAfter", params.updatedAtAfter);
-      if (params?.storeId)
-        queryParams.append("storeId", String(params.storeId));
-
-      const url = `${API_BASE_PATH}/products${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
-      const response = await api.get(url);
+      const response = await api.get("/products", {
+        params: catalogueListParams(params),
+      });
 
       if (response.data?.meta) {
         return response.data;
@@ -92,29 +82,29 @@ export const catalogueApi = {
     },
 
     getById: async (id: string): Promise<ApiProduct> => {
-      const response = await api.get(`${API_BASE_PATH}/products/${id}`);
+      const response = await api.get(`/products/${id}`);
       return response.data;
     },
 
     create: async (data: CreateProductDto): Promise<ApiProduct> => {
-      const response = await api.post(`${API_BASE_PATH}/products`, data);
+      const response = await api.post("/products", data);
       return response.data;
     },
 
     update: async (id: string, data: UpdateProductDto): Promise<ApiProduct> => {
-      const response = await api.patch(`${API_BASE_PATH}/products/${id}`, data);
+      const response = await api.patch(`/products/${id}`, data);
       return response.data;
     },
 
     delete: async (id: string): Promise<void> => {
-      await api.delete(`${API_BASE_PATH}/products/${id}`);
+      await api.delete(`/products/${id}`);
     },
 
     addTemplate: async (
       data: AddTemplateRequest
     ): Promise<AddTemplateProductResponse[]> => {
       const response = await api.post<AddTemplateProductResponse[]>(
-        `${API_BASE_PATH}/products/add-template`,
+        "/products/add-template",
         data
       );
       return Array.isArray(response.data)
@@ -128,7 +118,7 @@ export const catalogueApi = {
     getAll: async (): Promise<CategoryTemplate[]> => {
       const response = await api.get<
         CategoryTemplate[] | { data: CategoryTemplate[] }
-      >(`${API_BASE_PATH}/category-templates`);
+      >("/category-templates");
       const raw = response.data;
       if (Array.isArray(raw)) return raw;
       return (raw as { data: CategoryTemplate[] })?.data ?? [];
@@ -139,7 +129,7 @@ export const catalogueApi = {
     getAll: async (): Promise<ProductTemplate[]> => {
       const response = await api.get<
         ProductTemplate[] | { data: ProductTemplate[] }
-      >(`${API_BASE_PATH}/product-templates`);
+      >("/product-templates");
       const raw = response.data;
       if (Array.isArray(raw)) return raw;
       return (raw as { data: ProductTemplate[] })?.data ?? [];
@@ -147,7 +137,7 @@ export const catalogueApi = {
 
     getForStore: async (): Promise<ProductTemplate[]> => {
       const response = await api.get<ProductTemplate[]>(
-        `${API_BASE_PATH}/product-templates/for-store`
+        "/product-templates/for-store"
       );
       const raw = response.data;
       return Array.isArray(raw) ? raw : [];

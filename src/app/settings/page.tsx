@@ -82,7 +82,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { feedback } from "@/lib/feedback";
+import { feedback, getErrorMessage } from "@/lib/feedback";
+import { isNetworkErrorLike } from "@/lib/network-error";
+import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffectiveOnline } from "@/hooks/use-effective-online";
@@ -260,6 +262,11 @@ export default function SettingsPage() {
 
   const settingsStoreId =
     currentUser?.storeId ?? settingsStore?.id ?? undefined;
+  const isPlatformAdmin =
+    currentUser != null &&
+    String(currentUser.role ?? "").toLowerCase() === "admin";
+  /** Platform admin selects store via query; store_admin uses JWT only. */
+  const settingsApiStoreId = isPlatformAdmin ? settingsStoreId : undefined;
 
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== "store_admin") return;
@@ -294,7 +301,7 @@ export default function SettingsPage() {
 
     setLoadingSettings(true);
     settingsApi
-      .get(settingsStoreId)
+      .get(settingsApiStoreId)
       .then((res) => {
         const credit = res.data?.credit;
         const cc = credit?.customerCredit;
@@ -342,7 +349,7 @@ export default function SettingsPage() {
     isAdmin,
     currentUser?.role,
     effectiveOnline,
-    settingsStoreId,
+    settingsApiStoreId,
     settingsStore?.credit,
     settingsStore?.id,
   ]);
@@ -515,11 +522,11 @@ export default function SettingsPage() {
 
     setSavingCredit(true);
     try {
-      await settingsApi.patch(body, settingsStoreId);
+      await settingsApi.patch(body, settingsApiStoreId);
       let updatedCredit: typeof settingsStore.credit = null;
       if (creditForm.enabled) {
         try {
-          const verifyRes = await settingsApi.get(settingsStoreId);
+          const verifyRes = await settingsApi.get(settingsApiStoreId);
           const verifyRaw = verifyRes.data as {
             credit?: unknown;
             data?: { credit?: unknown };
@@ -569,23 +576,26 @@ export default function SettingsPage() {
       }
     } catch (err: unknown) {
       const ax = err as {
-        response?: { data?: { message?: string | string[] }; status?: number };
+        response?: { data?: unknown; status?: number };
         message?: string;
+        code?: string;
       };
-      let message: string = (err as Error)?.message ?? "Failed to save.";
-      if (ax?.response?.data) {
-        const msg = ax.response.data.message;
-        if (typeof msg === "string") message = msg;
-        else if (Array.isArray(msg) && msg[0]) message = String(msg[0]);
-      }
+      const message = getErrorMessage(err);
+      const recovery = isNetworkErrorLike(err)
+        ? `Start the KasiPOS API (default ${getConfiguredApiUrl()}), set NEXT_PUBLIC_API_URL in .env if needed, then restart npm run dev.`
+        : ax?.response?.status === 404
+          ? "PATCH /settings is not available on the API you are using. Check NEXT_PUBLIC_API_URL."
+          : undefined;
       if (process.env.NODE_ENV === "development") {
         console.error("[Credit settings] PATCH /settings failed", {
           status: ax?.response?.status,
           data: ax?.response?.data,
-          err,
+          code: ax?.code,
+          message: ax?.message ?? (err as Error)?.message,
+          apiUrl: getConfiguredApiUrl(),
         });
       }
-      feedback.error("Save failed", message, undefined, { code: "CREDIT" });
+      feedback.error("Save failed", message, recovery, { code: "CREDIT" });
     } finally {
       setSavingCredit(false);
     }

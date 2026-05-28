@@ -11,14 +11,20 @@ export interface PatchSettingsBody {
   [key: string]: unknown;
 }
 
+function settingsQueryParams(storeId?: string | null) {
+  if (storeId == null || storeId === "") return undefined;
+  return { storeId: String(storeId) };
+}
+
 export const settingsApi = {
+  /** Pass storeId only for platform admin; store admins use JWT store scope. */
   get: (storeId?: string | null) =>
     api.get<StoreSettingsResponse>("/settings", {
-      ...(storeId != null && storeId !== "" && { params: { storeId } }),
+      params: settingsQueryParams(storeId),
     }),
 
   patch: (data: PatchSettingsBody, storeId?: string | null) =>
     api.patch<StoreSettingsResponse>("/settings", data, {
-      ...(storeId != null && storeId !== "" && { params: { storeId } }),
+      params: settingsQueryParams(storeId),
     }),
 };

@@ -34,11 +34,9 @@ import {
   BookOpen,
   Check,
   CheckCheck,
-  X,
   Home,
   AlertCircle,
   Info,
-  CheckCircle,
   AlertTriangle,
   Printer,
 } from "lucide-react";
@@ -46,10 +44,10 @@ import Link from "next/link";
 import { useSettings } from "../settings-provider";
 import { useHardwareSetup } from "@/components/hardware-setup/HardwareSetupProvider";
 import {
-  useNotifications,
-  type Notification,
-  type NotificationType,
-} from "@/hooks/use-notifications";
+  useBackendNotifications,
+  getCreditNotificationLink,
+} from "@/hooks/use-backend-notifications";
+import type { AppNotification } from "@/types/notifications";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { offlineDetector } from "@/lib/offline-detector";
 import { Switch } from "@/components/ui/switch";
@@ -82,31 +80,31 @@ const pageIcons: Record<string, React.ElementType> = {
   "/boph": PackageCheck,
 };
 
-const getNotificationIcon = (type: NotificationType) => {
-  switch (type) {
-    case "success":
-      return CheckCircle;
-    case "warning":
-      return AlertTriangle;
-    case "error":
-      return AlertCircle;
-    default:
-      return Info;
-  }
-};
+function getBackendNotificationIcon(notification: AppNotification) {
+  if (notification.type !== "credit_payment_reminder") return Info;
+  const meta = notification.metadata;
+  const overdue =
+    meta != null &&
+    typeof meta === "object" &&
+    "overdue" in meta &&
+    Boolean(meta.overdue);
+  return overdue ? AlertTriangle : Info;
+}
 
-const getNotificationColor = (type: NotificationType) => {
-  switch (type) {
-    case "success":
-      return "text-green-600 dark:text-green-400";
-    case "warning":
-      return "text-yellow-600 dark:text-yellow-400";
-    case "error":
-      return "text-red-600 dark:text-red-400";
-    default:
-      return "text-blue-600 dark:text-blue-400";
+function getBackendNotificationColor(notification: AppNotification) {
+  if (notification.type !== "credit_payment_reminder") {
+    return "text-blue-600 dark:text-blue-400";
   }
-};
+  const meta = notification.metadata;
+  const overdue =
+    meta != null &&
+    typeof meta === "object" &&
+    "overdue" in meta &&
+    Boolean(meta.overdue);
+  return overdue
+    ? "text-red-600 dark:text-red-400"
+    : "text-amber-600 dark:text-amber-400";
+}
 
 export default function Header() {
   const { settings, logout } = useSettings();
@@ -117,10 +115,11 @@ export default function Header() {
   const {
     notifications,
     unreadCount,
+    loading: notificationsLoading,
     markAsRead,
     markAllAsRead,
-    removeNotification,
-  } = useNotifications();
+    refreshList,
+  } = useBackendNotifications({ enabled: settings.isLoggedIn });
   const { isOnline, wasOffline, hasInternet, cloudUnreachable } =
     useNetworkStatus();
   const { openHardwareSetup } = useHardwareSetup();
@@ -140,14 +139,20 @@ export default function Header() {
 
   const PageIcon = pageIcons[pathname] || Store;
 
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.read) {
-      markAsRead(notification.id);
+  const handleNotificationClick = (notification: AppNotification) => {
+    if (notification.readAt == null) {
+      void markAsRead(notification.id).catch(() => undefined);
     }
-    if (notification.link) {
+    if (getCreditNotificationLink(notification)) {
       setNotificationOpen(false);
     }
   };
+
+  useEffect(() => {
+    if (notificationOpen) {
+      refreshList();
+    }
+  }, [notificationOpen, refreshList]);
 
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
@@ -194,7 +199,8 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {mounted && process.env.NODE_ENV === "development" &&
+        {mounted &&
+          process.env.NODE_ENV === "development" &&
           offlineDetector.isDevHost() && (
             <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
               <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
@@ -251,45 +257,58 @@ export default function Header() {
               )}
             </div>
             <ScrollArea className="h-[400px]">
-              {notifications.length === 0 ? (
+              {notificationsLoading && notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Loading notifications...
+                  </p>
+                </div>
+              ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
                   <p className="text-sm text-muted-foreground">
                     No notifications
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    You're all caught up!
+                    Credit payment reminders will appear here.
                   </p>
                 </div>
               ) : (
                 <div className="divide-y">
                   {notifications.map((notification) => {
-                    const Icon = getNotificationIcon(notification.type);
-                    const colorClass = getNotificationColor(notification.type);
-                    const content = notification.link ? (
-                      <Link
-                        href={notification.link}
-                        onClick={() => handleNotificationClick(notification)}
-                        className="block"
-                      >
-                        <NotificationItem
-                          notification={notification}
-                          Icon={Icon}
-                          colorClass={colorClass}
-                          onMarkRead={() => markAsRead(notification.id)}
-                          onRemove={() => removeNotification(notification.id)}
-                        />
-                      </Link>
-                    ) : (
+                    const Icon = getBackendNotificationIcon(notification);
+                    const colorClass =
+                      getBackendNotificationColor(notification);
+                    const link = getCreditNotificationLink(notification);
+                    const item = (
                       <NotificationItem
                         notification={notification}
                         Icon={Icon}
                         colorClass={colorClass}
-                        onMarkRead={() => markAsRead(notification.id)}
-                        onRemove={() => removeNotification(notification.id)}
+                        onMarkRead={() => {
+                          void markAsRead(notification.id).catch(
+                            () => undefined
+                          );
+                        }}
                       />
                     );
-                    return <div key={notification.id}>{content}</div>;
+                    return (
+                      <div key={notification.id}>
+                        {link ? (
+                          <Link
+                            href={link}
+                            onClick={() =>
+                              handleNotificationClick(notification)
+                            }
+                            className="block"
+                          >
+                            {item}
+                          </Link>
+                        ) : (
+                          item
+                        )}
+                      </div>
+                    );
                   })}
                 </div>
               )}
@@ -383,11 +402,10 @@ export default function Header() {
 }
 
 interface NotificationItemProps {
-  notification: Notification;
+  notification: AppNotification;
   Icon: React.ElementType;
   colorClass: string;
   onMarkRead: () => void;
-  onRemove: () => void;
 }
 
 function NotificationItem({
@@ -395,13 +413,15 @@ function NotificationItem({
   Icon,
   colorClass,
   onMarkRead,
-  onRemove,
 }: NotificationItemProps) {
+  const isUnread = notification.readAt == null;
+  const createdAt = new Date(notification.createdAt);
+
   return (
     <div
       className={cn(
         "relative px-4 py-3 hover:bg-muted/50 transition-colors",
-        !notification.read && "bg-muted/30"
+        isUnread && "bg-muted/30"
       )}
     >
       <div className="flex gap-3">
@@ -411,51 +431,34 @@ function NotificationItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p
-              className={cn(
-                "text-sm font-medium",
-                !notification.read && "font-semibold"
-              )}
+              className={cn("text-sm font-medium", isUnread && "font-semibold")}
             >
               {notification.title}
             </p>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {!notification.read && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onMarkRead();
-                  }}
-                >
-                  <Check className="h-3 w-3" />
-                </Button>
-              )}
+            {isUnread && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="h-6 w-6 flex-shrink-0"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  onRemove();
+                  onMarkRead();
                 }}
               >
-                <X className="h-3 w-3" />
+                <Check className="h-3 w-3" />
               </Button>
-            </div>
+            )}
           </div>
           <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-            {notification.message}
+            {notification.body}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(createdAt, { addSuffix: true })}
           </p>
         </div>
       </div>
-      {!notification.read && (
+      {isUnread && (
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
       )}
     </div>

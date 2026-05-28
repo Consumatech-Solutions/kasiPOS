@@ -57,7 +57,7 @@ export default function LoginPage() {
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
-        
+
         try {
           const isOnline = await offlineDetector.forceCheck();
           if (isOnline) {
@@ -91,7 +91,7 @@ export default function LoginPage() {
       if (err?.code === "ERR_NETWORK" || err?.message === "Network Error") {
         if (process.env.NODE_ENV === "development") {
           console.warn(
-            "Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:9002)."
+            "Backend not reachable. Ensure the API is running (default http://localhost:3001) and NEXT_PUBLIC_API_URL is set, then restart npm run dev."
           );
         }
         feedback.error(

@@ -424,6 +424,9 @@ export default function PosPage() {
         total: amountToPay,
         storeId: currentStore.id!,
         idempotencyKey,
+        ...(transactionDetails.paymentMethod === "Credit"
+          ? { status: "pending" as const }
+          : {}),
       };
 
       const toReceiptData = (saleId: string): ReceiptData =>
@@ -499,15 +502,18 @@ export default function PosPage() {
             idempotencyKey,
           });
 
-          const resData = response.data as
-            | { id?: string; data?: { id?: string } }
-            | undefined;
-          const createdId =
-            resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
-          await db.transactions.add({
+          const resData = response.data as Transaction | undefined;
+          const createdId = resData?.id ?? `TXN-${Date.now()}`;
+          const savedTransaction: Transaction = {
             ...newTransaction,
+            ...(resData ?? {}),
             id: String(createdId),
-          } as Transaction);
+            status:
+              resData?.status ??
+              (newTransaction.paymentMethod === "Credit" ? "pending" : "paid"),
+          };
+          await db.transactions.add(savedTransaction);
+          await saveTransactionsToDexie([savedTransaction]);
 
           for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
             const product = await getDb().productCache.get(pid);
@@ -539,10 +545,21 @@ export default function PosPage() {
 
           if (process.env.NODE_ENV === "development") {
             console.log("[Complete Sale] Success (online)", {
-              createdId: resData?.id ?? resData?.data?.id,
+              createdId: resData?.id,
             });
           }
-          feedback.success("Sale complete!", "View your receipt below.");
+          const creditDue =
+            newTransaction.paymentMethod === "Credit"
+              ? (resData?.creditDueAt ?? resData?.creditDetails?.dueAt ?? null)
+              : null;
+          feedback.success(
+            newTransaction.paymentMethod === "Credit"
+              ? "Credit sale recorded"
+              : "Sale complete!",
+            creditDue
+              ? `Payment due ${new Date(creditDue).toLocaleString()}. View your receipt below.`
+              : "View your receipt below."
+          );
         } catch (error: unknown) {
           const err = error as {
             message?: string;

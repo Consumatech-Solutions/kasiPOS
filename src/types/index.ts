@@ -111,9 +111,12 @@ export interface TransactionDiscount {
   discountReason: string;
 }
 
+export type TransactionStatus = "pending" | "failed" | "paid";
+
 /** Credit sale details (payment date, note). */
 export interface TransactionCreditDetails {
-  paymentDate?: string; // ISO 8601
+  paymentDate?: string;
+  dueAt?: string;
   note?: string;
 }
 
@@ -138,6 +141,9 @@ export interface Transaction {
   storeId: string;
   /** Present when paymentMethod is 'Credit'. */
   creditDetails?: TransactionCreditDetails | null;
+  status?: TransactionStatus;
+  creditDueAt?: string | null;
+  creditSettledAt?: string | null;
 }
 
 export interface Voucher {

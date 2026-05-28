@@ -27,6 +27,9 @@ export type CreateTransactionDto = {
   creditDetails?: TransactionCreditDetails;
 };
 
+/** Body for POST /transactions/clear-credit (mark pending credit as paid). */
+export type ClearCreditRequest = { id: string };
+
 export interface GetTransactionsParams extends PaginationParams {
   page?: number;
   limit?: number;
@@ -138,6 +141,9 @@ export const transactionsApi = {
       }
     );
   },
+
+  clearCredit: (data: ClearCreditRequest) =>
+    api.post<Transaction>("/transactions/clear-credit", data),
 
   getById: (id: string, params?: { storeId?: string | null }) => {
     const requestParams: Record<string, string> = {};

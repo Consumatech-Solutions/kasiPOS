@@ -47,16 +47,19 @@ function readPersistedSettings(): AppSettings {
     const item = window.localStorage.getItem("kasi-pos-settings");
     const storedSettings = item ? JSON.parse(item) : {};
     const itemUser = window.localStorage.getItem("user");
-    const currentUser = itemUser ? JSON.parse(itemUser) : null;
+    const token = window.localStorage.getItem("token");
+    const hasToken = typeof token === "string" && token.trim() !== "";
+    const persistedUser = itemUser ? JSON.parse(itemUser) : null;
+    const currentUser = hasToken ? persistedUser : null;
 
-    const currentStore = storedSettings.currentStore || null;
+    const currentStore = hasToken ? storedSettings.currentStore || null : null;
     const modules = currentStore?.enabledModules;
     return {
       ...defaultSettings,
       theme: storedSettings.theme || "light",
       currentUser,
       currentStore,
-      isLoggedIn: !!currentUser,
+      isLoggedIn: Boolean(currentUser && hasToken),
       campaigns: modules?.campaigns ?? defaultSettings.campaigns,
       marketplace: modules?.marketplace ?? defaultSettings.marketplace,
       boph: modules?.boph ?? defaultSettings.boph,

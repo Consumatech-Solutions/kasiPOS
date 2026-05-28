@@ -1,11 +1,6 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
-const DbProvider = dynamic(() => import("@/components/db-provider"), {
-  ssr: false,
-  loading: () => null,
-});
+import DbProvider from "@/components/db-provider";
 
 export function ClientDbProvider({ children }: { children: React.ReactNode }) {
   return <DbProvider>{children}</DbProvider>;

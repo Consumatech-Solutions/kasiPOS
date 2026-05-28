@@ -12,6 +12,18 @@ vi.mock("@/lib/api/core", () => ({
 
 import { api } from "@/lib/api/core";
 
+describe("transactionsApi.clearCredit", () => {
+  it("posts to clear-credit", async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { id: "tx-1", status: "paid" },
+    });
+    await transactionsApi.clearCredit({ id: "tx-1" });
+    expect(api.post).toHaveBeenCalledWith("/transactions/clear-credit", {
+      id: "tx-1",
+    });
+  });
+});
+
 describe("toCreateTransactionDto", () => {
   it("stringifies storeId and product ids and coerces numeric fields", () => {
     const dto = toCreateTransactionDto({

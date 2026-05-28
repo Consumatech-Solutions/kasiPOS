@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { buildBackendProxyRewrites } from "./src/lib/api/resolve-api-base-url";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -84,6 +85,7 @@ const nextConfig: NextConfig = {
   // Ensure service worker is served from root; serve favicon from stable asset to avoid 500
   async rewrites() {
     return [
+      ...buildBackendProxyRewrites(),
       {
         source: "/sw.js",
         destination: "/sw.js",

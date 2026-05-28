@@ -24,6 +24,13 @@ function entityCap(): number {
 const PURCHASE_ORDERS_KEY = "purchaseOrders";
 const PURCHASE_ORDER_CAP = 1000;
 
+function toSortableText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString();
+  return String(value);
+}
+
 export const LAST_SYNC_KEYS = {
   products: "products-lastSync",
   categories: "categories-lastSync",
@@ -103,8 +110,8 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
   if (count > cap) {
     const allCust = await db.customers.toArray();
     allCust.sort((a, b) =>
-      ((a as Customer).updatedAt ?? "").localeCompare(
-        (b as Customer).updatedAt ?? ""
+      toSortableText((a as Customer).updatedAt).localeCompare(
+        toSortableText((b as Customer).updatedAt)
       )
     );
     const toDelete = allCust.slice(0, count - cap).map((r) => r.id);
@@ -136,6 +143,21 @@ export async function saveTransactionsToDexie(
       .toArray();
     await db.transactionCache.bulkDelete(oldest.map((r) => r.id));
   }
+}
+
+export async function updateTransactionInDexie(
+  transaction: Transaction
+): Promise<void> {
+  if (typeof window === "undefined" || !transaction.id) return;
+  const db = getDb();
+  await db.transactionCache.put({
+    ...transaction,
+    id: String(transaction.id),
+    date:
+      (transaction as Transaction & { date?: string }).date ??
+      transaction.createdAt ??
+      new Date().toISOString(),
+  });
 }
 
 export async function updateProductStockInDexie(
@@ -422,8 +444,8 @@ export async function savePurchaseOrdersToDexie(
     if (o.id) byId.set(o.id, o);
   }
   const merged = Array.from(byId.values()).sort((a, b) => {
-    const aT = a.createdAt ?? "";
-    const bT = b.createdAt ?? "";
+    const aT = toSortableText(a.createdAt);
+    const bT = toSortableText(b.createdAt);
     return bT.localeCompare(aT);
   });
   const capped = merged.slice(0, PURCHASE_ORDER_CAP);
@@ -577,8 +599,8 @@ export async function getCustomersFromDexie(
     all = all.filter((c) => (c as Customer).storeId === storeId);
   }
   all.sort((a, b) => {
-    const aT = (a as Customer).updatedAt ?? "";
-    const bT = (b as Customer).updatedAt ?? "";
+    const aT = toSortableText((a as Customer).updatedAt);
+    const bT = toSortableText((b as Customer).updatedAt);
     return bT.localeCompare(aT);
   });
   if (search?.trim()) {
@@ -619,7 +641,7 @@ export async function getTransactionsFromDexie(
     );
   }
   const sorted = (all as { date?: string }[]).sort((a, b) =>
-    (b.date ?? "").localeCompare(a.date ?? "")
+    toSortableText(b.date).localeCompare(toSortableText(a.date))
   );
   const total = sorted.length;
   const data = sorted.slice(

@@ -118,7 +118,10 @@ export default function RootLayout({
           </Script>
         ) : null}
       </head>
-      <body className={`${inter.variable} font-body antialiased bg-background`}>
+      <body
+        className={`${inter.variable} font-body antialiased bg-background`}
+        suppressHydrationWarning
+      >
         <QueryProvider>
           <ClientDbProvider>
             <SettingsProvider>
