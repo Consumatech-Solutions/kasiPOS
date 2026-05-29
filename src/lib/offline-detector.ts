@@ -225,3 +225,13 @@ export function isOffline(): boolean {
 export async function checkOfflineStatus(force?: boolean): Promise<boolean> {
   return await offlineDetector.checkOfflineStatus(force);
 }
+
+/**
+ * Whether read-only backend GETs (notifications, transaction list) should be skipped.
+ * Unlike checkOfflineStatus, does not treat offline-first queue mode as offline.
+ */
+export function shouldSkipBackendReads(): boolean {
+  if (typeof window === "undefined") return true;
+  if (offlineDetector.getForceOffline() && isDevHost()) return true;
+  return !navigator.onLine;
+}

@@ -1,6 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
 import {
@@ -48,10 +55,14 @@ import {
   isPendingCreditTransaction,
   transactionDisplayStatus,
 } from "@/lib/credit-transactions";
+import { usePayableCreditTransactionIds } from "@/hooks/use-payable-credit-ids";
+import { useSyncStatus } from "@/hooks/use-sync-status";
+import { feedback } from "@/lib/feedback";
 import {
   formatTransactionIdShort,
   isSafeTransactionIdForLink,
   parseTransactionDate,
+  resolveTransactionServerId,
   transactionIdString,
 } from "@/lib/transaction-utils";
 
@@ -91,6 +102,7 @@ function TransactionsPageContent() {
     transactions: allTransactions,
     loading,
     error,
+    refresh,
   } = useTransactions({
     page: 1,
     limit: 100,
@@ -98,6 +110,17 @@ function TransactionsPageContent() {
     search: backendSearch,
     storeIdForOffline: currentStore?.id ?? undefined,
   });
+
+  const { isIdle, pendingCount } = useSyncStatus();
+  const prevPendingCountRef = useRef(pendingCount);
+
+  useEffect(() => {
+    const hadPending = prevPendingCountRef.current > 0;
+    prevPendingCountRef.current = pendingCount;
+    if (isIdle && pendingCount === 0 && hadPending) {
+      void refresh();
+    }
+  }, [isIdle, pendingCount, refresh]);
 
   const clearCredit = useClearCredit();
   const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
@@ -139,10 +162,21 @@ function TransactionsPageContent() {
     [allTransactions]
   );
 
+  const { isPayable: canMarkCreditAsPaid } =
+    usePayableCreditTransactionIds(filteredTransactions);
+
   const handleConfirmClearCredit = async () => {
-    const id = transactionIdString(clearTarget?.id);
-    if (!id) return;
-    await clearCredit.mutateAsync(id);
+    if (!clearTarget) return;
+    const serverId = await resolveTransactionServerId(clearTarget);
+    if (!serverId) {
+      feedback.error(
+        "Could not mark credit as paid",
+        "This sale is still syncing to the server.",
+        "Wait for sync to finish, then try again."
+      );
+      return;
+    }
+    await clearCredit.mutateAsync(serverId);
     setClearTarget(null);
   };
 
@@ -333,7 +367,7 @@ function TransactionsPageContent() {
                             </li>
                           ))}
                         </ul>
-                        {isPendingCredit && txId && (
+                        {canMarkCreditAsPaid(transaction) && (
                           <div className="mt-4 flex justify-end">
                             <Button
                               size="sm"
@@ -343,6 +377,13 @@ function TransactionsPageContent() {
                             </Button>
                           </div>
                         )}
+                        {isPendingCredit &&
+                          !canMarkCreditAsPaid(transaction) && (
+                            <p className="mt-4 text-xs text-muted-foreground text-right">
+                              Waiting for this sale to sync before you can mark
+                              it as paid.
+                            </p>
+                          )}
                       </AccordionContent>
                     </AccordionItem>
                   );

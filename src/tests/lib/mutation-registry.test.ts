@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  transactionsCreate: vi.fn(async (..._args: unknown[]) => ({ id: "tx" })),
+  transactionsCreate: vi.fn(async (..._args: unknown[]) => ({
+    data: {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      status: "pending",
+      paymentMethod: "Credit",
+    },
+  })),
   productsCreate: vi.fn(async (..._args: unknown[]) => ({ id: "srv-p1" })),
   productsUpdate: vi.fn(async (..._args: unknown[]) => ({})),
   productsDelete: vi.fn(async (..._args: unknown[]) => ({})),
@@ -171,6 +177,44 @@ describe("executeMutation", () => {
     expect(mocks.transactionsCreate).toHaveBeenCalledWith(expect.anything(), {
       idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
     });
+  });
+
+  it("transactions/create maps server id into syncIdMapping and transactionCache", async () => {
+    const idempotencyKey = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const localId = "local-offline-1";
+    await getDb().transactionCache.put({
+      id: localId,
+      idempotencyKey,
+      storeId: "store-1",
+      total: 50,
+      paymentMethod: "Credit",
+      status: "pending",
+      date: new Date().toISOString(),
+    });
+
+    await executeMutation(["transactions", "create"], {
+      storeId: "store-1",
+      idempotencyKey,
+      items: [
+        {
+          productId: "p1",
+          productName: "X",
+          quantity: 1,
+          unitPrice: 50,
+          totalPrice: 50,
+        },
+      ],
+      total: 50,
+      paymentMethod: "Credit",
+    });
+
+    const serverId = "550e8400-e29b-41d4-a716-446655440000";
+    const mapping = await getDb().syncIdMapping.get(idempotencyKey);
+    expect(mapping?.serverId).toBe(serverId);
+
+    const cached = await getDb().transactionCache.get(serverId);
+    expect(cached).toBeDefined();
+    expect(await getDb().transactionCache.get(localId)).toBeUndefined();
   });
 
   it("products/create uses categoryId and syncIdMapping for _tempId", async () => {

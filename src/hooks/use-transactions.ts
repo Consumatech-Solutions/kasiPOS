@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   transactionsApi,
@@ -8,7 +9,7 @@ import {
 } from "@/lib/api/transactions";
 import { checkOfflineStatus } from "@/lib/offline-detector";
 import {
-  getTransactionsFromDexie,
+  getTransactionsForDisplay,
   saveTransactionsToDexie,
 } from "@/lib/entity-cache";
 import { mutationQueue } from "@/lib/mutation-queue";
@@ -19,6 +20,8 @@ interface UseTransactionsOptions extends GetTransactionsParams {
   autoLoad?: boolean;
   storeIdForOffline?: string | null;
 }
+
+const EMPTY_TRANSACTIONS: Transaction[] = [];
 
 export const transactionKeys = {
   all: ["transactions"] as const,
@@ -68,10 +71,11 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
   const query = useQuery({
     queryKey,
     queryFn: async () => {
-      return getTransactionsFromDexie(
+      return getTransactionsForDisplay(
         params.page ?? 1,
         params.limit ?? 10,
-        storeIdForOffline ?? undefined
+        storeIdForOffline ?? undefined,
+        { date: params.date, search: params.search }
       );
     },
     enabled: true,
@@ -150,8 +154,10 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
     },
   });
 
+  const refresh = useCallback(() => query.refetch(), [query]);
+
   return {
-    transactions: query.data?.data || [],
+    transactions: query.data?.data ?? EMPTY_TRANSACTIONS,
     pagination: query.data?.meta || {
       total: 0,
       page: params.page || 1,
@@ -164,7 +170,7 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       : null,
     createTransaction: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
-    refresh: () => query.refetch(),
+    refresh,
     loadTransactions: async (loadParams?: GetTransactionsParams) => {
       const newParams = { ...params, ...loadParams };
       const newQueryKey = transactionKeys.list(newParams);

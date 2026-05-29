@@ -6,6 +6,7 @@ import {
 } from "@/lib/offline-detector";
 import { feedback, genLogId } from "@/lib/feedback";
 import { executeMutation } from "@/lib/mutation-registry";
+import { syncTransactionCreateResult } from "@/lib/entity-cache";
 import { getDb } from "@/lib/db";
 
 export interface QueuedMutation {
@@ -310,7 +311,17 @@ class MutationQueue {
     while (true) {
       try {
         console.log(mutation.variables, mutation.mutationKey);
-        await mutation.mutationFn();
+        const result = await mutation.mutationFn();
+        if (
+          mutation.mutationKey[0] === "transactions" &&
+          mutation.mutationKey[1] === "create"
+        ) {
+          await syncTransactionCreateResult(
+            mutation.variables,
+            result,
+            mutation.idempotencyKey
+          );
+        }
         mutation.status = "completed";
         return "success";
       } catch (error: any) {
@@ -388,10 +399,9 @@ class MutationQueue {
           `[MutationQueue] Successfully synced mutation: ${mutation.mutationKey.join("/")}`
         );
         if (this.queryClient && mutation.mutationKey.length > 0) {
-          const key = mutation.mutationKey[0];
           queueMicrotask(() => {
-            this.queryClient?.invalidateQueries({
-              queryKey: [key],
+            void this.queryClient?.invalidateQueries({
+              queryKey: ["transactions"],
               refetchType: "all",
             });
           });
@@ -425,7 +435,10 @@ class MutationQueue {
   }
 
   add(
-    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retries" | "status" | "mutationFn"> & { mutationFn?: () => Promise<any> }
+    mutation: Omit<
+      QueuedMutation,
+      "id" | "timestamp" | "retries" | "status" | "mutationFn"
+    > & { mutationFn?: () => Promise<any> }
   ) {
     const [type, action] = mutation.mutationKey;
     const inferredKey =
@@ -487,7 +500,9 @@ class MutationQueue {
       timestamp: Date.now(),
       retries: 0,
       status: "pending",
-      mutationFn: mutation.mutationFn ?? (() => executeMutation(mutation.mutationKey, mutation.variables)),
+      mutationFn:
+        mutation.mutationFn ??
+        (() => executeMutation(mutation.mutationKey, mutation.variables)),
       ...(inferredKey !== undefined && inferredKey !== ""
         ? { idempotencyKey: inferredKey }
         : {}),

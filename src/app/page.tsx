@@ -514,6 +514,14 @@ export default function PosPage() {
           };
           await db.transactions.add(savedTransaction);
           await saveTransactionsToDexie([savedTransaction]);
+          if (resData?.id) {
+            const { applyServerTransactionAfterSync } =
+              await import("@/lib/entity-cache");
+            await applyServerTransactionAfterSync({
+              idempotencyKey,
+              serverTransaction: savedTransaction,
+            });
+          }
 
           for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
             const product = await getDb().productCache.get(pid);
@@ -666,16 +674,8 @@ export default function PosPage() {
 
           mutationQueue.add({
             mutationKey: ["transactions", "create"],
-            mutationFn: () =>
-              transactionsApi.create(
-                toCreateTransactionDto(
-                  newTransaction as Omit<Transaction, "id"> & {
-                    items: Array<TransactionItem & { [k: string]: unknown }>;
-                  }
-                ),
-                { idempotencyKey }
-              ),
             variables: newTransaction,
+            idempotencyKey,
           });
 
           const localSaleId = `LOCAL-${Date.now()}`;

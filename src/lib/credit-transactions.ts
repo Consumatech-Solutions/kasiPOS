@@ -1,5 +1,9 @@
 import type { Transaction, TransactionStatus } from "@/types";
-import { formatCreditDueLabel } from "@/lib/transaction-utils";
+import {
+  formatCreditDueLabel,
+  isServerTransactionId,
+  transactionIdString,
+} from "@/lib/transaction-utils";
 
 export function transactionDisplayStatus(
   transaction: Transaction
@@ -37,4 +41,11 @@ export function creditDueDateLabel(
   iso: string | null | undefined
 ): string | null {
   return formatCreditDueLabel(iso ?? null);
+}
+
+/** Pending credit with a synced backend UUID (safe to call clear-credit). */
+export function canMarkCreditAsPaid(transaction: Transaction): boolean {
+  if (!isPendingCreditTransaction(transaction)) return false;
+  const id = transactionIdString(transaction.id);
+  return id !== "" && isServerTransactionId(id);
 }

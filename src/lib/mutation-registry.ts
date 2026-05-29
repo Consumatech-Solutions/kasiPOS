@@ -18,7 +18,9 @@ import { parcelsApi } from "@/lib/api/parcels";
 import { usersApi } from "@/lib/api/users";
 import { settingsApi, type PatchSettingsBody } from "@/lib/api/settings";
 import { getDb } from "@/lib/db";
+import { syncTransactionCreateResult } from "@/lib/entity-cache";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import type { Transaction } from "@/types";
 
 const DELIVERY_FEE = 150;
 
@@ -117,9 +119,14 @@ export async function executeMutation(
         resolved as Parameters<typeof toCreateTransactionDto>[0]
       );
       const idempotencyKey = raw.idempotencyKey;
-      return transactionsApi.create(dto as unknown as CreateTransactionDto, {
-        idempotencyKey,
-      });
+      const result = await transactionsApi.create(
+        dto as unknown as CreateTransactionDto,
+        {
+          idempotencyKey,
+        }
+      );
+      await syncTransactionCreateResult(raw, result, idempotencyKey);
+      return result;
     }
 
     case "products/create": {

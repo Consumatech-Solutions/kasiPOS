@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  canMarkCreditAsPaid,
   isPendingCreditTransaction,
   creditDueAtFromTransaction,
   transactionDisplayStatus,
@@ -55,5 +56,22 @@ describe("credit-transactions", () => {
         creditDetails: { dueAt: "2026-04-01T12:00:00Z" },
       })
     ).toBe("2026-04-01T12:00:00Z");
+  });
+
+  it("allows mark paid only when pending credit has server uuid", () => {
+    expect(
+      canMarkCreditAsPaid({
+        ...base,
+        status: "pending",
+        id: "550e8400-e29b-41d4-a716-446655440000",
+      })
+    ).toBe(true);
+    expect(
+      canMarkCreditAsPaid({
+        ...base,
+        status: "pending",
+        id: "local-1730000000000",
+      })
+    ).toBe(false);
   });
 });

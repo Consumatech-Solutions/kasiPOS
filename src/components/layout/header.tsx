@@ -116,6 +116,7 @@ export default function Header() {
     notifications,
     unreadCount,
     loading: notificationsLoading,
+    error: notificationsError,
     markAsRead,
     markAllAsRead,
     refreshList,
@@ -263,6 +264,24 @@ export default function Header() {
                     Loading notifications...
                   </p>
                 </div>
+              ) : notificationsError ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                  <AlertCircle className="h-10 w-10 text-destructive mb-3 opacity-80" />
+                  <p className="text-sm text-muted-foreground">
+                    Could not load notifications
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {notificationsError}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => refreshList()}
+                  >
+                    Try again
+                  </Button>
+                </div>
               ) : notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
@@ -270,7 +289,8 @@ export default function Header() {
                     No notifications
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Credit payment reminders will appear here.
+                    Credit payment reminders appear when a credit sale is due
+                    (24h, 12h, 1h before, at due, or overdue).
                   </p>
                 </div>
               ) : (

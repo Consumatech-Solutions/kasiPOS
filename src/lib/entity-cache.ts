@@ -124,12 +124,20 @@ export async function saveTransactionsToDexie(
 ): Promise<void> {
   if (typeof window === "undefined" || !data.length) return;
   const db = getDb();
-  const records = data.map((t) => ({
-    ...t,
-    id: t.id ?? `local-${Date.now()}-${Math.random()}`,
-    date:
-      (t as Transaction & { date?: string }).date ?? new Date().toISOString(),
-  }));
+  const records = data.map((t) => {
+    const rawDate = (t as Transaction & { date?: string | Date }).date;
+    const dateIso =
+      rawDate instanceof Date
+        ? rawDate.toISOString()
+        : rawDate != null && rawDate !== ""
+          ? String(rawDate)
+          : new Date().toISOString();
+    return {
+      ...t,
+      id: t.id ?? `local-${Date.now()}-${Math.random()}`,
+      date: dateIso,
+    };
+  });
   await db.transactionCache.bulkPut(
     records as { id: string; date?: string; [k: string]: unknown }[]
   );
@@ -158,6 +166,364 @@ export async function updateTransactionInDexie(
       transaction.createdAt ??
       new Date().toISOString(),
   });
+}
+
+/** Normalize POST /transactions response (axios body shapes vary by backend). */
+export function extractTransactionFromCreateResponse(
+  result: unknown
+): Transaction | undefined {
+  if (result == null || typeof result !== "object") return undefined;
+
+  const root = result as Record<string, unknown>;
+  const candidates: unknown[] = [root.data, root];
+
+  for (const candidate of candidates) {
+    if (candidate == null || typeof candidate !== "object") continue;
+    const body = candidate as Record<string, unknown>;
+    if (body.id != null && body.id !== "") {
+      return { ...(body as Transaction), id: String(body.id) };
+    }
+    if (body.data != null && typeof body.data === "object") {
+      const nested = body.data as Record<string, unknown>;
+      if (nested.id != null && nested.id !== "") {
+        return { ...(nested as Transaction), id: String(nested.id) };
+      }
+    }
+    if (body.transaction != null && typeof body.transaction === "object") {
+      const tx = body.transaction as Record<string, unknown>;
+      if (tx.id != null && tx.id !== "") {
+        return { ...(tx as Transaction), id: String(tx.id) };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/** Apply POST /transactions response to Dexie (id mapping + cache row id). */
+export async function syncTransactionCreateResult(
+  variables: unknown,
+  result: unknown,
+  queuedIdempotencyKey?: string | null
+): Promise<void> {
+  const serverTransaction = extractTransactionFromCreateResponse(result);
+  const fromVariables =
+    variables &&
+    typeof variables === "object" &&
+    "idempotencyKey" in variables &&
+    typeof (variables as { idempotencyKey?: unknown }).idempotencyKey ===
+      "string"
+      ? (variables as { idempotencyKey: string }).idempotencyKey
+      : undefined;
+
+  const storeId =
+    variables &&
+    typeof variables === "object" &&
+    "storeId" in variables &&
+    (variables as { storeId?: unknown }).storeId != null
+      ? String((variables as { storeId: unknown }).storeId)
+      : "";
+
+  if (!serverTransaction?.id && storeId !== "") {
+    try {
+      const { transactionsApi } = await import("@/lib/api/transactions");
+      const res = await transactionsApi.getAll({ storeId, limit: 50 });
+      const { data } = parseTransactionsApiResponse(res.data);
+      await mergeApiTransactionsIntoCache(data, storeId);
+    } catch {
+      /* list fallback is best-effort */
+    }
+    return;
+  }
+
+  if (!serverTransaction?.id) return;
+
+  await applyServerTransactionAfterSync({
+    idempotencyKey: queuedIdempotencyKey ?? fromVariables,
+    serverTransaction,
+  });
+}
+
+/**
+ * After POST /transactions sync: map local keys to server UUID and replace cache row id.
+ */
+export async function applyServerTransactionAfterSync(args: {
+  idempotencyKey?: string | null;
+  serverTransaction: Transaction;
+}): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const { serverTransaction, idempotencyKey: rawIdempotencyKey } = args;
+  const serverId =
+    serverTransaction.id != null ? String(serverTransaction.id) : "";
+  if (!serverId) return;
+
+  const db = getDb();
+  const idempotencyKey = rawIdempotencyKey?.trim() ?? "";
+
+  const rows = await db.transactionCache.toArray();
+  let existing: (Transaction & { date?: string }) | undefined;
+  if (idempotencyKey !== "") {
+    const found = rows.find(
+      (row) =>
+        String(
+          (row as Transaction & { idempotencyKey?: string }).idempotencyKey ??
+            ""
+        ) === idempotencyKey
+    );
+    if (found) {
+      existing = found as Transaction & { date?: string };
+    }
+  }
+  if (!existing) {
+    const found = (rows as Transaction[]).find(
+      (row) =>
+        String(row.storeId ?? "") === String(serverTransaction.storeId ?? "") &&
+        transactionsFuzzyMatch(row, serverTransaction)
+    );
+    if (found) {
+      existing = found as Transaction & { date?: string };
+    }
+  }
+
+  const oldId = existing?.id != null ? String(existing.id) : "";
+  const mappingKeys = new Set<string>();
+  if (idempotencyKey !== "") mappingKeys.add(idempotencyKey);
+  if (oldId !== "") mappingKeys.add(oldId);
+
+  const now = Date.now();
+  for (const tempId of mappingKeys) {
+    await db.syncIdMapping.put({ tempId, serverId, createdAt: now });
+  }
+
+  const merged: Transaction & { date?: string } = {
+    ...(existing ?? {}),
+    ...serverTransaction,
+    id: serverId,
+    date:
+      (existing as { date?: string } | undefined)?.date ??
+      serverTransaction.createdAt ??
+      new Date().toISOString(),
+  };
+
+  if (oldId !== "" && oldId !== serverId) {
+    await db.transactionCache.delete(oldId);
+  }
+  await db.transactionCache.put(merged);
+}
+
+function parseCacheTransactionTime(transaction: Transaction): number {
+  const raw = transaction.createdAt ?? transaction.date;
+  if (raw == null || raw === "") return 0;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Repairs pending credit rows that synced to the server but still have local ids in cache.
+ */
+export async function reconcilePendingCreditTransactionsWithServer(
+  storeId: string
+): Promise<number> {
+  if (typeof window === "undefined" || storeId === "") return 0;
+
+  const { isServerTransactionId, transactionIdString } =
+    await import("@/lib/transaction-utils");
+  const { isPendingCreditTransaction } =
+    await import("@/lib/credit-transactions");
+  const { transactionsApi } = await import("@/lib/api/transactions");
+
+  const db = getDb();
+  const cached = (await db.transactionCache.toArray()) as Transaction[];
+  const needsReconcile = cached.filter(
+    (t) =>
+      String(t.storeId ?? "") === String(storeId) &&
+      isPendingCreditTransaction(t) &&
+      !isServerTransactionId(transactionIdString(t.id))
+  );
+  if (needsReconcile.length === 0) return 0;
+
+  const res = await transactionsApi.getAll({ storeId, limit: 100 });
+  const { data: serverList } = parseTransactionsApiResponse(res.data);
+
+  let fixed = 0;
+  for (const local of needsReconcile) {
+    const match = serverList.find(
+      (s) =>
+        String(s.storeId ?? "") === String(storeId) &&
+        isPendingCreditTransaction(s) &&
+        transactionsFuzzyMatch(local, s)
+    );
+
+    if (match?.id) {
+      await applyServerTransactionAfterSync({
+        idempotencyKey: local.idempotencyKey,
+        serverTransaction: match,
+      });
+      fixed++;
+    }
+  }
+
+  return fixed;
+}
+
+export function parseTransactionsApiResponse(body: unknown): {
+  data: Transaction[];
+  meta: PaginationMeta;
+} {
+  if (Array.isArray(body)) {
+    const total = body.length;
+    return {
+      data: body as Transaction[],
+      meta: { total, page: 1, limit: total || 10, totalPages: 1 },
+    };
+  }
+  if (body && typeof body === "object") {
+    const record = body as Record<string, unknown>;
+    if (Array.isArray(record.data)) {
+      const meta = record.meta as PaginationMeta | undefined;
+      const data = record.data as Transaction[];
+      return {
+        data,
+        meta: meta ?? {
+          total: data.length,
+          page: 1,
+          limit: data.length || 10,
+          totalPages: 1,
+        },
+      };
+    }
+  }
+  return { data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+}
+
+/** Match local cache row to a server transaction (customer ids may differ after sync). */
+export function transactionsFuzzyMatch(
+  local: Transaction,
+  server: Transaction
+): boolean {
+  const localKey = local.idempotencyKey?.trim() ?? "";
+  const serverKey =
+    (
+      server as Transaction & { idempotencyKey?: string }
+    ).idempotencyKey?.trim() ?? "";
+  if (localKey !== "" && serverKey !== "" && localKey === serverKey) {
+    return true;
+  }
+
+  if (Math.abs(Number(local.total) - Number(server.total)) > 0.02) {
+    return false;
+  }
+  const localPay = String(local.paymentMethod).toLowerCase();
+  const serverPay = String(server.paymentMethod).toLowerCase();
+  if (!localPay.includes("credit") || localPay !== serverPay) return false;
+
+  const localItems = local.items?.length ?? 0;
+  const serverItems = server.items?.length ?? 0;
+  if (localItems === 0 || localItems !== serverItems) return false;
+
+  const localName = local.items[0]?.productName?.trim().toLowerCase() ?? "";
+  const serverName = server.items[0]?.productName?.trim().toLowerCase() ?? "";
+  if (localName !== "" && serverName !== "" && localName !== serverName) {
+    return false;
+  }
+
+  const timeDiff = Math.abs(
+    parseCacheTransactionTime(local) - parseCacheTransactionTime(server)
+  );
+  return timeDiff <= 24 * 60 * 60 * 1000;
+}
+
+export async function mergeApiTransactionsIntoCache(
+  apiRows: Transaction[],
+  storeId: string
+): Promise<void> {
+  if (typeof window === "undefined" || apiRows.length === 0) return;
+
+  const db = getDb();
+  const cached = (await db.transactionCache.toArray()) as Transaction[];
+  const now = Date.now();
+
+  for (const serverTx of apiRows) {
+    const serverId = serverTx.id != null ? String(serverTx.id) : "";
+    if (serverId === "") continue;
+
+    const localDup = cached.find(
+      (row) =>
+        String(row.id) === serverId ||
+        (row.idempotencyKey != null &&
+          row.idempotencyKey !== "" &&
+          row.idempotencyKey === serverTx.idempotencyKey) ||
+        (String(row.storeId ?? "") === String(storeId) &&
+          transactionsFuzzyMatch(row, serverTx))
+    );
+
+    const oldId = localDup?.id != null ? String(localDup.id) : "";
+    const merged: Transaction & { date?: string } = {
+      ...(localDup ?? {}),
+      ...serverTx,
+      id: serverId,
+      date:
+        (localDup as { date?: string } | undefined)?.date ??
+        serverTx.createdAt ??
+        new Date().toISOString(),
+    };
+
+    if (oldId !== "" && oldId !== serverId) {
+      await db.transactionCache.delete(oldId);
+      await db.syncIdMapping.put({ tempId: oldId, serverId, createdAt: now });
+    }
+    if (localDup?.idempotencyKey) {
+      await db.syncIdMapping.put({
+        tempId: localDup.idempotencyKey,
+        serverId,
+        createdAt: now,
+      });
+    }
+    await db.transactionCache.put(merged);
+  }
+}
+
+export async function getTransactionsForDisplay(
+  page: number,
+  limit: number,
+  storeId?: string | null,
+  filters?: { date?: string; search?: string }
+): Promise<{ data: Transaction[]; meta: PaginationMeta }> {
+  const dexieResult = await getTransactionsFromDexie(page, limit, storeId);
+
+  if (typeof window === "undefined" || storeId == null || storeId === "") {
+    return dexieResult;
+  }
+
+  const { shouldSkipBackendReads } = await import("@/lib/offline-detector");
+  if (shouldSkipBackendReads()) return dexieResult;
+
+  try {
+    const { transactionsApi } = await import("@/lib/api/transactions");
+    const res = await transactionsApi.getAll({
+      storeId,
+      page,
+      limit,
+      date: filters?.date,
+      search: filters?.search,
+    });
+    const parsed = parseTransactionsApiResponse(res.data);
+    await mergeApiTransactionsIntoCache(parsed.data, storeId);
+
+    const fromCache = await getTransactionsFromDexie(page, limit, storeId);
+    return {
+      data: fromCache.data,
+      meta: {
+        ...fromCache.meta,
+        total: Math.max(fromCache.meta.total, parsed.meta.total),
+      },
+    };
+  } catch (error) {
+    const { isNetworkErrorLike } = await import("@/lib/network-error");
+    if (isNetworkErrorLike(error)) return dexieResult;
+    throw error;
+  }
 }
 
 export async function updateProductStockInDexie(
@@ -637,7 +1003,9 @@ export async function getTransactionsFromDexie(
   if (storeId != null && storeId !== "") {
     all = all.filter(
       (t) =>
-        (t as unknown as Transaction & { storeId?: string }).storeId === storeId
+        String(
+          (t as unknown as Transaction & { storeId?: string }).storeId ?? ""
+        ) === String(storeId)
     );
   }
   const sorted = (all as { date?: string }[]).sort((a, b) =>

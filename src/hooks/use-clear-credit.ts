@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { transactionsApi } from "@/lib/api/transactions";
 import { transactionKeys } from "@/hooks/use-transactions";
+import { notificationKeys } from "@/hooks/use-backend-notifications";
 import { updateTransactionInDexie } from "@/lib/entity-cache";
 import { feedback } from "@/lib/feedback";
 import { getErrorMessage } from "@/lib/feedback";
@@ -19,6 +20,7 @@ export function useClearCredit() {
         await updateTransactionInDexie(updated as Transaction);
       }
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       feedback.success(
         "Credit marked as paid",
         "The transaction status has been updated."

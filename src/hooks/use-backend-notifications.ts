@@ -3,9 +3,12 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/lib/api/notifications";
+import {
+  normalizeNotificationsResponse,
+  parseUnreadCountResponse,
+} from "@/lib/api/notifications-parse";
 import type { AppNotification } from "@/types/notifications";
-import type { PaginatedResponse, PaginationMeta } from "@/types/pagination";
-import { checkOfflineStatus } from "@/lib/offline-detector";
+import { shouldSkipBackendReads } from "@/lib/offline-detector";
 import {
   transactionsHighlightLink,
   transactionsPendingCreditLink,
@@ -19,29 +22,6 @@ export const notificationKeys = {
   unreadCount: () => [...notificationKeys.all, "unread-count"] as const,
 };
 
-function normalizeNotificationsResponse(
-  response: AppNotification[] | PaginatedResponse<AppNotification>
-): { data: AppNotification[]; meta: PaginationMeta } {
-  if (Array.isArray(response)) {
-    return {
-      data: response,
-      meta: {
-        total: response.length,
-        page: 1,
-        limit: response.length || 20,
-        totalPages: 1,
-      },
-    };
-  }
-  if ("data" in response && "meta" in response) {
-    return response;
-  }
-  return {
-    data: [],
-    meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
-  };
-}
-
 const POLL_INTERVAL_MS = 60_000;
 
 export function useBackendNotifications(options?: {
@@ -54,14 +34,15 @@ export function useBackendNotifications(options?: {
   const unreadQuery = useQuery({
     queryKey: notificationKeys.unreadCount(),
     queryFn: async () => {
-      if (await checkOfflineStatus()) return { count: 0 };
+      if (shouldSkipBackendReads()) return { count: 0 };
       const res = await notificationsApi.getUnreadCount();
-      return res.data;
+      return { count: parseUnreadCountResponse(res.data) };
     },
     enabled,
     refetchInterval: enabled ? POLL_INTERVAL_MS : false,
     refetchOnWindowFocus: true,
     staleTime: 30_000,
+    retry: 1,
   });
 
   const listQuery = useQuery({
@@ -71,11 +52,8 @@ export function useBackendNotifications(options?: {
       limit: 20,
     }),
     queryFn: async () => {
-      if (await checkOfflineStatus()) {
-        return {
-          data: [] as AppNotification[],
-          meta: { total: 0, page: 1, limit: 20, totalPages: 0 },
-        };
+      if (shouldSkipBackendReads()) {
+        return normalizeNotificationsResponse([]);
       }
       const res = await notificationsApi.getAll({
         page: 1,
@@ -85,7 +63,9 @@ export function useBackendNotifications(options?: {
       return normalizeNotificationsResponse(res.data);
     },
     enabled,
+    refetchInterval: enabled ? POLL_INTERVAL_MS : false,
     staleTime: 15_000,
+    retry: 1,
   });
 
   const markReadMutation = useMutation({
@@ -103,7 +83,7 @@ export function useBackendNotifications(options?: {
   });
 
   const refreshList = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: notificationKeys.lists() }),
+    () => queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     [queryClient]
   );
 
@@ -111,6 +91,14 @@ export function useBackendNotifications(options?: {
     notifications: listQuery.data?.data ?? [],
     unreadCount: unreadQuery.data?.count ?? 0,
     loading: listQuery.isLoading || unreadQuery.isLoading,
+    error:
+      (listQuery.error ?? unreadQuery.error)
+        ? String(
+            (listQuery.error ?? unreadQuery.error) instanceof Error
+              ? (listQuery.error ?? unreadQuery.error)?.message
+              : "Could not load notifications"
+          )
+        : null,
     refreshList,
     markAsRead: markReadMutation.mutateAsync,
     markAllAsRead: markAllReadMutation.mutateAsync,
