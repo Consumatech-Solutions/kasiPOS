@@ -43,6 +43,33 @@ export function getJwtExpiryMs(token: string): number | null {
   return null;
 }
 
+export function isJwtFormat(token: string): boolean {
+  if (!token?.trim()) return false;
+  return token.trim().split(".").length === 3;
+}
+
+export function isKasiPosE2eBypass(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      window.localStorage.getItem("__kasi_pos_e2e") === "1" ||
+      window.sessionStorage.getItem("__kasi_pos_e2e") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** True when the stored access token should trigger logout (expired or unusable). */
+export function isAccessTokenInvalidForSession(token: string): boolean {
+  if (!token?.trim()) return true;
+  if (isKasiPosE2eBypass()) return false;
+  if (!isJwtFormat(token)) return true;
+  const expMs = getJwtExpiryMs(token);
+  if (expMs == null) return false;
+  return Date.now() >= expMs;
+}
+
 export function isAuthEndpoint(url: string | undefined): boolean {
   if (!url) return false;
   let path = url.split("?")[0];
@@ -97,7 +124,12 @@ export function notifySessionExpired(): void {
 
   sessionExpiredNotifying = true;
   try {
-    sessionExpiredHandler?.();
+    if (sessionExpiredHandler) {
+      sessionExpiredHandler();
+    } else {
+      clearAuthSessionStorage();
+      window.location.replace("/login");
+    }
   } finally {
     window.setTimeout(() => {
       sessionExpiredNotifying = false;
