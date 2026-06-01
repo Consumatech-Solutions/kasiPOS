@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -33,10 +33,12 @@ import type { Transaction, TransactionItem } from "@/types";
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/types/pagination";
 import Select from "react-select";
+import { useTranslation } from "react-i18next";
 
 const PAGE_SIZE = 10;
 
 export default function SalePage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { currentStore } = settings;
 
@@ -76,23 +78,23 @@ export default function SalePage() {
     }));
   }, [allCustomersList]);
 
-  const getCustomerName = (
-    customerId: string | undefined | null,
-    tempCustomerId?: string | null
-  ) => {
-    if (!customers) return "N/A";
-    const normalMatch = customers.find((c) => c.id === String(customerId));
-    if (normalMatch) return normalMatch.name;
-    const tempMatch = customers.find((c) => c.id === String(tempCustomerId));
-    if (tempMatch) return tempMatch.name;
-    if (
-      customerId?.startsWith("temp-") ||
-      tempCustomerId?.startsWith("temp-")
-    ) {
-      return "Unsynced Customer";
-    }
-    return "N/A";
-  };
+  const getCustomerName = useCallback(
+    (customerId: string | undefined | null, tempCustomerId?: string | null) => {
+      if (!customers) return t("sales.notApplicable");
+      const normalMatch = customers.find((c) => c.id === String(customerId));
+      if (normalMatch) return normalMatch.name;
+      const tempMatch = customers.find((c) => c.id === String(tempCustomerId));
+      if (tempMatch) return tempMatch.name;
+      if (
+        customerId?.startsWith("temp-") ||
+        tempCustomerId?.startsWith("temp-")
+      ) {
+        return t("sales.unsyncedCustomer");
+      }
+      return t("sales.notApplicable");
+    },
+    [customers, t]
+  );
 
   useEffect(() => {
     const loadTransactions = async () => {
@@ -183,6 +185,7 @@ export default function SalePage() {
     searchTerm,
     selectedProduct,
     selectedCustomer,
+    getCustomerName,
   ]);
 
   const paginationMeta: PaginationMeta = useMemo(() => {
@@ -228,9 +231,11 @@ export default function SalePage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg sm:text-xl">Sales</CardTitle>
+        <CardTitle className="text-lg sm:text-xl">
+          {t("sales.page.title")}
+        </CardTitle>
         <CardDescription className="text-sm">
-          Detailed view of all sales transactions.
+          {t("sales.page.description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -248,7 +253,7 @@ export default function SalePage() {
                 {selectedDate ? (
                   format(selectedDate, "PPP")
                 ) : (
-                  <span>Filter by date</span>
+                  <span>{t("sales.filter.filterByDate")}</span>
                 )}
               </Button>
             </PopoverTrigger>
@@ -265,7 +270,7 @@ export default function SalePage() {
           <div className="relative w-full sm:w-[200px]">
             <input
               type="text"
-              placeholder="Customer or Order #"
+              placeholder={t("sales.filter.searchPlaceholder")}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -275,13 +280,18 @@ export default function SalePage() {
           <div className="w-full sm:w-[200px]">
             <Select
               options={[
-                { value: "", label: "All Products" },
+                { value: "", label: t("sales.filter.allProducts") },
                 ...productOptions,
               ]}
-              value={selectedProduct ?? { value: "", label: "All Products" }}
+              value={
+                selectedProduct ?? {
+                  value: "",
+                  label: t("sales.filter.allProducts"),
+                }
+              }
               onChange={(opt) => setSelectedProduct(opt?.value ? opt : null)}
               isSearchable
-              placeholder="Select product"
+              placeholder={t("sales.filter.selectProduct")}
               className="text-sm"
             />
           </div>
@@ -289,13 +299,18 @@ export default function SalePage() {
           <div className="w-full sm:w-[200px]">
             <Select
               options={[
-                { value: "", label: "All Customers" },
+                { value: "", label: t("sales.filter.allCustomers") },
                 ...customerOptions,
               ]}
-              value={selectedCustomer ?? { value: "", label: "All Customers" }}
+              value={
+                selectedCustomer ?? {
+                  value: "",
+                  label: t("sales.filter.allCustomers"),
+                }
+              }
               onChange={(opt) => setSelectedCustomer(opt?.value ? opt : null)}
               isSearchable
-              placeholder="Select customer"
+              placeholder={t("sales.filter.selectCustomer")}
               className="text-sm"
             />
           </div>
@@ -309,20 +324,22 @@ export default function SalePage() {
               onClick={clearFilters}
               className="min-h-[44px] touch-target w-full sm:w-auto"
             >
-              <X className="mr-2 h-4 w-4" /> Clear Filters
+              <X className="mr-2 h-4 w-4" /> {t("sales.filter.clear")}
             </Button>
           )}
         </div>
 
         <div className="mb-4 text-sm text-muted-foreground">
-          Showing {paginatedTransactions.length} of{" "}
-          {filteredTransactions.length} sales
+          {t("sales.summary.showing", {
+            pageCount: paginatedTransactions.length,
+            total: filteredTransactions.length,
+          })}
         </div>
 
         <ScrollArea className="h-[calc(100vh-22rem)]">
           {loading ? (
             <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
-              Loading sales...
+              {t("sales.loading")}
             </div>
           ) : (
             <Accordion type="single" collapsible className="w-full">
@@ -361,15 +378,21 @@ export default function SalePage() {
                         <div className="flex justify-between w-full pr-4">
                           <div className="text-left">
                             <p className="font-medium">
-                              Sale #
-                              {String(transaction.id ?? "").substring(0, 8) ||
-                                "N/A"}
+                              {t("sales.accordion.saleNumber", {
+                                id:
+                                  String(transaction.id ?? "").substring(
+                                    0,
+                                    8
+                                  ) || t("sales.notApplicable"),
+                              })}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {format(transactionDate, "PPP p")}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              Customer: {customerName}
+                              {t("sales.accordion.customer", {
+                                name: customerName,
+                              })}
                             </p>
                           </div>
                           <div className="text-right">
@@ -385,7 +408,7 @@ export default function SalePage() {
                       <AccordionContent>
                         <div className="space-y-3">
                           <div className="text-sm font-medium border-b pb-1">
-                            Items
+                            {t("sales.detail.items")}
                           </div>
                           <ul className="space-y-2 pl-2">
                             {transaction.items?.map((item, idx) => (
@@ -398,8 +421,10 @@ export default function SalePage() {
                                     {item.productName}
                                   </span>
                                   <div className="text-muted-foreground text-xs mt-0.5">
-                                    Qty: {item.quantity} x R{" "}
-                                    {Number(item.unitPrice).toFixed(2)}
+                                    {t("sales.detail.qtyLine", {
+                                      qty: item.quantity,
+                                      unit: Number(item.unitPrice).toFixed(2),
+                                    })}
                                   </div>
                                 </div>
                                 <span className="font-medium ml-2">
@@ -412,22 +437,24 @@ export default function SalePage() {
                           <div className="border-t pt-2 space-y-1">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">
-                                Subtotal
+                                {t("sales.detail.subtotal")}
                               </span>
                               <span>R{subtotal.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">Tax</span>
+                              <span className="text-muted-foreground">
+                                {t("sales.detail.tax")}
+                              </span>
                               <span>R{tax.toFixed(2)}</span>
                             </div>
                             {discountAmount > 0 && (
                               <div className="flex justify-between text-sm text-green-600">
-                                <span>Discount</span>
+                                <span>{t("sales.detail.discount")}</span>
                                 <span>-R{discountAmount.toFixed(2)}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-sm font-semibold border-t pt-1">
-                              <span>Total</span>
+                              <span>{t("sales.detail.total")}</span>
                               <span>R{total.toFixed(2)}</span>
                             </div>
                           </div>
@@ -438,7 +465,9 @@ export default function SalePage() {
                             </Badge>
                             {transaction.voucherCode && (
                               <Badge variant="outline">
-                                Voucher: {transaction.voucherCode}
+                                {t("sales.detail.voucher", {
+                                  code: transaction.voucherCode,
+                                })}
                               </Badge>
                             )}
                           </div>
@@ -449,7 +478,7 @@ export default function SalePage() {
                 })
               ) : (
                 <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
-                  No sales found for the selected filters.
+                  {t("sales.empty")}
                 </div>
               )}
             </Accordion>

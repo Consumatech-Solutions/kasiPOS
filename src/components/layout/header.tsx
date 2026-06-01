@@ -36,11 +36,13 @@ import {
   CheckCheck,
   X,
   Home,
+  DollarSign,
   AlertCircle,
   Info,
   CheckCircle,
   AlertTriangle,
   Printer,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
 import { useSettings } from "../settings-provider";
@@ -54,26 +56,32 @@ import { useNetworkStatus } from "@/hooks/use-network-status";
 import { offlineDetector } from "@/lib/offline-detector";
 import { Switch } from "@/components/ui/switch";
 import { formatDistanceToNow } from "date-fns";
+import { enUS, fr as frDateFns } from "date-fns/locale";
+import type { Locale } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
-const pageTitles: Record<string, string> = {
-  "/": "Home",
-  "/catalogue": "Catalogue",
-  "/inventory": "Inventory",
-  "/transactions": "Orders",
-  "/customers": "Customers",
-  "/buy-stock": "Buy Stock",
-  "/vouchers": "Campaigns",
-  "/marketplace": "Marketplace",
-  "/boph": "BOPH",
-  "/settings": "Settings",
-  "/profile": "Profile",
+/** Pathname → i18n key (default namespace `translation`) */
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  "/": "nav.home",
+  "/catalogue": "nav.catalogue",
+  "/inventory": "nav.inventory",
+  "/sale": "nav.sales",
+  "/transactions": "nav.orders",
+  "/customers": "nav.customers",
+  "/buy-stock": "nav.buyStock",
+  "/vouchers": "nav.campaigns",
+  "/marketplace": "nav.marketplace",
+  "/boph": "nav.boph",
+  "/settings": "nav.settings",
+  "/profile": "header.menu.profile",
 };
 
 const pageIcons: Record<string, React.ElementType> = {
   "/": Home,
   "/catalogue": BookOpen,
   "/inventory": LayoutGrid,
+  "/sale": DollarSign,
   "/transactions": ScrollText,
   "/customers": Users,
   "/buy-stock": ShoppingCart,
@@ -108,7 +116,13 @@ const getNotificationColor = (type: NotificationType) => {
   }
 };
 
-export default function Header() {
+type HeaderProps = {
+  onOpenMobileNav?: () => void;
+};
+
+export default function Header({ onOpenMobileNav }: HeaderProps) {
+  const { t, i18n } = useTranslation();
+  const dateLocale: Locale = i18n.language?.startsWith("fr") ? frDateFns : enUS;
   const { settings, logout } = useSettings();
   const { currentUser, currentStore } = settings;
   const pathname = usePathname();
@@ -129,16 +143,25 @@ export default function Header() {
   useEffect(() => setMounted(true), []);
 
   const currentPageTitle = useMemo(() => {
-    if (pageTitles[pathname]) {
-      return pageTitles[pathname];
+    const titleKey = PAGE_TITLE_KEYS[pathname];
+    if (titleKey) {
+      return t(titleKey);
     }
     if (pathname.startsWith("/marketplace/")) {
-      return "Marketplace Store";
+      return t("header.pageTitle.marketplaceStore");
     }
-    return "Dashboard";
-  }, [pathname]);
+    return t("header.pageTitle.dashboard");
+  }, [pathname, t]);
 
   const PageIcon = pageIcons[pathname] || Store;
+
+  const roleLabel = (role: string) => {
+    const norm = String(role).toLowerCase().replace(/\s+/g, "_");
+    if (norm === "admin" || norm === "store_admin" || norm === "staff") {
+      return t(`settings.staff.role.${norm}`);
+    }
+    return role;
+  };
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.read) {
@@ -152,6 +175,18 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+        {onOpenMobileNav && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="md:hidden h-9 w-9 touch-target shrink-0"
+            onClick={onOpenMobileNav}
+            aria-label={t("header.menu.navigation")}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
         <Link
           href="/"
           className="flex items-center gap-1 sm:gap-2 flex-shrink-0"
@@ -174,10 +209,12 @@ export default function Header() {
           </span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-2 text-muted-foreground">
-          <div className="h-6 w-px bg-border" />
-          <PageIcon className="h-4 w-4" />
-          <span className="text-sm font-medium">{currentPageTitle}</span>
+        <div className="flex items-center gap-2 text-muted-foreground min-w-0 flex-1 md:flex-none">
+          <div className="hidden md:block h-6 w-px bg-border" />
+          <PageIcon className="h-4 w-4 shrink-0" />
+          <span className="text-sm font-medium truncate">
+            {currentPageTitle}
+          </span>
         </div>
 
         {currentStore && (
@@ -194,18 +231,19 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {mounted && process.env.NODE_ENV === "development" &&
+        {mounted &&
+          process.env.NODE_ENV === "development" &&
           offlineDetector.isDevHost() && (
             <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
               <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
-                Simulate offline
+                {t("header.dev.simulateOffline")}
               </span>
               <Switch
                 checked={offlineDetector.getForceOffline()}
                 onCheckedChange={(checked) =>
                   offlineDetector.setForceOffline(checked)
                 }
-                aria-label="Simulate offline"
+                aria-label={t("header.dev.simulateOffline")}
               />
             </div>
           )}
@@ -231,10 +269,12 @@ export default function Header() {
           <PopoverContent className="w-[90vw] sm:w-80 p-0" align="end">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-sm">Notifications</h3>
+                <h3 className="font-semibold text-sm">
+                  {t("header.notifications.title")}
+                </h3>
                 {unreadCount > 0 && (
                   <Badge variant="secondary" className="text-xs">
-                    {unreadCount} new
+                    {t("header.notifications.new", { count: unreadCount })}
                   </Badge>
                 )}
               </div>
@@ -246,7 +286,7 @@ export default function Header() {
                   onClick={markAllAsRead}
                 >
                   <CheckCheck className="h-3 w-3 mr-1" />
-                  Mark all read
+                  {t("header.notifications.markAllRead")}
                 </Button>
               )}
             </div>
@@ -255,10 +295,10 @@ export default function Header() {
                 <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                   <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
                   <p className="text-sm text-muted-foreground">
-                    No notifications
+                    {t("header.notifications.empty")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    You're all caught up!
+                    {t("header.notifications.emptyHint")}
                   </p>
                 </div>
               ) : (
@@ -276,6 +316,7 @@ export default function Header() {
                           notification={notification}
                           Icon={Icon}
                           colorClass={colorClass}
+                          dateLocale={dateLocale}
                           onMarkRead={() => markAsRead(notification.id)}
                           onRemove={() => removeNotification(notification.id)}
                         />
@@ -285,6 +326,7 @@ export default function Header() {
                         notification={notification}
                         Icon={Icon}
                         colorClass={colorClass}
+                        dateLocale={dateLocale}
                         onMarkRead={() => markAsRead(notification.id)}
                         onRemove={() => removeNotification(notification.id)}
                       />
@@ -329,17 +371,17 @@ export default function Header() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
-                  {currentUser?.name || "User"}
+                  {currentUser?.name || t("header.user.fallbackName")}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {currentUser?.phone || "No phone"}
+                  {currentUser?.phone || t("header.user.noPhone")}
                 </p>
                 {currentUser?.role && (
                   <Badge
                     variant="secondary"
                     className="w-fit mt-1 text-[10px] px-1.5 py-0"
                   >
-                    {currentUser.role}
+                    {roleLabel(currentUser.role)}
                   </Badge>
                 )}
               </div>
@@ -348,7 +390,7 @@ export default function Header() {
             <Link href="/profile">
               <DropdownMenuItem className="min-h-[44px] touch-target">
                 <User className="mr-2 h-4 w-4" />
-                Profile
+                {t("header.menu.profile")}
               </DropdownMenuItem>
             </Link>
             <DropdownMenuItem
@@ -356,7 +398,7 @@ export default function Header() {
               className="min-h-[44px] touch-target"
             >
               <Printer className="mr-2 h-4 w-4" />
-              Hardware setup
+              {t("settings.hardware.label")}
             </DropdownMenuItem>
             {(currentUser?.role === "admin" ||
               currentStore?.ownerId === currentUser?.id ||
@@ -364,7 +406,7 @@ export default function Header() {
               <Link href="/settings">
                 <DropdownMenuItem className="min-h-[44px] touch-target">
                   <Store className="mr-2 h-4 w-4" />
-                  Settings
+                  {t("nav.settings")}
                 </DropdownMenuItem>
               </Link>
             )}
@@ -373,7 +415,7 @@ export default function Header() {
               onClick={logout}
               className="text-destructive focus:text-destructive min-h-[44px] touch-target"
             >
-              Log out
+              {t("header.menu.logout")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -386,6 +428,7 @@ interface NotificationItemProps {
   notification: Notification;
   Icon: React.ElementType;
   colorClass: string;
+  dateLocale: Locale;
   onMarkRead: () => void;
   onRemove: () => void;
 }
@@ -394,6 +437,7 @@ function NotificationItem({
   notification,
   Icon,
   colorClass,
+  dateLocale,
   onMarkRead,
   onRemove,
 }: NotificationItemProps) {
@@ -451,7 +495,10 @@ function NotificationItem({
             {notification.message}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatDistanceToNow(notification.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(notification.createdAt, {
+              addSuffix: true,
+              locale: dateLocale,
+            })}
           </p>
         </div>
       </div>

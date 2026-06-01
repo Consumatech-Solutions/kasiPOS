@@ -198,7 +198,7 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
             const strategy = getPrintStrategy();
             const hint =
               strategy === "android"
-                ? "Please ensure RawBT or POS Printer Driver is running and your printer is paired."
+                ? "Install RawBT, pair your printer, and complete printer setup in Settings."
                 : "Please ensure QZ Tray (Desktop) or your printer server is running.";
             toast({
               variant: "destructive",

@@ -30,8 +30,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useTranslation } from "react-i18next";
 
 export default function BuyStockPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { hasInternet } = useNetworkStatus();
   const { currentStore } = settings;
@@ -75,9 +77,9 @@ export default function BuyStockPage() {
     const quantity = quantities[product.id] || 0;
     if (quantity <= 0) {
       feedback.error(
-        "No quantity",
-        "Enter a quantity to add the item to your cart.",
-        "Enter a number greater than 0.",
+        t("buyStock.feedback.noQuantityTitle"),
+        t("buyStock.feedback.noQuantityDesc"),
+        t("buyStock.feedback.noQuantityHint"),
         { code: ERROR_CODES.PURCHASE_ORDER }
       );
       return;
@@ -112,8 +114,11 @@ export default function BuyStockPage() {
     localStorage.setItem("purchaseOrderCart", JSON.stringify(cart));
 
     feedback.success(
-      "Added to cart",
-      `${quantity} × ${product.name} added to your purchase order cart.`
+      t("buyStock.feedback.addedTitle"),
+      t("buyStock.feedback.addedDesc", {
+        quantity,
+        productName: product.name,
+      })
     );
   };
 
@@ -127,9 +132,11 @@ export default function BuyStockPage() {
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle className="text-lg sm:text-xl">Buy Stock</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">
+                {t("buyStock.page.title")}
+              </CardTitle>
               <CardDescription className="text-sm">
-                Order from suppliers to replenish your inventory.
+                {t("buyStock.page.description")}
               </CardDescription>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -140,7 +147,7 @@ export default function BuyStockPage() {
               >
                 <Link href="/buy-stock/history">
                   <History className="mr-2 h-4 w-4" />
-                  Order History
+                  {t("buyStock.actions.orderHistory")}
                 </Link>
               </Button>
               <Button
@@ -149,7 +156,7 @@ export default function BuyStockPage() {
               >
                 <Link href="/buy-stock/cart">
                   <ShoppingCart className="mr-2 h-4 w-4" />
-                  View Cart
+                  {t("buyStock.actions.viewCart")}
                 </Link>
               </Button>
             </div>
@@ -157,31 +164,39 @@ export default function BuyStockPage() {
           <CardContent>
             <Alert className="mb-6 bg-blue-50 border-blue-200 text-blue-800">
               <Info className="h-4 w-4 !text-blue-800" />
-              <AlertTitle>Group Buying Power!</AlertTitle>
+              <AlertTitle>{t("buyStock.alert.title")}</AlertTitle>
               <AlertDescription>
-                The <span className="font-bold">Group Price</span> is an
-                estimated cost based on aggregated orders from stores near you.
-                Order together to save!
+                {t("buyStock.alert.beforeBold")}
+                <span className="font-bold">
+                  {t("buyStock.alert.boldLabel")}
+                </span>
+                {t("buyStock.alert.afterBold")}
               </AlertDescription>
             </Alert>
 
             {lowStockItems && lowStockItems.length > 0 && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-2">Low Stock Items</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {t("buyStock.lowStock.title")}
+                </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  These items are running low. Consider reordering them now.
+                  {t("buyStock.lowStock.hint")}
                 </p>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product</TableHead>
+                        <TableHead>{t("buyStock.table.product")}</TableHead>
                         <TableHead className="hidden sm:table-cell">
-                          Stock
+                          {t("buyStock.table.stock")}
                         </TableHead>
-                        <TableHead>Group Price</TableHead>
-                        <TableHead className="w-[100px]">Quantity</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
+                        <TableHead>{t("buyStock.table.groupPrice")}</TableHead>
+                        <TableHead className="w-[100px]">
+                          {t("buyStock.table.quantity")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("buyStock.table.action")}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -198,14 +213,18 @@ export default function BuyStockPage() {
                                   variant="destructive"
                                   className="mt-1 w-fit"
                                 >
-                                  {product.stock ?? 0} left
+                                  {t("buyStock.stockLeft", {
+                                    count: product.stock ?? 0,
+                                  })}
                                 </Badge>
                               </span>
                             </div>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
                             <Badge variant="destructive">
-                              {product.stock ?? 0} left
+                              {t("buyStock.stockLeft", {
+                                count: product.stock ?? 0,
+                              })}
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold text-green-600">
@@ -233,7 +252,9 @@ export default function BuyStockPage() {
                               onClick={() => handleAddToCart(product)}
                             >
                               <Plus />{" "}
-                              <span className="hidden sm:inline">Add</span>
+                              <span className="hidden sm:inline">
+                                {t("buyStock.add")}
+                              </span>
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -246,29 +267,33 @@ export default function BuyStockPage() {
 
             <div>
               <h3 className="text-lg font-semibold mb-2">
-                Full Supplier Catalogue
+                {t("buyStock.catalog.title")}
               </h3>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Product</TableHead>
+                      <TableHead>{t("buyStock.table.product")}</TableHead>
                       <TableHead className="hidden sm:table-cell">
-                        Current Stock
+                        {t("buyStock.table.currentStock")}
                       </TableHead>
                       <TableHead className="hidden md:table-cell">
-                        Unit Price
+                        {t("buyStock.table.unitPrice")}
                       </TableHead>
-                      <TableHead>Group Price</TableHead>
-                      <TableHead className="w-[100px]">Quantity</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead>{t("buyStock.table.groupPrice")}</TableHead>
+                      <TableHead className="w-[100px]">
+                        {t("buyStock.table.quantity")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("buyStock.table.action")}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {productsLoading ? (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center py-10">
-                          Loading products...
+                          {t("buyStock.loadingProducts")}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -278,7 +303,9 @@ export default function BuyStockPage() {
                             <div className="flex flex-col">
                               <span>{product.name}</span>
                               <span className="text-xs text-muted-foreground sm:hidden">
-                                Stock: {product.stock ?? 0}
+                                {t("buyStock.mobileStock", {
+                                  count: product.stock ?? 0,
+                                })}
                               </span>
                             </div>
                           </TableCell>
@@ -313,7 +340,9 @@ export default function BuyStockPage() {
                               onClick={() => handleAddToCart(product)}
                             >
                               <Plus />{" "}
-                              <span className="hidden sm:inline">Add</span>
+                              <span className="hidden sm:inline">
+                                {t("buyStock.add")}
+                              </span>
                             </Button>
                           </TableCell>
                         </TableRow>

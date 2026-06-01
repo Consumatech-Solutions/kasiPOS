@@ -13,6 +13,15 @@ import { usePathname, useRouter } from "next/navigation";
 import type { AppSettings, User, Store } from "@/types";
 import { authApi } from "@/lib/api/auth";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import { parseStoredAppLanguage } from "@/lib/language-code";
+import { useSyncI18nLanguage } from "@/hooks/use-sync-i18n-language";
+import {
+  clearAuthSessionStorage,
+  getJwtExpiryMs,
+  registerSessionExpiredHandler,
+  resetSessionExpiredNotifyGuard,
+} from "@/lib/auth-session";
+import { feedback } from "@/lib/feedback";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -54,6 +63,7 @@ function readPersistedSettings(): AppSettings {
     return {
       ...defaultSettings,
       theme: storedSettings.theme || "light",
+      language: parseStoredAppLanguage(storedSettings.language),
       currentUser,
       currentStore,
       isLoggedIn: !!currentUser,
@@ -92,11 +102,14 @@ function persistedSettingsMatch(a: AppSettings, b: AppSettings): boolean {
 
 const AUTH_ROUTES = [
   "/login",
+  "/signup",
+  "/signup/verify",
   "/request-access",
   "/verify-code",
   "/set-password",
   "/set-password-store-admin",
 ];
+const PUBLIC_ROUTES = ["/offline", "/print-test"];
 const SETUP_ROUTE = "/store-setup";
 
 function isCypressRuntime(): boolean {
@@ -238,6 +251,87 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
 
+  const clearSessionAndRedirect = useCallback(
+    (options?: { showExpiredToast?: boolean }) => {
+      const theme = settings.theme;
+      clearAuthSessionStorage(theme);
+      setSettings({
+        ...defaultSettings,
+        theme,
+        isLoggedIn: false,
+        currentUser: null,
+        currentStore: null,
+      });
+      router.replace("/login");
+      if (options?.showExpiredToast) {
+        feedback.error(
+          "Session expired",
+          "Your session has expired. Please sign in again.",
+          undefined
+        );
+      }
+    },
+    [router, settings.theme]
+  );
+
+  const sessionExpiryLogoutInProgressRef = useRef(false);
+
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiryLogoutInProgressRef.current) return;
+    sessionExpiryLogoutInProgressRef.current = true;
+    // Automatic expiry / 401 — never show the manual logout confirm dialog.
+    clearSessionAndRedirect({ showExpiredToast: true });
+  }, [clearSessionAndRedirect]);
+
+  const handleSessionExpiredRef = useRef(handleSessionExpired);
+  handleSessionExpiredRef.current = handleSessionExpired;
+
+  useEffect(() => {
+    registerSessionExpiredHandler(() => {
+      handleSessionExpiredRef.current();
+    });
+    return () => registerSessionExpiredHandler(null);
+  }, []);
+
+  useEffect(() => {
+    if (!settings.isLoggedIn || typeof window === "undefined") return;
+
+    const checkExpiry = () => {
+      const token = window.localStorage.getItem("token");
+      if (!token) return;
+      const expMs = getJwtExpiryMs(token);
+      if (expMs != null && Date.now() >= expMs) {
+        handleSessionExpiredRef.current();
+      }
+    };
+
+    checkExpiry();
+
+    const token = window.localStorage.getItem("token");
+    let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
+    if (token) {
+      const expMs = getJwtExpiryMs(token);
+      if (expMs != null && expMs > Date.now()) {
+        const delay = Math.min(expMs - Date.now(), 2_147_483_647);
+        timeoutId = globalThis.setTimeout(() => {
+          handleSessionExpiredRef.current();
+        }, delay);
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkExpiry();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [settings.isLoggedIn]);
+
   const logout = useCallback(async () => {
     if (
       typeof window !== "undefined" &&
@@ -248,36 +342,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const theme = settings.theme;
-
-    const newSettings = {
-      ...defaultSettings,
-      theme,
-      isLoggedIn: false,
-      currentUser: null,
-      currentStore: null,
-    };
-    try {
-      window.localStorage.setItem(
-        "kasi-pos-settings",
-        JSON.stringify({ theme })
-      );
-      window.localStorage.removeItem("token");
-      window.localStorage.removeItem("user");
-      window.localStorage.removeItem("__kasi_pos_e2e");
-      window.sessionStorage.removeItem("__kasi_pos_e2e");
-    } catch (error) {
-      console.error("Error saving settings to localStorage on logout", error);
-    }
-    setSettings(newSettings);
-    router.replace("/login");
+    resetSessionExpiredNotifyGuard();
+    sessionExpiryLogoutInProgressRef.current = false;
+    clearSessionAndRedirect();
 
     try {
       await authApi.logout();
     } catch (error) {
       console.error("Logout API call failed", error);
     }
-  }, [router, settings.theme]);
+  }, [clearSessionAndRedirect]);
 
   useEffect(() => {
     const bootstrapData = async () => {
@@ -309,7 +383,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem("user", JSON.stringify(freshUser));
           } catch (profileErr: any) {
             if (profileErr?.response?.status === 401) {
-              await logout();
+              handleSessionExpiredRef.current();
               return;
             }
             if (isNetworkErrorLike(profileErr)) {
@@ -430,7 +504,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (isInitialLoad) {
       bootstrapData();
     }
-  }, [isInitialLoad, setSetting, logout, settings.currentUser]);
+  }, [isInitialLoad, setSetting, settings.currentUser]);
 
   useEffect(() => {
     if (!hasHydratedStorage) return;
@@ -453,6 +527,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       const next: Record<string, unknown> = {
         ...existing,
         theme: settings.theme,
+        language: settings.language,
         showVatInCheckout: settings.showVatInCheckout,
       };
       if (settings.currentStore) {
@@ -497,6 +572,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (isCypress || isE2eHarness) {
         return;
       }
+      if (PUBLIC_ROUTES.includes(pathname)) {
+        return;
+      }
       if (pathname.startsWith("/marketplace") || pathname.startsWith("/boph")) {
         return;
       }
@@ -534,6 +612,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (userData: User & { accessToken?: string }) => {
+      sessionExpiryLogoutInProgressRef.current = false;
+      resetSessionExpiredNotifyGuard();
       if (userData.accessToken) {
         localStorage.setItem("token", userData.accessToken);
       }
@@ -584,6 +664,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     [setSetting]
   );
 
+  useSyncI18nLanguage(settings.language, hasHydratedStorage);
+
   const canRenderChildren = () => {
     if (!hasHydratedStorage) return false;
     if (!settings.isLoggedIn) {
@@ -605,6 +687,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         allowBophBootstrap
       ) {
         return !AUTH_ROUTES.includes(pathname) && pathname !== SETUP_ROUTE;
+      }
+      if (PUBLIC_ROUTES.includes(pathname)) {
+        return true;
       }
       return AUTH_ROUTES.includes(pathname);
     }

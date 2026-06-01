@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
+import { v4 as uuidv4 } from "uuid";
 
 import type {
   Product,
@@ -14,18 +15,7 @@ import { db, getDb } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import {
-  Plus,
-  Minus,
-  Trash2,
-  User,
-  Ticket,
-  Search,
-  QrCode,
-  LayoutGrid,
-  List,
-  Percent,
-} from "lucide-react";
+import { Plus, Search, QrCode, LayoutGrid, List } from "lucide-react";
 import {
   Carousel,
   CarouselContent,
@@ -51,6 +41,11 @@ import {
 } from "@/components/ui/table";
 import { Eye } from "lucide-react";
 import PaymentModal from "@/components/pos/PaymentModal";
+import {
+  PosSalePanel,
+  type PosSalePanelProps,
+} from "@/components/pos/PosSalePanel";
+import { PosMobileCartSheet } from "@/components/pos/PosMobileCartSheet";
 import VoucherModal from "@/components/pos/VoucherModal";
 import ApplyDiscountModal from "@/components/pos/ApplyDiscountModal";
 import CreditSaleModal from "@/components/pos/CreditSaleModal";
@@ -87,8 +82,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
+
+type PosAlertTitleKey = "stock" | "credit" | "notice";
 
 export default function PosPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
@@ -125,9 +124,11 @@ export default function PosPage() {
   const [insufficientStockPopup, setInsufficientStockPopup] = useState<{
     open: boolean;
     message: string;
-  }>({ open: false, message: "" });
+    titleKey: PosAlertTitleKey;
+  }>({ open: false, message: "", titleKey: "stock" });
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
   const [isCreditModalOpen, setIsCreditModalOpen] = useState(false);
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
 
   const clearCartAndResetCoupons = () => {
     clearCart();
@@ -234,13 +235,14 @@ export default function PosPage() {
   const showVatInCheckout = settings.showVatInCheckout !== false;
   const vatAmount = showVatInCheckout ? cartTotal * (VAT_RATE / 100) : 0;
   const amountToPay = showVatInCheckout ? cartTotal + vatAmount : cartTotal;
+  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleOpenVoucherModal = () => {
     if (cartSubtotal < 5) {
       feedback.error(
-        "Cannot redeem voucher",
-        "You need a cart total of at least R5 to redeem a voucher.",
-        "Add more items to the cart."
+        t("pos.feedback.voucherMinTitle"),
+        t("pos.feedback.voucherMinDescription"),
+        t("pos.feedback.voucherMinHint")
       );
       return;
     }
@@ -254,18 +256,18 @@ export default function PosPage() {
   ) => {
     if (cart.size === 0) {
       feedback.error(
-        "Cart is empty",
-        "Please add products to the cart before checkout.",
-        "Add products and try again."
+        t("pos.feedback.cartEmptyTitle"),
+        t("pos.feedback.cartEmptyDescription"),
+        t("pos.feedback.cartEmptyHint")
       );
       return;
     }
     if (method === "Credit") {
       if (!creditConfigured) {
         feedback.error(
-          "Credit not configured",
-          "Set the customer credit limit in Store settings to allow sales on credit.",
-          "Open Settings"
+          t("pos.feedback.creditNotConfiguredTitle"),
+          t("pos.feedback.creditNotConfiguredDescription"),
+          t("pos.feedback.creditNotConfiguredHint")
         );
         return;
       }
@@ -274,6 +276,36 @@ export default function PosPage() {
     }
     setActivePaymentMethod(method);
   };
+
+  const salePanelProps: PosSalePanelProps = {
+    cartItems,
+    isCartHydrated,
+    cartSubtotal,
+    vatAmount,
+    amountToPay,
+    appliedDiscount,
+    manualDiscountAmount,
+    showVatInCheckout,
+    settings,
+    selectedCustomer,
+    campaignsEnabled: !!settings?.campaigns,
+    onOpenCustomerDialog: () => {
+      setCustomerSearchTerm("");
+      setCustomerDialogOpen(true);
+    },
+    onOpenVoucherModal: handleOpenVoucherModal,
+    onOpenDiscountModal: () => setIsApplyDiscountModalOpen(true),
+    onCheckout: handleCheckout,
+    onClearCart: () => setIsClearCartDialogOpen(true),
+    updateQuantity,
+    onInsufficientStock: (message) =>
+      setInsufficientStockPopup({
+        open: true,
+        titleKey: "stock",
+        message,
+      }),
+  };
+
   const creditLimit =
     settings?.currentStore?.credit?.customerCredit?.creditLimit;
 
@@ -299,8 +331,10 @@ export default function PosPage() {
     setAppliedVoucherCode(code);
     setAppliedDiscount(amount);
     feedback.success(
-      "Voucher applied",
-      `Discount of R${amount.toFixed(2)} applied.`
+      t("pos.feedback.voucherAppliedTitle"),
+      t("pos.feedback.voucherAppliedDescription", {
+        amount: amount.toFixed(2),
+      })
     );
   };
 
@@ -311,8 +345,10 @@ export default function PosPage() {
         ? (cartSubtotal * discount.discountAmount) / 100
         : discount.discountAmount;
     feedback.success(
-      "Discount applied",
-      `Discount of R${amount.toFixed(2)} applied.`
+      t("pos.feedback.discountAppliedTitle"),
+      t("pos.feedback.discountAppliedDescription", {
+        amount: amount.toFixed(2),
+      })
     );
   };
 
@@ -327,7 +363,11 @@ export default function PosPage() {
     if (typeof stock === "number" && stock < currentQty + 1) {
       setInsufficientStockPopup({
         open: true,
-        message: `Insufficient stock for "${productByBarcode.name}". Available stock: ${stock}.`,
+        titleKey: "stock",
+        message: t("pos.stock.insufficient", {
+          productName: productByBarcode.name,
+          stock: String(stock),
+        }),
       });
       return;
     }
@@ -347,8 +387,10 @@ export default function PosPage() {
     } as Product;
     addToCart(productForCart);
     feedback.success(
-      "Product added",
-      `${productByBarcode.name} added to cart.`
+      t("pos.feedback.productAddedTitle"),
+      t("pos.feedback.productAddedDescription", {
+        name: productByBarcode.name,
+      })
     );
   };
 
@@ -382,8 +424,8 @@ export default function PosPage() {
     setCategoryView("carousel");
     loadPage(1);
     feedback.success(
-      "Barcode scanned",
-      `No product found with barcode "${barcode}". Showing search results.`
+      t("pos.feedback.barcodeNoProductTitle"),
+      t("pos.feedback.barcodeNoProductDescription", { barcode })
     );
   };
 
@@ -413,7 +455,7 @@ export default function PosPage() {
           isOnline: isOnline,
         });
       }
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = uuidv4();
       const newTransaction: Omit<Transaction, "id"> = {
         ...transactionDetails,
         date: new Date(),
@@ -458,8 +500,8 @@ export default function PosPage() {
             .filter((id) => id.startsWith("temp-") && !map.has(id));
           if (unresolvedProductIds.length > 0) {
             feedback.error(
-              "Products still syncing",
-              "Some products in your cart haven't finished syncing. Please wait a moment and try again."
+              t("pos.feedback.productsSyncingTitle"),
+              t("pos.feedback.productsSyncingDescription")
             );
             return;
           }
@@ -469,8 +511,8 @@ export default function PosPage() {
             !map.has(String(newTransaction.customerId));
           if (unresolvedCustomerId) {
             feedback.error(
-              "Customer still syncing",
-              "The selected customer has not finished syncing yet. Please wait a moment and try again."
+              t("pos.feedback.customerSyncingTitle"),
+              t("pos.feedback.customerSyncingDescription")
             );
             return;
           }
@@ -542,7 +584,10 @@ export default function PosPage() {
               createdId: resData?.id ?? resData?.data?.id,
             });
           }
-          feedback.success("Sale complete!", "View your receipt below.");
+          feedback.success(
+            t("pos.feedback.saleCompleteTitle"),
+            t("pos.feedback.saleCompleteOnlineHint")
+          );
         } catch (error: unknown) {
           const err = error as {
             message?: string;
@@ -601,23 +646,25 @@ export default function PosPage() {
               messageForUser
             );
           const popupMessage = isStoreIdError
-            ? "Store configuration error. Please sign out, sign in again, then try the sale. If it persists, contact support."
+            ? t("pos.error.storeConfig")
             : isCreditNotConfigured
-              ? "Credit is not configured for this store. Open Settings → Customer credit, choose this store, and save the credit limit and term."
-              : messageForUser ||
-                "Something went wrong. Check the items and store.";
+              ? t("pos.error.creditSettings")
+              : messageForUser || t("pos.error.generic");
           if (showInPopup) {
             setInsufficientStockPopup({
               open: true,
               message: popupMessage,
+              titleKey: isCreditNotConfigured ? "credit" : "notice",
             });
           } else {
             feedback.fromError(
               error,
-              "Failed to complete the sale",
+              t("pos.feedback.failedSaleTitle"),
               messageForUser
-                ? `${messageForUser} Try again or check your connection.`
-                : "Check your connection and try again."
+                ? t("pos.feedback.failedSaleTrySuffix", {
+                    message: messageForUser,
+                  })
+                : t("pos.feedback.failedSaleConnectionHint")
             );
           }
         }
@@ -672,7 +719,10 @@ export default function PosPage() {
           setReceiptData(receiptPayload);
           setTimeout(() => setReceiptOpen(true), 0);
 
-          feedback.success("Sale complete!", "Order recorded.");
+          feedback.success(
+            t("pos.feedback.saleCompleteTitle"),
+            t("pos.feedback.saleCompleteOfflineHint")
+          );
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
             console.error("[Complete Sale] Failed (offline)", { error });
@@ -683,8 +733,8 @@ export default function PosPage() {
 
           feedback.fromError(
             error,
-            "Failed to save the sale locally",
-            "Try again or check storage."
+            t("pos.feedback.failedSaleLocalTitle"),
+            t("pos.feedback.failedSaleLocalHint")
           );
         }
       }
@@ -695,18 +745,18 @@ export default function PosPage() {
   };
 
   return (
-    <div className="w-full min-w-0 max-w-full min-h-[85vh] lg:h-full lg:min-h-0 lg:overflow-hidden lg:flex lg:flex-col overflow-x-hidden pb-4">
-      <div className="flex-1 lg:min-h-0 lg:overflow-hidden py-4 px-2 sm:px-4 bg-muted">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 min-h-[80vh] lg:min-h-0 lg:h-full min-w-0 w-full">
+    <div className="w-full min-w-0 max-w-full min-h-[85vh] lg:h-full lg:min-h-0 lg:overflow-hidden lg:flex lg:flex-col overflow-x-hidden pb-20 lg:pb-4">
+      <div className="flex-1 lg:min-h-0 lg:overflow-hidden py-4 px-2 sm:px-4 bg-muted max-lg:flex max-lg:flex-col max-lg:min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 min-h-[80vh] max-lg:flex-1 max-lg:min-h-0 max-lg:flex max-lg:flex-col lg:min-h-0 lg:h-full min-w-0 w-full">
           {/* Product Selection — first column: fixed height on desktop, product list scrolls independently */}
-          <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-h-[75vh] sm:max-h-[80vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-1">
+          <div className="lg:col-span-1 xl:col-span-1 min-w-0 min-h-[200px] max-lg:max-h-none max-lg:flex-1 lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-1">
             <div className="relative mb-4 shrink-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
                 placeholder={
                   categoryView === "grid"
-                    ? "Search categories..."
-                    : "Scan barcode or search item..."
+                    ? t("pos.search.categoriesPlaceholder")
+                    : t("pos.search.productsPlaceholder")
                 }
                 className="pl-10 pr-10 h-12"
                 value={categoryView === "grid" ? categorySearch : productSearch}
@@ -720,7 +770,7 @@ export default function PosPage() {
                 type="button"
                 onClick={() => setIsBarcodeScannerOpen(true)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
-                title="Scan barcode"
+                title={t("pos.scanBarcode.buttonTitle")}
               >
                 <QrCode className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
               </button>
@@ -728,7 +778,7 @@ export default function PosPage() {
 
             <div className="flex justify-between items-center mb-2 shrink-0">
               <p className="text-xs font-semibold text-gray-500 uppercase">
-                Categories
+                {t("pos.categories.heading")}
               </p>
               <Button
                 variant="ghost"
@@ -762,7 +812,7 @@ export default function PosPage() {
                       size="sm"
                       onClick={() => selectCategory(null)}
                     >
-                      All
+                      {t("pos.categories.all")}
                     </Button>
                   </CarouselItem>
                   {apiCategories.map((cat) => (
@@ -795,7 +845,7 @@ export default function PosPage() {
                     onClick={() => selectCategory(null)}
                     className={`aspect-square rounded-lg flex items-center justify-center text-center p-2 transition-colors ${activeCategory === null ? "bg-secondary text-secondary-foreground" : "bg-card hover:bg-accent hover:text-accent-foreground border"}`}
                   >
-                    <p className="font-semibold">All</p>
+                    <p className="font-semibold">{t("pos.categories.all")}</p>
                   </button>
                   {filteredCategories?.map((cat) => (
                     <button
@@ -811,7 +861,7 @@ export default function PosPage() {
             ) : (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden w-full min-w-0">
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase shrink-0">
-                  Products
+                  {t("pos.products.heading")}
                 </p>
                 <ScrollArea className="flex-1 min-h-0 min-w-0 w-full pr-1">
                   <div
@@ -821,13 +871,17 @@ export default function PosPage() {
                     <Table noScrollWrapper className="w-full table-fixed">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="min-w-0">Product</TableHead>
-                          <TableHead className="hidden md:table-cell w-16 shrink-0">
-                            Stock
+                          <TableHead className="min-w-0">
+                            {t("pos.products.table.product")}
                           </TableHead>
-                          <TableHead className="w-20 shrink-0">Price</TableHead>
+                          <TableHead className="hidden md:table-cell w-16 shrink-0">
+                            {t("pos.products.table.stock")}
+                          </TableHead>
+                          <TableHead className="w-20 shrink-0">
+                            {t("pos.products.table.price")}
+                          </TableHead>
                           <TableHead className="text-center w-16 min-w-[4.5rem] shrink-0">
-                            Action
+                            {t("pos.products.table.action")}
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -838,7 +892,7 @@ export default function PosPage() {
                               colSpan={4}
                               className="text-center py-10"
                             >
-                              Loading products...
+                              {t("pos.products.loading")}
                             </TableCell>
                           </TableRow>
                         ) : products?.length === 0 ? (
@@ -847,7 +901,7 @@ export default function PosPage() {
                               colSpan={4}
                               className="text-center py-10 text-muted-foreground"
                             >
-                              No products found.
+                              {t("pos.products.none")}
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -861,7 +915,10 @@ export default function PosPage() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-8 w-8 shrink-0 touch-target-sm"
-                                        aria-label={`View ${product.name}`}
+                                        aria-label={t(
+                                          "pos.products.viewDetailsAria",
+                                          { name: product.name }
+                                        )}
                                       >
                                         <Eye className="h-4 w-4" />
                                       </Button>
@@ -872,7 +929,9 @@ export default function PosPage() {
                                           {product.name}
                                         </DialogTitle>
                                         <DialogDescription className="sr-only">
-                                          Product details and image
+                                          {t(
+                                            "pos.products.detailsDescriptionSr"
+                                          )}
                                         </DialogDescription>
                                       </DialogHeader>
                                       <div className="flex items-center justify-center">
@@ -933,7 +992,9 @@ export default function PosPage() {
                                       {product.name}
                                     </span>
                                     <span className="mt-1 text-xs text-muted-foreground md:hidden leading-tight">
-                                      Stock: {product.stock ?? "-"}
+                                      {t("pos.products.stockMobile", {
+                                        stock: product.stock ?? "-",
+                                      })}
                                     </span>
                                   </div>
                                 </div>
@@ -952,8 +1013,12 @@ export default function PosPage() {
                                 <Button
                                   size="icon"
                                   className="mx-auto h-10 w-10 min-h-[44px] touch-target"
-                                  aria-label={`Add ${product.name}`}
-                                  title={`Add ${product.name}`}
+                                  aria-label={t("pos.products.addAria", {
+                                    name: product.name,
+                                  })}
+                                  title={t("pos.products.addAria", {
+                                    name: product.name,
+                                  })}
                                   onClick={() => {
                                     const currentQty =
                                       cart.get(product.id)?.quantity ?? 0;
@@ -964,7 +1029,11 @@ export default function PosPage() {
                                     ) {
                                       setInsufficientStockPopup({
                                         open: true,
-                                        message: `Insufficient stock for "${product.name}". Available: ${stock}.`,
+                                        titleKey: "stock",
+                                        message: t("pos.stock.insufficient", {
+                                          productName: product.name,
+                                          stock: String(stock),
+                                        }),
                                       });
                                       return;
                                     }
@@ -993,337 +1062,65 @@ export default function PosPage() {
             )}
           </div>
 
-          {/* Cart Section — second column: fixed height on desktop, cart items scroll independently */}
-          <div className="lg:col-span-1 xl:col-span-1 min-w-0 w-full min-h-[200px] max-h-[65vh] sm:max-h-[70vh] lg:max-h-none lg:h-full min-h-0 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg p-2 sm:p-4 order-2">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4 border-b pb-3 shrink-0">
-              <div>
-                <h2 className="font-semibold text-base sm:text-lg">
-                  Sale #8822
-                </h2>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Dialog
-                  open={customerDialogOpen}
-                  onOpenChange={setCustomerDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="min-h-[44px] touch-target text-xs sm:text-sm"
-                      onClick={() => setCustomerSearchTerm("")}
-                    >
-                      <User className="mr-1 sm:mr-2 h-4 w-4" />
-                      <span className="truncate max-w-[120px] sm:max-w-none">
-                        {selectedCustomer
-                          ? selectedCustomer.name
-                          : "Add Customer"}
-                      </span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
-                    <DialogHeader>
-                      <DialogTitle>Select a Customer</DialogTitle>
-                      <DialogDescription className="sr-only">
-                        Search and select a customer for this sale
-                      </DialogDescription>
-                      <div className="relative mt-4">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                        <Input
-                          placeholder="Search by name or phone number..."
-                          className="pl-10"
-                          value={customerSearchTerm}
-                          onChange={(e) =>
-                            setCustomerSearchTerm(e.target.value)
-                          }
-                        />
-                      </div>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[50vh]">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Phone</TableHead>
-                            <TableHead></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredCustomers?.map((customer: Customer) => (
-                            <TableRow
-                              key={customer.id}
-                              className="cursor-pointer hover:bg-muted"
-                              onClick={() => {
-                                handleCustomerSelect(customer.id);
-                              }}
-                            >
-                              <TableCell>{customer.name}</TableCell>
-                              <TableCell>{customer.contact}</TableCell>
-                              <TableCell className="text-right">
-                                <Button size="sm">Select</Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </ScrollArea>
-                  </DialogContent>
-                </Dialog>
-                {settings?.campaigns && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="min-h-[44px] touch-target text-xs sm:text-sm"
-                    onClick={handleOpenVoucherModal}
-                  >
-                    <Ticket className="mr-1 sm:mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">Redeem Voucher</span>
-                    <span className="sm:hidden">Voucher</span>
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="min-h-[44px] touch-target text-xs sm:text-sm"
-                  onClick={() =>
-                    cartItems.length > 0 && setIsApplyDiscountModalOpen(true)
-                  }
-                  disabled={cartItems.length === 0}
-                >
-                  <Percent className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span>Discount</span>
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex-1 min-h-0 overflow-hidden w-full min-w-0">
-              <ScrollArea className="h-full w-full min-w-0 pr-4">
-                {!isCartHydrated ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    <p>Loading cart…</p>
-                  </div>
-                ) : cartItems.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <p>Cart is empty</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1 w-full min-w-0">
-                    {/* Column headers — product column grows to fill card width */}
-                    <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left w-full min-w-0">
-                      <span className="min-w-0">Product</span>
-                      <span className="shrink-0">Price</span>
-                      <span className="shrink-0">Qty</span>
-                      <span className="shrink-0">Total</span>
-                      <span aria-hidden className="w-9 shrink-0" />
-                    </div>
-                    {cartItems.map((item) => (
-                      <div
-                        key={item.productId}
-                        data-testid="pos-cart-line"
-                        data-product-name={item.productName}
-                        className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_4.5rem_2.75rem] sm:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] gap-2 sm:gap-3 items-start p-2 rounded-md hover:bg-gray-50 dark:hover:bg-muted/50 w-full min-w-0"
-                      >
-                        <div className="flex items-start gap-2 w-full min-w-0">
-                          {item.imageUrl &&
-                          !item.imageUrl.startsWith("blob:") ? (
-                            <div className="relative w-10 h-10 flex-shrink-0">
-                              <Image
-                                src={item.imageUrl}
-                                alt={item.productName}
-                                width={40}
-                                height={40}
-                                className="rounded-md bg-gray-200 object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = "none";
-                                  const initialsDiv =
-                                    target.nextElementSibling as HTMLElement;
-                                  if (initialsDiv) {
-                                    initialsDiv.style.display = "flex";
-                                  }
-                                }}
-                              />
-                              <div className="hidden w-10 h-10 rounded-md bg-primary/10 items-center justify-center text-primary font-bold text-sm absolute inset-0">
-                                {getProductInitials(item.productName)}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0 text-sm">
-                              {getProductInitials(item.productName)}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-xs sm:text-sm break-words whitespace-normal hyphens-auto">
-                              {item.productName}
-                            </p>
-                            <p className="text-xs text-muted-foreground sm:hidden">
-                              R{" "}
-                              {(typeof item.unitPrice === "number"
-                                ? item.unitPrice
-                                : parseFloat(String(item.unitPrice)) || 0
-                              ).toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground text-left hidden sm:block self-center">
-                          R{" "}
-                          {(typeof item.unitPrice === "number"
-                            ? item.unitPrice
-                            : parseFloat(String(item.unitPrice)) || 0
-                          ).toFixed(2)}
-                        </p>
-                        <div className="flex items-center justify-start gap-1 sm:gap-2 self-center">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0"
-                            onClick={() =>
-                              updateQuantity(item.productId, item.quantity - 1)
-                            }
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="font-bold text-sm w-6 sm:w-4 text-center">
-                            {item.quantity}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 sm:h-7 sm:w-7 rounded-full touch-target shrink-0"
-                            onClick={() => {
-                              const stock = item.stock;
-                              if (
-                                typeof stock === "number" &&
-                                item.quantity + 1 > stock
-                              ) {
-                                setInsufficientStockPopup({
-                                  open: true,
-                                  message: `Insufficient stock for "${item.productName}". Available: ${stock}.`,
-                                });
-                                return;
-                              }
-                              updateQuantity(item.productId, item.quantity + 1);
-                            }}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-left self-center">
-                          R
-                          {(typeof item.totalPrice === "number"
-                            ? item.totalPrice
-                            : parseFloat(String(item.totalPrice)) || 0
-                          ).toFixed(2)}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 sm:h-7 sm:w-7 text-gray-400 hover:text-red-500 touch-target self-center"
-                          onClick={() => updateQuantity(item.productId, 0)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-
-            {cartItems.length > 0 ? (
-              <div className="pt-4 border-t shrink-0">
-                <div className="text-sm space-y-2 mb-4">
-                  <div className="flex justify-between text-gray-500">
-                    <span>Subtotal</span>
-                    <span>R {cartSubtotal.toFixed(2)}</span>
-                  </div>
-                  {showVatInCheckout && (
-                    <div className="flex justify-between text-gray-500">
-                      <span>VAT (15%)</span>
-                      <span>R {vatAmount.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {(appliedDiscount > 0 || manualDiscountAmount > 0) && (
-                    <div className="flex justify-between text-green-600 font-medium">
-                      <span>Discount Applied</span>
-                      <span>
-                        -R {(appliedDiscount + manualDiscountAmount).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="mb-3 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
-                  {showVatInCheckout
-                    ? "VAT is added to the total. Total = Subtotal + VAT."
-                    : "VAT is included in the total (no addition)."}
-                  {(settings.currentUser?.role === "admin" ||
-                    settings.currentStore?.ownerId ===
-                      settings.currentUser?.id ||
-                    settings.currentUser?.role === "store_admin") && (
-                    <span className="block mt-1">
-                      <a
-                        href="/settings#checkout-display-admin"
-                        className="underline hover:text-foreground"
-                      >
-                        Display options in Settings
-                      </a>
-                    </span>
-                  )}
-                </div>
-                <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 dark:bg-muted rounded-lg">
-                  <span className="text-lg font-bold">Total to Pay</span>
-                  <span className="text-2xl font-bold">
-                    R {amountToPay.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                  <Button
-                    size="lg"
-                    className="h-12 sm:h-14 text-sm sm:text-base bg-green-500 hover:bg-green-600 text-white touch-target"
-                    onClick={() => handleCheckout("Cash")}
-                  >
-                    CASH
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 sm:h-14 text-sm sm:text-base touch-target"
-                    onClick={() => handleCheckout("Card")}
-                  >
-                    CARD
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 sm:h-14 text-sm sm:text-base touch-target"
-                    onClick={() => handleCheckout("Mobile Money")}
-                  >
-                    MOBILE
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 sm:h-14 text-sm sm:text-base touch-target"
-                    onClick={() => handleCheckout("Credit")}
-                  >
-                    CREDIT
-                  </Button>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full bg-destructive/50 text-black hover:bg-destructive/10 hover:text-black mt-2"
-                  onClick={() => setIsClearCartDialogOpen(true)}
-                >
-                  Clear cart
-                </Button>
-              </div>
-            ) : null}
+          {/* Cart Section — desktop only; mobile uses bottom sheet */}
+          <div className="hidden lg:flex lg:col-span-1 xl:col-span-1 min-w-0 w-full min-h-[200px] lg:max-h-none lg:h-full min-h-0 flex-col order-2">
+            <PosSalePanel {...salePanelProps} className="h-full" />
           </div>
         </div>
       </div>
+      <PosMobileCartSheet
+        open={mobileCartOpen}
+        onOpenChange={setMobileCartOpen}
+        itemCount={cartItemCount}
+        amountToPay={amountToPay}
+      >
+        <PosSalePanel {...salePanelProps} className="h-full rounded-none" />
+      </PosMobileCartSheet>
+      <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>{t("pos.customer.dialogTitle")}</DialogTitle>
+            <DialogDescription className="sr-only">
+              {t("pos.customer.dialogDescriptionSr")}
+            </DialogDescription>
+            <div className="relative mt-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                placeholder={t("pos.customer.searchPlaceholder")}
+                className="pl-10"
+                value={customerSearchTerm}
+                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+              />
+            </div>
+          </DialogHeader>
+          <ScrollArea className="max-h-[50vh]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("pos.customer.table.name")}</TableHead>
+                  <TableHead>{t("pos.customer.table.phone")}</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers?.map((customer: Customer) => (
+                  <TableRow
+                    key={customer.id}
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => handleCustomerSelect(customer.id)}
+                  >
+                    <TableCell>{customer.name}</TableCell>
+                    <TableCell>{customer.contact}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm">{t("pos.customer.select")}</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
       <PaymentModal
         isOpen={!!activePaymentMethod}
         onClose={() => setActivePaymentMethod(null)}
@@ -1373,19 +1170,18 @@ export default function PosPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Clear cart?</AlertDialogTitle>
+            <AlertDialogTitle>{t("pos.clearDialog.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove all items from the cart and clear any applied
-              voucher or discount. You cannot undo this.
+              {t("pos.clearDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("pos.clearDialog.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={clearCartAndResetCoupons}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Clear cart
+              {t("pos.clearDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1401,9 +1197,11 @@ export default function PosPage() {
         <AlertDialogContent className="z-[100]">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {insufficientStockPopup.message.toLowerCase().includes("credit")
-                ? "Credit not configured"
-                : "Insufficient stock"}
+              {insufficientStockPopup.titleKey === "credit"
+                ? t("pos.stock.dialogTitleCredit")
+                : insufficientStockPopup.titleKey === "notice"
+                  ? t("pos.alert.title")
+                  : t("pos.stock.dialogTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {insufficientStockPopup.message}
@@ -1415,7 +1213,7 @@ export default function PosPage() {
                 setInsufficientStockPopup((prev) => ({ ...prev, open: false }))
               }
             >
-              OK
+              {t("pos.stock.ok")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1427,10 +1225,9 @@ export default function PosPage() {
       >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Scan Barcode</DialogTitle>
+            <DialogTitle>{t("pos.barcode.scanTitle")}</DialogTitle>
             <DialogDescription>
-              Use your camera or barcode scanner device to scan a product
-              barcode.
+              {t("pos.barcode.scanDescription")}
             </DialogDescription>
           </DialogHeader>
           <BarcodeScanner

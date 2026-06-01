@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
+import { normalizePhone } from "@/lib/phone";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,27 +30,95 @@ import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
 import { offlineDetector } from "@/lib/offline-detector";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
+import {
+  backendUnreachableRecovery,
+  isBackendConnectionError,
+} from "@/lib/backend-connection";
+import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
-const loginSchema = z.object({
-  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
-  password: z.string().min(1, { message: "Password is required." }),
-});
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_INPUT_REGEX = /^[\d\s\-+()]+$/;
+
+type IdentifierType = "email" | "phone";
+
+function detectIdentifierType(value: string): IdentifierType | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("@") || EMAIL_REGEX.test(trimmed)) return "email";
+  if (PHONE_INPUT_REGEX.test(trimmed)) return "phone";
+  return null;
+}
+
+const loginSchema = z
+  .object({
+    identifier: z
+      .string()
+      .min(1, { message: "Enter your email or mobile number." }),
+    password: z.string().min(1, { message: "Password is required." }),
+  })
+  .superRefine((data, ctx) => {
+    const trimmed = data.identifier.trim();
+    const type = detectIdentifierType(trimmed);
+
+    if (!type) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid email address or mobile number.",
+        path: ["identifier"],
+      });
+      return;
+    }
+
+    if (type === "email" && !z.string().email().safeParse(trimmed).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid email address.",
+        path: ["identifier"],
+      });
+    }
+
+    if (type === "phone" && normalizePhone(trimmed).length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid mobile number (at least 10 digits).",
+        path: ["identifier"],
+      });
+    }
+  });
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+function buildLoginPayload(values: LoginFormValues) {
+  const trimmed = values.identifier.trim();
+  const type = detectIdentifierType(trimmed);
+  const payload: { password: string; email?: string; phone?: string } = {
+    password: values.password,
+  };
+
+  if (type === "email") {
+    payload.email = trimmed;
+  } else if (type === "phone") {
+    payload.phone = normalizePhone(trimmed);
+  }
+
+  return payload;
+}
 
 export default function LoginPage() {
   const { login } = useSettings();
   const queryClient = useQueryClient();
 
-  const form = useForm<z.infer<typeof loginSchema>>({
+  const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      phone: "",
+      identifier: "",
       password: "",
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+  const onSubmit = async (values: LoginFormValues) => {
     try {
-      const response = await authApi.login(values.phone, values.password);
+      const response = await authApi.login(buildLoginPayload(values));
 
       if (response.data && response.data.accessToken) {
         feedback.success("Login successful", "Welcome back!");
@@ -57,7 +126,7 @@ export default function LoginPage() {
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
-        
+
         try {
           const isOnline = await offlineDetector.forceCheck();
           if (isOnline) {
@@ -88,17 +157,14 @@ export default function LoginPage() {
         });
       }
 
-      if (err?.code === "ERR_NETWORK" || err?.message === "Network Error") {
+      if (isBackendConnectionError(err)) {
         if (process.env.NODE_ENV === "development") {
           console.warn(
-            "Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:9002)."
+            `[Login] Backend not reachable at ${getConfiguredApiUrl()}`
           );
         }
         feedback.error(
-          "Connection error",
-          "Cannot reach server.",
-          "Ensure the backend is running and try again.",
-          { code: ERROR_CODES.LOGIN }
+          "Login Failed, please try again with a different email or phone number"
         );
         return;
       }
@@ -110,14 +176,14 @@ export default function LoginPage() {
         (typeof (data as { msg?: string })?.msg === "string" &&
           (data as { msg: string }).msg) ||
         (status === 401
-          ? "Invalid phone number or password."
+          ? "Invalid email/phone or password."
           : "Login failed. Please try again.");
       feedback.error(
         "Login failed",
         serverMessage,
         status === 401
-          ? "Check your phone number and password."
-          : "Try again or request access if you don't have an account.",
+          ? "Check your email or phone and password."
+          : "Try again or create an account if you are new.",
         { code: ERROR_CODES.LOGIN }
       );
     }
@@ -129,7 +195,7 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
           <CardDescription className="text-sm">
-            Enter your details to sign in to your store
+            Sign in with your email or mobile number and password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -137,14 +203,16 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="phone"
+                name="identifier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel>Email or mobile number</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., 0812345678"
+                        type="text"
+                        placeholder="owner@example.com or 0812345678"
                         className="touch-target"
+                        autoComplete="username"
                         {...field}
                       />
                     </FormControl>
@@ -162,6 +230,7 @@ export default function LoginPage() {
                       <Input
                         type="password"
                         className="touch-target"
+                        autoComplete="current-password"
                         {...field}
                       />
                     </FormControl>
@@ -178,22 +247,13 @@ export default function LoginPage() {
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            First time here?{" "}
+            New here?{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/request-access">Request Access</Link>
-            </Button>
-            {" · "}
-            Store admin?{" "}
-            <Button
-              variant="link"
-              className="p-0 min-h-[44px] touch-target"
-              asChild
-            >
-              <Link href="/set-password-store-admin">Set your password</Link>
+              <Link href="/signup">Create an account</Link>
             </Button>
           </p>
         </CardContent>

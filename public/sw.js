@@ -56,6 +56,7 @@ const PRECACHE_PAGES = [
   "/verify-code",
   "/set-password",
   "/offline",
+  "/print-test",
 ];
 
 // Assets to precache on install (manifest + all pages)

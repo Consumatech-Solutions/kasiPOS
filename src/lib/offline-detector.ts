@@ -6,10 +6,9 @@ interface OfflineState {
 
 const CONNECTIVITY_CHECK_INTERVAL_MS = 10000;
 const NETWORK_TEST_TIMEOUT = 5000;
-const BACKEND_URL =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL
-    : "http://localhost:9002";
+import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
+
+const BACKEND_URL = getConfiguredApiUrl();
 
 function isDevHost(): boolean {
   if (typeof window === "undefined") return false;
