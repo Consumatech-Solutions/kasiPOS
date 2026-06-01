@@ -73,12 +73,20 @@ export default function TransactionsPage() {
     [customers, t]
   );
 
+  const formatTransactionIdLabel = useCallback(
+    (id: unknown) => {
+      const value = id == null || id === "" ? "" : String(id);
+      return value ? value.substring(0, 8) : t("transactions.notApplicable");
+    },
+    [t]
+  );
+
   const filteredTransactions =
     allTransactions?.filter((transaction: any) => {
       if (!searchTerm) return true;
 
       const searchLower = searchTerm.toLowerCase();
-      const transactionId = transaction.id?.toLowerCase() || "";
+      const transactionId = String(transaction.id ?? "").toLowerCase();
       const customerName = getCustomerName(
         transaction.customerId
       ).toLowerCase();
@@ -174,20 +182,19 @@ export default function TransactionsPage() {
                     : transaction.date
                       ? new Date(transaction.date)
                       : new Date();
+                  const transactionId = String(transaction.id ?? "");
 
                   return (
                     <AccordionItem
-                      value={`item-${transaction.id}`}
-                      key={transaction.id}
+                      value={`item-${transactionId}`}
+                      key={transactionId}
                     >
                       <AccordionTrigger>
                         <div className="flex justify-between w-full pr-4">
                           <div className="text-left">
                             <p className="font-medium">
                               {t("transactions.accordion.transactionNumber", {
-                                id:
-                                  transaction.id?.substring(0, 8) ||
-                                  t("transactions.notApplicable"),
+                                id: formatTransactionIdLabel(transaction.id),
                               })}
                             </p>
                             <p className="text-sm text-muted-foreground">

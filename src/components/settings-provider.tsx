@@ -18,6 +18,7 @@ import { useSyncI18nLanguage } from "@/hooks/use-sync-i18n-language";
 import {
   clearAuthSessionStorage,
   getJwtExpiryMs,
+  isAccessTokenInvalidForSession,
   registerSessionExpiredHandler,
   resetSessionExpiredNotifyGuard,
 } from "@/lib/auth-session";
@@ -147,8 +148,47 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const sessionExpiryLogoutInProgressRef = useRef(false);
+  const handleSessionExpiredRef = useRef<() => void>(() => {});
+
+  const clearSessionAndRedirect = useCallback(
+    (options?: { showExpiredToast?: boolean }) => {
+      const theme = settings.theme;
+      clearAuthSessionStorage(theme);
+      setSettings({
+        ...defaultSettings,
+        theme,
+        isLoggedIn: false,
+        currentUser: null,
+        currentStore: null,
+      });
+      sessionExpiryLogoutInProgressRef.current = false;
+      router.replace("/login");
+      if (options?.showExpiredToast) {
+        feedback.error(
+          "Session expired",
+          "Your session has expired. Please sign in again.",
+          undefined
+        );
+      }
+    },
+    [router, settings.theme]
+  );
+
+  const handleSessionExpired = useCallback(() => {
+    if (sessionExpiryLogoutInProgressRef.current) return;
+    sessionExpiryLogoutInProgressRef.current = true;
+    clearSessionAndRedirect({ showExpiredToast: true });
+  }, [clearSessionAndRedirect]);
+
+  handleSessionExpiredRef.current = handleSessionExpired;
+
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
+
+    registerSessionExpiredHandler(() => {
+      handleSessionExpiredRef.current();
+    });
 
     const inPwa =
       window.matchMedia("(display-mode: standalone)").matches ||
@@ -156,13 +196,23 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setIsPwa(inPwa);
 
     const restored = readPersistedSettings();
+    const token = window.localStorage.getItem("token");
+    if (restored.isLoggedIn && token && isAccessTokenInvalidForSession(token)) {
+      handleSessionExpiredRef.current();
+      setHasHydratedStorage(true);
+      setIsInitialLoad(false);
+      return () => registerSessionExpiredHandler(null);
+    }
+
     setSettings((prev) => {
       if (persistedSettingsMatch(prev, restored)) return prev;
       return { ...prev, ...restored };
     });
     setHasHydratedStorage(true);
     setIsInitialLoad(false);
-  }, []);
+
+    return () => registerSessionExpiredHandler(null);
+  }, [router]);
 
   useEffect(() => {
     const store = settings.currentStore;
@@ -251,56 +301,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isInitialLoad, settings.currentUser, settings.currentStore, setSetting]);
 
-  const clearSessionAndRedirect = useCallback(
-    (options?: { showExpiredToast?: boolean }) => {
-      const theme = settings.theme;
-      clearAuthSessionStorage(theme);
-      setSettings({
-        ...defaultSettings,
-        theme,
-        isLoggedIn: false,
-        currentUser: null,
-        currentStore: null,
-      });
-      router.replace("/login");
-      if (options?.showExpiredToast) {
-        feedback.error(
-          "Session expired",
-          "Your session has expired. Please sign in again.",
-          undefined
-        );
-      }
-    },
-    [router, settings.theme]
-  );
-
-  const sessionExpiryLogoutInProgressRef = useRef(false);
-
-  const handleSessionExpired = useCallback(() => {
-    if (sessionExpiryLogoutInProgressRef.current) return;
-    sessionExpiryLogoutInProgressRef.current = true;
-    // Automatic expiry / 401 — never show the manual logout confirm dialog.
-    clearSessionAndRedirect({ showExpiredToast: true });
-  }, [clearSessionAndRedirect]);
-
-  const handleSessionExpiredRef = useRef(handleSessionExpired);
-  handleSessionExpiredRef.current = handleSessionExpired;
-
-  useEffect(() => {
-    registerSessionExpiredHandler(() => {
-      handleSessionExpiredRef.current();
-    });
-    return () => registerSessionExpiredHandler(null);
-  }, []);
-
   useEffect(() => {
     if (!settings.isLoggedIn || typeof window === "undefined") return;
 
     const checkExpiry = () => {
       const token = window.localStorage.getItem("token");
       if (!token) return;
-      const expMs = getJwtExpiryMs(token);
-      if (expMs != null && Date.now() >= expMs) {
+      if (isAccessTokenInvalidForSession(token)) {
         handleSessionExpiredRef.current();
       }
     };

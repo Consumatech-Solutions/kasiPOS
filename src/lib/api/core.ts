@@ -1,6 +1,10 @@
 import axios, { AxiosError } from "axios";
 import { isNetworkErrorLike } from "@/lib/network-error";
-import { isAuthEndpoint, notifySessionExpired } from "@/lib/auth-session";
+import {
+  isAuthEndpoint,
+  isAccessTokenInvalidForSession,
+  notifySessionExpired,
+} from "@/lib/auth-session";
 import {
   getConfiguredApiUrl,
   resolveApiBaseUrl,
@@ -32,6 +36,14 @@ api.interceptors.request.use(
     config.baseURL = resolveApiBaseUrl();
     const token = localStorage.getItem("token");
     if (token) {
+      if (isAccessTokenInvalidForSession(token)) {
+        notifySessionExpired();
+        return Promise.reject(
+          Object.assign(new Error("Session expired"), {
+            isSessionExpired: true,
+          })
+        );
+      }
       config.headers.Authorization = `Bearer ${token}`;
     }
     if (config.data instanceof FormData) {
@@ -49,6 +61,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    if ((error as { isSessionExpired?: boolean })?.isSessionExpired) {
+      return Promise.reject(error);
+    }
+
     if (!isOnline()) {
       const offlineError: OfflineError = new Error(
         "No internet connection"

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   getJwtExpiryMs,
   isAuthEndpoint,
+  isAccessTokenInvalidForSession,
+  isJwtFormat,
   clearAuthSessionStorage,
   registerSessionExpiredHandler,
   notifySessionExpired,
@@ -81,6 +83,38 @@ describe("auth-session", () => {
     });
   });
 
+  describe("isAccessTokenInvalidForSession", () => {
+    it("returns true for expired JWT", () => {
+      const token = makeJwt(Math.floor(Date.now() / 1000) - 60);
+      expect(isAccessTokenInvalidForSession(token)).toBe(true);
+    });
+
+    it("returns false for valid future JWT", () => {
+      const token = makeJwt(Math.floor(Date.now() / 1000) + 3600);
+      expect(isAccessTokenInvalidForSession(token)).toBe(false);
+    });
+
+    it("returns true for non-JWT token outside e2e bypass", () => {
+      expect(
+        isAccessTokenInvalidForSession("kasi-pos-e2e-local-auth-stub")
+      ).toBe(true);
+    });
+
+    it("returns false for non-JWT token when e2e bypass is active", () => {
+      localStorage.setItem("__kasi_pos_e2e", "1");
+      expect(
+        isAccessTokenInvalidForSession("kasi-pos-e2e-local-auth-stub")
+      ).toBe(false);
+    });
+  });
+
+  describe("isJwtFormat", () => {
+    it("detects three-part JWT strings", () => {
+      expect(isJwtFormat(makeJwt(1_700_000_000))).toBe(true);
+      expect(isJwtFormat("not-a-jwt")).toBe(false);
+    });
+  });
+
   describe("notifySessionExpired", () => {
     it("invokes registered handler once when token exists", () => {
       const handler = vi.fn();
@@ -100,6 +134,16 @@ describe("auth-session", () => {
       notifySessionExpired();
 
       expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("clears session when no handler is registered", () => {
+      localStorage.setItem("token", makeJwt(1_700_000_000));
+      localStorage.setItem("user", "{}");
+
+      notifySessionExpired();
+
+      expect(localStorage.getItem("token")).toBeNull();
+      expect(localStorage.getItem("user")).toBeNull();
     });
   });
 });
