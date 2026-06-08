@@ -1,0 +1,18 @@
+{
+  "printTest.title": "RawBT print test",
+  "printTest.description": "Public page for testing RawBT on Android. No login required.",
+  "printTest.checklistTitle": "Setup checklist",
+  "printTest.installRawBt": "Install RawBT",
+  "printTest.pairPrinter": "Open RawBT and pair your thermal printer",
+  "printTest.openOnAndroid": "Open this page on the same Android device in Chrome",
+  "printTest.tapSend": "Tap Send test print below",
+  "printTest.platformAndroid": "Android detected",
+  "printTest.platformNotAndroid": "Not Android",
+  "printTest.method": "Method: RawBT intent (rawbt:base64)",
+  "printTest.sending": "Sending test print...",
+  "printTest.sendButton": "Send test print",
+  "printTest.successFeedback": "RawBT opened. Confirm a test receipt prints on your thermal printer.",
+  "printTest.failedFeedback": "Print failed.",
+  "printTest.afterSetup": "After setup works here, configure the receipt printer in",
+  "printTest.settingsLink": "Settings"
+}

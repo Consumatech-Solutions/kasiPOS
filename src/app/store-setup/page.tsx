@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -40,25 +41,38 @@ import { Label } from "@/components/ui/label";
 import { feedback } from "@/lib/feedback";
 import { ImageUpload } from "@/components/catalogue/image-upload";
 
-const businessInfoSchema = z.object({
-  name: z
-    .string()
-    .min(3, { message: "Store name must be at least 3 characters." }),
-  vatNumber: z.string().optional(),
-});
-
-const receiptSchema = z.object({
-  receiptHeader: z.string().optional(),
-  receiptFooter: z.string().optional(),
-});
-
-type FormData = z.infer<typeof businessInfoSchema> &
-  z.infer<typeof receiptSchema>;
+type FormData = {
+  name: string;
+  vatNumber?: string;
+  receiptHeader?: string;
+  receiptFooter?: string;
+};
 
 const TOTAL_STEPS = 4;
 
 export default function StoreSetupPage() {
+  const { t } = useTranslation();
   const router = useRouter();
+
+  const businessInfoSchema = useMemo(
+    () =>
+      z.object({
+        name: z
+          .string()
+          .min(3, { message: t("onboarding.storeSetup.nameMin3") }),
+        vatNumber: z.string().optional(),
+      }),
+    [t]
+  );
+
+  const receiptSchema = useMemo(
+    () =>
+      z.object({
+        receiptHeader: z.string().optional(),
+        receiptFooter: z.string().optional(),
+      }),
+    [t]
+  );
   const { settings, setSetting } = useSettings();
   const { currentStore } = settings;
   const { updateStore, createStore } = useStore();
@@ -75,9 +89,10 @@ export default function StoreSetupPage() {
       name: currentStore?.name || "",
       vatNumber: currentStore?.vatNumber || "",
       receiptHeader:
-        currentStore?.receiptHeader || "Thank you for your purchase!",
+        currentStore?.receiptHeader ||
+        t("onboarding.storeSetup.defaultHeader"),
       receiptFooter:
-        currentStore?.receiptFooter || "Find us on social media @KasiPOS",
+        currentStore?.receiptFooter || t("onboarding.storeSetup.defaultFooter"),
     },
   });
 
@@ -129,15 +144,18 @@ export default function StoreSetupPage() {
             isSetupComplete: true,
           });
         }
-        feedback.success("Store setup completed", "Store setup completed!");
+        feedback.success(
+          t("onboarding.storeSetup.completedTitle"),
+          t("onboarding.storeSetup.completedDesc")
+        );
         router.push("/");
       }
     } catch (error) {
       console.error("Failed to save store:", error);
       feedback.fromError(
         error,
-        "Failed to save store",
-        "Check your connection and try again."
+        t("onboarding.storeSetup.saveFailedTitle"),
+        t("onboarding.storeSetup.saveFailedHint")
       );
     }
   };
@@ -159,9 +177,12 @@ export default function StoreSetupPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Store Name</FormLabel>
+                    <FormLabel>{t("onboarding.storeSetup.storeName")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Sipho's Spaza" {...field} />
+                      <Input
+                        placeholder={t("onboarding.storeSetup.storeNamePlaceholder")}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -172,9 +193,12 @@ export default function StoreSetupPage() {
                 name="vatNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>VAT Number (Optional)</FormLabel>
+                    <FormLabel>{t("onboarding.storeSetup.vatNumber")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your VAT number" {...field} />
+                      <Input
+                        placeholder={t("onboarding.storeSetup.vatPlaceholder")}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -182,7 +206,7 @@ export default function StoreSetupPage() {
               />
               {currentStore && (
                 <div>
-                  <FormLabel>Store logo (Optional)</FormLabel>
+                  <FormLabel>{t("onboarding.storeSetup.storeLogo")}</FormLabel>
                   <div className="mt-2">
                     <ImageUpload
                       productId={`store-${currentStore.id}`}
@@ -209,10 +233,14 @@ export default function StoreSetupPage() {
                   name="receiptHeader"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Receipt Header Text</FormLabel>
+                      <FormLabel>
+                        {t("onboarding.storeSetup.receiptHeader")}
+                      </FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="e.g., Thank you for shopping with us!"
+                          placeholder={t(
+                            "onboarding.storeSetup.receiptHeaderPlaceholder"
+                          )}
                           {...field}
                         />
                       </FormControl>
@@ -225,10 +253,14 @@ export default function StoreSetupPage() {
                   name="receiptFooter"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Receipt Footer Text</FormLabel>
+                      <FormLabel>
+                        {t("onboarding.storeSetup.receiptFooter")}
+                      </FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="e.g., Follow us on social media!"
+                          placeholder={t(
+                            "onboarding.storeSetup.receiptFooterPlaceholder"
+                          )}
                           {...field}
                         />
                       </FormControl>
@@ -239,19 +271,20 @@ export default function StoreSetupPage() {
               </form>
             </Form>
             <div>
-              <Label>Receipt Preview</Label>
+              <Label>{t("onboarding.storeSetup.receiptPreview")}</Label>
               <div className="mt-2 p-4 border rounded-md bg-muted/50 h-full">
                 <div className="bg-white p-6 max-w-sm mx-auto shadow-sm font-mono text-xs">
                   <div className="text-center">
                     <Image
                       src="/logo-placeholder.svg"
-                      alt="Store Logo"
+                      alt={t("onboarding.storeSetup.storeLogoAlt")}
                       width={80}
                       height={80}
                       className="mx-auto mb-2"
                     />
                     <h2 className="text-sm font-bold">
-                      {currentStore?.name || "Your Store Name"}
+                      {currentStore?.name ||
+                        t("onboarding.storeSetup.yourStoreName")}
                     </h2>
                     <p>VAT#: {currentStore?.vatNumber || "N/A"}</p>
                     <Separator className="my-2 border-dashed" />
@@ -260,17 +293,17 @@ export default function StoreSetupPage() {
                   </div>
                   <div className="space-y-1 my-2">
                     <div className="flex justify-between">
-                      <span>Item 1</span>
+                      <span>{t("onboarding.storeSetup.sampleItem1")}</span>
                       <span>R12.50</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Item 2</span>
+                      <span>{t("onboarding.storeSetup.sampleItem2")}</span>
                       <span>R18.00</span>
                     </div>
                   </div>
                   <Separator className="my-2 border-dashed" />
                   <div className="flex justify-between font-bold">
-                    <span>TOTAL</span>
+                    <span>{t("onboarding.storeSetup.total")}</span>
                     <span>R30.50</span>
                   </div>
                   <Separator className="my-2 border-dashed" />
@@ -283,27 +316,28 @@ export default function StoreSetupPage() {
       case 3:
         return (
           <div className="text-center">
-            <h3 className="text-xl font-semibold">Hardware Setup</h3>
+            <h3 className="text-xl font-semibold">
+              {t("onboarding.storeSetup.hardwareTitle")}
+            </h3>
             <p className="text-muted-foreground mt-2">
-              Connect your receipt printer, barcode scanner, and card reader.
-              You can also do this later from the settings.
+              {t("onboarding.storeSetup.hardwareDesc")}
             </p>
             <div className="flex justify-center gap-8 md:gap-16 mt-8">
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <Printer className="h-16 w-16" />
-                <span>Receipt Printer</span>
+                <span>{t("onboarding.storeSetup.receiptPrinter")}</span>
               </div>
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <ScanLine className="h-16 w-16" />
-                <span>Barcode Scanner</span>
+                <span>{t("onboarding.storeSetup.barcodeScanner")}</span>
               </div>
               <div className="flex flex-col items-center gap-2 text-muted-foreground">
                 <CreditCard className="h-16 w-16" />
-                <span>Card Reader</span>
+                <span>{t("onboarding.storeSetup.cardReader")}</span>
               </div>
             </div>
             <Button variant="outline" className="mt-12" onClick={onNext}>
-              Skip for now
+              {t("onboarding.storeSetup.skipForNow")}
             </Button>
           </div>
         );
@@ -315,11 +349,11 @@ export default function StoreSetupPage() {
                 <Sparkles className="h-10 w-10 text-primary" />
               </div>
             </div>
-            <h3 className="text-xl font-semibold mt-4">You're All Set!</h3>
+            <h3 className="text-xl font-semibold mt-4">
+              {t("onboarding.storeSetup.allSetTitle")}
+            </h3>
             <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-              Your store is ready. You can now start adding products to your
-              catalogue and making sales. You can manage your store settings at
-              any time from the main menu.
+              {t("onboarding.storeSetup.allSetDesc")}
             </p>
           </div>
         );
@@ -331,15 +365,15 @@ export default function StoreSetupPage() {
   const getStepTitle = (currentStep: number) => {
     switch (currentStep) {
       case 1:
-        return "Tell us about your business";
+        return t("onboarding.storeSetup.step1Title");
       case 2:
-        return "Customize your receipts";
+        return t("onboarding.storeSetup.step2Title");
       case 3:
-        return "Set up your hardware";
+        return t("onboarding.storeSetup.step3Title");
       case 4:
-        return "Setup Complete!";
+        return t("onboarding.storeSetup.step4Title");
       default:
-        return "Store Setup";
+        return t("onboarding.storeSetup.defaultTitle");
     }
   };
 
@@ -350,13 +384,16 @@ export default function StoreSetupPage() {
           <div className="space-y-2 mb-6">
             <Progress value={(step / TOTAL_STEPS) * 100} className="w-full" />
             <p className="text-sm text-muted-foreground">
-              Step {step} of {TOTAL_STEPS}
+              {t("onboarding.storeSetup.stepOf", {
+                step,
+                total: TOTAL_STEPS,
+              })}
             </p>
           </div>
           <CardTitle className="text-3xl">{getStepTitle(step)}</CardTitle>
           {step === 1 && (
             <CardDescription>
-              Let's start with the basics. You can change these details later.
+              {t("onboarding.storeSetup.step1Desc")}
             </CardDescription>
           )}
         </CardHeader>
@@ -367,16 +404,19 @@ export default function StoreSetupPage() {
           <div>
             {step > 1 && step < 4 && (
               <Button variant="ghost" onClick={onBack}>
-                Back
+                {t("onboarding.storeSetup.back")}
               </Button>
             )}
           </div>
           <div>
             {step < 4 ? (
-              <Button onClick={onNext}>Save & Continue</Button>
+              <Button onClick={onNext}>
+                {t("onboarding.storeSetup.saveContinue")}
+              </Button>
             ) : (
               <Button onClick={onNext}>
-                Go to Dashboard <MoveRight className="ml-2 h-4 w-4" />
+                {t("onboarding.storeSetup.goDashboard")}{" "}
+                <MoveRight className="ml-2 h-4 w-4" />
               </Button>
             )}
           </div>

@@ -5,11 +5,11 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  ResponsiveContainer,
   XAxis,
   YAxis,
   Tooltip,
 } from "recharts";
+import { useTranslation } from "react-i18next";
 import { getTransactionsFromDexie } from "@/lib/entity-cache";
 import type { Transaction } from "@/types";
 import {
@@ -25,6 +25,7 @@ import { format, subDays } from "date-fns";
 import { useSettings } from "@/components/settings-provider";
 
 export default function ReportsPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { currentStore } = settings;
 
@@ -48,9 +49,9 @@ export default function ReportsPage() {
     ).reverse();
 
     const dailySales = transactions.reduce(
-      (acc: Record<string, number>, t: Transaction) => {
-        const date = format(t.date ?? new Date(), "yyyy-MM-dd");
-        acc[date] = (acc[date] || 0) + t.total;
+      (acc: Record<string, number>, txn: Transaction) => {
+        const date = format(txn.date ?? new Date(), "yyyy-MM-dd");
+        acc[date] = (acc[date] || 0) + txn.total;
         return acc;
       },
       {} as Record<string, number>
@@ -66,9 +67,9 @@ export default function ReportsPage() {
     if (!transactions) return [];
 
     const productSales = transactions
-      .flatMap((t) => t.items)
+      .flatMap((txn) => txn.items)
       .reduce(
-        (acc: Record<string, number>, item: any) => {
+        (acc: Record<string, number>, item: { productName: string; quantity: number }) => {
           acc[item.productName] = (acc[item.productName] || 0) + item.quantity;
           return acc;
         },
@@ -83,11 +84,11 @@ export default function ReportsPage() {
 
   const chartConfig = {
     total: {
-      label: "Sales",
+      label: t("reports.chart.sales"),
       color: "hsl(var(--primary))",
     },
     sales: {
-      label: "Units Sold",
+      label: t("reports.chart.unitsSold"),
       color: "hsl(var(--accent))",
     },
   };
@@ -96,8 +97,10 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Sales Overview</CardTitle>
-          <CardDescription>Total sales over the last 7 days.</CardDescription>
+          <CardTitle>{t("reports.salesOverview.title")}</CardTitle>
+          <CardDescription>
+            {t("reports.salesOverview.description")}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -125,8 +128,8 @@ export default function ReportsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Top Selling Products</CardTitle>
-          <CardDescription>Top 5 products by units sold.</CardDescription>
+          <CardTitle>{t("reports.topProducts.title")}</CardTitle>
+          <CardDescription>{t("reports.topProducts.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[250px] w-full">

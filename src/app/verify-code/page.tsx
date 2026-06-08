@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 import { authApi } from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
@@ -28,28 +29,33 @@ import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 
-const verifyCodeSchema = z.object({
-  code: z.string().length(6, { message: "Code must be 6 digits." }),
-});
-
 function VerifyCodeContent() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams ? searchParams.get("phone") : null;
 
+  const verifyCodeSchema = useMemo(
+    () =>
+      z.object({
+        code: z
+          .string()
+          .length(6, { message: t("auth.validation.code6DigitsShort") }),
+      }),
+    [t]
+  );
+
   const form = useForm<z.infer<typeof verifyCodeSchema>>({
     resolver: zodResolver(verifyCodeSchema),
-    defaultValues: {
-      code: "",
-    },
+    defaultValues: { code: "" },
   });
 
   const onSubmit = async (values: z.infer<typeof verifyCodeSchema>) => {
     if (!phone) {
       feedback.error(
-        "Verification failed",
-        "No phone number was provided.",
-        "Go back to Request Access and enter your mobile number.",
+        t("auth.verifyCode.noPhoneTitle"),
+        t("auth.verifyCode.noPhoneDesc"),
+        t("auth.verifyCode.noPhoneHint"),
         { code: ERROR_CODES.VERIFY }
       );
       router.push("/request-access");
@@ -61,8 +67,8 @@ function VerifyCodeContent() {
 
       if (response.data) {
         feedback.success(
-          "Verification successful",
-          "You can now continue to sign in or set your password."
+          t("auth.verifyCode.successTitle"),
+          t("auth.verifyCode.successDesc")
         );
 
         const { tempToken, hasPassword, user } = response.data;
@@ -84,8 +90,8 @@ function VerifyCodeContent() {
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Verification failed",
-        "Check the code and try again, or request a new code from Request Access.",
+        t("auth.verifyCode.failedTitle"),
+        t("auth.verifyCode.failedHint"),
         ERROR_CODES.VERIFY
       );
     }
@@ -95,10 +101,14 @@ function VerifyCodeContent() {
     <div className="flex min-h-screen items-center justify-center bg-muted">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Verify Your Code</CardTitle>
+          <CardTitle>{t("auth.verifyCode.title")}</CardTitle>
           <CardDescription>
-            A 6-digit code was sent to your mobile number
-            {phone ? ` ending in ...${phone.slice(-4)}` : ""}.
+            {t("auth.verifyCode.description")}
+            {phone
+              ? t("auth.verifyCode.descriptionEnding", {
+                  suffix: phone.slice(-4),
+                })
+              : "."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -109,7 +119,7 @@ function VerifyCodeContent() {
                 name="code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Verification Code</FormLabel>
+                    <FormLabel>{t("auth.verifyCode.codeLabel")}</FormLabel>
                     <FormControl>
                       <Input placeholder="123456" {...field} />
                     </FormControl>
@@ -118,14 +128,14 @@ function VerifyCodeContent() {
                 )}
               />
               <Button type="submit" className="w-full">
-                Verify & Continue
+                {t("auth.verifyCode.submit")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Didn't get a code?{" "}
+            {t("auth.verifyCode.noCode")}{" "}
             <Button variant="link" className="p-0" asChild>
-              <Link href="/request-access">Resend</Link>
+              <Link href="/request-access">{t("auth.verifyCode.resend")}</Link>
             </Button>
           </p>
         </CardContent>
@@ -135,11 +145,13 @@ function VerifyCodeContent() {
 }
 
 export default function VerifyCodePage() {
+  const { t } = useTranslation();
+
   return (
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-muted">
-          Loading...
+          {t("auth.common.loading")}
         </div>
       }
     >

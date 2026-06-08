@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { authApi } from "@/lib/api";
 import { normalizePhone } from "@/lib/phone";
 
@@ -33,22 +35,37 @@ import {
 } from "@/lib/backend-connection";
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
-const signupSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  name: z.string().min(1, { message: "Your name is required." }),
-  storeName: z.string().min(1, { message: "Store name is required." }),
-  password: z
-    .string()
-    .min(8, { message: "Password must be at least 8 characters." }),
-  phoneNumber: z.string().min(10, {
-    message: "Please enter a valid mobile number (at least 10 digits).",
-  }),
-});
-
-type SignupFormValues = z.infer<typeof signupSchema>;
+type SignupFormValues = {
+  email: string;
+  name: string;
+  storeName: string;
+  password: string;
+  phoneNumber: string;
+};
 
 export default function SignupPage() {
+  const { t } = useTranslation();
   const router = useRouter();
+
+  const signupSchema = useMemo(
+    () =>
+      z.object({
+        email: z
+          .string()
+          .email({ message: t("auth.validation.emailInvalid") }),
+        name: z.string().min(1, { message: t("auth.validation.nameRequired") }),
+        storeName: z
+          .string()
+          .min(1, { message: t("auth.validation.storeNameRequired") }),
+        password: z
+          .string()
+          .min(8, { message: t("auth.validation.passwordMin8") }),
+        phoneNumber: z.string().min(10, {
+          message: t("auth.validation.phoneInvalid"),
+        }),
+      }),
+    [t]
+  );
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -65,8 +82,8 @@ export default function SignupPage() {
     const phoneNumber = normalizePhone(values.phoneNumber);
     if (phoneNumber.length < 10) {
       feedback.error(
-        "Invalid number",
-        "Please enter at least 10 digits.",
+        t("auth.common.invalidNumberTitle"),
+        t("auth.common.invalidNumberDesc"),
         undefined,
         { code: ERROR_CODES.SIGNUP }
       );
@@ -83,8 +100,8 @@ export default function SignupPage() {
       });
 
       const message =
-        response.data?.message ?? "Verification code sent to your email.";
-      feedback.success("Check your email", message);
+        response.data?.message ?? t("auth.signup.codeSentDefault");
+      feedback.success(t("auth.signup.checkEmailTitle"), message);
       router.push(
         `/signup/verify?email=${encodeURIComponent(values.email.trim())}`
       );
@@ -95,9 +112,9 @@ export default function SignupPage() {
       const status = err?.response?.status;
       if (status === 409) {
         feedback.error(
-          "Already registered",
-          "This email or phone is already registered.",
-          "Sign in if you already have an account.",
+          t("auth.signup.alreadyRegisteredTitle"),
+          t("auth.signup.alreadyRegisteredDesc"),
+          t("auth.signup.alreadyRegisteredHint"),
           { code: ERROR_CODES.SIGNUP }
         );
         return;
@@ -105,8 +122,8 @@ export default function SignupPage() {
 
       if (isBackendConnectionError(error)) {
         feedback.error(
-          "Backend not running",
-          `Cannot reach the API at ${getConfiguredApiUrl()}.`,
+          t("auth.signup.backendDownTitle"),
+          t("auth.signup.backendDownDesc", { url: getConfiguredApiUrl() }),
           backendUnreachableRecovery(),
           { code: ERROR_CODES.SIGNUP }
         );
@@ -116,8 +133,8 @@ export default function SignupPage() {
       const message = getErrorMessage(error);
       if (status === 404 && /cannot post\s+\/auth\/signup/i.test(message)) {
         feedback.error(
-          "Signup Failed, contact support",
-          "Please contact support if you continue to experience issues.",
+          t("auth.signup.contactSupportTitle"),
+          t("auth.signup.contactSupportDesc"),
           undefined,
           { code: ERROR_CODES.SIGNUP }
         );
@@ -126,8 +143,8 @@ export default function SignupPage() {
 
       feedback.fromError(
         error,
-        "Signup failed",
-        "Check your details and try again.",
+        t("auth.signup.failedTitle"),
+        t("auth.signup.failedHint"),
         ERROR_CODES.SIGNUP
       );
     }
@@ -138,10 +155,10 @@ export default function SignupPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-lg sm:text-xl">
-            Create your store
+            {t("auth.signup.title")}
           </CardTitle>
           <CardDescription className="text-sm">
-            Register as a merchant. We will email you a verification code.
+            {t("auth.signup.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -152,7 +169,7 @@ export default function SignupPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("auth.common.email")}</FormLabel>
                     <FormControl>
                       <Input
                         type="email"
@@ -171,10 +188,10 @@ export default function SignupPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Your name</FormLabel>
+                    <FormLabel>{t("auth.signup.nameLabel")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Jane Doe"
+                        placeholder={t("auth.signup.namePlaceholder")}
                         className="touch-target"
                         autoComplete="name"
                         {...field}
@@ -189,10 +206,10 @@ export default function SignupPage() {
                 name="storeName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Store name</FormLabel>
+                    <FormLabel>{t("auth.signup.storeNameLabel")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Jane's Shop"
+                        placeholder={t("auth.signup.storeNamePlaceholder")}
                         className="touch-target"
                         {...field}
                       />
@@ -206,10 +223,10 @@ export default function SignupPage() {
                 name="phoneNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile number</FormLabel>
+                    <FormLabel>{t("auth.common.mobileNumber")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., 0812345678"
+                        placeholder={t("auth.signup.phonePlaceholder")}
                         className="touch-target"
                         autoComplete="tel"
                         {...field}
@@ -224,7 +241,7 @@ export default function SignupPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("auth.common.password")}</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -241,18 +258,18 @@ export default function SignupPage() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                Continue
+                {t("auth.signup.continue")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("auth.common.alreadyHaveAccount")}{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/login">Sign in</Link>
+              <Link href="/login">{t("auth.common.signIn")}</Link>
             </Button>
           </p>
         </CardContent>

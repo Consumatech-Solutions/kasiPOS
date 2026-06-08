@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { authApi } from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
@@ -28,29 +30,39 @@ import { ERROR_CODES } from "@/lib/error-codes";
 import { useSettings } from "@/components/settings-provider";
 import Link from "next/link";
 
-const setPasswordStoreAdminSchema = z
-  .object({
-    phone: z
-      .string()
-      .min(10, { message: "Please enter a valid mobile number." }),
-    temporaryPassword: z
-      .string()
-      .min(1, { message: "Temporary password from SMS is required." }),
-    newPassword: z
-      .string()
-      .min(8, { message: "New password must be at least 8 characters." }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
-
-type FormValues = z.infer<typeof setPasswordStoreAdminSchema>;
+type FormValues = {
+  phone: string;
+  temporaryPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
 
 export default function SetPasswordStoreAdminPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { login } = useSettings();
+
+  const setPasswordStoreAdminSchema = useMemo(
+    () =>
+      z
+        .object({
+          phone: z
+            .string()
+            .min(10, { message: t("auth.validation.phoneValid") }),
+          temporaryPassword: z.string().min(1, {
+            message: t("auth.validation.tempPasswordRequired"),
+          }),
+          newPassword: z
+            .string()
+            .min(8, { message: t("auth.validation.newPasswordMin8") }),
+          confirmPassword: z.string(),
+        })
+        .refine((data) => data.newPassword === data.confirmPassword, {
+          message: t("auth.validation.passwordsMismatch"),
+          path: ["confirmPassword"],
+        }),
+    [t]
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(setPasswordStoreAdminSchema),
@@ -72,8 +84,8 @@ export default function SetPasswordStoreAdminPage() {
 
       if (response.data?.accessToken && response.data?.user) {
         feedback.success(
-          "Password set",
-          "Your password has been set. You can now use the app."
+          t("auth.setPasswordStoreAdmin.successTitle"),
+          t("auth.setPasswordStoreAdmin.successDesc")
         );
         await login({
           ...response.data.user,
@@ -84,35 +96,32 @@ export default function SetPasswordStoreAdminPage() {
     } catch (error: unknown) {
       const err = error as {
         response?: { status?: number; data?: { message?: string } };
-        code?: string;
-        message?: string;
       };
       const status = err?.response?.status;
       const message = err?.response?.data?.message;
 
       if (status === 401) {
         feedback.error(
-          "Invalid temporary password",
-          message ||
-            "The temporary password is invalid or your account is not a store admin.",
-          "Check the SMS you received and try again.",
+          t("auth.setPasswordStoreAdmin.invalidTempTitle"),
+          message || t("auth.setPasswordStoreAdmin.invalidTempDefault"),
+          t("auth.setPasswordStoreAdmin.invalidTempHint"),
           { code: ERROR_CODES.SET_PASSWORD_STORE_ADMIN }
         );
         return;
       }
       if (status === 404) {
         feedback.error(
-          "User not found",
-          message || "No account found for this phone number.",
-          "Contact your administrator if you were expecting access.",
+          t("auth.setPasswordStoreAdmin.userNotFoundTitle"),
+          message || t("auth.setPasswordStoreAdmin.userNotFoundDefault"),
+          t("auth.setPasswordStoreAdmin.userNotFoundHint"),
           { code: ERROR_CODES.SET_PASSWORD_STORE_ADMIN }
         );
         return;
       }
       feedback.fromError(
         error,
-        "Set password failed",
-        "Check your details and try again, or contact your administrator.",
+        t("auth.setPasswordStoreAdmin.failedTitle"),
+        t("auth.setPasswordStoreAdmin.failedHint"),
         ERROR_CODES.SET_PASSWORD_STORE_ADMIN
       );
     }
@@ -122,11 +131,9 @@ export default function SetPasswordStoreAdminPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Set your password</CardTitle>
+          <CardTitle>{t("auth.setPasswordStoreAdmin.title")}</CardTitle>
           <CardDescription>
-            You received an SMS with a temporary password. Enter your phone
-            number, the temporary password, and choose a new password (min 8
-            characters).
+            {t("auth.setPasswordStoreAdmin.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -137,10 +144,10 @@ export default function SetPasswordStoreAdminPage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile number</FormLabel>
+                    <FormLabel>{t("auth.common.mobileNumber")}</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., 0812345678"
+                        placeholder={t("auth.signup.phonePlaceholder")}
                         className="touch-target"
                         {...field}
                       />
@@ -154,12 +161,16 @@ export default function SetPasswordStoreAdminPage() {
                 name="temporaryPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Temporary password (from SMS)</FormLabel>
+                    <FormLabel>
+                      {t("auth.setPasswordStoreAdmin.tempPasswordLabel")}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="password"
                         className="touch-target"
-                        placeholder="From your SMS"
+                        placeholder={t(
+                          "auth.setPasswordStoreAdmin.tempPasswordPlaceholder"
+                        )}
                         {...field}
                       />
                     </FormControl>
@@ -172,7 +183,9 @@ export default function SetPasswordStoreAdminPage() {
                 name="newPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New password</FormLabel>
+                    <FormLabel>
+                      {t("auth.setPasswordStoreAdmin.newPassword")}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -189,7 +202,9 @@ export default function SetPasswordStoreAdminPage() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm new password</FormLabel>
+                    <FormLabel>
+                      {t("auth.setPasswordStoreAdmin.confirmPassword")}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="password"
@@ -205,7 +220,7 @@ export default function SetPasswordStoreAdminPage() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                Set password & continue
+                {t("auth.setPasswordStoreAdmin.submit")}
               </Button>
             </form>
           </Form>
@@ -215,7 +230,9 @@ export default function SetPasswordStoreAdminPage() {
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/login">Back to sign in</Link>
+              <Link href="/login">
+                {t("auth.setPasswordStoreAdmin.backToSignIn")}
+              </Link>
             </Button>
           </p>
         </CardContent>

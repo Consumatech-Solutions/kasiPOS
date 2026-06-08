@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,15 +31,24 @@ import type { User } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-const profileSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  phone: z.string().min(10, { message: "Please enter a valid mobile number." }),
-});
-
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { settings, login } = useSettings();
   const { currentUser } = settings;
+
+  const profileSchema = useMemo(
+    () =>
+      z.object({
+        name: z
+          .string()
+          .min(2, { message: t("onboarding.profile.nameMin2") }),
+        phone: z
+          .string()
+          .min(10, { message: t("onboarding.profile.phoneInvalid") }),
+      }),
+    [t]
+  );
 
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -50,9 +61,9 @@ export default function ProfilePage() {
   const onSubmit = async (values: z.infer<typeof profileSchema>) => {
     if (!currentUser) {
       feedback.error(
-        "Error",
-        "No user is logged in.",
-        "Sign in again and try again."
+        t("onboarding.profile.errorTitle"),
+        t("onboarding.profile.notLoggedIn"),
+        t("onboarding.profile.signInAgain")
       );
       return;
     }
@@ -61,24 +72,25 @@ export default function ProfilePage() {
     const phoneChanged = values.phone !== currentUser.phone;
 
     if (!phoneChanged && !nameChanged) {
-      feedback.success("No changes", "You have not made any changes.");
+      feedback.success(
+        t("onboarding.profile.noChangesTitle"),
+        t("onboarding.profile.noChangesDesc")
+      );
       return;
     }
 
     if (phoneChanged) {
       feedback.error(
-        "Operation not allowed",
-        "Updating phone number is not supported yet.",
-        "Please contact admin."
+        t("onboarding.profile.phoneNotAllowedTitle"),
+        t("onboarding.profile.phoneNotAllowedDesc"),
+        t("onboarding.profile.contactAdmin")
       );
       return;
     }
 
     try {
       const response = await authApi.updateProfile({ name: values.name });
-
       const updatedUser = response.data;
-
       const accessToken = localStorage.getItem("token");
       if (accessToken) {
         await login({ ...updatedUser, accessToken } as User & {
@@ -89,15 +101,15 @@ export default function ProfilePage() {
       }
 
       feedback.success(
-        "Profile updated",
-        "Your name has been successfully updated."
+        t("onboarding.profile.updatedTitle"),
+        t("onboarding.profile.updatedDesc")
       );
       router.push("/");
-    } catch (error: any) {
+    } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Update failed",
-        "Check your connection and try again."
+        t("onboarding.profile.updateFailedTitle"),
+        t("onboarding.profile.updateFailedHint")
       );
     }
   };
@@ -113,9 +125,9 @@ export default function ProfilePage() {
               </Link>
             </Button>
             <div>
-              <CardTitle>My Profile</CardTitle>
+              <CardTitle>{t("onboarding.profile.title")}</CardTitle>
               <CardDescription>
-                Manage your personal information.
+                {t("onboarding.profile.description")}
               </CardDescription>
             </div>
           </div>
@@ -128,7 +140,7 @@ export default function ProfilePage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>{t("onboarding.profile.fullName")}</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -141,12 +153,12 @@ export default function ProfilePage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel>{t("auth.common.mobileNumber")}</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         disabled
-                        title="Contact admin to change phone number"
+                        title={t("onboarding.profile.phoneDisabledTitle")}
                       />
                     </FormControl>
                     <FormMessage />
@@ -154,7 +166,9 @@ export default function ProfilePage() {
                 )}
               />
               <div className="flex justify-end">
-                <Button type="submit">Save Changes</Button>
+                <Button type="submit">
+                  {t("onboarding.profile.saveChanges")}
+                </Button>
               </div>
             </form>
           </Form>

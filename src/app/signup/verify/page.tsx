@@ -1,11 +1,12 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { authApi } from "@/lib/api";
 import { useSettings } from "@/components/settings-provider";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,20 +34,25 @@ import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 
-const verifySignupSchema = z.object({
-  code: z
-    .string()
-    .length(6, { message: "Code must be exactly 6 digits." })
-    .regex(/^\d{6}$/, { message: "Code must be 6 digits." }),
-});
-
 function VerifySignupContent() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams?.get("email")?.trim() ?? "";
   const { login, setSetting } = useSettings();
   const queryClient = useQueryClient();
   const isDev = process.env.NODE_ENV === "development";
+
+  const verifySignupSchema = useMemo(
+    () =>
+      z.object({
+        code: z
+          .string()
+          .length(6, { message: t("auth.validation.code6Digits") })
+          .regex(/^\d{6}$/, { message: t("auth.validation.code6DigitsShort") }),
+      }),
+    [t]
+  );
 
   const form = useForm<z.infer<typeof verifySignupSchema>>({
     resolver: zodResolver(verifySignupSchema),
@@ -56,9 +62,9 @@ function VerifySignupContent() {
   const onSubmit = async (values: z.infer<typeof verifySignupSchema>) => {
     if (!email) {
       feedback.error(
-        "Verification failed",
-        "No email address was provided.",
-        "Go back to signup and enter your email.",
+        t("auth.signupVerify.noEmailTitle"),
+        t("auth.signupVerify.noEmailDesc"),
+        t("auth.signupVerify.noEmailHint"),
         { code: ERROR_CODES.SIGNUP_VERIFY }
       );
       router.push("/signup");
@@ -73,8 +79,8 @@ function VerifySignupContent() {
 
       if (!response.data?.accessToken || !response.data?.user) {
         feedback.error(
-          "Verification failed",
-          "Invalid response from server.",
+          t("auth.signupVerify.noEmailTitle"),
+          t("auth.signupVerify.invalidResponse"),
           undefined,
           { code: ERROR_CODES.SIGNUP_VERIFY }
         );
@@ -82,8 +88,8 @@ function VerifySignupContent() {
       }
 
       feedback.success(
-        "Account created",
-        "Your store is ready. Welcome to KasiPOS!"
+        t("auth.signupVerify.successTitle"),
+        t("auth.signupVerify.successDesc")
       );
 
       await login({
@@ -111,26 +117,26 @@ function VerifySignupContent() {
       const status = err?.response?.status;
       if (status === 401) {
         feedback.error(
-          "Invalid or expired code",
-          "Invalid or expired code. Request a new signup or try again.",
-          isDev ? "In development, use code 123456." : undefined,
+          t("auth.signupVerify.invalidCodeTitle"),
+          t("auth.signupVerify.invalidCodeDesc"),
+          isDev ? t("auth.signupVerify.devCodeHint") : undefined,
           { code: ERROR_CODES.SIGNUP_VERIFY }
         );
         return;
       }
       if (status === 409) {
         feedback.error(
-          "Already registered",
-          "This email or phone is already registered.",
-          "Try signing in instead.",
+          t("auth.signup.alreadyRegisteredTitle"),
+          t("auth.signup.alreadyRegisteredDesc"),
+          t("auth.signupVerify.trySignIn"),
           { code: ERROR_CODES.SIGNUP_VERIFY }
         );
         return;
       }
       feedback.fromError(
         error,
-        "Verification failed",
-        "Check the code and try again.",
+        t("auth.signupVerify.failedTitle"),
+        t("auth.signupVerify.failedHint"),
         ERROR_CODES.SIGNUP_VERIFY
       );
     }
@@ -141,17 +147,17 @@ function VerifySignupContent() {
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-lg sm:text-xl">
-            Verify your email
+            {t("auth.signupVerify.title")}
           </CardTitle>
           <CardDescription className="text-sm">
-            Enter the 6-digit code sent to
-            {email ? ` ${email}` : " your email"}.
+            {t("auth.signupVerify.description")}
+            {email || t("auth.signupVerify.descriptionYourEmail")}.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {isDev && (
             <p className="mb-4 text-center text-xs text-muted-foreground">
-              Development: use verification code <strong>123456</strong>.
+              {t("auth.signupVerify.devHint")} <strong>123456</strong>.
             </p>
           )}
           <Form {...form}>
@@ -161,7 +167,7 @@ function VerifySignupContent() {
                 name="code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Verification code</FormLabel>
+                    <FormLabel>{t("auth.signupVerify.codeLabel")}</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="123456"
@@ -180,18 +186,18 @@ function VerifySignupContent() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                Verify and continue
+                {t("auth.signupVerify.submit")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Wrong email?{" "}
+            {t("auth.signupVerify.wrongEmail")}{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/signup">Start over</Link>
+              <Link href="/signup">{t("auth.signupVerify.startOver")}</Link>
             </Button>
           </p>
         </CardContent>
@@ -201,11 +207,13 @@ function VerifySignupContent() {
 }
 
 export default function VerifySignupPage() {
+  const { t } = useTranslation();
+
   return (
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-muted">
-          Loading...
+          {t("auth.common.loading")}
         </div>
       }
     >

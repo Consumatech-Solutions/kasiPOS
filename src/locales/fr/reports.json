@@ -1,0 +1,8 @@
+{
+  "reports.salesOverview.title": "Aperçu des ventes",
+  "reports.salesOverview.description": "Ventes totales des 7 derniers jours.",
+  "reports.chart.sales": "Ventes",
+  "reports.chart.unitsSold": "Unités vendues",
+  "reports.topProducts.title": "Produits les plus vendus",
+  "reports.topProducts.description": "Top 5 des produits par unités vendues."
+}

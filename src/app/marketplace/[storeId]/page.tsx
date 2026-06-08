@@ -3,6 +3,7 @@
 import { use, useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 
 import type { Transaction, TransactionItem } from "@/types";
 import type { ApiProduct } from "@/types/catalogue";
@@ -71,6 +72,7 @@ const quickAccessCategories = [
 type PageProps = { params: Promise<{ storeId?: string }> };
 
 export default function StorePosPage(props: PageProps) {
+  const { t } = useTranslation();
   const resolvedParams = use(props.params);
   const storeId = resolvedParams?.storeId
     ? String(resolvedParams.storeId)
@@ -84,8 +86,9 @@ export default function StorePosPage(props: PageProps) {
   });
 
   const storeName = storeId
-    ? marketplaceStores.find((s) => s.code === storeId)?.name || "Marketplace"
-    : "Marketplace";
+    ? marketplaceStores.find((s) => s.code === storeId)?.name ||
+      t("nav.marketplace")
+    : t("nav.marketplace");
 
   const [cart, setCart] = useState<Map<string, TransactionItem>>(new Map());
   const [selectedCustomerId, setSelectedCustomerId] = useState<
@@ -234,18 +237,18 @@ export default function StorePosPage(props: PageProps) {
   const handleCheckout = (method: "Cash" | "Card" | "Mobile Money") => {
     if (cart.size === 0) {
       feedback.error(
-        "Cart is empty",
-        "Add products to the cart before checkout.",
-        "Add items and try again.",
+        t("marketplace.storePos.cartEmptyTitle"),
+        t("marketplace.storePos.cartEmptyDesc"),
+        t("marketplace.storePos.cartEmptyHint"),
         { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
     }
     if (!selectedCustomerId) {
       feedback.error(
-        "No customer selected",
-        "A customer is required for this marketplace order.",
-        "Click Add Customer and select a customer.",
+        t("marketplace.storePos.noCustomerTitle"),
+        t("marketplace.storePos.noCustomerDesc"),
+        t("marketplace.storePos.noCustomerHint"),
         { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
@@ -267,9 +270,9 @@ export default function StorePosPage(props: PageProps) {
     if (completingOrderRef.current || isCompletingOrder) return;
     if (!currentStore || !storeId) {
       feedback.error(
-        "Order failed",
-        "Store context was not found.",
-        "Refresh the page and try again.",
+        t("marketplace.storePos.orderFailedTitle"),
+        t("marketplace.storePos.storeNotFound"),
+        t("marketplace.storePos.refreshRetry"),
         { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
@@ -277,9 +280,9 @@ export default function StorePosPage(props: PageProps) {
 
     if (!selectedCustomerId) {
       feedback.error(
-        "Order failed",
-        "No customer was selected.",
-        "Select a customer and try again.",
+        t("marketplace.storePos.orderFailedTitle"),
+        t("marketplace.storePos.noCustomerSelected"),
+        t("marketplace.storePos.selectCustomerRetry"),
         { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
@@ -317,8 +320,10 @@ export default function StorePosPage(props: PageProps) {
       const createdOrder = response.data;
 
       feedback.success(
-        "Order created",
-        `Marketplace order ${createdOrder.orderCode} has been created successfully.`
+        t("marketplace.storePos.orderCreatedTitle"),
+        t("marketplace.storePos.orderCreatedDesc", {
+          orderCode: createdOrder.orderCode,
+        })
       );
 
       setCart(new Map());
@@ -341,8 +346,8 @@ export default function StorePosPage(props: PageProps) {
             <Input
               placeholder={
                 categoryView === "grid"
-                  ? "Search categories..."
-                  : "Scan barcode or search item..."
+                  ? t("marketplace.storePos.searchCategories")
+                  : t("marketplace.storePos.searchProducts")
               }
               className="pl-10 h-12"
               value={categoryView === "grid" ? categorySearch : productSearch}
@@ -357,7 +362,7 @@ export default function StorePosPage(props: PageProps) {
 
           <div className="flex justify-between items-center mb-2">
             <p className="text-xs font-semibold text-gray-500 uppercase">
-              Categories
+              {t("marketplace.storePos.categories")}
             </p>
             <Button
               variant="ghost"
@@ -389,7 +394,7 @@ export default function StorePosPage(props: PageProps) {
                     size="sm"
                     onClick={() => selectCategory(null)}
                   >
-                    All
+                    {t("marketplace.storePos.all")}
                   </Button>
                 </CarouselItem>
                 {quickAccessCategories.map((cat) => (
@@ -418,7 +423,7 @@ export default function StorePosPage(props: PageProps) {
                   onClick={() => selectCategory(null)}
                   className={`aspect-square rounded-lg flex items-center justify-center text-center p-2 transition-colors ${activeCategory === null ? "bg-secondary text-secondary-foreground" : "bg-card hover:bg-accent hover:text-accent-foreground border"}`}
                 >
-                  <p className="font-semibold">All</p>
+                  <p className="font-semibold">{t("marketplace.storePos.all")}</p>
                 </button>
                 {filteredCategories?.map((cat) => (
                   <button
@@ -434,21 +439,23 @@ export default function StorePosPage(props: PageProps) {
           ) : (
             <>
               <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">
-                Products
+                {t("marketplace.storePos.products")}
               </p>
               <ScrollArea className="flex-grow pr-1">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[50px] hidden sm:table-cell">
-                        View
+                        {t("marketplace.storePos.view")}
                       </TableHead>
-                      <TableHead>Product</TableHead>
+                      <TableHead>{t("marketplace.storePos.product")}</TableHead>
                       <TableHead className="hidden md:table-cell">
-                        Stock
+                        {t("marketplace.storePos.stock")}
                       </TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead>{t("marketplace.storePos.price")}</TableHead>
+                      <TableHead className="text-right">
+                        {t("marketplace.storePos.action")}
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -512,7 +519,9 @@ export default function StorePosPage(props: PageProps) {
                           <div className="flex flex-col">
                             <span>{product.name}</span>
                             <span className="text-xs text-muted-foreground md:hidden">
-                              Stock: {product.stock}
+                              {t("marketplace.storePos.stockMobile", {
+                                count: product.stock,
+                              })}
                             </span>
                           </div>
                         </TableCell>
@@ -533,7 +542,9 @@ export default function StorePosPage(props: PageProps) {
                             onClick={() => addToCart(product)}
                           >
                             <Plus className="h-4 w-4 sm:mr-2" />{" "}
-                            <span className="hidden sm:inline">Add</span>
+                            <span className="hidden sm:inline">
+                              {t("marketplace.storePos.add")}
+                            </span>
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -557,11 +568,13 @@ export default function StorePosPage(props: PageProps) {
                 >
                   <Link href="/marketplace">
                     <ArrowLeft className="h-4 w-4" />
-                    <span className="sr-only">Back to Marketplace</span>
+                    <span className="sr-only">
+                      {t("marketplace.storePos.backSrOnly")}
+                    </span>
                   </Link>
                 </Button>
                 <h2 className="font-semibold text-base sm:text-lg">
-                  Order for {storeName}
+                  {t("marketplace.storePos.orderFor", { storeName })}
                 </h2>
               </div>
               <Dialog
@@ -579,17 +592,19 @@ export default function StorePosPage(props: PageProps) {
                     <span className="truncate max-w-[120px] sm:max-w-none">
                       {selectedCustomer
                         ? selectedCustomer.name
-                        : "Add Customer"}
+                        : t("marketplace.storePos.addCustomer")}
                     </span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-[95vw] sm:max-w-2xl p-4 sm:p-6">
                   <DialogHeader>
-                    <DialogTitle>Select a Customer</DialogTitle>
+                    <DialogTitle>
+                      {t("marketplace.storePos.selectCustomer")}
+                    </DialogTitle>
                     <div className="relative mt-4">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <Input
-                        placeholder="Search by name or phone number..."
+                        placeholder={t("marketplace.storePos.searchCustomer")}
                         className="pl-10"
                         value={customerSearchTerm}
                         onChange={(e) => setCustomerSearchTerm(e.target.value)}
@@ -600,8 +615,8 @@ export default function StorePosPage(props: PageProps) {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Phone</TableHead>
+                          <TableHead>{t("marketplace.storePos.name")}</TableHead>
+                          <TableHead>{t("marketplace.storePos.phone")}</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -615,7 +630,9 @@ export default function StorePosPage(props: PageProps) {
                             <TableCell>{customer.name}</TableCell>
                             <TableCell>{customer.contact}</TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm">Select</Button>
+                              <Button size="sm">
+                                {t("marketplace.storePos.select")}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -631,7 +648,7 @@ export default function StorePosPage(props: PageProps) {
             <ScrollArea className="h-full">
               {cartItems.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-500">
-                  <p>Cart is empty</p>
+                  <p>{t("marketplace.storePos.cartEmpty")}</p>
                 </div>
               ) : (
                 <div className="space-y-2 p-4">
@@ -722,21 +739,23 @@ export default function StorePosPage(props: PageProps) {
             <div className="pt-4 p-4 border-t" style={{ height: "65%" }}>
               <div className="text-sm space-y-2 mb-4">
                 <div className="flex justify-between text-gray-500">
-                  <span>Subtotal</span>
+                  <span>{t("marketplace.storePos.subtotal")}</span>
                   <span>R {cartSubtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
-                  <span>VAT (15%)</span>
+                  <span>{t("marketplace.storePos.vat15")}</span>
                   <span>R {vat.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
-                  <span>Service Fee</span>
+                  <span>{t("marketplace.storePos.serviceFee")}</span>
                   <span>R {serviceFee.toFixed(2)}</span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
-                <span className="text-lg font-bold">Total to Pay</span>
+                <span className="text-lg font-bold">
+                  {t("marketplace.storePos.totalToPay")}
+                </span>
                 <span className="text-2xl font-bold">
                   R {cartTotal.toFixed(2)}
                 </span>
@@ -749,7 +768,7 @@ export default function StorePosPage(props: PageProps) {
                   onClick={() => handleCheckout("Cash")}
                   disabled={!selectedCustomerId}
                 >
-                  CASH
+                  {t("marketplace.storePos.cash")}
                 </Button>
                 <Button
                   size="lg"
@@ -758,7 +777,7 @@ export default function StorePosPage(props: PageProps) {
                   onClick={() => handleCheckout("Card")}
                   disabled={!selectedCustomerId}
                 >
-                  CARD
+                  {t("marketplace.storePos.card")}
                 </Button>
                 <Button
                   size="lg"
@@ -767,12 +786,12 @@ export default function StorePosPage(props: PageProps) {
                   onClick={() => handleCheckout("Mobile Money")}
                   disabled={!selectedCustomerId}
                 >
-                  MOBILE
+                  {t("marketplace.storePos.mobile")}
                 </Button>
               </div>
               {!selectedCustomerId && cartItems.length > 0 && (
                 <p className="text-center text-sm text-destructive mt-2">
-                  Please select a customer to proceed with the order.
+                  {t("marketplace.storePos.selectCustomerWarning")}
                 </p>
               )}
             </div>

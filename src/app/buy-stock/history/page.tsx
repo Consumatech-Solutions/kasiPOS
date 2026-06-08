@@ -18,6 +18,7 @@ import {
   Clock,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 import { useSettings } from "@/components/settings-provider";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { feedback } from "@/lib/feedback";
@@ -58,6 +59,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function BuyStockHistoryPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
@@ -121,8 +123,8 @@ export default function BuyStockHistoryPage() {
           )
         );
         feedback.success(
-          "Status updated",
-          `Purchase order status changed to ${newStatus}.`
+          t("buyStock.history.statusUpdatedTitle"),
+          t("buyStock.history.statusUpdatedDesc", { status: newStatus })
         );
       } else {
         setPurchaseOrders((prev) =>
@@ -140,13 +142,16 @@ export default function BuyStockHistoryPage() {
             }),
           variables: { id: orderId, status: newStatus },
         });
-        feedback.success("Status updated", "Status updated successfully.");
+        feedback.success(
+          t("buyStock.history.statusUpdatedTitle"),
+          t("buyStock.history.statusUpdatedOffline")
+        );
       }
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Failed to update status",
-        "Check your connection and try again.",
+        t("buyStock.history.updateFailedTitle"),
+        t("buyStock.history.updateFailedHint"),
         ERROR_CODES.PURCHASE_ORDER
       );
     } finally {
@@ -187,17 +192,15 @@ export default function BuyStockHistoryPage() {
               </Link>
             </Button>
             <div>
-              <CardTitle>Purchase Order History</CardTitle>
-              <CardDescription>
-                View your past orders from suppliers.
-              </CardDescription>
+              <CardTitle>{t("buyStock.history.title")}</CardTitle>
+              <CardDescription>{t("buyStock.history.description")}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-16 text-muted-foreground">
-              <p>Loading purchase orders...</p>
+              <p>{t("buyStock.history.loading")}</p>
             </div>
           ) : purchaseOrders && purchaseOrders.length > 0 ? (
             <Accordion type="single" collapsible className="w-full">
@@ -247,7 +250,7 @@ export default function BuyStockHistoryPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>
-                                  Change Status
+                                  {t("buyStock.history.changeStatus")}
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 {order.status !== "pending" && (
@@ -258,7 +261,7 @@ export default function BuyStockHistoryPage() {
                                     }}
                                   >
                                     <Clock className="mr-2 h-4 w-4" />
-                                    Mark as Pending
+                                    {t("buyStock.history.markPending")}
                                   </DropdownMenuItem>
                                 )}
                                 {order.status !== "completed" && (
@@ -272,7 +275,7 @@ export default function BuyStockHistoryPage() {
                                     }}
                                   >
                                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                                    Mark as Completed
+                                    {t("buyStock.history.markCompleted")}
                                   </DropdownMenuItem>
                                 )}
                                 {order.status !== "cancelled" && (
@@ -287,7 +290,7 @@ export default function BuyStockHistoryPage() {
                                     className="text-destructive focus:text-destructive"
                                   >
                                     <XCircle className="mr-2 h-4 w-4" />
-                                    Mark as Cancelled
+                                    {t("buyStock.history.markCancelled")}
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
@@ -308,10 +311,12 @@ export default function BuyStockHistoryPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Qty</TableHead>
-                            <TableHead>Group Price</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead>{t("buyStock.history.product")}</TableHead>
+                            <TableHead>{t("buyStock.history.qty")}</TableHead>
+                            <TableHead>{t("buyStock.history.groupPrice")}</TableHead>
+                            <TableHead className="text-right">
+                              {t("buyStock.history.total")}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -332,7 +337,7 @@ export default function BuyStockHistoryPage() {
                       <div className="text-right mt-4 space-y-1 text-sm">
                         <div className="flex justify-end gap-4">
                           <span className="text-muted-foreground">
-                            Subtotal:
+                            {t("buyStock.history.subtotal")}
                           </span>
                           <span>R{Number(order.subtotal || 0).toFixed(2)}</span>
                         </div>
@@ -345,7 +350,7 @@ export default function BuyStockHistoryPage() {
                           </span>
                         </div>
                         <div className="flex justify-end gap-4 font-bold text-base border-t pt-2 mt-2">
-                          <span className="">Total:</span>
+                          <span>{t("buyStock.history.total")}</span>
                           <span>R{Number(order.total || 0).toFixed(2)}</span>
                         </div>
                       </div>
@@ -353,7 +358,7 @@ export default function BuyStockHistoryPage() {
                         <div className="mt-4 pt-4 border-t flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">
-                              Status:
+                              {t("buyStock.history.status")}
                             </span>
                             <Badge
                               variant={getStatusBadgeVariant(order.status)}
@@ -374,12 +379,12 @@ export default function BuyStockHistoryPage() {
                                 disabled={updatingStatus === order.id}
                               >
                                 <MoreVertical className="mr-2 h-4 w-4" />
-                                Change Status
+                                {t("buyStock.history.changeStatus")}
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>
-                                Change Status
+                                {t("buyStock.history.changeStatus")}
                               </DropdownMenuLabel>
                               <DropdownMenuSeparator />
                               {order.status !== "pending" && (
@@ -389,7 +394,7 @@ export default function BuyStockHistoryPage() {
                                   }
                                 >
                                   <Clock className="mr-2 h-4 w-4" />
-                                  Mark as Pending
+                                  {t("buyStock.history.markPending")}
                                 </DropdownMenuItem>
                               )}
                               {order.status !== "completed" && (
@@ -399,7 +404,7 @@ export default function BuyStockHistoryPage() {
                                   }
                                 >
                                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                                  Mark as Completed
+                                  {t("buyStock.history.markCompleted")}
                                 </DropdownMenuItem>
                               )}
                               {order.status !== "cancelled" && (
@@ -410,7 +415,7 @@ export default function BuyStockHistoryPage() {
                                   className="text-destructive focus:text-destructive"
                                 >
                                   <XCircle className="mr-2 h-4 w-4" />
-                                  Mark as Cancelled
+                                  {t("buyStock.history.markCancelled")}
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
@@ -425,11 +430,9 @@ export default function BuyStockHistoryPage() {
           ) : (
             <div className="text-center py-16 text-muted-foreground">
               <Package className="mx-auto h-12 w-12" />
-              <p className="mt-4">
-                You haven't placed any purchase orders yet.
-              </p>
+              <p className="mt-4">{t("buyStock.history.empty")}</p>
               <Button asChild variant="link">
-                <Link href="/buy-stock">Create a New Order</Link>
+                <Link href="/buy-stock">{t("buyStock.history.createOrder")}</Link>
               </Button>
             </div>
           )}

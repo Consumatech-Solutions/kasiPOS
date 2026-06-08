@@ -1,5 +1,6 @@
 "use client";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -41,6 +42,7 @@ import {
 } from "@/components/ui/table";
 
 export default function MarketplaceOrdersPage() {
+  const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStore, setSelectedStore] = useState<string | undefined>();
@@ -77,9 +79,10 @@ export default function MarketplaceOrdersPage() {
   }, [searchTerm, selectedStore]);
 
   const getCustomerName = (customerId: string | undefined | null) => {
-    if (!customers || !customerId) return "N/A";
+    if (!customers || !customerId) return t("marketplace.orders.notApplicable");
     return (
-      customers.find((c) => c.id === String(customerId))?.name || "Unknown"
+      customers.find((c) => c.id === String(customerId))?.name ||
+      t("marketplace.orders.customerUnknown")
     );
   };
 
@@ -106,18 +109,20 @@ export default function MarketplaceOrdersPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Marketplace Orders</h1>
+          <h1 className="text-2xl font-bold">
+            {t("marketplace.orders.pageTitle")}
+          </h1>
           <p className="text-muted-foreground">
-            View and manage all marketplace orders
+            {t("marketplace.orders.pageDescription")}
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Order History</CardTitle>
+          <CardTitle>{t("marketplace.orders.historyTitle")}</CardTitle>
           <CardDescription>
-            View and filter your marketplace orders.
+            {t("marketplace.orders.historyDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -135,7 +140,7 @@ export default function MarketplaceOrdersPage() {
                   {selectedDate ? (
                     format(selectedDate, "PPP")
                   ) : (
-                    <span>Pick a date</span>
+                    <span>{t("marketplace.orders.pickDate")}</span>
                   )}
                 </Button>
               </PopoverTrigger>
@@ -152,7 +157,7 @@ export default function MarketplaceOrdersPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by order code..."
+                placeholder={t("marketplace.orders.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -164,7 +169,7 @@ export default function MarketplaceOrdersPage() {
               onChange={(e) => setSelectedStore(e.target.value || undefined)}
               className="flex h-10 w-full sm:w-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
-              <option value="">All Stores</option>
+              <option value="">{t("marketplace.orders.allStores")}</option>
               {marketplaceStores.map((store) => (
                 <option key={store.id} value={store.code}>
                   {store.name}
@@ -179,26 +184,26 @@ export default function MarketplaceOrdersPage() {
                 className="w-full sm:w-auto"
               >
                 <X className="mr-2 h-4 w-4" />
-                Clear
+                {t("marketplace.orders.clear")}
               </Button>
             )}
           </div>
 
           {loading && (
             <div className="text-center py-8 text-muted-foreground">
-              Loading orders...
+              {t("marketplace.orders.loading")}
             </div>
           )}
 
           {error && (
             <div className="text-center py-8 text-destructive">
-              Error: {error}
+              {t("marketplace.orders.error", { message: error })}
             </div>
           )}
 
           {!loading && !error && filteredOrders.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              No marketplace orders found.
+              {t("marketplace.orders.empty")}
             </div>
           )}
 
@@ -230,7 +235,7 @@ export default function MarketplaceOrdersPage() {
                                   : "secondary"
                             }
                           >
-                            {order.status.toUpperCase()}
+                            {t(`marketplace.status.${order.status}`)}
                           </Badge>
                           <div className="text-right">
                             <p className="font-semibold">
@@ -251,26 +256,30 @@ export default function MarketplaceOrdersPage() {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-muted-foreground">
-                              Marketplace Store
+                              {t("marketplace.orders.marketplaceStore")}
                             </p>
                             <p className="font-medium">
                               {getStoreName(order.marketplaceStoreId)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Customer</p>
+                            <p className="text-muted-foreground">
+                              {t("marketplace.orders.customer")}
+                            </p>
                             <p className="font-medium">
                               {getCustomerName(order.customerId)}
                             </p>
                           </div>
                           <div>
                             <p className="text-muted-foreground">
-                              Payment Method
+                              {t("marketplace.orders.paymentMethod")}
                             </p>
                             <p className="font-medium">{order.paymentMethod}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Order Date</p>
+                            <p className="text-muted-foreground">
+                              {t("marketplace.orders.orderDate")}
+                            </p>
                             <p className="font-medium">
                               {format(new Date(order.createdAt), "PPP p")}
                             </p>
@@ -278,17 +287,23 @@ export default function MarketplaceOrdersPage() {
                         </div>
 
                         <div>
-                          <p className="text-sm font-medium mb-2">Items</p>
+                          <p className="text-sm font-medium mb-2">
+                            {t("marketplace.orders.items")}
+                          </p>
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Product</TableHead>
-                                <TableHead>Quantity</TableHead>
-                                <TableHead className="text-right">
-                                  Unit Price
+                                <TableHead>
+                                  {t("marketplace.orders.product")}
+                                </TableHead>
+                                <TableHead>
+                                  {t("marketplace.orders.quantity")}
                                 </TableHead>
                                 <TableHead className="text-right">
-                                  Total
+                                  {t("marketplace.orders.unitPrice")}
+                                </TableHead>
+                                <TableHead className="text-right">
+                                  {t("marketplace.orders.total")}
                                 </TableHead>
                               </TableRow>
                             </TableHeader>
@@ -318,7 +333,7 @@ export default function MarketplaceOrdersPage() {
                         <div className="space-y-2 pt-4 border-t">
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">
-                              Subtotal
+                              {t("marketplace.orders.subtotal")}
                             </span>
                             <span>
                               R{(Number(order.subtotal) || 0).toFixed(2)}
@@ -326,7 +341,9 @@ export default function MarketplaceOrdersPage() {
                           </div>
                           {order.vatAmount > 0 && (
                             <div className="flex justify-between text-sm">
-                              <span className="text-muted-foreground">VAT</span>
+                              <span className="text-muted-foreground">
+                                {t("marketplace.orders.vat")}
+                              </span>
                               <span>
                                 R{(Number(order.vatAmount) || 0).toFixed(2)}
                               </span>
@@ -335,7 +352,7 @@ export default function MarketplaceOrdersPage() {
                           {order.serviceFee > 0 && (
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">
-                                Service Fee
+                                {t("marketplace.orders.serviceFee")}
                               </span>
                               <span>
                                 R{(Number(order.serviceFee) || 0).toFixed(2)}
@@ -343,7 +360,7 @@ export default function MarketplaceOrdersPage() {
                             </div>
                           )}
                           <div className="flex justify-between text-lg font-bold pt-2">
-                            <span>Total</span>
+                            <span>{t("marketplace.orders.total")}</span>
                             <span>
                               R{(Number(order.total) || 0).toFixed(2)}
                             </span>

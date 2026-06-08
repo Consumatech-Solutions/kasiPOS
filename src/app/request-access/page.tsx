@@ -1,10 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { authApi } from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
@@ -27,33 +29,35 @@ import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 
-const requestAccessSchema = z.object({
-  phone: z.string().min(10, {
-    message: "Please enter a valid mobile number (at least 10 digits).",
-  }),
-});
-
 function normalizePhone(input: string): string {
-  const digits = input.replace(/\D/g, "");
-  return digits;
+  return input.replace(/\D/g, "");
 }
 
 export default function RequestAccessPage() {
+  const { t } = useTranslation();
   const router = useRouter();
+
+  const requestAccessSchema = useMemo(
+    () =>
+      z.object({
+        phone: z.string().min(10, {
+          message: t("auth.validation.phoneInvalid"),
+        }),
+      }),
+    [t]
+  );
 
   const form = useForm<z.infer<typeof requestAccessSchema>>({
     resolver: zodResolver(requestAccessSchema),
-    defaultValues: {
-      phone: "",
-    },
+    defaultValues: { phone: "" },
   });
 
   const onSubmit = async (values: z.infer<typeof requestAccessSchema>) => {
     const phone = normalizePhone(values.phone);
     if (phone.length < 10) {
       feedback.error(
-        "Invalid number",
-        "Please enter at least 10 digits.",
+        t("auth.common.invalidNumberTitle"),
+        t("auth.common.invalidNumberDesc"),
         undefined,
         { code: ERROR_CODES.REQUEST_ACCESS }
       );
@@ -62,15 +66,15 @@ export default function RequestAccessPage() {
     try {
       await authApi.requestOtp(phone);
       feedback.success(
-        "Code sent",
-        `A verification code has been sent to ${phone}. Check your messages and enter the code on the next screen.`
+        t("auth.requestAccess.codeSentTitle"),
+        t("auth.requestAccess.codeSentDesc", { phone })
       );
       router.push(`/verify-code?phone=${encodeURIComponent(phone)}`);
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Could not send code",
-        "Check your mobile number and try again, or try again later.",
+        t("auth.requestAccess.failedTitle"),
+        t("auth.requestAccess.failedHint"),
         ERROR_CODES.REQUEST_ACCESS
       );
     }
@@ -80,10 +84,8 @@ export default function RequestAccessPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Request Access</CardTitle>
-          <CardDescription>
-            Enter your mobile number to receive a one-time access code.
-          </CardDescription>
+          <CardTitle>{t("auth.requestAccess.title")}</CardTitle>
+          <CardDescription>{t("auth.requestAccess.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -93,23 +95,26 @@ export default function RequestAccessPage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel>{t("auth.common.mobileNumber")}</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., 0812345678" {...field} />
+                      <Input
+                        placeholder={t("auth.requestAccess.phonePlaceholder")}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <Button type="submit" className="w-full">
-                Send Code
+                {t("auth.requestAccess.sendCode")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            {t("auth.common.alreadyHaveAccount")}{" "}
             <Button variant="link" className="p-0" asChild>
-              <Link href="/login">Sign In</Link>
+              <Link href="/login">{t("auth.common.signInButton")}</Link>
             </Button>
           </p>
         </CardContent>

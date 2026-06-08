@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 import {
   Card,
@@ -45,6 +46,7 @@ import { useEnsureStore } from "@/hooks/use-ensure-store";
 const DELIVERY_FEE = 150.0;
 
 export default function BuyStockCartPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
@@ -111,9 +113,9 @@ export default function BuyStockCartPage() {
     }
     if (cart.length === 0) {
       feedback.error(
-        "Cart is empty",
-        "Add items to your cart before confirming.",
-        "Go to Buy Stock and add items, then try again.",
+        t("buyStock.cart.emptyTitle"),
+        t("buyStock.cart.emptyDesc"),
+        t("buyStock.cart.emptyHint"),
         { code: ERROR_CODES.PURCHASE_ORDER }
       );
       return;
@@ -139,8 +141,8 @@ export default function BuyStockCartPage() {
       } catch (error: unknown) {
         feedback.fromError(
           error,
-          "Purchase order failed",
-          "Check your connection and try again.",
+          t("buyStock.cart.orderFailedTitle"),
+          t("buyStock.cart.orderFailedHint"),
           ERROR_CODES.PURCHASE_ORDER
         );
       } finally {
@@ -170,18 +172,21 @@ export default function BuyStockCartPage() {
         setCart([]);
         localStorage.removeItem("purchaseOrderCart");
 
-        feedback.success("Order recorded", "Order placed successfully.");
+        feedback.success(
+          t("buyStock.cart.orderRecordedTitle"),
+          t("buyStock.cart.orderRecordedDesc")
+        );
       } catch (error: unknown) {
         feedback.fromError(
           error,
-          "Failed to save order locally",
-          "Try again or check storage.",
+          t("buyStock.cart.saveFailedTitle"),
+          t("buyStock.cart.saveFailedHint"),
           ERROR_CODES.PURCHASE_ORDER
         );
         setIsConfirmingOrder(false);
       }
     }
-  }, [cart, subtotal, total, deliveryMethod, ensureStore, isOnline]);
+  }, [cart, subtotal, total, deliveryMethod, ensureStore, isOnline, t]);
 
   const closeConfirmationDialog = useCallback(() => {
     setIsOrderConfirmed(false);
@@ -200,19 +205,17 @@ export default function BuyStockCartPage() {
                 </Link>
               </Button>
               <div>
-                <CardTitle>Supplier Cart</CardTitle>
-                <CardDescription>
-                  Review and place your purchase order.
-                </CardDescription>
+                <CardTitle>{t("buyStock.cart.title")}</CardTitle>
+                <CardDescription>{t("buyStock.cart.description")}</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             {cart.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
-                <p>Your purchase order cart is empty.</p>
+                <p>{t("buyStock.cart.empty")}</p>
                 <Button asChild variant="link">
-                  <Link href="/buy-stock">Return to Catalogue</Link>
+                  <Link href="/buy-stock">{t("buyStock.cart.returnCatalogue")}</Link>
                 </Button>
               </div>
             ) : (
@@ -221,10 +224,14 @@ export default function BuyStockCartPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Group Price</TableHead>
-                        <TableHead className="w-[120px]">Quantity</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>{t("buyStock.cart.product")}</TableHead>
+                        <TableHead>{t("buyStock.cart.groupPrice")}</TableHead>
+                        <TableHead className="w-[120px]">
+                          {t("buyStock.cart.quantity")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("buyStock.cart.total")}
+                        </TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -297,11 +304,11 @@ export default function BuyStockCartPage() {
                 <div className="space-y-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Order Summary</CardTitle>
+                      <CardTitle>{t("buyStock.cart.orderSummary")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <Label>Delivery Method</Label>
+                        <Label>{t("buyStock.cart.deliveryMethod")}</Label>
                         <RadioGroup
                           value={deliveryMethod}
                           onValueChange={(value) =>
@@ -321,8 +328,10 @@ export default function BuyStockCartPage() {
                               htmlFor="collection"
                               className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                             >
-                              Collection
-                              <span className="text-xs font-normal">FREE</span>
+                              {t("buyStock.cart.collection")}
+                              <span className="text-xs font-normal">
+                                {t("buyStock.cart.free")}
+                              </span>
                             </Label>
                           </div>
                           <div>
@@ -335,7 +344,7 @@ export default function BuyStockCartPage() {
                               htmlFor="delivery"
                               className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
                             >
-                              Delivery
+                              {t("buyStock.cart.delivery")}
                               <span className="text-xs font-normal">
                                 R{DELIVERY_FEE.toFixed(2)}
                               </span>
@@ -349,7 +358,7 @@ export default function BuyStockCartPage() {
                           <span>R{subtotal.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Delivery Fee</span>
+                          <span>{t("buyStock.cart.deliveryFee")}</span>
                           <span>
                             R
                             {(deliveryMethod === "delivery"
@@ -359,7 +368,7 @@ export default function BuyStockCartPage() {
                           </span>
                         </div>
                         <div className="flex justify-between font-bold text-lg border-t pt-2">
-                          <span>Total</span>
+                          <span>{t("buyStock.cart.total")}</span>
                           <span>R{total.toFixed(2)}</span>
                         </div>
                       </div>
@@ -372,7 +381,9 @@ export default function BuyStockCartPage() {
                         {isConfirmingOrder && (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         )}
-                        {isConfirmingOrder ? "Processing..." : "Confirm Order"}
+                        {isConfirmingOrder
+                          ? t("buyStock.cart.processing")
+                          : t("buyStock.cart.confirmOrder")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -386,21 +397,22 @@ export default function BuyStockCartPage() {
       <AlertDialog open={isOrderConfirmed} onOpenChange={setIsOrderConfirmed}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Order Confirmed!</AlertDialogTitle>
+            <AlertDialogTitle>{t("buyStock.cart.confirmedTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Your purchase order has been placed successfully. Please use the
-              code below for payment and collection/delivery tracking.
+              {t("buyStock.cart.confirmedDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-6 text-center">
-            <p className="text-sm text-muted-foreground">Your Order Code</p>
+            <p className="text-sm text-muted-foreground">
+              {t("buyStock.cart.yourOrderCode")}
+            </p>
             <p className="text-4xl font-bold tracking-widest font-mono p-4 bg-muted rounded-lg mt-2">
               {confirmedOrderCode}
             </p>
           </div>
           <AlertDialogFooter>
             <AlertDialogAction onClick={closeConfirmationDialog}>
-              View Order History
+              {t("buyStock.cart.viewHistory")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

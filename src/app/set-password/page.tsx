@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { authApi } from "@/lib/api";
 
 import { Button } from "@/components/ui/button";
@@ -28,38 +29,40 @@ import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 import { useSettings } from "@/components/settings-provider";
 
-const setPasswordSchema = z
-  .object({
-    password: z
-      .string()
-      .min(8, { message: "Password must be at least 8 characters." }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
-
 function SetPasswordContent() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams ? searchParams.get("phone") : null;
   const { login } = useSettings();
 
+  const setPasswordSchema = useMemo(
+    () =>
+      z
+        .object({
+          password: z
+            .string()
+            .min(8, { message: t("auth.validation.passwordMin8") }),
+          confirmPassword: z.string(),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: t("auth.validation.passwordsMismatch"),
+          path: ["confirmPassword"],
+        }),
+    [t]
+  );
+
   const form = useForm<z.infer<typeof setPasswordSchema>>({
     resolver: zodResolver(setPasswordSchema),
-    defaultValues: {
-      password: "",
-      confirmPassword: "",
-    },
+    defaultValues: { password: "", confirmPassword: "" },
   });
 
   const onSubmit = async (values: z.infer<typeof setPasswordSchema>) => {
     if (!phone) {
       feedback.error(
-        "Set password failed",
-        "No phone number was provided.",
-        "Go back to Request Access and enter your mobile number.",
+        t("auth.setPassword.noPhoneTitle"),
+        t("auth.setPassword.noPhoneDesc"),
+        t("auth.setPassword.noPhoneHint"),
         { code: ERROR_CODES.SET_PASSWORD }
       );
       router.push("/request-access");
@@ -72,9 +75,9 @@ function SetPasswordContent() {
         : null;
     if (!tempToken) {
       feedback.error(
-        "Session expired",
-        "Your verification session has expired.",
-        "Request a new code from Request Access and try again.",
+        t("auth.setPassword.sessionExpiredTitle"),
+        t("auth.setPassword.sessionExpiredDesc"),
+        t("auth.setPassword.sessionExpiredHint"),
         { code: ERROR_CODES.SET_PASSWORD }
       );
       router.push("/request-access");
@@ -86,8 +89,8 @@ function SetPasswordContent() {
 
       if (response.data && response.data.accessToken) {
         feedback.success(
-          "Password set",
-          "Your password has been set. You can now sign in."
+          t("auth.setPassword.successTitle"),
+          t("auth.setPassword.successDesc")
         );
         if (typeof window !== "undefined")
           localStorage.removeItem("kasi-pos-temp-token");
@@ -99,8 +102,8 @@ function SetPasswordContent() {
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Set password failed",
-        "Ensure your password meets the requirements and try again, or request a new code.",
+        t("auth.setPassword.failedTitle"),
+        t("auth.setPassword.failedHint"),
         ERROR_CODES.SET_PASSWORD
       );
     }
@@ -110,11 +113,8 @@ function SetPasswordContent() {
     <div className="flex min-h-screen items-center justify-center bg-muted">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Set Your Password</CardTitle>
-          <CardDescription>
-            Create a secure password to protect your account. This will be used
-            for future sign-ins.
-          </CardDescription>
+          <CardTitle>{t("auth.setPassword.title")}</CardTitle>
+          <CardDescription>{t("auth.setPassword.description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -124,7 +124,7 @@ function SetPasswordContent() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>New Password</FormLabel>
+                    <FormLabel>{t("auth.setPassword.newPassword")}</FormLabel>
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
@@ -137,7 +137,7 @@ function SetPasswordContent() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm New Password</FormLabel>
+                    <FormLabel>{t("auth.setPassword.confirmPassword")}</FormLabel>
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
@@ -146,7 +146,7 @@ function SetPasswordContent() {
                 )}
               />
               <Button type="submit" className="w-full">
-                Set Password & Continue
+                {t("auth.setPassword.submit")}
               </Button>
             </form>
           </Form>
@@ -157,11 +157,13 @@ function SetPasswordContent() {
 }
 
 export default function SetPasswordPage() {
+  const { t } = useTranslation();
+
   return (
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-muted">
-          Loading...
+          {t("auth.common.loading")}
         </div>
       }
     >

@@ -1,0 +1,8 @@
+{
+  "reports.salesOverview.title": "Sales Overview",
+  "reports.salesOverview.description": "Total sales over the last 7 days.",
+  "reports.chart.sales": "Sales",
+  "reports.chart.unitsSold": "Units Sold",
+  "reports.topProducts.title": "Top Selling Products",
+  "reports.topProducts.description": "Top 5 products by units sold."
+}

@@ -1,0 +1,18 @@
+{
+  "printTest.title": "Test d'impression RawBT",
+  "printTest.description": "Page publique pour tester RawBT sur Android. Aucune connexion requise.",
+  "printTest.checklistTitle": "Liste de vérification",
+  "printTest.installRawBt": "Installer RawBT",
+  "printTest.pairPrinter": "Ouvrez RawBT et associez votre imprimante thermique",
+  "printTest.openOnAndroid": "Ouvrez cette page sur le même appareil Android dans Chrome",
+  "printTest.tapSend": "Appuyez sur Envoyer le test d'impression ci-dessous",
+  "printTest.platformAndroid": "Android détecté",
+  "printTest.platformNotAndroid": "Pas Android",
+  "printTest.method": "Méthode : intent RawBT (rawbt:base64)",
+  "printTest.sending": "Envoi du test d'impression...",
+  "printTest.sendButton": "Envoyer le test d'impression",
+  "printTest.successFeedback": "RawBT ouvert. Vérifiez qu'un reçu de test s'imprime sur votre imprimante.",
+  "printTest.failedFeedback": "Échec de l'impression.",
+  "printTest.afterSetup": "Une fois le test réussi, configurez l'imprimante dans",
+  "printTest.settingsLink": "Paramètres"
+}
