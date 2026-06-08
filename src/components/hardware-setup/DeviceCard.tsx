@@ -3,6 +3,7 @@
 import React from "react";
 import { HardwareDevice } from "./types";
 import { Check, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface DeviceCardProps {
   device: HardwareDevice;
@@ -10,6 +11,7 @@ interface DeviceCardProps {
 }
 
 export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onClick }) => {
+  const { t } = useTranslation();
   const Icon = device.icon;
   const isConnected = device.status === "connected";
 
@@ -61,7 +63,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onClick }) => {
         <p
           className={`text-xs sm:text-sm ${isConnected ? "text-green-700" : "text-slate-500"}`}
         >
-          {isConnected ? device.modelName || "Connected" : "Tap to connect"}
+          {isConnected
+            ? device.modelName || t("hardware.deviceCard.connected")
+            : t("hardware.deviceCard.tapToConnect")}
         </p>
       </div>
     </button>

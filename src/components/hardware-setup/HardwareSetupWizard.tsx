@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Printer, ScanBarcode, CreditCard } from "lucide-react";
 import { HardwareDevice, ConnectionStatus } from "./types";
 import { DeviceCard } from "./DeviceCard";
@@ -15,37 +16,37 @@ interface HardwareSetupWizardProps {
   onSkip: () => void;
 }
 
-const INITIAL_DEVICES: Omit<HardwareDevice, "status" | "deviceId">[] = [
-  {
-    id: "printer",
-    name: "Receipt Printer",
-    icon: Printer,
-  },
-  {
-    id: "scanner",
-    name: "Barcode Scanner",
-    icon: ScanBarcode,
-  },
-  {
-    id: "reader",
-    name: "Card Reader",
-    icon: CreditCard,
-  },
+const DEVICE_DEFS: (Omit<HardwareDevice, "status" | "deviceId" | "name"> & {
+  nameKey: string;
+})[] = [
+  { id: "printer", nameKey: "hardware.device.receiptPrinter", icon: Printer },
+  { id: "scanner", nameKey: "hardware.device.barcodeScanner", icon: ScanBarcode },
+  { id: "reader", nameKey: "hardware.device.cardReader", icon: CreditCard },
 ];
 
 export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
   onComplete,
   onSkip,
 }) => {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<HardwareDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<HardwareDevice | null>(
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const deviceDefs = useMemo(
+    () =>
+      DEVICE_DEFS.map((device) => ({
+        ...device,
+        name: t(device.nameKey),
+      })),
+    [t]
+  );
+
   useEffect(() => {
     const checkStoredDevices = () => {
-      const updatedDevices = INITIAL_DEVICES.map((device) => {
+      const updatedDevices = deviceDefs.map((device) => {
         const serviceType =
           device.id === "printer"
             ? "printer"
@@ -78,7 +79,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
     };
 
     checkStoredDevices();
-  }, []);
+  }, [deviceDefs]);
 
   const handleDeviceClick = (device: HardwareDevice) => {
     if (device.status !== "connected") {
@@ -120,11 +121,10 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
         <Card className="shadow-lg">
           <CardHeader className="text-center pb-4 sm:pb-8 px-4 sm:px-6 pt-4 sm:pt-6">
             <CardTitle className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">
-              Set up your hardware
+              {t("hardware.wizard.title")}
             </CardTitle>
             <p className="text-muted-foreground text-sm sm:text-base md:text-lg">
-              Connect your receipt printer, barcode scanner, and card reader to
-              start selling.
+              {t("hardware.wizard.description")}
             </p>
           </CardHeader>
 
@@ -147,7 +147,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
                   onClick={handleSkip}
                   className="px-6 py-2.5 min-h-[44px] touch-target w-full sm:w-auto"
                 >
-                  Skip for now
+                  {t("hardware.wizard.skipForNow")}
                 </Button>
               </div>
             </div>
@@ -158,15 +158,15 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
               onClick={handleSaveAndContinue}
               className="px-6 sm:px-8 py-2.5 sm:py-3 min-h-[44px] touch-target w-full sm:w-auto text-sm sm:text-base"
             >
-              Save & Continue
+              {t("hardware.wizard.saveAndContinue")}
             </Button>
           </div>
         </Card>
 
         <p className="text-center text-muted-foreground text-xs sm:text-sm mt-4 sm:mt-8 px-4">
-          Need help connecting?{" "}
+          {t("hardware.wizard.needHelp")}{" "}
           <a href="#" className="text-primary hover:underline">
-            View setup guide
+            {t("hardware.wizard.viewSetupGuide")}
           </a>
         </p>
       </div>

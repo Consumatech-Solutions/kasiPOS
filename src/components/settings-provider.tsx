@@ -15,6 +15,7 @@ import { authApi } from "@/lib/api/auth";
 import { isNetworkErrorLike } from "@/lib/network-error";
 import { parseStoredAppLanguage } from "@/lib/language-code";
 import { useSyncI18nLanguage } from "@/hooks/use-sync-i18n-language";
+import { useTranslation } from "react-i18next";
 import {
   clearAuthSessionStorage,
   getJwtExpiryMs,
@@ -140,6 +141,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   const setSetting = useCallback(
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
@@ -166,13 +168,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       if (options?.showExpiredToast) {
         feedback.error(
-          "Session expired",
-          "Your session has expired. Please sign in again.",
+          t("settings.session.expiredTitle"),
+          t("settings.session.expiredDescription"),
           undefined
         );
       }
     },
-    [router, settings.theme]
+    [router, settings.theme, t]
   );
 
   const handleSessionExpired = useCallback(() => {
@@ -342,9 +344,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     if (
       typeof window !== "undefined" &&
-      !window.confirm(
-        "Are you sure you want to log out? Offline data on this device will be kept."
-      )
+      !window.confirm(t("settings.logout.confirm"))
     ) {
       return;
     }
@@ -358,7 +358,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Logout API call failed", error);
     }
-  }, [clearSessionAndRedirect]);
+  }, [clearSessionAndRedirect, t]);
 
   useEffect(() => {
     const bootstrapData = async () => {

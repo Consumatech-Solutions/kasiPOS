@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "react-i18next";
 
 const QZ_TRAY_DOWNLOAD_URL = "https://qz.io/download/";
 
@@ -47,11 +48,14 @@ interface PrinterSetupModalProps {
   onSuccess?: (deviceId: string) => void;
 }
 
-function getConnectionTypeLabel(ct: Device["connectionType"]): string {
-  if (ct === "webusb") return "WebUSB";
-  if (ct === "webhid") return "WebHID";
-  if (ct === "qz") return "QZ Tray";
-  return "Server";
+function getConnectionTypeLabel(
+  ct: Device["connectionType"],
+  t: (key: string) => string
+): string {
+  if (ct === "webusb") return t("hardware.connectionType.webusb");
+  if (ct === "webhid") return t("hardware.connectionType.webhid");
+  if (ct === "qz") return t("hardware.connectionType.qz");
+  return t("hardware.connectionType.server");
 }
 
 export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
@@ -59,6 +63,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState<PrinterStep>("choice");
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +72,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
   const [rawBtTestFeedback, setRawBtTestFeedback] = useState<string | null>(
     null
   );
+  const [rawBtTestOk, setRawBtTestOk] = useState<boolean | null>(null);
 
   const printStrategy = getPrintStrategy();
 
@@ -78,6 +84,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       setStep("choice");
       setIsRawBtTesting(false);
       setRawBtTestFeedback(null);
+      setRawBtTestOk(null);
     }
   }, [open]);
 
@@ -97,16 +104,14 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       }
       if (devices.length === 0) {
         setStep("error");
-        setError(
-          "No QZ Tray printers found. Please ensure QZ Tray is running and your printer is installed."
-        );
+        setError(t("hardware.error.noQzPrinters"));
         return;
       }
       setAvailableDevices(devices);
       setStep("found");
     } catch (err: any) {
       setStep("error");
-      setError(err.message || "Failed to get QZ Tray printers");
+      setError(err.message || t("hardware.error.qzFailed"));
     }
   };
 
@@ -126,16 +131,14 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       }
       if (devices.length === 0) {
         setStep("error");
-        setError(
-          "No WebUSB or printer server devices found. Connect a device and try again."
-        );
+        setError(t("hardware.error.noWebUsbPrinters"));
         return;
       }
       setAvailableDevices(devices);
       setStep("found");
     } catch (err: any) {
       setStep("error");
-      setError(err.message || "Failed to search for devices");
+      setError(err.message || t("hardware.error.searchFailed"));
     }
   };
 
@@ -156,15 +159,15 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
   const handleRawBtTestPrint = async () => {
     setIsRawBtTesting(true);
     setRawBtTestFeedback(null);
+    setRawBtTestOk(null);
     try {
       await printReceipt("thermal-android", buildTestPrintPayload());
-      setRawBtTestFeedback(
-        "Test print sent. Confirm a receipt prints on your thermal printer."
-      );
+      setRawBtTestOk(true);
+      setRawBtTestFeedback(t("hardware.rawBt.testSent"));
     } catch (err: any) {
+      setRawBtTestOk(false);
       setRawBtTestFeedback(
-        err.message ||
-          "Test print failed. Install RawBT, pair your printer, and try again."
+        err.message || t("hardware.rawBt.testFailed")
       );
     } finally {
       setIsRawBtTesting(false);
@@ -181,7 +184,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
   const connectPrinterWithTest = async (deviceId: string) => {
     const selectedDevice = availableDevices.find((d) => d.id === deviceId);
     if (!selectedDevice) {
-      setError("Selected device not found");
+      setError(t("hardware.error.deviceNotFound"));
       setStep("error");
       return;
     }
@@ -199,10 +202,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       }, 1500);
     } catch (err: any) {
       setStep("error");
-      setError(
-        err.message ||
-          "Test print failed. Please ensure the printer is on and try again."
-      );
+      setError(err.message || t("hardware.error.testPrintFailed"));
     }
   };
 
@@ -221,7 +221,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       <DialogContent className="w-[95vw] max-w-md mx-2 sm:mx-auto !z-[110]">
         <DialogHeader className="px-2 sm:px-0">
           <DialogTitle className="text-lg sm:text-xl">
-            Connect Receipt Printer
+            {t("hardware.printer.connectTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -229,19 +229,19 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
           {step === "choice" && (
             <div className="w-full animate-in slide-in-from-bottom-4 fade-in duration-300 text-left space-y-4">
               <p className="text-sm text-slate-600 mb-4">
-                How do you want to print receipts?
+                {t("hardware.choice.howToPrint")}
               </p>
 
               {printStrategy === "desktop" && (
                 <>
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Thermal printer (QZ Tray)
+                      {t("hardware.choice.thermalQzTitle")}
                     </p>
                     <ol className="text-sm text-slate-700 list-decimal list-inside space-y-1 mb-2">
-                      <li>Download and install QZ Tray</li>
-                      <li>Run QZ Tray and keep it running</li>
-                      <li>Use the button below to find your printer</li>
+                      <li>{t("hardware.choice.stepDownloadQz")}</li>
+                      <li>{t("hardware.choice.stepRunQz")}</li>
+                      <li>{t("hardware.choice.stepFindPrinter")}</li>
                     </ol>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -255,7 +255,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Download QZ Tray
+                          {t("hardware.choice.downloadQz")}
                         </a>
                       </Button>
                       <Button
@@ -264,18 +264,17 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                         className="min-h-[44px] touch-target"
                         onClick={handlePrinterChoiceQzTray}
                       >
-                        Find my printer
+                        {t("hardware.choice.findMyPrinter")}
                       </Button>
                     </div>
                   </div>
 
                   <div className="border-t pt-4">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                      WebUSB / printer server
+                      {t("hardware.choice.webUsbTitle")}
                     </p>
                     <p className="text-sm text-slate-600 mb-2">
-                      If you use a USB printer or a local printer server, find
-                      it below.
+                      {t("hardware.choice.webUsbDescription")}
                     </p>
                     <Button
                       variant="outline"
@@ -283,7 +282,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                       onClick={handlePrinterChoiceWebUsb}
                     >
                       <Usb className="mr-2 h-4 w-4" />
-                      Search for WebUSB or server printer
+                      {t("hardware.choice.searchWebUsb")}
                     </Button>
                   </div>
                 </>
@@ -292,13 +291,13 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
               {printStrategy === "android" && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Thermal printer (RawBT)
+                    {t("hardware.choice.thermalRawBtTitle")}
                   </p>
                   <ol className="text-sm text-slate-700 list-decimal list-inside space-y-1 mb-2">
-                    <li>Install RawBT from the Play Store</li>
-                    <li>Open RawBT and pair your USB or Bluetooth thermal printer</li>
-                    <li>Tap Test printer to verify printing</li>
-                    <li>When printing works, tap Save setup</li>
+                    <li>{t("hardware.choice.stepInstallRawBt")}</li>
+                    <li>{t("hardware.choice.stepPairRawBt")}</li>
+                    <li>{t("hardware.choice.stepTestRawBt")}</li>
+                    <li>{t("hardware.choice.stepSaveRawBt")}</li>
                   </ol>
                   <div className="flex flex-col gap-2">
                     <Button
@@ -312,7 +311,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Get RawBT on Play Store
+                        {t("hardware.choice.getRawBt")}
                       </a>
                     </Button>
                     <Button
@@ -325,12 +324,12 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                       {isRawBtTesting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Testing...
+                          {t("hardware.choice.testing")}
                         </>
                       ) : (
                         <>
                           <Printer className="mr-2 h-4 w-4" />
-                          Test printer
+                          {t("hardware.choice.testPrinter")}
                         </>
                       )}
                     </Button>
@@ -340,14 +339,12 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                       className="min-h-[44px] touch-target"
                       onClick={handleRawBtSaveSetup}
                     >
-                      Save setup
+                      {t("hardware.choice.saveSetup")}
                     </Button>
                     {rawBtTestFeedback ? (
                       <p
                         className={`text-xs text-left px-1 ${
-                          rawBtTestFeedback.startsWith("Test print sent")
-                            ? "text-green-700"
-                            : "text-red-600"
+                          rawBtTestOk ? "text-green-700" : "text-red-600"
                         }`}
                       >
                         {rawBtTestFeedback}
@@ -359,11 +356,10 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
 
               <div className="border-t pt-4">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                  Normal printing (browser)
+                  {t("hardware.choice.browserTitle")}
                 </p>
                 <p className="text-sm text-slate-600 mb-2">
-                  Use your browser&apos;s print dialog. No extra app or device
-                  needed.
+                  {t("hardware.choice.browserDescription")}
                 </p>
                 <Button
                   variant="outline"
@@ -371,7 +367,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                   onClick={handlePrinterChoiceBrowser}
                 >
                   <Monitor className="mr-2 h-4 w-4" />
-                  Use browser print
+                  {t("hardware.choice.useBrowserPrint")}
                 </Button>
               </div>
             </div>
@@ -386,12 +382,12 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                 </div>
               </div>
               <h4 className="text-lg sm:text-xl font-medium text-slate-900 mb-2 px-4">
-                Looking for printers...
+                {t("hardware.search.lookingForPrinters")}
               </h4>
               <p className="text-sm text-slate-500 px-4">
                 {searchSource === "qz"
-                  ? "Connecting to QZ Tray and discovering printers."
-                  : "Ensure your printer is turned on and nearby."}
+                  ? t("hardware.search.qzDiscovering")
+                  : t("hardware.search.ensurePrinterOn")}
               </p>
             </div>
           )}
@@ -401,8 +397,10 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
               <div className="text-left mb-4">
                 <h4 className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
                   {availableDevices.length === 1
-                    ? "Printer Found"
-                    : `Printers Found (${availableDevices.length})`}
+                    ? t("hardware.found.printer")
+                    : t("hardware.found.printers", {
+                        count: availableDevices.length,
+                      })}
                 </h4>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
                   {availableDevices.map((deviceItem) => (
@@ -435,25 +433,28 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                             {deviceItem.name}
                           </p>
                           <p className="text-xs text-slate-500 truncate">
-                            {getConnectionTypeLabel(deviceItem.connectionType)}{" "}
-                            • Ready to pair
+                            {getConnectionTypeLabel(
+                              deviceItem.connectionType,
+                              t
+                            )}{" "}
+                            • {t("hardware.found.readyToPair")}
                           </p>
                         </div>
                       </div>
                       <span className="text-xs sm:text-sm font-medium text-primary opacity-100 sm:opacity-0 group-active:opacity-100 sm:group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
-                        Connect
+                        {t("hardware.found.connect")}
                       </span>
                     </button>
                   ))}
                 </div>
               </div>
               <p className="text-xs text-center text-slate-400 mt-4 sm:mt-8 px-2">
-                Don&apos;t see your printer?{" "}
+                {t("hardware.found.dontSeePrinter")}{" "}
                 <button
                   onClick={handleRetry}
                   className="text-primary active:underline sm:hover:underline touch-target min-h-[44px]"
                 >
-                  Scan again
+                  {t("hardware.found.scanAgain")}
                 </button>
               </p>
             </div>
@@ -468,11 +469,10 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                 </div>
               </div>
               <h4 className="text-lg sm:text-xl font-medium text-slate-900 mb-2">
-                Sending test print...
+                {t("hardware.connecting.testPrintTitle")}
               </h4>
               <p className="text-sm text-slate-500">
-                A test receipt will print. This verifies your printer is
-                working.
+                {t("hardware.connecting.testPrintDesc")}
               </p>
             </div>
           )}
@@ -483,10 +483,10 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                 <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 text-green-600" />
               </div>
               <h4 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
-                Connected!
+                {t("hardware.success.title")}
               </h4>
               <p className="text-sm text-slate-500">
-                Your printer is ready to use.
+                {t("hardware.success.printerReady")}
               </p>
             </div>
           )}
@@ -497,7 +497,7 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                 <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-red-600" />
               </div>
               <h4 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
-                Connection Failed
+                {t("hardware.error.connectionFailed")}
               </h4>
               <p className="text-sm text-slate-500 mb-4 text-center">{error}</p>
               <div className="flex flex-wrap gap-2 justify-center">
@@ -506,14 +506,14 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                   onClick={() => setStep("choice")}
                   className="min-h-[44px] touch-target"
                 >
-                  Choose another method
+                  {t("hardware.error.chooseAnotherMethod")}
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleRetry}
                   className="min-h-[44px] touch-target"
                 >
-                  Try Again
+                  {t("hardware.error.tryAgain")}
                 </Button>
               </div>
             </div>

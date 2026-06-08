@@ -19,6 +19,8 @@ import enAuth from "@/locales/en/auth.json";
 import enOnboarding from "@/locales/en/onboarding.json";
 import enReports from "@/locales/en/reports.json";
 import enPrintTest from "@/locales/en/printTest.json";
+import enPayment from "@/locales/en/payment.json";
+import enHardware from "@/locales/en/hardware.json";
 import frApp from "@/locales/fr/app.json";
 import frCommon from "@/locales/fr/common.json";
 import frSettings from "@/locales/fr/settings.json";
@@ -36,6 +38,8 @@ import frAuth from "@/locales/fr/auth.json";
 import frOnboarding from "@/locales/fr/onboarding.json";
 import frReports from "@/locales/fr/reports.json";
 import frPrintTest from "@/locales/fr/printTest.json";
+import frPayment from "@/locales/fr/payment.json";
+import frHardware from "@/locales/fr/hardware.json";
 import {
   normalizeToSupportedI18nLng,
   parseStoredAppLanguage,
@@ -76,6 +80,8 @@ const enTranslation = {
   ...enOnboarding,
   ...enReports,
   ...enPrintTest,
+  ...enPayment,
+  ...enHardware,
 };
 const frTranslation = {
   ...frCommon,
@@ -95,6 +101,8 @@ const frTranslation = {
   ...frOnboarding,
   ...frReports,
   ...frPrintTest,
+  ...frPayment,
+  ...frHardware,
 };
 
 if (!i18n.isInitialized) {

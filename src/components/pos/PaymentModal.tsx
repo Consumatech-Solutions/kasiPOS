@@ -32,6 +32,7 @@ import {
   appendTenderedKey,
   sanitizeTenderedInput,
 } from "@/lib/payment-tendered-input";
+import { useTranslation } from "react-i18next";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -72,6 +73,7 @@ export default function PaymentModal({
   const [posConnected, setPosConnected] = useState(false);
   const [isConnectingPos, setIsConnectingPos] = useState(false);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const tenderedAmount = parseFloat(tendered) || 0;
   const change = Math.max(0, tenderedAmount - cartTotal);
@@ -102,15 +104,15 @@ export default function PaymentModal({
       await connectPos(deviceId);
       setPosConnected(true);
       toast({
-        title: "POS device connected",
-        description: "Card reader is ready to process payments.",
+        title: t("payment.pos.connectedTitle"),
+        description: t("payment.pos.connectedDesc"),
       });
     } catch (error: any) {
       setPosConnected(false);
       toast({
         variant: "destructive",
-        title: "POS connection failed",
-        description: error.message || "Failed to connect to POS device.",
+        title: t("payment.pos.failedTitle"),
+        description: error.message || t("payment.pos.failedDesc"),
       });
     } finally {
       setIsConnectingPos(false);
@@ -235,11 +237,15 @@ export default function PaymentModal({
           <>
             <div className="space-y-4 text-lg">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Due:</span>
+                <span className="text-muted-foreground">
+                  {t("payment.cash.totalDue")}
+                </span>
                 <span className="font-bold">R {cartTotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Items:</span>
+                <span className="text-muted-foreground">
+                  {t("payment.cash.items")}
+                </span>
                 <span className="font-bold">
                   {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
                 </span>
@@ -248,27 +254,31 @@ export default function PaymentModal({
             <Separator className="my-6" />
             <div className="space-y-4 text-lg">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Tendered:</span>
+                <span className="text-muted-foreground">
+                  {t("payment.cash.tendered")}
+                </span>
                 <span className="font-bold text-primary">
                   R {tenderedAmount.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Change:</span>
+                <span className="text-muted-foreground">
+                  {t("payment.cash.change")}
+                </span>
                 <span className="font-bold text-green-600">
                   R {change.toFixed(2)}
                 </span>
               </div>
               {tenderedAmount === 0 && (
                 <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-                  No amount entered. Enter the amount received from the
-                  customer.
+                  {t("payment.cash.noAmountEntered")}
                 </p>
               )}
               {isInsufficient && (
                 <p className="text-sm text-destructive">
-                  Amount insufficient. Add R{" "}
-                  {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
+                  {t("payment.cash.amountInsufficient", {
+                    amount: (cartTotal - tenderedAmount).toFixed(2),
+                  })}
                 </p>
               )}
             </div>
@@ -278,7 +288,7 @@ export default function PaymentModal({
         const tenderedInput = (
           <div className="mb-4">
             <label htmlFor="tendered" className="text-sm text-muted-foreground">
-              Amount Tendered
+              {t("payment.cash.amountTenderedLabel")}
             </label>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
@@ -303,7 +313,7 @@ export default function PaymentModal({
                 placeholder="0.00"
                 className="text-2xl h-14 pl-8 text-right font-mono"
                 disabled={isLoading}
-                aria-label="Amount tendered"
+                aria-label={t("payment.cash.amountTenderedAria")}
               />
             </div>
           </div>
@@ -318,7 +328,7 @@ export default function PaymentModal({
               onClick={handleClear}
               disabled={isLoading}
             >
-              Clear
+              {t("payment.cash.clear")}
             </Button>
             <Button
               type="button"
@@ -331,7 +341,9 @@ export default function PaymentModal({
               {isLoading && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
               )}
-              {isLoading ? "Processing..." : "Complete Sale"}
+              {isLoading
+                ? t("payment.cash.processing")
+                : t("payment.cash.completeSale")}
             </Button>
           </DialogFooter>
         );
@@ -340,7 +352,9 @@ export default function PaymentModal({
           <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2">
             <div className="flex flex-col">
               <DialogHeader className="mb-4">
-                <DialogTitle className="text-2xl">Cash Payment</DialogTitle>
+                <DialogTitle className="text-2xl">
+                  {t("payment.cash.title")}
+                </DialogTitle>
               </DialogHeader>
               {cashSummary}
             </div>
@@ -368,7 +382,7 @@ export default function PaymentModal({
                     onClick={() => setTendered(cartTotal.toFixed(2))}
                     disabled={isLoading}
                   >
-                    EXACT
+                    {t("payment.cash.exact")}
                   </Button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -404,9 +418,11 @@ export default function PaymentModal({
         return (
           <div>
             <DialogHeader className="text-center mb-6">
-              <DialogTitle className="text-2xl">Card Payment</DialogTitle>
+              <DialogTitle className="text-2xl">
+                {t("payment.card.title")}
+              </DialogTitle>
               <DialogDescription>
-                Total amount to be charged to the card.
+                {t("payment.card.description")}
               </DialogDescription>
             </DialogHeader>
 
@@ -415,9 +431,13 @@ export default function PaymentModal({
                 <div className="flex items-center gap-3">
                   <CreditCard className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-semibold text-sm">POS Device</p>
+                    <p className="font-semibold text-sm">
+                      {t("payment.card.posDevice")}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {posDeviceId ? "Device selected" : "No device selected"}
+                      {posDeviceId
+                        ? t("payment.card.deviceSelected")
+                        : t("payment.card.noDeviceSelected")}
                     </p>
                   </div>
                 </div>
@@ -426,21 +446,21 @@ export default function PaymentModal({
                     <>
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">
-                        Connecting...
+                        {t("payment.card.connecting")}
                       </span>
                     </>
                   ) : posConnected ? (
                     <>
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
                       <span className="text-xs text-green-600 font-medium">
-                        Connected
+                        {t("payment.card.connected")}
                       </span>
                     </>
                   ) : (
                     <>
                       <XCircle className="h-5 w-5 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">
-                        Not Connected
+                        {t("payment.card.notConnected")}
                       </span>
                     </>
                   )}
@@ -452,7 +472,9 @@ export default function PaymentModal({
                     disabled={isConnectingPos}
                   >
                     <Settings className="h-4 w-4 mr-1" />
-                    {posDeviceId ? "Change" : "Select"}
+                    {posDeviceId
+                      ? t("payment.card.change")
+                      : t("payment.card.select")}
                   </Button>
                 </div>
               </div>
@@ -464,10 +486,10 @@ export default function PaymentModal({
               </p>
               <p className="mt-2">
                 {posConnected
-                  ? "Waiting for card machine interaction..."
+                  ? t("payment.card.waitingCard")
                   : posDeviceId
-                    ? "Connect to POS device to process payment"
-                    : "Select a POS device to process payment"}
+                    ? t("payment.card.connectToProcess")
+                    : t("payment.card.selectToProcess")}
               </p>
             </div>
             <DialogFooter className="mt-6">
@@ -478,7 +500,7 @@ export default function PaymentModal({
                   className="w-full min-h-[44px] touch-target"
                   disabled={isLoading}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </DialogClose>
               <Button
@@ -492,10 +514,10 @@ export default function PaymentModal({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
                 )}
                 {isLoading
-                  ? "Processing..."
+                  ? t("payment.cash.processing")
                   : posConnected
-                    ? "Process Payment"
-                    : "Connect POS Device First"}
+                    ? t("payment.card.processPayment")
+                    : t("payment.card.connectFirst")}
               </Button>
             </DialogFooter>
           </div>
@@ -504,30 +526,34 @@ export default function PaymentModal({
         return (
           <div>
             <DialogHeader className="mb-6">
-              <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
+              <DialogTitle className="text-2xl">
+                {t("payment.mobile.title")}
+              </DialogTitle>
               <DialogDescription>
-                Select a provider and confirm the mobile number to send the USSD
-                push to.
+                {t("payment.mobile.description")}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6">
               {customer ? (
                 <Alert>
                   <Phone className="h-4 w-4" />
-                  <AlertTitle>Confirm Customer</AlertTitle>
+                  <AlertTitle>{t("payment.mobile.confirmCustomer")}</AlertTitle>
                   <AlertDescription>
-                    The payment request will be sent to{" "}
-                    <strong>{customer.name}</strong> at{" "}
-                    <strong>{customer.contact}</strong>.
+                    {t("payment.mobile.paymentRequestTo", {
+                      name: customer.name,
+                      contact: customer.contact,
+                    })}
                   </AlertDescription>
                 </Alert>
               ) : (
                 <div>
-                  <Label htmlFor="mobileNumber">Mobile Number</Label>
+                  <Label htmlFor="mobileNumber">
+                    {t("payment.mobile.mobileNumber")}
+                  </Label>
                   <Input
                     id="mobileNumber"
                     type="tel"
-                    placeholder="Enter mobile number"
+                    placeholder={t("payment.mobile.mobilePlaceholder")}
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
                   />
@@ -535,7 +561,7 @@ export default function PaymentModal({
               )}
 
               <div>
-                <Label>Select Provider</Label>
+                <Label>{t("payment.mobile.selectProvider")}</Label>
                 <RadioGroup
                   value={selectedMobileProvider}
                   onValueChange={setSelectedMobileProvider}
@@ -560,7 +586,7 @@ export default function PaymentModal({
                   className="w-full min-h-[44px] touch-target"
                   disabled={isLoading}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </DialogClose>
               <Button
@@ -574,8 +600,10 @@ export default function PaymentModal({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
                 )}
                 {isLoading
-                  ? "Processing..."
-                  : `Send Payment Request for R${cartTotal.toFixed(2)}`}
+                  ? t("payment.cash.processing")
+                  : t("payment.mobile.sendRequest", {
+                      amount: cartTotal.toFixed(2),
+                    })}
               </Button>
             </DialogFooter>
           </div>

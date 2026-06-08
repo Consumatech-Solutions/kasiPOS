@@ -27,8 +27,19 @@ import {
   isWebHIDAvailable,
   createWebHIDDeviceId,
 } from "@/lib/webhid-scanner";
+import { useTranslation } from "react-i18next";
 
 type ModalStep = "searching" | "found" | "connecting" | "success" | "error";
+
+function getConnectionTypeLabel(
+  ct: Device["connectionType"],
+  t: (key: string) => string
+): string {
+  if (ct === "webusb") return t("hardware.connectionType.webusb");
+  if (ct === "webhid") return t("hardware.connectionType.webhid");
+  if (ct === "qz") return t("hardware.connectionType.qz");
+  return t("hardware.connectionType.server");
+}
 
 interface DeviceSelectorProps {
   type: "printer" | "scanner" | "pos";
@@ -43,6 +54,7 @@ export function DeviceSelector({
   onClose,
   onSelect,
 }: DeviceSelectorProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<ModalStep>("searching");
   const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +97,9 @@ export function DeviceSelector({
       if (deviceList.length === 0) {
         setStep("error");
         setError(
-          `No ${getTypeLabel().toLowerCase()} devices found. Please connect a device and try again.`
+          t("hardware.deviceSelector.noDevices", {
+            type: getTypeLabel().toLowerCase(),
+          })
         );
         return;
       }
@@ -95,7 +109,7 @@ export function DeviceSelector({
     } catch (err: any) {
       console.error("Error searching for devices:", err);
       setStep("error");
-      setError(err.message || "Failed to search for devices");
+      setError(err.message || t("hardware.deviceSelector.searchFailed"));
     }
   };
 
@@ -107,7 +121,7 @@ export function DeviceSelector({
       const selectedDevice = devices.find((d) => d.id === deviceId);
 
       if (!selectedDevice) {
-        throw new Error("Selected device not found");
+        throw new Error(t("hardware.deviceSelector.deviceNotFound"));
       }
 
       storeDevice(type, deviceId, selectedDevice.connectionType);
@@ -123,7 +137,7 @@ export function DeviceSelector({
     } catch (err: any) {
       console.error("Error connecting device:", err);
       setStep("error");
-      setError(err.message || "Failed to connect device");
+      setError(err.message || t("hardware.deviceSelector.connectFailed"));
     }
   };
 
@@ -141,7 +155,10 @@ export function DeviceSelector({
           connectionType: "webusb",
           name:
             device.productName ||
-            `Printer (${device.vendorId.toString(16)}:${device.productId.toString(16)})`,
+            t("hardware.deviceSelector.printerFallback", {
+              vid: device.vendorId.toString(16),
+              pid: device.productId.toString(16),
+            }),
           vendorId: device.vendorId,
           productId: device.productId,
           manufacturer: (device as any).manufacturerName,
@@ -161,7 +178,10 @@ export function DeviceSelector({
           connectionType: "webhid",
           name:
             device.productName ||
-            `Scanner (${device.vendorId.toString(16)}:${device.productId.toString(16)})`,
+            t("hardware.deviceSelector.scannerFallback", {
+              vid: device.vendorId.toString(16),
+              pid: device.productId.toString(16),
+            }),
           vendorId: device.vendorId,
           productId: device.productId,
           manufacturer: (device as any).manufacturerName,
@@ -173,7 +193,7 @@ export function DeviceSelector({
         connectDevice(deviceId);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to request device");
+      setError(err.message || t("hardware.deviceSelector.requestFailed"));
       setStep("error");
     } finally {
       setRequestingDevice(false);
@@ -183,13 +203,13 @@ export function DeviceSelector({
   const getTypeLabel = () => {
     switch (type) {
       case "printer":
-        return "Printer";
+        return t("hardware.deviceSelector.typePrinter");
       case "scanner":
-        return "Barcode Scanner";
+        return t("hardware.deviceSelector.typeScanner");
       case "pos":
-        return "POS Device";
+        return t("hardware.deviceSelector.typePos");
       default:
-        return "Device";
+        return t("hardware.deviceSelector.typeDefault");
     }
   };
 
@@ -200,7 +220,9 @@ export function DeviceSelector({
       <DialogContent className="w-[95vw] max-w-md mx-2 sm:mx-auto !z-[110]">
         <DialogHeader className="px-2 sm:px-0">
           <DialogTitle className="text-lg sm:text-xl">
-            Connect {getTypeLabel()}
+            {t("hardware.deviceSelector.connectTitle", {
+              type: getTypeLabel(),
+            })}
           </DialogTitle>
         </DialogHeader>
 
@@ -214,11 +236,12 @@ export function DeviceSelector({
                 </div>
               </div>
               <h4 className="text-lg sm:text-xl font-medium text-slate-900 mb-2 px-4">
-                Looking for devices...
+                {t("hardware.search.lookingForDevices")}
               </h4>
               <p className="text-sm sm:text-base text-slate-500 px-4">
-                Ensure your {getTypeLabel().toLowerCase()} is turned on and
-                nearby.
+                {t("hardware.search.ensureDeviceOn", {
+                  device: getTypeLabel().toLowerCase(),
+                })}
               </p>
             </div>
           )}
@@ -228,8 +251,8 @@ export function DeviceSelector({
               <div className="text-left mb-4">
                 <h4 className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
                   {devices.length === 1
-                    ? "Device Found"
-                    : `Devices Found (${devices.length})`}
+                    ? t("hardware.found.device")
+                    : t("hardware.found.devices", { count: devices.length })}
                 </h4>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
                   {devices.map((deviceItem) => (
@@ -262,29 +285,28 @@ export function DeviceSelector({
                             {deviceItem.name}
                           </p>
                           <p className="text-xs text-slate-500 truncate">
-                            {deviceItem.connectionType === "webusb"
-                              ? "WebUSB"
-                              : deviceItem.connectionType === "webhid"
-                                ? "WebHID"
-                                : "Server"}{" "}
-                            • Ready to pair
+                            {getConnectionTypeLabel(
+                              deviceItem.connectionType,
+                              t
+                            )}{" "}
+                            • {t("hardware.found.readyToPair")}
                           </p>
                         </div>
                       </div>
                       <span className="text-xs sm:text-sm font-medium text-primary opacity-100 sm:opacity-0 group-active:opacity-100 sm:group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
-                        Connect
+                        {t("hardware.found.connect")}
                       </span>
                     </button>
                   ))}
                 </div>
               </div>
               <p className="text-xs text-center text-slate-400 mt-4 sm:mt-8 px-2">
-                Don't see your device?{" "}
+                {t("hardware.found.dontSeeDevice")}{" "}
                 <button
                   onClick={searchForDevices}
                   className="text-primary active:underline sm:hover:underline touch-target min-h-[44px]"
                 >
-                  Scan again
+                  {t("hardware.found.scanAgain")}
                 </button>
               </p>
             </div>
@@ -299,10 +321,10 @@ export function DeviceSelector({
                 </div>
               </div>
               <h4 className="text-lg sm:text-xl font-medium text-slate-900 mb-2">
-                Connecting...
+                {t("hardware.connecting.title")}
               </h4>
               <p className="text-sm sm:text-base text-slate-500">
-                Establishing secure connection...
+                {t("hardware.connecting.secureConnection")}
               </p>
             </div>
           )}
@@ -313,10 +335,12 @@ export function DeviceSelector({
                 <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 text-green-600" />
               </div>
               <h4 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
-                Connected!
+                {t("hardware.success.title")}
               </h4>
               <p className="text-sm sm:text-base text-slate-500">
-                Your {getTypeLabel().toLowerCase()} is ready to use.
+                {t("hardware.success.deviceReady", {
+                  device: getTypeLabel().toLowerCase(),
+                })}
               </p>
             </div>
           )}
@@ -327,7 +351,7 @@ export function DeviceSelector({
                 <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-red-600" />
               </div>
               <h4 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
-                Connection Failed
+                {t("hardware.error.connectionFailed")}
               </h4>
               <p className="text-sm sm:text-base text-slate-500 mb-4 text-center">
                 {error}
@@ -343,7 +367,7 @@ export function DeviceSelector({
                     {requestingDevice ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
-                    Request Device
+                    {t("hardware.deviceSelector.requestDevice")}
                   </Button>
                 )}
                 <Button
@@ -351,7 +375,7 @@ export function DeviceSelector({
                   variant="outline"
                   className="min-h-[44px] touch-target w-full sm:w-auto"
                 >
-                  Try Again
+                  {t("hardware.error.tryAgain")}
                 </Button>
               </div>
             </div>

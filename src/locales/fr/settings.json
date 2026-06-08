@@ -170,5 +170,8 @@
   "settings.staff.feedback.passwordUpdatedTitle": "Mot de passe mis à jour",
   "settings.staff.feedback.passwordUpdatedDesc": "Le mot de passe a été mis à jour avec succès.",
   "settings.staff.feedback.passwordUpdateFailedTitle": "Échec de la mise à jour du mot de passe",
-  "settings.staff.feedback.passwordUpdateFailedHint": "Vérifiez que le mot de passe respecte les exigences et réessayez."
+  "settings.staff.feedback.passwordUpdateFailedHint": "Vérifiez que le mot de passe respecte les exigences et réessayez.",
+  "settings.session.expiredTitle": "Session expirée",
+  "settings.session.expiredDescription": "Votre session a expiré. Veuillez vous reconnecter.",
+  "settings.logout.confirm": "Voulez-vous vraiment vous déconnecter ? Les données hors ligne sur cet appareil seront conservées."
 }
