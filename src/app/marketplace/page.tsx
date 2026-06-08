@@ -36,9 +36,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { MarketplaceOrderItem } from "@/lib/api/marketplace-orders";
+import type {
+  MarketplaceOrder,
+  MarketplaceOrderItem,
+} from "@/lib/api/marketplace-orders";
+import { useTranslation } from "react-i18next";
+
+function paymentMethodLabel(
+  t: (key: string) => string,
+  method: MarketplaceOrder["paymentMethod"]
+) {
+  if (method === "Cash") return t("marketplace.payment.cash");
+  if (method === "Card") return t("marketplace.payment.card");
+  return t("marketplace.payment.mobileMoney");
+}
 
 export default function MarketplacePage() {
+  const { t } = useTranslation();
   const { isOnline } = useNetworkStatus();
   const [orderCode, setOrderCode] = useState("");
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
@@ -52,9 +66,9 @@ export default function MarketplacePage() {
   const handleSearch = async () => {
     if (!orderCode.trim()) {
       feedback.error(
-        "Order code required",
-        "Enter an order code to search.",
-        "Type the code and try again.",
+        t("marketplace.feedback.orderCodeRequiredTitle"),
+        t("marketplace.feedback.orderCodeRequiredDesc"),
+        t("marketplace.feedback.orderCodeRequiredHint"),
         { code: ERROR_CODES.MARKETPLACE_ORDER }
       );
       return;
@@ -66,8 +80,8 @@ export default function MarketplacePage() {
     } catch (error: unknown) {
       feedback.fromError(
         error,
-        "Order not found",
-        "Check the order code and try again.",
+        t("marketplace.feedback.orderNotFoundTitle"),
+        t("marketplace.feedback.orderNotFoundHint"),
         ERROR_CODES.MARKETPLACE_ORDER
       );
     }
@@ -89,20 +103,22 @@ export default function MarketplacePage() {
       >
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Marketplace</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">
+              {t("marketplace.page.title")}
+            </CardTitle>
             <CardDescription className="text-sm">
-              Place orders from third-party stores for your customers.
+              {t("marketplace.page.description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="max-w-md space-y-2">
               <label htmlFor="order-code" className="text-sm font-medium">
-                Have an Order Code?
+                {t("marketplace.orderCode.label")}
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   id="order-code"
-                  placeholder="Enter order code..."
+                  placeholder={t("marketplace.orderCode.placeholder")}
                   className="touch-target"
                   value={orderCode}
                   onChange={(e) => setOrderCode(e.target.value)}
@@ -117,14 +133,18 @@ export default function MarketplacePage() {
                   {searchLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
-                      <span className="hidden sm:inline">Find Order</span>
-                      <span className="sm:hidden">Find</span>
+                      <span className="hidden sm:inline">
+                        {t("marketplace.findOrder")}
+                      </span>
+                      <span className="sm:hidden">{t("marketplace.find")}</span>
                     </>
                   ) : (
                     <>
                       <Search className="mr-2 h-4 w-4 flex-shrink-0" />
-                      <span className="hidden sm:inline">Find Order</span>
-                      <span className="sm:hidden">Find</span>
+                      <span className="hidden sm:inline">
+                        {t("marketplace.findOrder")}
+                      </span>
+                      <span className="sm:hidden">{t("marketplace.find")}</span>
                     </>
                   )}
                 </Button>
@@ -135,14 +155,16 @@ export default function MarketplacePage() {
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
-            Available Stores
+            {t("marketplace.stores.title")}
           </h2>
           <Button
             variant="outline"
             asChild
             className="min-h-[44px] touch-target w-full sm:w-auto"
           >
-            <Link href="/marketplace/orders">View Orders</Link>
+            <Link href="/marketplace/orders">
+              {t("marketplace.stores.viewOrders")}
+            </Link>
           </Button>
         </div>
         <div>
@@ -153,7 +175,7 @@ export default function MarketplacePage() {
                   <CardHeader className="flex-row items-center gap-4">
                     <Image
                       src={store.logoUrl || "/placeholder-store.png"}
-                      alt={`${store.name} logo`}
+                      alt={t("marketplace.store.logoAlt", { name: store.name })}
                       width={80}
                       height={40}
                       className="rounded-md object-contain"
@@ -169,7 +191,8 @@ export default function MarketplacePage() {
                   </CardHeader>
                   <CardContent className="flex-grow">
                     <p className="text-sm text-muted-foreground">
-                      {store.description || "No description available."}
+                      {store.description ||
+                        t("marketplace.store.noDescription")}
                     </p>
                   </CardContent>
                 </Card>
@@ -182,10 +205,12 @@ export default function MarketplacePage() {
           <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-lg sm:text-xl">
-                Order Details
+                {t("marketplace.dialog.title")}
               </DialogTitle>
               <DialogDescription className="text-sm">
-                Order Code: {foundOrder?.orderCode}
+                {t("marketplace.dialog.orderCode", {
+                  code: foundOrder?.orderCode ?? "",
+                })}
               </DialogDescription>
             </DialogHeader>
             {foundOrder && (
@@ -193,7 +218,7 @@ export default function MarketplacePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Marketplace Store
+                      {t("marketplace.dialog.marketplaceStore")}
                     </p>
                     <p className="text-sm">
                       {marketplaces.find(
@@ -202,7 +227,9 @@ export default function MarketplacePage() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Status</p>
+                    <p className="text-sm font-medium text-gray-500">
+                      {t("marketplace.dialog.status")}
+                    </p>
                     <Badge
                       variant={
                         foundOrder.status === "completed"
@@ -212,17 +239,21 @@ export default function MarketplacePage() {
                             : "secondary"
                       }
                     >
-                      {foundOrder.status.toUpperCase()}
+                      {t(`marketplace.status.${foundOrder.status}`)}
                     </Badge>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500">
-                      Payment Method
+                      {t("marketplace.dialog.paymentMethod")}
                     </p>
-                    <p className="text-sm">{foundOrder.paymentMethod}</p>
+                    <p className="text-sm">
+                      {paymentMethodLabel(t, foundOrder.paymentMethod)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-500">Date</p>
+                    <p className="text-sm font-medium text-gray-500">
+                      {t("marketplace.dialog.date")}
+                    </p>
                     <p className="text-sm">
                       {new Date(foundOrder.createdAt).toLocaleString()}
                     </p>
@@ -231,15 +262,19 @@ export default function MarketplacePage() {
 
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-2">
-                    Items
+                    {t("marketplace.dialog.items")}
                   </p>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead className="text-right">Unit Price</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>{t("marketplace.table.product")}</TableHead>
+                        <TableHead>{t("marketplace.table.quantity")}</TableHead>
+                        <TableHead className="text-right">
+                          {t("marketplace.table.unitPrice")}
+                        </TableHead>
+                        <TableHead className="text-right">
+                          {t("marketplace.table.total")}
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -263,14 +298,18 @@ export default function MarketplacePage() {
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Subtotal</span>
+                    <span className="text-gray-500">
+                      {t("marketplace.summary.subtotal")}
+                    </span>
                     <span>
                       R{(Number(foundOrder.subtotal) || 0).toFixed(2)}
                     </span>
                   </div>
                   {foundOrder.vatAmount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">VAT</span>
+                      <span className="text-gray-500">
+                        {t("marketplace.summary.vat")}
+                      </span>
                       <span>
                         R{(Number(foundOrder.vatAmount) || 0).toFixed(2)}
                       </span>
@@ -278,14 +317,16 @@ export default function MarketplacePage() {
                   )}
                   {foundOrder.serviceFee > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Service Fee</span>
+                      <span className="text-gray-500">
+                        {t("marketplace.summary.serviceFee")}
+                      </span>
                       <span>
                         R{(Number(foundOrder.serviceFee) || 0).toFixed(2)}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold pt-2">
-                    <span>Total</span>
+                    <span>{t("marketplace.summary.total")}</span>
                     <span>R{(Number(foundOrder.total) || 0).toFixed(2)}</span>
                   </div>
                 </div>

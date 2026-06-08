@@ -9,6 +9,7 @@ import {
   Laptop2,
   AlertCircle,
   Monitor,
+  Printer,
 } from "lucide-react";
 import {
   getDevices,
@@ -20,6 +21,7 @@ import {
   type Device,
 } from "@/lib/device-service";
 import { getPrintStrategy } from "@/lib/platform";
+import { RAWBT_PLAY_STORE_URL } from "@/lib/rawbt-print";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +31,6 @@ import {
 import { Button } from "@/components/ui/button";
 
 const QZ_TRAY_DOWNLOAD_URL = "https://qz.io/download/";
-const RAWBT_PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=ru.a40243.rawbt";
-const POS_PRINTER_DRIVER_PLAY_STORE_URL =
-  "https://play.google.com/store/apps/details?id=com.fidelier.printfromweb";
 
 type PrinterStep =
   | "choice"
@@ -65,6 +63,10 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
   const [availableDevices, setAvailableDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchSource, setSearchSource] = useState<SearchSource>(null);
+  const [isRawBtTesting, setIsRawBtTesting] = useState(false);
+  const [rawBtTestFeedback, setRawBtTestFeedback] = useState<string | null>(
+    null
+  );
 
   const printStrategy = getPrintStrategy();
 
@@ -74,6 +76,8 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
       setAvailableDevices([]);
       setSearchSource(null);
       setStep("choice");
+      setIsRawBtTesting(false);
+      setRawBtTestFeedback(null);
     }
   }, [open]);
 
@@ -149,8 +153,27 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
     searchWebUsbPrinters();
   };
 
-  const handlePrinterChoiceThermalAndroid = () => {
+  const handleRawBtTestPrint = async () => {
+    setIsRawBtTesting(true);
+    setRawBtTestFeedback(null);
+    try {
+      await printReceipt("thermal-android", buildTestPrintPayload());
+      setRawBtTestFeedback(
+        "Test print sent. Confirm a receipt prints on your thermal printer."
+      );
+    } catch (err: any) {
+      setRawBtTestFeedback(
+        err.message ||
+          "Test print failed. Install RawBT, pair your printer, and try again."
+      );
+    } finally {
+      setIsRawBtTesting(false);
+    }
+  };
+
+  const handleRawBtSaveSetup = () => {
     setPrinterMode("thermal");
+    storeDevice("printer", "thermal-android");
     onSuccess?.("thermal-android");
     onClose();
   };
@@ -269,17 +292,13 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
               {printStrategy === "android" && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Thermal printer (RawBT or POS Printer Driver)
+                    Thermal printer (RawBT)
                   </p>
                   <ol className="text-sm text-slate-700 list-decimal list-inside space-y-1 mb-2">
-                    <li>
-                      Install RawBT or POS Printer Driver from the Play Store
-                    </li>
-                    <li>
-                      Open the app and pair your Xprinter XP-P201A (or other
-                      thermal printer)
-                    </li>
-                    <li>Return here and complete setup</li>
+                    <li>Install RawBT from the Play Store</li>
+                    <li>Open RawBT and pair your USB or Bluetooth thermal printer</li>
+                    <li>Tap Test printer to verify printing</li>
+                    <li>When printing works, tap Save setup</li>
                   </ol>
                   <div className="flex flex-col gap-2">
                     <Button
@@ -297,27 +316,43 @@ export const PrinterSetupModal: React.FC<PrinterSetupModalProps> = ({
                       </a>
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
                       className="min-h-[44px] touch-target"
-                      asChild
+                      onClick={handleRawBtTestPrint}
+                      disabled={isRawBtTesting}
                     >
-                      <a
-                        href={POS_PRINTER_DRIVER_PLAY_STORE_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Get POS Printer Driver on Play Store
-                      </a>
+                      {isRawBtTesting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        <>
+                          <Printer className="mr-2 h-4 w-4" />
+                          Test printer
+                        </>
+                      )}
                     </Button>
                     <Button
                       variant="secondary"
                       size="sm"
                       className="min-h-[44px] touch-target"
-                      onClick={handlePrinterChoiceThermalAndroid}
+                      onClick={handleRawBtSaveSetup}
                     >
-                      I&apos;ve installed the app, continue
+                      Save setup
                     </Button>
+                    {rawBtTestFeedback ? (
+                      <p
+                        className={`text-xs text-left px-1 ${
+                          rawBtTestFeedback.startsWith("Test print sent")
+                            ? "text-green-700"
+                            : "text-red-600"
+                        }`}
+                      >
+                        {rawBtTestFeedback}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}

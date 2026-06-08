@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { User } from "@/types";
+import type { AppSettings, User } from "@/types";
+import { useTranslation } from "react-i18next";
+import { normalizeToSupportedI18nLng } from "@/lib/language-code";
 
 import {
   Card,
@@ -34,7 +36,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/components/settings-provider";
-import { useI18n } from "@/components/i18n-provider";
 import { usersApi, settingsApi } from "@/lib/api";
 import { storesApi } from "@/lib/api/stores";
 import { saveStorePermanently } from "@/lib/store-persistence";
@@ -126,8 +127,17 @@ const passwordSchema = z
   });
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
+  const staffRoleLabel = (role: string | undefined) => {
+    const norm = String(role ?? "")
+      .toLowerCase()
+      .replace(/\s+/g, "_");
+    if (norm === "admin" || norm === "store_admin" || norm === "staff") {
+      return t(`settings.staff.role.${norm}`);
+    }
+    return role ?? "";
+  };
   const { settings, setSetting, logout } = useSettings();
-  const { t } = useI18n();
   const { openHardwareSetup } = useHardwareSetup();
   const { currentUser, currentStore: settingsStore } = settings;
   const isAdmin =
@@ -380,8 +390,8 @@ export default function SettingsPage() {
     } catch (err: any) {
       console.error("Failed to update store modules:", err);
       feedback.error(
-        "Update failed",
-        err?.message ?? "Could not update feature. Try again."
+        t("settings.storeUpdate.failedTitle"),
+        err?.message ?? t("settings.storeUpdate.failedFeatureBody")
       );
       setSetting(feature, !enabled);
     } finally {
@@ -413,8 +423,8 @@ export default function SettingsPage() {
     } catch (err: any) {
       console.error("Failed to update showVatInCheckout:", err);
       feedback.error(
-        "Update failed",
-        err?.message ?? "Could not update setting. Try again."
+        t("settings.storeUpdate.failedTitle"),
+        err?.message ?? t("settings.storeUpdate.failedVatBody")
       );
       setSetting("showVatInCheckout", !checked);
     } finally {
@@ -425,8 +435,8 @@ export default function SettingsPage() {
   const saveCreditSettings = async () => {
     if (!settingsStoreId) {
       feedback.error(
-        "No store",
-        "Load a store first or ensure your account has a store.",
+        t("settings.credit.feedback.noStoreTitle"),
+        t("settings.credit.feedback.noStoreDesc"),
         undefined,
         { code: "CREDIT" }
       );
@@ -434,8 +444,8 @@ export default function SettingsPage() {
     }
     if (!settingsStore) {
       feedback.error(
-        "No store",
-        "Load your store before saving credit settings.",
+        t("settings.credit.feedback.noStoreTitle"),
+        t("settings.credit.feedback.noStoreContextDesc"),
         undefined,
         { code: "CREDIT" }
       );
@@ -507,8 +517,8 @@ export default function SettingsPage() {
 
     if (!effectiveOnline) {
       feedback.error(
-        "Server unavailable",
-        "Connect to the internet and ensure the server is reachable to save credit settings.",
+        t("settings.credit.feedback.serverUnavailableTitle"),
+        t("settings.credit.feedback.serverUnavailableDesc"),
         undefined,
         { code: "CREDIT" }
       );
@@ -558,15 +568,15 @@ export default function SettingsPage() {
           : null;
       if (creditForm.enabled && !cc) {
         feedback.error(
-          "Saved but not confirmed on server",
-          "Credit settings were sent, but the server did not return the stored config.",
-          "Check store settings on the server, then try a credit sale again.",
+          t("settings.credit.feedback.savedNotConfirmedTitle"),
+          t("settings.credit.feedback.savedNotConfirmedDesc"),
+          t("settings.credit.feedback.savedNotConfirmedHint"),
           { code: "CREDIT" }
         );
       } else {
         feedback.success(
-          "Credit settings saved",
-          "Customer credit configuration has been updated."
+          t("settings.credit.feedback.savedTitle"),
+          t("settings.credit.feedback.savedDesc")
         );
       }
     } catch (err: unknown) {
@@ -587,7 +597,12 @@ export default function SettingsPage() {
           err,
         });
       }
-      feedback.error("Save failed", message, undefined, { code: "CREDIT" });
+      feedback.error(
+        t("settings.credit.feedback.saveFailedTitle"),
+        message,
+        undefined,
+        { code: "CREDIT" }
+      );
     } finally {
       setSavingCredit(false);
     }
@@ -620,27 +635,23 @@ export default function SettingsPage() {
     switch (feature) {
       case "campaigns":
         return {
-          title: "Opt-In to Campaigns",
-          description:
-            "Campaigns allow you to create and participate in loyalty and reward programmes.",
+          title: t("settings.featureOptIn.campaigns.title"),
+          description: t("settings.featureOptIn.campaigns.description"),
         };
       case "marketplace":
         return {
-          title: "Opt-In to Marketplace",
-          description:
-            "The Marketplace feature allows you to place orders from popular third-party online stores on behalf of your customers, earning a service fee for each order.",
+          title: t("settings.featureOptIn.marketplace.title"),
+          description: t("settings.featureOptIn.marketplace.description"),
         };
       case "boph":
         return {
-          title: "Opt-In to BOPH",
-          description:
-            "BOPH (Buy Online, Pickup Here) lets your store act as a pickup point for online orders. You'll manage incoming parcels and hand them off to customers, earning a fee for the service.",
+          title: t("settings.featureOptIn.boph.title"),
+          description: t("settings.featureOptIn.boph.description"),
         };
       case "buyStock":
         return {
-          title: "Opt-In to Buy Stock",
-          description:
-            "Buy Stock lets you order inventory and manage purchase orders for your store.",
+          title: t("settings.featureOptIn.buyStock.title"),
+          description: t("settings.featureOptIn.buyStock.description"),
         };
       default:
         return { title: "", description: "" };
@@ -669,8 +680,8 @@ export default function SettingsPage() {
   ) => {
     if (!effectiveOnline) {
       feedback.error(
-        "Server unavailable",
-        "Staff changes require a working connection to the server. Reconnect and try again.",
+        t("settings.staff.feedback.staffServerUnavailableTitle"),
+        t("settings.staff.feedback.staffServerUnavailableDesc"),
         undefined,
         { code: "USER" }
       );
@@ -682,8 +693,8 @@ export default function SettingsPage() {
       currentUser?.storeId;
     if (!storeId) {
       feedback.error(
-        "No store",
-        "Cannot add staff without a store. Open the app and ensure a store is loaded.",
+        t("settings.staff.feedback.noStoreCannotAddTitle"),
+        t("settings.staff.feedback.noStoreCannotAddDesc"),
         undefined,
         { code: "USER" }
       );
@@ -697,13 +708,16 @@ export default function SettingsPage() {
           phone: values.phone,
         };
         await usersApi.update(editingUser.id!, updateData);
-        feedback.success("User updated", "User updated successfully.");
+        feedback.success(
+          t("settings.staff.feedback.userUpdatedTitle"),
+          t("settings.staff.feedback.userUpdatedDesc")
+        );
       } else {
         const phone = normalizePhone(values.phone);
         if (phone.length < 10) {
           feedback.error(
-            "Invalid number",
-            "Please enter at least 10 digits.",
+            t("settings.staff.feedback.invalidPhoneTitle"),
+            t("settings.staff.feedback.invalidPhoneDesc"),
             undefined,
             { code: "USER" }
           );
@@ -718,8 +732,8 @@ export default function SettingsPage() {
         };
         await usersApi.create(createData);
         feedback.success(
-          "Staff user added",
-          "They will receive an SMS to set up their password. They are assigned to this store only."
+          t("settings.staff.feedback.staffAddedTitle"),
+          t("settings.staff.feedback.staffAddedDesc")
         );
       }
       setUserDialogOpen(false);
@@ -733,8 +747,8 @@ export default function SettingsPage() {
       }
       feedback.fromError(
         error,
-        "Failed to save user",
-        "Check the details and try again, or try again later."
+        t("settings.staff.feedback.saveUserFailedTitle"),
+        t("settings.staff.feedback.saveUserFailedHint")
       );
     }
   };
@@ -747,8 +761,8 @@ export default function SettingsPage() {
   const deleteUser = async (id: string) => {
     if (!effectiveOnline) {
       feedback.error(
-        "Server unavailable",
-        "Deleting staff requires a working connection to the server.",
+        t("settings.staff.feedback.deleteServerUnavailableTitle"),
+        t("settings.staff.feedback.deleteServerUnavailableDesc"),
         undefined,
         { code: "USER" }
       );
@@ -757,21 +771,24 @@ export default function SettingsPage() {
     try {
       if (id === currentUser?.id) {
         feedback.error(
-          "Cannot delete",
-          "You cannot delete your own account.",
-          "Ask another admin to remove you."
+          t("settings.staff.feedback.cannotDeleteSelfTitle"),
+          t("settings.staff.feedback.cannotDeleteSelfDesc"),
+          t("settings.staff.feedback.cannotDeleteSelfHint")
         );
         return;
       }
       await usersApi.remove(id);
-      feedback.success("User deleted", "User deleted successfully.");
+      feedback.success(
+        t("settings.staff.feedback.userDeletedTitle"),
+        t("settings.staff.feedback.userDeletedDesc")
+      );
       void fetchUsers();
     } catch (error) {
       console.error("Failed to delete user:", error);
       feedback.fromError(
         error,
-        "Failed to delete user",
-        "Check your connection and try again."
+        t("settings.staff.feedback.deleteUserFailedTitle"),
+        t("settings.staff.feedback.deleteUserFailedHint")
       );
     }
   };
@@ -787,8 +804,8 @@ export default function SettingsPage() {
     const ok = await refreshEffectiveOnline();
     if (!ok) {
       feedback.error(
-        "Server unavailable",
-        "Role transfer requires a working connection to the server. Please reconnect and try again."
+        t("settings.staff.feedback.transferServerUnavailableTitle"),
+        t("settings.staff.feedback.transferServerUnavailableDesc")
       );
       return;
     }
@@ -801,10 +818,10 @@ export default function SettingsPage() {
           : "staff user",
       });
       feedback.success(
-        "Role transferred",
+        t("settings.staff.feedback.roleTransferredTitle"),
         deleteCurrentAdminOnTransfer
-          ? "You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in; your account is removed as selected."
-          : "You are signed out. The new store admin should sign in again too. Roles will be correct after sign-in—you will be a staff user at this store."
+          ? t("settings.staff.feedback.roleTransferredDeletedDesc")
+          : t("settings.staff.feedback.roleTransferredStaffDesc")
       );
       setTransferDialogOpen(false);
       await logout();
@@ -812,8 +829,8 @@ export default function SettingsPage() {
       console.error("Failed to transfer store admin role:", error);
       feedback.fromError(
         error,
-        "Failed to transfer role",
-        "Please verify the selected user is a staff member and try again."
+        t("settings.staff.feedback.transferFailedTitle"),
+        t("settings.staff.feedback.transferFailedHint")
       );
     } finally {
       setIsTransferringRole(false);
@@ -832,8 +849,8 @@ export default function SettingsPage() {
     if (!userForPassword?.id) return;
     if (!effectiveOnline) {
       feedback.error(
-        "Server unavailable",
-        "Setting a password requires a working connection to the server.",
+        t("settings.staff.feedback.passwordServerUnavailableTitle"),
+        t("settings.staff.feedback.passwordServerUnavailableDesc"),
         undefined,
         { code: "USER" }
       );
@@ -841,7 +858,10 @@ export default function SettingsPage() {
     }
     try {
       await usersApi.update(userForPassword.id, { password: values.password });
-      feedback.success("Password updated", "Password updated successfully.");
+      feedback.success(
+        t("settings.staff.feedback.passwordUpdatedTitle"),
+        t("settings.staff.feedback.passwordUpdatedDesc")
+      );
       setPasswordDialogOpen(false);
       setUserForPassword(null);
       passwordForm.reset();
@@ -849,8 +869,8 @@ export default function SettingsPage() {
       console.error("Failed to update password:", error);
       feedback.fromError(
         error,
-        "Failed to update password",
-        "Ensure the password meets requirements and try again."
+        t("settings.staff.feedback.passwordUpdateFailedTitle"),
+        t("settings.staff.feedback.passwordUpdateFailedHint")
       );
     }
   };
@@ -860,9 +880,9 @@ export default function SettingsPage() {
   const handleUpdateApp = async () => {
     if (!effectiveOnline) {
       feedback.error(
-        "Server unavailable",
-        "Connect to the internet and ensure the server is reachable to update the app.",
-        "Connect to Wi‑Fi or mobile data and try again."
+        t("settings.updateApp.feedback.serverUnavailableTitle"),
+        t("settings.updateApp.feedback.serverUnavailableDesc"),
+        t("settings.updateApp.feedback.serverUnavailableHint")
       );
       return;
     }
@@ -891,8 +911,8 @@ export default function SettingsPage() {
       }
 
       feedback.success(
-        "Cache cleared",
-        "Reloading the app with the latest version..."
+        t("settings.updateApp.feedback.cacheClearedTitle"),
+        t("settings.updateApp.feedback.cacheClearedDesc")
       );
 
       setTimeout(() => {
@@ -902,8 +922,8 @@ export default function SettingsPage() {
       console.error("Failed to update app:", error);
       feedback.fromError(
         error,
-        "Failed to update the app",
-        "Check your connection and try again."
+        t("settings.updateApp.feedback.failedTitle"),
+        t("settings.updateApp.feedback.failedHint")
       );
       setIsUpdating(false);
     }
@@ -914,10 +934,8 @@ export default function SettingsPage() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Settings</CardTitle>
-            <CardDescription>
-              Manage your application preferences and features.
-            </CardDescription>
+            <CardTitle>{t("settings.page.title")}</CardTitle>
+            <CardDescription>{t("settings.page.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -931,10 +949,10 @@ export default function SettingsPage() {
                   ) : (
                     <Sun className="w-5 h-5" />
                   )}
-                  {t("settings.theme")}
+                  {t("settings.theme.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  {t("settings.themeDescription")}
+                  {t("settings.theme.description")}
                 </p>
               </div>
               <Switch
@@ -953,24 +971,36 @@ export default function SettingsPage() {
                   className="font-semibold flex items-center gap-2"
                 >
                   <Languages className="w-5 h-5" />
-                  {t("settings.language")}
+                  {t("settings.language.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  {t("settings.languageDescription")}
+                  {t("settings.language.description")}
                 </p>
               </div>
               <Select
-                value={settings.language === "fr" ? "fr" : "en"}
-                onValueChange={(value) =>
-                  setSetting("language", value === "fr" ? "fr" : "en")
-                }
+                value={normalizeToSupportedI18nLng(settings.language)}
+                onValueChange={(value) => {
+                  if (value === "en" || value === "fr") {
+                    setSetting("language", value as AppSettings["language"]);
+                  }
+                }}
               >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder={t("settings.language")} />
+                <SelectTrigger
+                  id="language-select"
+                  className="w-[180px]"
+                  aria-label={t("settings.language.label")}
+                >
+                  <SelectValue
+                    placeholder={t("settings.language.placeholder")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">{t("settings.languageEnglish")}</SelectItem>
-                  <SelectItem value="fr">{t("settings.languageFrench")}</SelectItem>
+                  <SelectItem value="en">
+                    {t("settings.language.english")}
+                  </SelectItem>
+                  <SelectItem value="fr">
+                    {t("settings.language.french")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -982,10 +1012,10 @@ export default function SettingsPage() {
                   className="font-semibold flex items-center gap-2"
                 >
                   <RefreshCw className="w-5 h-5" />
-                  Update App
+                  {t("settings.updateApp.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Clear cache and reload the app to get the latest version.
+                  {t("settings.updateApp.description")}
                 </p>
               </div>
               <Button
@@ -998,19 +1028,19 @@ export default function SettingsPage() {
                 {isUpdating ? (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Updating...
+                    {t("settings.updateApp.button.updating")}
                   </>
                 ) : (
                   <>
                     {effectiveOnline ? (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Update
+                        {t("settings.updateApp.button.update")}
                       </>
                     ) : (
                       <>
                         <WifiOff className="mr-2 h-4 w-4" />
-                        Offline
+                        {t("settings.updateApp.button.offline")}
                       </>
                     )}
                   </>
@@ -1025,10 +1055,10 @@ export default function SettingsPage() {
                   className="font-semibold flex items-center gap-2"
                 >
                   <Printer className="w-5 h-5" />
-                  Hardware setup
+                  {t("settings.hardware.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Configure receipt printer, barcode scanner, and card reader.
+                  {t("settings.hardware.description")}
                 </p>
               </div>
               <Button
@@ -1038,7 +1068,7 @@ export default function SettingsPage() {
                 className="min-h-[44px] touch-target"
               >
                 <Printer className="mr-2 h-4 w-4" />
-                Launch hardware setup
+                {t("settings.hardware.launch")}
               </Button>
             </div>
 
@@ -1048,10 +1078,11 @@ export default function SettingsPage() {
                 !effectiveOnline && "opacity-60 pointer-events-none"
               )}
             >
-              <h3 className="text-lg font-semibold">Feature Management</h3>
+              <h3 className="text-lg font-semibold">
+                {t("settings.features.sectionTitle")}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                Enable or disable optional features. Requires internet
-                connection.
+                {t("settings.features.sectionDescription")}
               </p>
             </div>
 
@@ -1063,11 +1094,10 @@ export default function SettingsPage() {
             >
               <div>
                 <Label htmlFor="campaigns-toggle" className="font-semibold">
-                  Campaigns
+                  {t("settings.features.campaigns.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Enable to create and participate in loyalty and reward
-                  programmes.
+                  {t("settings.features.campaigns.description")}
                 </p>
               </div>
               <Switch
@@ -1088,10 +1118,10 @@ export default function SettingsPage() {
             >
               <div>
                 <Label htmlFor="marketplace-toggle" className="font-semibold">
-                  Marketplace
+                  {t("settings.features.marketplace.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Enable ordering from third-party stores.
+                  {t("settings.features.marketplace.description")}
                 </p>
               </div>
               <Switch
@@ -1112,10 +1142,10 @@ export default function SettingsPage() {
             >
               <div>
                 <Label htmlFor="boph-toggle" className="font-semibold">
-                  Buy Online, Pickup Here (BOPH)
+                  {t("settings.features.boph.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Enable parcel pickup point services.
+                  {t("settings.features.boph.description")}
                 </p>
               </div>
               <Switch
@@ -1134,10 +1164,10 @@ export default function SettingsPage() {
             >
               <div>
                 <Label htmlFor="buy-stock-toggle" className="font-semibold">
-                  Buy Stock
+                  {t("settings.features.buyStock.label")}
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Enable ordering inventory and managing purchase orders.
+                  {t("settings.features.buyStock.description")}
                 </p>
               </div>
               <Switch
@@ -1155,23 +1185,22 @@ export default function SettingsPage() {
                   className="space-y-2 pt-4 scroll-mt-4"
                 >
                   <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Receipt className="w-5 h-5" /> Checkout display{" "}
-                    {isAdmin ? "(Admin)" : ""}
+                    <Receipt className="w-5 h-5" />{" "}
+                    {isAdmin
+                      ? t("settings.checkout.titleAdmin")
+                      : t("settings.checkout.title")}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    When ON, VAT is added to the total (Total = Subtotal + VAT).
-                    When OFF, VAT is included in the total (no addition).
+                    {t("settings.checkout.intro")}
                   </p>
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
                     <Label htmlFor="show-vat-toggle" className="font-semibold">
-                      Show VAT in checkout summary
+                      {t("settings.checkout.showVat.label")}
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      When ON, VAT is added on top (Total = Subtotal + VAT).
-                      When OFF, VAT is included in prices and the VAT line is
-                      hidden.
+                      {t("settings.checkout.showVat.description")}
                     </p>
                   </div>
                   <Switch
@@ -1191,26 +1220,22 @@ export default function SettingsPage() {
                       className="space-y-2 pt-4 scroll-mt-4"
                     >
                       <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <CreditCard className="w-5 h-5" /> Customer credit
+                        <CreditCard className="w-5 h-5" />{" "}
+                        {t("settings.credit.title")}
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Allow sales on credit and set the credit limit and
-                        payment term. When enabled, the Credit payment option
-                        appears at checkout.
+                        {t("settings.credit.intro")}
                       </p>
                       {!settingsStoreId && (
                         <p className="text-xs text-amber-600 dark:text-amber-500">
-                          No store linked. Load a store or use an account with a
-                          store so credit settings apply correctly at checkout.
+                          {t("settings.credit.noStoreWarning")}
                         </p>
                       )}
                     </div>
                     <div className="space-y-4 p-4 border rounded-lg">
                       {!effectiveOnline && (
                         <p className="text-xs text-muted-foreground">
-                          Server unreachable: you can review credit options
-                          below. Saving requires a working connection to the
-                          server.
+                          {t("settings.credit.offlineNote")}
                         </p>
                       )}
                       <div className="flex items-center justify-between">
@@ -1218,7 +1243,7 @@ export default function SettingsPage() {
                           htmlFor="credit-enabled"
                           className="font-semibold"
                         >
-                          Allow sales on credit
+                          {t("settings.credit.allow.label")}
                         </Label>
                         <Switch
                           id="credit-enabled"
@@ -1233,7 +1258,7 @@ export default function SettingsPage() {
                         <>
                           <div className="space-y-2">
                             <Label htmlFor="credit-limit">
-                              Credit limit (e.g. max amount per customer)
+                              {t("settings.credit.limit.label")}
                             </Label>
                             <Input
                               id="credit-limit"
@@ -1249,7 +1274,7 @@ export default function SettingsPage() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label>Payment term type</Label>
+                            <Label>{t("settings.credit.termType.label")}</Label>
                             <Select
                               value={creditForm.termType}
                               onValueChange={(v: "fixed" | "variable") =>
@@ -1261,10 +1286,10 @@ export default function SettingsPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="fixed">
-                                  Fixed (number of days)
+                                  {t("settings.credit.termType.fixed")}
                                 </SelectItem>
                                 <SelectItem value="variable">
-                                  Variable
+                                  {t("settings.credit.termType.variable")}
                                 </SelectItem>
                               </SelectContent>
                             </Select>
@@ -1272,7 +1297,7 @@ export default function SettingsPage() {
                           {creditForm.termType === "fixed" && (
                             <div className="space-y-2">
                               <Label htmlFor="credit-term">
-                                Number of days (payment due)
+                                {t("settings.credit.termDays.label")}
                               </Label>
                               <Input
                                 id="credit-term"
@@ -1304,10 +1329,10 @@ export default function SettingsPage() {
                         {savingCredit ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
+                            {t("settings.credit.saving")}
                           </>
                         ) : (
-                          "Save credit settings"
+                          t("settings.credit.save")
                         )}
                       </Button>
                     </div>
@@ -1322,14 +1347,16 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users /> User Management
+                <Users /> {t("settings.staff.title")}
               </CardTitle>
               <CardDescription>
                 {userManagementStoreId && settingsStore?.name
-                  ? `Staff for this store only: ${settingsStore.name}. Add, edit, or remove staff assigned to this store.`
+                  ? t("settings.staff.descriptionWithStore", {
+                      storeName: settingsStore.name,
+                    })
                   : userManagementStoreId
-                    ? "Staff for this store only. Add, edit, or remove staff assigned to this store."
-                    : "Load or select a store to manage its staff. Only staff assigned to the current store are shown."}
+                    ? t("settings.staff.descriptionStoreOnly")
+                    : t("settings.staff.descriptionNoStore")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1343,22 +1370,25 @@ export default function SettingsPage() {
                   }}
                   title={
                     !userManagementStoreId
-                      ? "Select or load a store first"
+                      ? t("settings.staff.addTitleNoStore")
                       : !effectiveOnline
-                        ? "Server must be reachable to add or change staff"
-                        : "Add staff to this store"
+                        ? t("settings.staff.addTitleOffline")
+                        : t("settings.staff.addTitleOnline")
                   }
                 >
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Staff
+                  <PlusCircle className="mr-2 h-4 w-4" />{" "}
+                  {t("settings.staff.addButton")}
                 </Button>
               </div>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t("settings.staff.table.name")}</TableHead>
+                    <TableHead>{t("settings.staff.table.phone")}</TableHead>
+                    <TableHead>{t("settings.staff.table.role")}</TableHead>
+                    <TableHead className="text-right">
+                      {t("settings.staff.table.actions")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1369,8 +1399,8 @@ export default function SettingsPage() {
                         className="text-center text-muted-foreground py-8"
                       >
                         {effectiveOnline
-                          ? "No staff members found. Add one above!"
-                          : "No cached staff list for this page. Open Settings while the server is reachable to load staff, then you can view the list offline."}
+                          ? t("settings.staff.empty.online")
+                          : t("settings.staff.empty.offline")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1389,7 +1419,7 @@ export default function SettingsPage() {
                           }
                           className="capitalize"
                         >
-                          {user.role}
+                          {staffRoleLabel(user.role)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -1398,7 +1428,7 @@ export default function SettingsPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openUserDialog(user)}
-                            title="Edit user"
+                            title={t("settings.staff.action.editTitle")}
                             disabled={!effectiveOnline}
                           >
                             <Edit className="h-4 w-4" />
@@ -1407,7 +1437,7 @@ export default function SettingsPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => openPasswordDialog(user)}
-                            title="Set password"
+                            title={t("settings.staff.action.setPasswordTitle")}
                             disabled={!effectiveOnline}
                           >
                             <Key className="h-4 w-4" />
@@ -1418,7 +1448,7 @@ export default function SettingsPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => openTransferRoleDialog(user)}
-                              title="Transfer store admin role to this staff user"
+                              title={t("settings.staff.action.transferTitle")}
                               disabled={!effectiveOnline || isTransferringRole}
                             >
                               <Crown className="h-4 w-4 text-amber-600" />
@@ -1433,7 +1463,7 @@ export default function SettingsPage() {
                                   user.id === currentUser?.id ||
                                   !effectiveOnline
                                 }
-                                title="Delete user"
+                                title={t("settings.staff.action.deleteTitle")}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
@@ -1441,19 +1471,20 @@ export default function SettingsPage() {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>
-                                  Are you sure?
+                                  {t("settings.staff.delete.title")}
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  This action cannot be undone. This will
-                                  permanently delete the user account.
+                                  {t("settings.staff.delete.description")}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogCancel>
+                                  {t("settings.staff.delete.cancel")}
+                                </AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => deleteUser(user.id!)}
                                 >
-                                  Delete
+                                  {t("settings.staff.delete.confirm")}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -1473,10 +1504,13 @@ export default function SettingsPage() {
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
-                  Previous
+                  {t("settings.staff.pagination.previous")}
                 </Button>
                 <div className="text-sm text-muted-foreground">
-                  Page {page} of {totalPages}
+                  {t("settings.staff.pagination.pageOf", {
+                    page,
+                    total: totalPages,
+                  })}
                 </div>
                 <Button
                   variant="outline"
@@ -1484,7 +1518,7 @@ export default function SettingsPage() {
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                 >
-                  Next
+                  {t("settings.staff.pagination.next")}
                 </Button>
               </div>
             </CardContent>
@@ -1509,9 +1543,11 @@ export default function SettingsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancel}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={handleCancel}>
+              {t("settings.featureOptIn.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirm}>
-              Opt-In
+              {t("settings.featureOptIn.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1521,7 +1557,9 @@ export default function SettingsPage() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>
-              {editingUser ? "Edit User" : "Add Staff Member"}
+              {editingUser
+                ? t("settings.staff.dialog.editTitle")
+                : t("settings.staff.dialog.addTitle")}
             </DialogTitle>
           </DialogHeader>
           <Form {...userForm}>
@@ -1534,7 +1572,7 @@ export default function SettingsPage() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full Name</FormLabel>
+                    <FormLabel>{t("settings.staff.form.fullName")}</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -1547,12 +1585,12 @@ export default function SettingsPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>{t("settings.staff.form.email")}</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
                         type="email"
-                        placeholder="staff@example.com"
+                        placeholder={t("settings.staff.form.emailPlaceholder")}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1564,7 +1602,7 @@ export default function SettingsPage() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel>{t("settings.staff.form.mobile")}</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -1575,11 +1613,11 @@ export default function SettingsPage() {
               <DialogFooter>
                 <DialogClose asChild>
                   <Button type="button" variant="secondary">
-                    Cancel
+                    {t("settings.staff.dialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button type="submit" disabled={!effectiveOnline}>
-                  Save
+                  {t("settings.staff.dialog.save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -1592,10 +1630,13 @@ export default function SettingsPage() {
         <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Set Password for {userForPassword.name}</DialogTitle>
+              <DialogTitle>
+                {t("settings.staff.password.title", {
+                  name: userForPassword.name,
+                })}
+              </DialogTitle>
               <DialogDescription>
-                Set a new password for this user. They will be able to use this
-                password to log in.
+                {t("settings.staff.password.description")}
               </DialogDescription>
             </DialogHeader>
             <Form {...passwordForm}>
@@ -1608,12 +1649,16 @@ export default function SettingsPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>New Password</FormLabel>
+                      <FormLabel>
+                        {t("settings.staff.password.newLabel")}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="password"
                           {...field}
-                          placeholder="Enter new password"
+                          placeholder={t(
+                            "settings.staff.password.newPlaceholder"
+                          )}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1625,12 +1670,16 @@ export default function SettingsPage() {
                   name="confirmPassword"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
+                      <FormLabel>
+                        {t("settings.staff.password.confirmLabel")}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="password"
                           {...field}
-                          placeholder="Confirm new password"
+                          placeholder={t(
+                            "settings.staff.password.confirmPlaceholder"
+                          )}
                         />
                       </FormControl>
                       <FormMessage />
@@ -1640,11 +1689,11 @@ export default function SettingsPage() {
                 <DialogFooter>
                   <DialogClose asChild>
                     <Button type="button" variant="secondary">
-                      Cancel
+                      {t("settings.staff.password.cancel")}
                     </Button>
                   </DialogClose>
                   <Button type="submit" disabled={!effectiveOnline}>
-                    Set Password
+                    {t("settings.staff.password.submit")}
                   </Button>
                 </DialogFooter>
               </form>
@@ -1663,15 +1712,16 @@ export default function SettingsPage() {
           aria-describedby="duplicate-phone-description"
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>Number already registered</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("settings.staff.duplicatePhone.title")}
+            </AlertDialogTitle>
             <AlertDialogDescription id="duplicate-phone-description">
-              This phone number is already registered for a staff member. Please
-              use a different number.
+              {t("settings.staff.duplicatePhone.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction onClick={closeDuplicatePhonePopup}>
-              OK
+              {t("settings.staff.duplicatePhone.ok")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1685,37 +1735,44 @@ export default function SettingsPage() {
       >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Confirm Store Admin transfer</DialogTitle>
+            <DialogTitle>{t("settings.staff.transfer.title")}</DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>
-                  You are transferring Store Admin to{" "}
-                  <span className="font-semibold text-foreground">
-                    {transferTargetUser?.name ?? "this user"}
-                  </span>
-                  . Please confirm below. This action cannot be undone.
+                  {t("settings.staff.transfer.lead", {
+                    name:
+                      transferTargetUser?.name ??
+                      t("settings.staff.transfer.targetFallback"),
+                  })}
                 </p>
-                <p>
-                  After you confirm, this app signs you out and the new store
-                  admin should be signed out as well (existing sessions may stay
-                  valid until the server ends them or they expire). When both of
-                  you sign in again, roles will match the server—the previous
-                  store admin is deleted only if you select that option in the
-                  checkbox.
-                </p>
+                <p>{t("settings.staff.transfer.details")}</p>
               </div>
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="rounded-md border p-3 text-sm text-muted-foreground">
-              <p>New Store Admin: {transferTargetUser?.name ?? "-"}</p>
-              <p>Phone: {transferTargetUser?.phone ?? "-"}</p>
-              <p>Current Store Admin: {currentUser?.name ?? "Current user"}</p>
+              <p>
+                {t("settings.staff.transfer.summaryNewAdmin", {
+                  name: transferTargetUser?.name ?? "-",
+                })}
+              </p>
+              <p>
+                {t("settings.staff.transfer.summaryPhone", {
+                  phone: transferTargetUser?.phone ?? "-",
+                })}
+              </p>
+              <p>
+                {t("settings.staff.transfer.summaryCurrentAdmin", {
+                  name:
+                    currentUser?.name ??
+                    t("settings.staff.transfer.currentUserFallback"),
+                })}
+              </p>
             </div>
 
             <p className="text-sm font-medium text-foreground">
-              What should happen to the current Store Admin account (you)?
+              {t("settings.staff.transfer.accountQuestion")}
             </p>
             <div className="flex items-start space-x-2 rounded-md border p-3">
               <Checkbox
@@ -1730,15 +1787,17 @@ export default function SettingsPage() {
                   htmlFor="delete-current-admin-on-transfer"
                   className="cursor-pointer font-normal"
                 >
-                  Delete the current Store Admin
+                  {t("settings.staff.transfer.deleteCheckbox")}
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">
-                    Unchecked:
+                    {t("settings.staff.transfer.uncheckedLabel")}
                   </span>{" "}
-                  keep the account and make them a staff user at this store.{" "}
-                  <span className="font-medium text-foreground">Checked:</span>{" "}
-                  remove or deactivate the current Store Admin per server rules.
+                  {t("settings.staff.transfer.uncheckedHint")}{" "}
+                  <span className="font-medium text-foreground">
+                    {t("settings.staff.transfer.checkedLabel")}
+                  </span>{" "}
+                  {t("settings.staff.transfer.checkedHint")}
                 </p>
               </div>
             </div>
@@ -1751,7 +1810,7 @@ export default function SettingsPage() {
                 variant="secondary"
                 disabled={isTransferringRole}
               >
-                Cancel
+                {t("settings.staff.transfer.cancel")}
               </Button>
             </DialogClose>
             <Button
@@ -1762,7 +1821,7 @@ export default function SettingsPage() {
               {isTransferringRole && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Confirm Transfer
+              {t("settings.staff.transfer.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

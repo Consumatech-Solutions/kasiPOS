@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSettings } from "@/components/settings-provider";
-import { useI18n } from "@/components/i18n-provider";
+import { useTranslation } from "react-i18next";
 import { useParcels } from "@/hooks/use-parcels";
 import type { Parcel } from "@/types";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
@@ -75,7 +75,7 @@ import { format } from "date-fns";
 
 export default function BophPage() {
   const { toast } = useToast();
-  const { t } = useI18n();
+  const { t } = useTranslation();
   const { settings } = useSettings();
 
   const collectionFormSchema = useMemo(

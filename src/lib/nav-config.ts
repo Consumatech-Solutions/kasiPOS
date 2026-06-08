@@ -23,6 +23,7 @@ export const OFFLINE_FIRST_PATHS = [
 
 type NavItem = {
   href: string;
+  /** i18n key in `translation` namespace (e.g. nav.home) */
   labelKey: string;
   icon: React.ElementType;
   featureFlag?: keyof AppSettings;
@@ -54,7 +55,12 @@ export const navItems: NavItem[] = [
     icon: ShoppingBasket,
     featureFlag: "marketplace",
   },
-  { href: "/boph", labelKey: "nav.boph", icon: PackageCheck, featureFlag: "boph" },
+  {
+    href: "/boph",
+    labelKey: "nav.boph",
+    icon: PackageCheck,
+    featureFlag: "boph",
+  },
   {
     href: "/settings",
     labelKey: "nav.settings",

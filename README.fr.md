@@ -51,4 +51,6 @@ Les équivalents en anglais sont disponibles dans le dossier `docs/en`.
 
 ## Licence
 
-La licence n'est pas encore definie dans ce repo.
+Ce projet est sous licence [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Consultez le fichier [LICENSE](LICENSE) à la racine du repo pour le texte complet de la licence.
+
+Copyright 2026 KasiPOS Contributors.

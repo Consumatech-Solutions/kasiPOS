@@ -12,7 +12,6 @@ import { DataPreloader } from "@/components/providers/data-preloader";
 import { SyncStatusIndicator } from "@/components/sync-status-indicator";
 import { HardwareSetupProvider } from "@/components/hardware-setup/HardwareSetupProvider";
 import { I18nProvider } from "@/components/i18n-provider";
-import { HtmlLangSync } from "@/components/html-lang-sync";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const chunkRecoveryScript = `(function() {
@@ -121,11 +120,10 @@ export default function RootLayout({
         ) : null}
       </head>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
-        <QueryProvider>
-          <ClientDbProvider>
-            <SettingsProvider>
-              <I18nProvider>
-                <HtmlLangSync />
+        <I18nProvider>
+          <QueryProvider>
+            <ClientDbProvider>
+              <SettingsProvider>
                 <HardwareSetupProvider>
                   <CartProvider>
                     <DataPreloader />
@@ -134,10 +132,10 @@ export default function RootLayout({
                   <Toaster />
                   <SyncStatusIndicator />
                 </HardwareSetupProvider>
-              </I18nProvider>
-            </SettingsProvider>
-          </ClientDbProvider>
-        </QueryProvider>
+              </SettingsProvider>
+            </ClientDbProvider>
+          </QueryProvider>
+        </I18nProvider>
       </body>
     </html>
   );

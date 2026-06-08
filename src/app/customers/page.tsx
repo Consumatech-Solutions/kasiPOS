@@ -5,7 +5,6 @@ import { format, parseISO } from "date-fns";
 import type { Customer } from "@/types";
 import { feedback } from "@/lib/feedback";
 import { useSettings } from "@/components/settings-provider";
-import { useI18n } from "@/components/i18n-provider";
 import { useCustomers, customerKeys } from "@/hooks/use-customers";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
@@ -68,11 +67,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Pagination } from "@/components/ui/pagination";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 export default function CustomersPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { settings } = useSettings();
-  const { t } = useI18n();
   const { currentStore, currentUser } = settings;
   const { isOnline } = useNetworkStatus();
   const [searchTerm, setSearchTerm] = useState("");
@@ -143,8 +143,8 @@ export default function CustomersPage() {
         if (isOnline) {
           await updateCustomer(editingCustomer.id, data);
           feedback.success(
-            t("customers.customerUpdated"),
-            t("customers.customerUpdatedDesc")
+            t("customers.feedback.updatedTitle"),
+            t("customers.feedback.updatedDesc")
           );
         } else {
           const updatedCustomer = {
@@ -173,8 +173,8 @@ export default function CustomersPage() {
             variables: { id: editingCustomer.id, data },
           });
           feedback.success(
-            t("customers.customerUpdated"),
-            t("customers.customerUpdatedDesc")
+            t("customers.feedback.updatedTitle"),
+            t("customers.feedback.updatedDesc")
           );
         }
       } else {
@@ -182,10 +182,10 @@ export default function CustomersPage() {
           await createCustomer(data);
           const hasContact = data?.contact?.trim();
           feedback.success(
-            t("customers.customerCreated"),
+            t("customers.feedback.createdTitle"),
             hasContact
-              ? t("customers.welcomeSms")
-              : t("customers.customerRegistered")
+              ? t("customers.feedback.createdSms")
+              : t("customers.feedback.createdNoSms")
           );
         } else {
           const tempId = `temp-${Date.now()}`;
@@ -226,8 +226,8 @@ export default function CustomersPage() {
             variables: { ...data, _tempId: tempId },
           });
           feedback.success(
-            t("customers.customerAdded"),
-            t("customers.customerAddedDesc")
+            t("customers.feedback.addedTitle"),
+            t("customers.feedback.addedDesc")
           );
         }
       }
@@ -236,8 +236,8 @@ export default function CustomersPage() {
     } catch (error) {
       feedback.fromError(
         error,
-        t("customers.failedSaveCustomer"),
-        t("catalogue.retryConnection")
+        t("customers.feedback.saveFailedTitle"),
+        t("customers.feedback.saveFailedHint")
       );
     } finally {
       customerSubmitRef.current = false;
@@ -255,8 +255,8 @@ export default function CustomersPage() {
       if (isOnline) {
         await deleteCustomer(id);
         feedback.success(
-          t("customers.customerDeleted"),
-          t("customers.customerDeletedDesc")
+          t("customers.feedback.deletedTitle"),
+          t("customers.feedback.deletedDesc")
         );
       } else {
         const customerQueries = queryClient.getQueriesData<{
@@ -282,15 +282,15 @@ export default function CustomersPage() {
           variables: { id },
         });
         feedback.success(
-          t("customers.customerDeleted"),
-          t("customers.customerDeletedDesc")
+          t("customers.feedback.deletedTitle"),
+          t("customers.feedback.deletedDesc")
         );
       }
     } catch (error) {
       feedback.fromError(
         error,
-        t("customers.failedDeleteCustomer"),
-        t("catalogue.retryDelete")
+        t("customers.feedback.deleteFailedTitle"),
+        t("customers.feedback.deleteFailedHint")
       );
     } finally {
       setDeletingCustomerId(null);
@@ -311,7 +311,7 @@ export default function CustomersPage() {
       <div className="p-4">
         <Card>
           <CardContent className="p-6">
-            <div className="text-center">{t("home.loading")}</div>
+            <div className="text-center">{t("customers.page.loading")}</div>
           </CardContent>
         </Card>
       </div>
@@ -323,7 +323,9 @@ export default function CustomersPage() {
       <div className="p-4">
         <Card>
           <CardContent className="p-6">
-            <div className="text-red-600">Error: {error}</div>
+            <div className="text-red-600">
+              {t("customers.page.error", { message: String(error) })}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -335,9 +337,11 @@ export default function CustomersPage() {
       <Card>
         <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg sm:text-xl">{t("customers.title")}</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">
+              {t("customers.page.title")}
+            </CardTitle>
             <CardDescription className="text-sm">
-              {t("customers.description")}
+              {t("customers.page.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -345,7 +349,7 @@ export default function CustomersPage() {
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  placeholder={t("customers.searchPlaceholder")}
+                  placeholder={t("customers.search.placeholder")}
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -355,7 +359,8 @@ export default function CustomersPage() {
                 onClick={() => openCustomerDialog()}
                 className="w-full sm:w-auto min-h-[44px] touch-target"
               >
-                <PlusCircle className="mr-2 h-4 w-4" /> {t("customers.addCustomer")}
+                <PlusCircle className="mr-2 h-4 w-4" />{" "}
+                {t("customers.actions.add")}
               </Button>
             </div>
           </CardContent>
@@ -365,15 +370,17 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("customers.customer")}</TableHead>
-                  <TableHead>{t("customers.contact")}</TableHead>
-                  <TableHead>{t("customers.loyaltyPoints")}</TableHead>
+                  <TableHead>{t("customers.table.customer")}</TableHead>
+                  <TableHead>{t("customers.table.contact")}</TableHead>
+                  <TableHead>{t("customers.table.loyaltyPoints")}</TableHead>
                   {showStoreColumn && (
                     <TableHead className="hidden sm:table-cell">
-                      {t("customers.store")}
+                      {t("customers.table.store")}
                     </TableHead>
                   )}
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">
+                    {t("customers.table.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -383,7 +390,9 @@ export default function CustomersPage() {
                       <TableCell className="font-medium">
                         {customer.name}
                       </TableCell>
-                      <TableCell>{customer.contact || t("common.na")}</TableCell>
+                      <TableCell>
+                        {customer.contact || t("customers.table.notApplicable")}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="secondary"
@@ -397,7 +406,8 @@ export default function CustomersPage() {
                         <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                           {customer.storeId != null
                             ? customer.storeId === currentStore?.id
-                              ? (currentStore?.name ?? t("customers.thisStore"))
+                              ? (currentStore?.name ??
+                                t("customers.table.thisStore"))
                               : customer.storeId
                             : "—"}
                         </TableCell>
@@ -434,10 +444,10 @@ export default function CustomersPage() {
                               <AlertDialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle className="text-lg sm:text-xl">
-                                    {t("customers.deleteCustomer")}
+                                    {t("customers.delete.title")}
                                   </AlertDialogTitle>
                                   <AlertDialogDescription className="text-sm">
-                                    {t("customers.deleteCustomerDesc")}
+                                    {t("customers.delete.description")}
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -448,7 +458,7 @@ export default function CustomersPage() {
                                       isDeleting
                                     }
                                   >
-                                    {t("common.cancel")}
+                                    {t("customers.delete.cancel")}
                                   </AlertDialogCancel>
                                   <AlertDialogAction
                                     className="min-h-[44px] touch-target w-full sm:w-auto"
@@ -466,8 +476,8 @@ export default function CustomersPage() {
                                     )}
                                     {deletingCustomerId === customer.id ||
                                     isDeleting
-                                      ? t("customers.deleting")
-                                      : t("common.delete")}
+                                      ? t("customers.delete.deleting")
+                                      : t("customers.delete.confirm")}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -483,7 +493,7 @@ export default function CustomersPage() {
                       colSpan={showStoreColumn ? 5 : 4}
                       className="text-center h-24"
                     >
-                      {t("customers.noCustomersFound")}
+                      {t("customers.table.empty")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -493,10 +503,7 @@ export default function CustomersPage() {
 
           {pagination.totalPages > 1 && (
             <div className="mt-4">
-              <Pagination
-                meta={pagination}
-                onPageChange={handlePageChange}
-              />
+              <Pagination meta={pagination} onPageChange={handlePageChange} />
             </div>
           )}
         </CardContent>
@@ -506,12 +513,14 @@ export default function CustomersPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {editingCustomer ? t("customers.editCustomer") : t("customers.addCustomer")}
+              {editingCustomer
+                ? t("customers.dialog.editTitle")
+                : t("customers.dialog.addTitle")}
             </DialogTitle>
             <DialogDescription className="text-sm">
               {editingCustomer
-                ? t("customers.editCustomerDesc")
-                : t("customers.addCustomerDesc")}
+                ? t("customers.dialog.editDesc")
+                : t("customers.dialog.addDesc")}
             </DialogDescription>
           </DialogHeader>
           <CustomerForm
@@ -530,7 +539,7 @@ export default function CustomersPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {t("customers.purchaseHistoryFor", {
+              {t("customers.history.title", {
                 name: selectedCustomer?.name ?? "",
               })}
             </DialogTitle>
@@ -539,10 +548,12 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t("customers.orderNumber")}</TableHead>
-                  <TableHead>{t("customers.date")}</TableHead>
-                  <TableHead>{t("customers.items")}</TableHead>
-                  <TableHead className="text-right">{t("customers.total")}</TableHead>
+                  <TableHead>{t("customers.history.table.order")}</TableHead>
+                  <TableHead>{t("customers.history.table.date")}</TableHead>
+                  <TableHead>{t("customers.history.table.items")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("customers.history.table.total")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -572,8 +583,8 @@ export default function CustomersPage() {
               customerTransactionsQuery.isLoading) && (
               <p className="text-center text-muted-foreground py-8">
                 {customerTransactionsQuery.isLoading
-                  ? t("customers.loadingPurchaseHistory")
-                  : t("customers.noPurchaseHistory")}
+                  ? t("customers.history.loading")
+                  : t("customers.history.empty")}
               </p>
             )}
           </ScrollArea>

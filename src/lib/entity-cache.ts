@@ -24,6 +24,30 @@ function entityCap(): number {
 const PURCHASE_ORDERS_KEY = "purchaseOrders";
 const PURCHASE_ORDER_CAP = 1000;
 
+function toSortableTimestamp(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+  return String(value);
+}
+
+function compareTimestampsDesc(aValue: unknown, bValue: unknown): number {
+  return toSortableTimestamp(bValue).localeCompare(toSortableTimestamp(aValue));
+}
+
+function compareTimestampsAsc(aValue: unknown, bValue: unknown): number {
+  return toSortableTimestamp(aValue).localeCompare(toSortableTimestamp(bValue));
+}
+
+function transactionTimestamp(record: {
+  createdAt?: unknown;
+  date?: unknown;
+}): unknown {
+  return record.createdAt ?? record.date;
+}
+
 export const LAST_SYNC_KEYS = {
   products: "products-lastSync",
   categories: "categories-lastSync",
@@ -103,9 +127,7 @@ export async function saveCustomersToDexie(data: Customer[]): Promise<void> {
   if (count > cap) {
     const allCust = await db.customers.toArray();
     allCust.sort((a, b) =>
-      ((a as Customer).updatedAt ?? "").localeCompare(
-        (b as Customer).updatedAt ?? ""
-      )
+      compareTimestampsAsc((a as Customer).updatedAt, (b as Customer).updatedAt)
     );
     const toDelete = allCust.slice(0, count - cap).map((r) => r.id);
     await db.customers.bulkDelete(toDelete);
@@ -121,7 +143,9 @@ export async function saveTransactionsToDexie(
     ...t,
     id: t.id ?? `local-${Date.now()}-${Math.random()}`,
     date:
-      (t as Transaction & { date?: string }).date ?? new Date().toISOString(),
+      toSortableTimestamp(
+        (t as Transaction & { date?: unknown }).date ?? t.createdAt
+      ) || new Date().toISOString(),
   }));
   await db.transactionCache.bulkPut(
     records as { id: string; date?: string; [k: string]: unknown }[]
@@ -421,11 +445,9 @@ export async function savePurchaseOrdersToDexie(
   for (const o of orders) {
     if (o.id) byId.set(o.id, o);
   }
-  const merged = Array.from(byId.values()).sort((a, b) => {
-    const aT = a.createdAt ?? "";
-    const bT = b.createdAt ?? "";
-    return bT.localeCompare(aT);
-  });
+  const merged = Array.from(byId.values()).sort((a, b) =>
+    compareTimestampsDesc(a.createdAt, b.createdAt)
+  );
   const capped = merged.slice(0, PURCHASE_ORDER_CAP);
   await db.keyVal.put({
     key: PURCHASE_ORDERS_KEY,
@@ -576,11 +598,9 @@ export async function getCustomersFromDexie(
   if (storeId != null && storeId !== "") {
     all = all.filter((c) => (c as Customer).storeId === storeId);
   }
-  all.sort((a, b) => {
-    const aT = (a as Customer).updatedAt ?? "";
-    const bT = (b as Customer).updatedAt ?? "";
-    return bT.localeCompare(aT);
-  });
+  all.sort((a, b) =>
+    compareTimestampsDesc((a as Customer).updatedAt, (b as Customer).updatedAt)
+  );
   if (search?.trim()) {
     const q = search.trim().toLowerCase();
     all = all.filter(
@@ -618,8 +638,11 @@ export async function getTransactionsFromDexie(
         (t as unknown as Transaction & { storeId?: string }).storeId === storeId
     );
   }
-  const sorted = (all as { date?: string }[]).sort((a, b) =>
-    (b.date ?? "").localeCompare(a.date ?? "")
+  const sorted = [...all].sort((a, b) =>
+    compareTimestampsDesc(
+      transactionTimestamp(a as unknown as Transaction),
+      transactionTimestamp(b as unknown as Transaction)
+    )
   );
   const total = sorted.length;
   const data = sorted.slice(
@@ -664,11 +687,9 @@ export async function getCustomerTransactionsFromDexie(args: {
     if (tCid == null) return false;
     return String(tCid) === cid;
   });
-  const sorted = filtered.sort((a, b) => {
-    const aT = (a.createdAt ?? String(a.date ?? "")) as string;
-    const bT = (b.createdAt ?? String(b.date ?? "")) as string;
-    return String(bT).localeCompare(String(aT));
-  });
+  const sorted = filtered.sort((a, b) =>
+    compareTimestampsDesc(transactionTimestamp(a), transactionTimestamp(b))
+  );
   if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
     return sorted.slice(0, Math.trunc(limit));
   }
@@ -698,11 +719,9 @@ export async function getCustomerTransactionsFromTransactionsTable(args: {
     if (tCid == null && tTempCid == null) return false;
     return String(tCid ?? "") === cid || String(tTempCid ?? "") === cid;
   });
-  const sorted = filtered.sort((a, b) => {
-    const aT = (a.createdAt ?? String(a.date ?? "")) as string;
-    const bT = (b.createdAt ?? String(b.date ?? "")) as string;
-    return String(bT).localeCompare(String(aT));
-  });
+  const sorted = filtered.sort((a, b) =>
+    compareTimestampsDesc(transactionTimestamp(a), transactionTimestamp(b))
+  );
   if (typeof limit === "number" && Number.isFinite(limit) && limit > 0) {
     return sorted.slice(0, Math.trunc(limit));
   }
@@ -766,12 +785,12 @@ export async function getStockAdjustmentsFromDexie(
   if (productId != null && productId !== "") {
     all = all.filter((a) => String(a.productId) === String(productId));
   }
-  const sorted = all.sort((a, b) => {
-    // `date` is optional for backward compatibility, so fall back to `createdAt`.
-    const aTime = a.date?.getTime() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-    const bTime = b.date?.getTime() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-    return bTime - aTime;
-  });
+  const sorted = all.sort((a, b) =>
+    compareTimestampsDesc(
+      (a.createdAt ?? a.date) as unknown,
+      (b.createdAt ?? b.date) as unknown
+    )
+  );
   const total = sorted.length;
   const data = sorted.slice((page - 1) * limit, page * limit);
   return {

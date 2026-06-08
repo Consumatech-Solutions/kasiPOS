@@ -28,7 +28,8 @@ describe("Transactions", () => {
   it("expands transaction details with payment and item totals", () => {
     cy.contains(/transaction #txn-001/i).click();
     cy.contains(/cola 330ml/i).should("be.visible");
-    cy.contains(/2 x r12\.50/i).should("be.visible");
+    // EN: "(2 x R 12.50)" · FR: "(2 × 12.50 R)" — tolerate × vs x and currency spacing/order
+    cy.contains(/\(?\s*2\s*[x×]\s*(?:r\s*)?12\.50/i).should("be.visible");
     cy.contains(/^cash$/i).should("be.visible");
     cy.contains(/r25\.00/i).should("be.visible");
   });

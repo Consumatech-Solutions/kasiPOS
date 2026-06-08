@@ -1,0 +1,19 @@
+{
+  "common.cancel": "Cancel",
+  "common.save": "Save",
+  "common.delete": "Delete",
+  "common.edit": "Edit",
+  "common.error": "Error",
+  "common.loading": "Loading...",
+  "common.update": "Update",
+  "common.create": "Create",
+  "common.search": "Search",
+  "common.actions": "Actions",
+  "common.na": "N/A",
+  "common.copied": "Copied!",
+  "common.copiedDescription": "Code copied to clipboard.",
+  "requireOnlineBanner.cloudTitle": "Cloud unavailable",
+  "requireOnlineBanner.offlineTitle": "Offline",
+  "requireOnlineBanner.cloudDescription": "Internet is available, but the cloud/backend is unreachable. This section is temporarily disabled.",
+  "requireOnlineBanner.offlineDescription": "This section requires an internet connection. It is disabled while you are offline. Reconnect to use it."
+}

@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
+import { normalizePhone } from "@/lib/phone";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,41 +25,103 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/components/settings-provider";
-import { useI18n } from "@/components/i18n-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
 import { offlineDetector } from "@/lib/offline-detector";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
+import {
+  backendUnreachableRecovery,
+  isBackendConnectionError,
+} from "@/lib/backend-connection";
+import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_INPUT_REGEX = /^[\d\s\-+()]+$/;
+
+type IdentifierType = "email" | "phone";
+
+function detectIdentifierType(value: string): IdentifierType | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes("@") || EMAIL_REGEX.test(trimmed)) return "email";
+  if (PHONE_INPUT_REGEX.test(trimmed)) return "phone";
+  return null;
+}
+
+const loginSchema = z
+  .object({
+    identifier: z
+      .string()
+      .min(1, { message: "Enter your email or mobile number." }),
+    password: z.string().min(1, { message: "Password is required." }),
+  })
+  .superRefine((data, ctx) => {
+    const trimmed = data.identifier.trim();
+    const type = detectIdentifierType(trimmed);
+
+    if (!type) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Enter a valid email address or mobile number.",
+        path: ["identifier"],
+      });
+      return;
+    }
+
+    if (type === "email" && !z.string().email().safeParse(trimmed).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid email address.",
+        path: ["identifier"],
+      });
+    }
+
+    if (type === "phone" && normalizePhone(trimmed).length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please enter a valid mobile number (at least 10 digits).",
+        path: ["identifier"],
+      });
+    }
+  });
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+function buildLoginPayload(values: LoginFormValues) {
+  const trimmed = values.identifier.trim();
+  const type = detectIdentifierType(trimmed);
+  const payload: { password: string; email?: string; phone?: string } = {
+    password: values.password,
+  };
+
+  if (type === "email") {
+    payload.email = trimmed;
+  } else if (type === "phone") {
+    payload.phone = normalizePhone(trimmed);
+  }
+
+  return payload;
+}
 
 export default function LoginPage() {
   const { login } = useSettings();
-  const { t } = useI18n();
   const queryClient = useQueryClient();
 
-  const loginSchema = useMemo(
-    () =>
-      z.object({
-        phone: z.string().min(10, { message: t("auth.phoneInvalid") }),
-        password: z.string().min(1, { message: t("auth.passwordRequired") }),
-      }),
-    [t]
-  );
-
-  const form = useForm<z.infer<typeof loginSchema>>({
+  const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      phone: "",
+      identifier: "",
       password: "",
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+  const onSubmit = async (values: LoginFormValues) => {
     try {
-      const response = await authApi.login(values.phone, values.password);
+      const response = await authApi.login(buildLoginPayload(values));
 
       if (response.data && response.data.accessToken) {
-        feedback.success(t("auth.loginSuccess"), t("auth.welcomeBackToast"));
+        feedback.success("Login successful", "Welcome back!");
         await login({
           ...response.data.user,
           accessToken: response.data.accessToken,
@@ -95,17 +157,14 @@ export default function LoginPage() {
         });
       }
 
-      if (err?.code === "ERR_NETWORK" || err?.message === "Network Error") {
+      if (isBackendConnectionError(err)) {
         if (process.env.NODE_ENV === "development") {
           console.warn(
-            "Backend not reachable. Ensure backend is running (e.g. NEXT_PUBLIC_API_URL or http://localhost:9002)."
+            `[Login] Backend not reachable at ${getConfiguredApiUrl()}`
           );
         }
         feedback.error(
-          t("auth.connectionError"),
-          t("auth.cannotReachServer"),
-          t("auth.ensureBackend"),
-          { code: ERROR_CODES.LOGIN }
+          "Login Failed, please try again with a different email or phone number"
         );
         return;
       }
@@ -117,14 +176,14 @@ export default function LoginPage() {
         (typeof (data as { msg?: string })?.msg === "string" &&
           (data as { msg: string }).msg) ||
         (status === 401
-          ? t("auth.invalidCredentials")
-          : t("auth.loginFailedRetry"));
+          ? "Invalid email/phone or password."
+          : "Login failed. Please try again.");
       feedback.error(
-        t("auth.loginFailed"),
+        "Login failed",
         serverMessage,
         status === 401
-          ? t("auth.checkCredentials")
-          : t("auth.noAccount"),
+          ? "Check your email or phone and password."
+          : "Try again or create an account if you are new.",
         { code: ERROR_CODES.LOGIN }
       );
     }
@@ -134,11 +193,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-lg sm:text-xl">
-            {t("auth.welcomeBack")}
-          </CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
           <CardDescription className="text-sm">
-            {t("auth.signInDescription")}
+            Sign in with your email or mobile number and password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,14 +203,16 @@ export default function LoginPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="phone"
+                name="identifier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("auth.mobileNumber")}</FormLabel>
+                    <FormLabel>Email or mobile number</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder={t("auth.mobilePlaceholder")}
+                        type="text"
+                        placeholder="owner@example.com or 0812345678"
                         className="touch-target"
+                        autoComplete="username"
                         {...field}
                       />
                     </FormControl>
@@ -166,11 +225,12 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("auth.password")}</FormLabel>
+                    <FormLabel>Password</FormLabel>
                     <FormControl>
                       <Input
                         type="password"
                         className="touch-target"
+                        autoComplete="current-password"
                         {...field}
                       />
                     </FormControl>
@@ -182,29 +242,18 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                {t("auth.signIn")}
+                Sign In
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            {t("auth.firstTime")}{" "}
+            New here?{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/request-access">{t("auth.requestAccess")}</Link>
-            </Button>
-            {" · "}
-            {t("auth.storeAdmin")}{" "}
-            <Button
-              variant="link"
-              className="p-0 min-h-[44px] touch-target"
-              asChild
-            >
-              <Link href="/set-password-store-admin">
-                {t("auth.setPassword")}
-              </Link>
+              <Link href="/signup">Create an account</Link>
             </Button>
           </p>
         </CardContent>

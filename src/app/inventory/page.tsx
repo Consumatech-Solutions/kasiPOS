@@ -38,7 +38,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
 import { useSettings } from "@/components/settings-provider";
-import { useI18n } from "@/components/i18n-provider";
 import { Search, History, Edit, Loader2 } from "lucide-react";
 import {
   Select,
@@ -70,6 +69,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { getProductInitials } from "@/lib/utils/product-initials";
+import { useTranslation } from "react-i18next";
 
 const REASONS: StockAdjustmentReason[] = [
   "New stock received",
@@ -79,6 +79,15 @@ const REASONS: StockAdjustmentReason[] = [
   "Damages",
   "Expired",
 ];
+
+const INVENTORY_REASON_LABEL_KEY: Record<StockAdjustmentReason, string> = {
+  "New stock received": "newStockReceived",
+  Returns: "returns",
+  Shrinkage: "shrinkage",
+  Expansion: "expansion",
+  Damages: "damages",
+  Expired: "expired",
+};
 
 const adjustmentSchema = z.object({
   reason: z
@@ -96,27 +105,8 @@ const adjustmentSchema = z.object({
 });
 
 export default function InventoryPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
-  const { t } = useI18n();
-  const getReasonLabel = (value: StockAdjustmentReason): string => {
-    switch (value) {
-      case "New stock received":
-        return t("inventory.quantityReceived");
-      case "Returns":
-        return t("inventory.quantityReturned");
-      case "Shrinkage":
-        return "Shrinkage";
-      case "Expansion":
-        return "Expansion";
-      case "Damages":
-        return t("inventory.quantityDamaged");
-      case "Expired":
-        return t("inventory.quantityExpired");
-      default:
-        return value;
-    }
-  };
-
   const { currentStore } = settings;
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
@@ -215,8 +205,8 @@ export default function InventoryPage() {
     if (!allProducts?.length) return [];
     if (!showLowStockOnly) return allProducts;
     return allProducts.filter((product: any) => {
-      const t = product.lowStockThreshold || 0;
-      return (product.stock ?? 0) <= t && t > 0;
+      const lowTh = product.lowStockThreshold || 0;
+      return (product.stock ?? 0) <= lowTh && lowTh > 0;
     });
   }, [allProducts, showLowStockOnly]);
 
@@ -263,21 +253,26 @@ export default function InventoryPage() {
   const secondFieldLabel = useMemo(() => {
     switch (reason) {
       case "New stock received":
-        return t("inventory.quantityReceived");
+        return t("inventory.adjustDialog.field.quantityReceived");
       case "Returns":
-        return t("inventory.quantityReturned");
+        return t("inventory.adjustDialog.field.quantityReturned");
       case "Shrinkage":
-        return t("inventory.shrinkageLabel");
+        return t("inventory.adjustDialog.field.updatedStockShrinkage");
       case "Expansion":
-        return t("inventory.expansionLabel");
+        return t("inventory.adjustDialog.field.updatedStockExpansion");
       case "Damages":
-        return t("inventory.quantityDamaged");
+        return t("inventory.adjustDialog.field.quantityDamaged");
       case "Expired":
-        return t("inventory.quantityExpired");
+        return t("inventory.adjustDialog.field.quantityExpired");
       default:
         return "";
     }
   }, [reason, t]);
+
+  const translateReason = (r: string) => {
+    const suffix = INVENTORY_REASON_LABEL_KEY[r as StockAdjustmentReason];
+    return suffix ? t(`inventory.reason.${suffix}`) : r;
+  };
 
   const showUpdatedStockAboveNotes =
     reason &&
@@ -296,9 +291,9 @@ export default function InventoryPage() {
     if (!selectedProduct || !selectedProduct.id) return;
     if (!values.reason) {
       feedback.error(
-        t("inventory.reasonRequired"),
-        t("inventory.reasonRequiredDesc"),
-        t("inventory.reasonRequiredRecovery")
+        t("inventory.feedback.reasonRequiredTitle"),
+        t("inventory.feedback.reasonRequiredDesc"),
+        t("inventory.feedback.reasonRequiredHint")
       );
       return;
     }
@@ -307,9 +302,9 @@ export default function InventoryPage() {
       values.quantityOrUpdated === null
     ) {
       feedback.error(
-        t("inventory.quantityRequired"),
-        t("inventory.quantityRequiredDesc"),
-        t("inventory.quantityRequiredRecovery")
+        t("inventory.feedback.quantityRequiredTitle"),
+        t("inventory.feedback.quantityRequiredDesc"),
+        t("inventory.feedback.quantityRequiredHint")
       );
       return;
     }
@@ -330,9 +325,9 @@ export default function InventoryPage() {
       case "Shrinkage":
         if (q >= cur) {
           feedback.error(
-            t("inventory.invalidValue"),
-            t("inventory.shrinkageInvalid"),
-            t("inventory.enterLowerValue")
+            t("inventory.feedback.invalidShrinkTitle"),
+            t("inventory.feedback.invalidShrinkDesc"),
+            t("inventory.feedback.invalidShrinkHint")
           );
           return;
         }
@@ -341,9 +336,9 @@ export default function InventoryPage() {
       case "Expansion":
         if (q <= cur) {
           feedback.error(
-            t("inventory.invalidValue"),
-            t("inventory.expansionInvalid"),
-            t("inventory.enterHigherValue")
+            t("inventory.feedback.invalidExpandTitle"),
+            t("inventory.feedback.invalidExpandDesc"),
+            t("inventory.feedback.invalidExpandHint")
           );
           return;
         }
@@ -354,9 +349,9 @@ export default function InventoryPage() {
     }
     if (newStock < 0) {
       feedback.error(
-        t("inventory.invalidValue"),
-        t("inventory.stockNegative"),
-        t("inventory.reduceQuantity")
+        t("inventory.feedback.negativeStockTitle"),
+        t("inventory.feedback.negativeStockDesc"),
+        t("inventory.feedback.negativeStockHint")
       );
       return;
     }
@@ -375,8 +370,10 @@ export default function InventoryPage() {
         await refreshProducts();
 
         feedback.success(
-          t("inventory.stockUpdated"),
-          t("inventory.stockUpdatedFor", { name: selectedProduct.name })
+          t("inventory.feedback.stockUpdatedTitle"),
+          t("inventory.feedback.stockUpdatedDesc", {
+            name: selectedProduct.name,
+          })
         );
       } else {
         const productId = String(selectedProduct.id);
@@ -399,8 +396,8 @@ export default function InventoryPage() {
         });
 
         feedback.success(
-          t("inventory.stockAdjusted"),
-          t("inventory.stockAdjustedSuccess")
+          t("inventory.feedback.stockAdjustedTitle"),
+          t("inventory.feedback.stockAdjustedDesc")
         );
       }
       setAdjustmentDialogOpen(false);
@@ -413,8 +410,8 @@ export default function InventoryPage() {
       }
       feedback.fromError(
         error,
-        t("inventory.failedAdjustStock"),
-        t("catalogue.retryConnection")
+        t("inventory.feedback.adjustFailedTitle"),
+        t("inventory.feedback.adjustFailedHint")
       );
     }
   };
@@ -425,9 +422,9 @@ export default function InventoryPage() {
       : 0;
     if (normalizedThreshold < 0) {
       feedback.error(
-        t("inventory.invalidThreshold"),
-        t("inventory.invalidThresholdDesc"),
-        t("inventory.invalidThresholdRecovery")
+        t("inventory.feedback.invalidThresholdTitle"),
+        t("inventory.feedback.invalidThresholdDesc"),
+        t("inventory.feedback.invalidThresholdHint")
       );
       return;
     }
@@ -448,8 +445,8 @@ export default function InventoryPage() {
         await updateProduct(id, { lowStockThreshold: normalizedThreshold });
 
         feedback.success(
-          t("inventory.lowStockTriggerUpdated"),
-          t("inventory.lowStockTriggerUpdatedDesc")
+          t("inventory.feedback.lowStockTriggerTitle"),
+          t("inventory.feedback.lowStockTriggerDesc")
         );
       } else {
         mutationQueue.add({
@@ -461,16 +458,16 @@ export default function InventoryPage() {
           variables: { id, data: { lowStockThreshold: normalizedThreshold } },
         });
         feedback.success(
-          t("inventory.thresholdUpdated"),
-          t("inventory.thresholdUpdatedSuccess")
+          t("inventory.feedback.thresholdTitle"),
+          t("inventory.feedback.thresholdDesc")
         );
       }
       setEditingThresholdId(null);
     } catch (error: any) {
       feedback.fromError(
         error,
-        t("inventory.failedUpdateThreshold"),
-        t("catalogue.retryConnection")
+        t("inventory.feedback.thresholdFailedTitle"),
+        t("inventory.feedback.thresholdFailedHint")
       );
       await applyThresholdToCaches(previousThreshold);
     }
@@ -482,10 +479,10 @@ export default function InventoryPage() {
         <div className="sticky top-0 z-20 bg-card border-b shadow-[0_1px_0_0_hsl(var(--border))]">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg sm:text-xl">
-              {t("inventory.title")}
+              {t("inventory.page.title")}
             </CardTitle>
             <CardDescription className="text-sm">
-              {t("inventory.description")}
+              {t("inventory.page.description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -493,7 +490,7 @@ export default function InventoryPage() {
               <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  placeholder={t("inventory.searchPlaceholder")}
+                  placeholder={t("inventory.search.placeholder")}
                   className="pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -504,10 +501,14 @@ export default function InventoryPage() {
                 onValueChange={setSelectedCategory}
               >
                 <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder={t("inventory.filterByCategory")} />
+                  <SelectValue
+                    placeholder={t("inventory.filter.placeholder")}
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t("inventory.allCategories")}</SelectItem>
+                  <SelectItem value="all">
+                    {t("inventory.filter.allCategories")}
+                  </SelectItem>
                   {categories?.map((c: any) => (
                     <SelectItem key={c.id} value={c.name}>
                       {c.name}
@@ -521,7 +522,9 @@ export default function InventoryPage() {
                   checked={showLowStockOnly}
                   onCheckedChange={setShowLowStockOnly}
                 />
-                <Label htmlFor="low-stock-filter">{t("inventory.lowStockOnly")}</Label>
+                <Label htmlFor="low-stock-filter">
+                  {t("inventory.filter.lowStockOnly")}
+                </Label>
               </div>
             </div>
           </CardContent>
@@ -532,24 +535,26 @@ export default function InventoryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[80px] hidden sm:table-cell">
-                    {t("inventory.image")}
+                    {t("inventory.table.image")}
                   </TableHead>
-                  <TableHead>{t("inventory.name")}</TableHead>
+                  <TableHead>{t("inventory.table.name")}</TableHead>
                   <TableHead className="hidden md:table-cell">
-                    {t("inventory.category")}
+                    {t("inventory.table.category")}
                   </TableHead>
-                  <TableHead>{t("inventory.stock")}</TableHead>
+                  <TableHead>{t("inventory.table.stock")}</TableHead>
                   <TableHead className="hidden lg:table-cell">
-                    {t("inventory.lowStockTrigger")}
+                    {t("inventory.table.lowStockTrigger")}
                   </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">
+                    {t("inventory.table.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {productsLoading ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-10">
-                      {t("inventory.loadingProducts")}
+                      {t("inventory.table.loading")}
                     </TableCell>
                   </TableRow>
                 ) : filteredProducts && filteredProducts.length > 0 ? (
@@ -596,11 +601,13 @@ export default function InventoryPage() {
                             <Badge variant="outline" className="mt-1 w-fit">
                               {(product as any).category?.name ||
                                 (product as any).category ||
-                                t("common.na")}
+                                t("inventory.table.notApplicable")}
                             </Badge>
                           </span>
                           <span className="text-xs text-muted-foreground lg:hidden">
-                            {t("inventory.threshold")}: {(product as any).lowStockThreshold ?? 0}
+                            {t("inventory.table.thresholdMobile", {
+                              value: (product as any).lowStockThreshold ?? 0,
+                            })}
                           </span>
                         </div>
                       </TableCell>
@@ -608,7 +615,7 @@ export default function InventoryPage() {
                         <Badge variant="outline">
                           {(product as any).category?.name ||
                             (product as any).category ||
-                            t("common.na")}
+                            t("inventory.table.notApplicable")}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -675,7 +682,7 @@ export default function InventoryPage() {
                             className="min-h-[44px] touch-target w-full sm:w-auto"
                             onClick={() => openAdjustmentDialog(product)}
                           >
-                            {t("inventory.adjustStock")}
+                            {t("inventory.actions.adjustStock")}
                           </Button>
                           <Button
                             size="sm"
@@ -684,7 +691,9 @@ export default function InventoryPage() {
                             onClick={() => openHistoryDialog(product)}
                           >
                             <History className="h-4 w-4 sm:mr-1" />{" "}
-                            <span className="hidden sm:inline">{t("inventory.history")}</span>
+                            <span className="hidden sm:inline">
+                              {t("inventory.actions.history")}
+                            </span>
                           </Button>
                         </div>
                       </TableCell>
@@ -693,7 +702,7 @@ export default function InventoryPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center h-24">
-                      {t("inventory.noProductsFound")}
+                      {t("inventory.table.empty")}
                     </TableCell>
                   </TableRow>
                 )}
@@ -719,10 +728,14 @@ export default function InventoryPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-[425px] p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {t("inventory.adjustStockFor", { name: selectedProduct?.name ?? "" })}
+              {t("inventory.adjustDialog.title", {
+                name: selectedProduct?.name ?? "",
+              })}
             </DialogTitle>
             <DialogDescription className="text-sm">
-              {t("inventory.currentStock", { stock: currentStock })}
+              {t("inventory.adjustDialog.currentStock", {
+                count: currentStock,
+              })}
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -735,20 +748,24 @@ export default function InventoryPage() {
                 name="reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("inventory.reason")}</FormLabel>
+                    <FormLabel>{t("inventory.adjustDialog.reason")}</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       value={field.value ?? ""}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={t("inventory.selectReason")} />
+                          <SelectValue
+                            placeholder={t(
+                              "inventory.adjustDialog.reasonPlaceholder"
+                            )}
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {REASONS.map((r) => (
                           <SelectItem key={r} value={r}>
-                            {getReasonLabel(r)}
+                            {translateReason(r)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -784,7 +801,7 @@ export default function InventoryPage() {
               )}
               {showUpdatedStockAboveNotes && (
                 <p className="text-sm font-medium text-muted-foreground">
-                  {t("inventory.updatedStock")}{" "}
+                  {t("inventory.adjustDialog.updatedStock")}{" "}
                   <span className="text-foreground">{computedNewStock}</span>
                 </p>
               )}
@@ -793,7 +810,9 @@ export default function InventoryPage() {
                 name="note"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("inventory.noteOptional")}</FormLabel>
+                    <FormLabel>
+                      {t("inventory.adjustDialog.noteOptional")}
+                    </FormLabel>
                     <FormControl>
                       <Textarea {...field} />
                     </FormControl>
@@ -809,7 +828,7 @@ export default function InventoryPage() {
                     className="min-h-[44px] touch-target w-full sm:w-auto"
                     disabled={isCreating}
                   >
-                    {t("common.cancel")}
+                    {t("inventory.adjustDialog.cancel")}
                   </Button>
                 </DialogClose>
                 <Button
@@ -820,7 +839,9 @@ export default function InventoryPage() {
                   {isCreating && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {isCreating ? t("inventory.saving") : t("inventory.saveAdjustment")}
+                  {isCreating
+                    ? t("inventory.adjustDialog.saving")
+                    : t("inventory.adjustDialog.save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -832,25 +853,27 @@ export default function InventoryPage() {
         <DialogContent className="max-w-[95vw] sm:max-w-3xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg sm:text-xl">
-              {t("inventory.historyFor", { name: selectedProduct?.name ?? "" })}
+              {t("inventory.historyDialog.title", {
+                name: selectedProduct?.name ?? "",
+              })}
             </DialogTitle>
           </DialogHeader>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("inventory.date")}</TableHead>
-                <TableHead>{t("inventory.reason")}</TableHead>
-                <TableHead>{t("inventory.oldStock")}</TableHead>
-                <TableHead>{t("inventory.newStock")}</TableHead>
-                <TableHead>{t("inventory.change")}</TableHead>
-                <TableHead>{t("inventory.note")}</TableHead>
+                <TableHead>{t("inventory.history.table.date")}</TableHead>
+                <TableHead>{t("inventory.history.table.reason")}</TableHead>
+                <TableHead>{t("inventory.history.table.oldStock")}</TableHead>
+                <TableHead>{t("inventory.history.table.newStock")}</TableHead>
+                <TableHead>{t("inventory.history.table.change")}</TableHead>
+                <TableHead>{t("inventory.history.table.note")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {adjustmentsLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10">
-                    {t("inventory.loadingHistory")}
+                    {t("inventory.history.loading")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -862,7 +885,7 @@ export default function InventoryPage() {
                   return (
                     <TableRow key={adj.id}>
                       <TableCell>{format(adjDate, "Pp")}</TableCell>
-                      <TableCell>{getReasonLabel(adj.reason as StockAdjustmentReason)}</TableCell>
+                      <TableCell>{translateReason(adj.reason)}</TableCell>
                       <TableCell>{adj.oldStock}</TableCell>
                       <TableCell>{adj.newStock}</TableCell>
                       <TableCell
@@ -881,7 +904,7 @@ export default function InventoryPage() {
           </Table>
           {(!stockAdjustments || stockAdjustments.length === 0) && (
             <p className="text-center text-muted-foreground py-8">
-              {t("inventory.noAdjustmentHistory")}
+              {t("inventory.history.empty")}
             </p>
           )}
         </DialogContent>

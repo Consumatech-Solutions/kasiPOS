@@ -1,0 +1,19 @@
+{
+  "common.cancel": "Annuler",
+  "common.save": "Enregistrer",
+  "common.delete": "Supprimer",
+  "common.edit": "Modifier",
+  "common.error": "Erreur",
+  "common.loading": "Chargement...",
+  "common.update": "Mettre à jour",
+  "common.create": "Créer",
+  "common.search": "Rechercher",
+  "common.actions": "Actions",
+  "common.na": "N/D",
+  "common.copied": "Copié !",
+  "common.copiedDescription": "Code copié dans le presse-papiers.",
+  "requireOnlineBanner.cloudTitle": "Cloud indisponible",
+  "requireOnlineBanner.offlineTitle": "Hors ligne",
+  "requireOnlineBanner.cloudDescription": "Internet est disponible, mais le cloud / le serveur est injoignable. Cette section est temporairement désactivée.",
+  "requireOnlineBanner.offlineDescription": "Cette section nécessite une connexion Internet. Elle est désactivée hors ligne. Reconnectez-vous pour l’utiliser."
+}

@@ -11,6 +11,7 @@ import {
 } from "./webhid-scanner";
 import { getQzPrinters, printViaQz } from "./qz-tray";
 import { isAndroid } from "./platform";
+import { printViaRawBt } from "./rawbt-print";
 
 const PRINTER_SERVER_URL = "http://localhost:7788";
 
@@ -192,7 +193,7 @@ export async function getDevices(
           error.message.includes("Failed to fetch")
         ) {
           throw new Error(
-            "Cannot connect to printer server. Make sure it is running on localhost:7788"
+            "Cannot connect to printer server. Make sure it is running "
           );
         }
         throw error;
@@ -243,6 +244,16 @@ export async function printReceipt(
   deviceId: string,
   data: Uint8Array
 ): Promise<PrintResponse> {
+  if (deviceId === "thermal-android") {
+    if (!isAndroid()) {
+      throw new Error(
+        "Android thermal printing is only available on Android devices"
+      );
+    }
+    await printViaRawBt(data);
+    return { success: true, message: "Printed via RawBT" };
+  }
+
   if (deviceId.startsWith("webusb_")) {
     if (!isWebUSBAvailable()) {
       throw new Error("WebUSB API is not available in this browser");
@@ -253,18 +264,6 @@ export async function printReceipt(
   if (deviceId.startsWith("qz_")) {
     await printViaQz(deviceId, data);
     return { success: true, message: "Printed via QZ Tray" };
-  }
-
-  if (deviceId === "thermal-android") {
-    if (!isAndroid()) {
-      throw new Error(
-        "Android thermal printing is only available on Android devices"
-      );
-    }
-    const base64 = btoa(String.fromCharCode(...data));
-    const intentUrl = `rawbt:base64,${base64}`;
-    window.location.href = intentUrl;
-    return { success: true, message: "Printed via RawBT" };
   }
 
   try {

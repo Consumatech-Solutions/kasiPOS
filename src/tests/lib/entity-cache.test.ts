@@ -220,6 +220,30 @@ describe("entity-cache", () => {
     expect(s1.data[0].id).toBe("tx1");
   });
 
+  it("getTransactionsFromDexie sorts Date and string timestamps without throwing", async () => {
+    await saveTransactionsToDexie([
+      {
+        id: "tx-old",
+        items: [],
+        total: 1,
+        paymentMethod: "Cash",
+        storeId: "s1",
+        date: new Date("2024-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "tx-new",
+        items: [],
+        total: 2,
+        paymentMethod: "Cash",
+        storeId: "s1",
+        createdAt: "2024-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    const page = await getTransactionsFromDexie(1, 10, "s1");
+    expect(page.data.map((t) => t.id)).toEqual(["tx-new", "tx-old"]);
+  });
+
   it("savePurchaseOrdersToDexie merges and updatePurchaseOrderStatusInDexie works", async () => {
     const base = {
       orderCode: "OC",
