@@ -34,7 +34,7 @@ import {
 } from "@/lib/payment-tendered-input";
 import { useTranslation } from "react-i18next";
 
-interface PaymentModalProps {
+type PaymentModalProps = Readonly<{
   isOpen: boolean;
   onClose: () => void;
   method: "Cash" | "Card" | "Mobile Money" | null;
@@ -45,7 +45,7 @@ interface PaymentModalProps {
   ) => void;
   customer: Customer | null | undefined;
   isLoading?: boolean;
-}
+}>;
 
 const mobileMoneyOptions = [
   "MTN MoMo",
@@ -65,7 +65,7 @@ export default function PaymentModal({
   onCompleteSale,
   customer,
   isLoading = false,
-}: Readonly<PaymentModalProps>) {
+}: PaymentModalProps) {
   const [tendered, setTendered] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [selectedMobileProvider, setSelectedMobileProvider] = useState("");

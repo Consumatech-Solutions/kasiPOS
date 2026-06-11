@@ -62,48 +62,54 @@ function readInitialLngFromStorage(): "en" | "fr" {
   }
 }
 
-const enTranslation = {
-  ...enCommon,
-  ...enApp,
-  ...enSettings,
-  ...enPos,
-  ...enCatalogue,
-  ...enInventory,
-  ...enSales,
-  ...enTransactions,
-  ...enCustomers,
-  ...enBuyStock,
-  ...enVouchers,
-  ...enMarketplace,
-  ...enBoph,
-  ...enAuth,
-  ...enOnboarding,
-  ...enReports,
-  ...enPrintTest,
-  ...enPayment,
-  ...enHardware,
-};
-const frTranslation = {
-  ...frCommon,
-  ...frApp,
-  ...frSettings,
-  ...frPos,
-  ...frCatalogue,
-  ...frInventory,
-  ...frSales,
-  ...frTransactions,
-  ...frCustomers,
-  ...frBuyStock,
-  ...frVouchers,
-  ...frMarketplace,
-  ...frBoph,
-  ...frAuth,
-  ...frOnboarding,
-  ...frReports,
-  ...frPrintTest,
-  ...frPayment,
-  ...frHardware,
-};
+function mergeLocaleBundles(
+  ...bundles: Record<string, string>[]
+): Record<string, string> {
+  return Object.assign({}, ...bundles);
+}
+
+const enTranslation = mergeLocaleBundles(
+  enCommon,
+  enApp,
+  enSettings,
+  enPos,
+  enCatalogue,
+  enInventory,
+  enSales,
+  enTransactions,
+  enCustomers,
+  enBuyStock,
+  enVouchers,
+  enMarketplace,
+  enBoph,
+  enAuth,
+  enOnboarding,
+  enReports,
+  enPrintTest,
+  enPayment,
+  enHardware
+);
+const frTranslation = mergeLocaleBundles(
+  frCommon,
+  frApp,
+  frSettings,
+  frPos,
+  frCatalogue,
+  frInventory,
+  frSales,
+  frTransactions,
+  frCustomers,
+  frBuyStock,
+  frVouchers,
+  frMarketplace,
+  frBoph,
+  frAuth,
+  frOnboarding,
+  frReports,
+  frPrintTest,
+  frPayment,
+  frHardware
+);
 
 if (!i18n.isInitialized) {
   i18n.use(initReactI18next).init({
@@ -114,8 +120,7 @@ if (!i18n.isInitialized) {
     lng: readInitialLngFromStorage(),
     fallbackLng: "en",
     supportedLngs: ["en", "fr"],
-    // React escapes text nodes; locale strings are not rendered as HTML.
-    interpolation: { escapeValue: false }, // NOSONAR
+    interpolation: { escapeValue: true },
     react: { useSuspense: false },
   });
 }

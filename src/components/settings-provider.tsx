@@ -24,6 +24,16 @@ import {
   resetSessionExpiredNotifyGuard,
 } from "@/lib/auth-session";
 import { feedback } from "@/lib/feedback";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -138,6 +148,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [isPwa, setIsPwa] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const logoutConfirmResolverRef = useRef<((confirmed: boolean) => void) | null>(
+    null
+  );
 
   const router = useRouter();
   const pathname = usePathname();
@@ -341,14 +355,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     };
   }, [settings.isLoggedIn]);
 
-  const logout = useCallback(async () => {
-    if (
-      typeof globalThis.window !== "undefined" &&
-      !globalThis.window.confirm(t("settings.logout.confirm"))
-    ) {
-      return;
-    }
-
+  const performLogout = useCallback(async () => {
     resetSessionExpiredNotifyGuard();
     sessionExpiryLogoutInProgressRef.current = false;
     clearSessionAndRedirect();
@@ -358,7 +365,36 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Logout API call failed", error);
     }
-  }, [clearSessionAndRedirect, t]);
+  }, [clearSessionAndRedirect]);
+
+  const logout = useCallback(async () => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      logoutConfirmResolverRef.current = resolve;
+      setLogoutDialogOpen(true);
+    });
+    if (!confirmed) return;
+    await performLogout();
+  }, [performLogout]);
+
+  const handleLogoutDialogChange = useCallback((open: boolean) => {
+    setLogoutDialogOpen(open);
+    if (!open && logoutConfirmResolverRef.current) {
+      logoutConfirmResolverRef.current(false);
+      logoutConfirmResolverRef.current = null;
+    }
+  }, []);
+
+  const handleLogoutConfirm = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      if (logoutConfirmResolverRef.current) {
+        logoutConfirmResolverRef.current(true);
+        logoutConfirmResolverRef.current = null;
+      }
+      setLogoutDialogOpen(false);
+    },
+    []
+  );
 
   useEffect(() => {
     const bootstrapData = async () => {
@@ -710,6 +746,27 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   return (
     <SettingsContext.Provider value={value}>
       {canRenderChildren() ? children : null}
+      <AlertDialog open={logoutDialogOpen} onOpenChange={handleLogoutDialogChange}>
+        <AlertDialogContent className="max-w-[95vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("settings.logout.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("settings.logout.confirm")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="min-h-[44px] touch-target">
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="min-h-[44px] touch-target"
+              onClick={handleLogoutConfirm}
+            >
+              {t("settings.logout.confirmAction")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsContext.Provider>
   );
 }

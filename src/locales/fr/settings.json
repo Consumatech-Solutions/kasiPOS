@@ -173,5 +173,7 @@
   "settings.staff.feedback.passwordUpdateFailedHint": "Vérifiez que le mot de passe respecte les exigences et réessayez.",
   "settings.session.expiredTitle": "Session expirée",
   "settings.session.expiredDescription": "Votre session a expiré. Veuillez vous reconnecter.",
-  "settings.logout.confirm": "Voulez-vous vraiment vous déconnecter ? Les données hors ligne sur cet appareil seront conservées."
+  "settings.logout.title": "Se déconnecter ?",
+  "settings.logout.confirm": "Voulez-vous vraiment vous déconnecter ? Les données hors ligne sur cet appareil seront conservées.",
+  "settings.logout.confirmAction": "Se déconnecter"
 }

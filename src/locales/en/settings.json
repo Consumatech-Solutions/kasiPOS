@@ -173,5 +173,7 @@
   "settings.staff.feedback.passwordUpdateFailedHint": "Ensure the password meets requirements and try again.",
   "settings.session.expiredTitle": "Session expired",
   "settings.session.expiredDescription": "Your session has expired. Please sign in again.",
-  "settings.logout.confirm": "Are you sure you want to log out? Offline data on this device will be kept."
+  "settings.logout.title": "Log out?",
+  "settings.logout.confirm": "Are you sure you want to log out? Offline data on this device will be kept.",
+  "settings.logout.confirmAction": "Log out"
 }
