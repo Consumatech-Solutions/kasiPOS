@@ -343,8 +343,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     if (
-      typeof window !== "undefined" &&
-      !window.confirm(t("settings.logout.confirm"))
+      typeof globalThis.window !== "undefined" &&
+      !globalThis.window.confirm(t("settings.logout.confirm"))
     ) {
       return;
     }

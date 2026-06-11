@@ -65,7 +65,7 @@ export default function PaymentModal({
   onCompleteSale,
   customer,
   isLoading = false,
-}: PaymentModalProps) {
+}: Readonly<PaymentModalProps>) {
   const [tendered, setTendered] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [selectedMobileProvider, setSelectedMobileProvider] = useState("");
@@ -215,11 +215,9 @@ export default function PaymentModal({
     });
   };
 
-  const renderContent = () => {
-    switch (method) {
-      case "Cash":
-        const quickBills = [50, 100, 200];
-        const keypadKeys = [
+  const renderCashContent = () => {
+    const quickBills = [50, 100, 200];
+    const keypadKeys = [
           "1",
           "2",
           "3",
@@ -230,10 +228,10 @@ export default function PaymentModal({
           "8",
           "9",
           ".",
-          "0",
-        ];
+      "0",
+    ];
 
-        const cashSummary = (
+    const cashSummary = (
           <>
             <div className="space-y-4 text-lg">
               <div className="flex justify-between">
@@ -283,9 +281,9 @@ export default function PaymentModal({
               )}
             </div>
           </>
-        );
+    );
 
-        const tenderedInput = (
+    const tenderedInput = (
           <div className="mb-4">
             <label htmlFor="tendered" className="text-sm text-muted-foreground">
               {t("payment.cash.amountTenderedLabel")}
@@ -317,9 +315,9 @@ export default function PaymentModal({
               />
             </div>
           </div>
-        );
+    );
 
-        const cashFooter = (
+    const cashFooter = (
           <DialogFooter className="mt-4 gap-2 sm:flex-row flex-col">
             <Button
               type="button"
@@ -346,10 +344,10 @@ export default function PaymentModal({
                 : t("payment.cash.completeSale")}
             </Button>
           </DialogFooter>
-        );
+    );
 
-        return (
-          <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2">
+    return (
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2">
             <div className="flex flex-col">
               <DialogHeader className="mb-4">
                 <DialogTitle className="text-2xl">
@@ -411,9 +409,15 @@ export default function PaymentModal({
               </div>
               {cashFooter}
             </div>
-          </div>
-        );
-      case "Card":
+      </div>
+    );
+  };
+
+  const renderContent = () => {
+    switch (method) {
+      case "Cash":
+        return renderCashContent();
+      case "Card": {
         const posDeviceId = getStoredDevice("pos");
         return (
           <div>
@@ -522,6 +526,7 @@ export default function PaymentModal({
             </DialogFooter>
           </div>
         );
+      }
       case "Mobile Money":
         return (
           <div>

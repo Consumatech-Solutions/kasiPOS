@@ -8,14 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Wifi,
-  Usb,
-  Laptop2,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { getDevices, storeDevice, type Device } from "@/lib/device-service";
 import {
   requestWebUSBPrinter,
@@ -28,18 +21,15 @@ import {
   createWebHIDDeviceId,
 } from "@/lib/webhid-scanner";
 import { useTranslation } from "react-i18next";
+import {
+  HardwareConnectingStep,
+  HardwareDeviceListStep,
+  HardwareErrorStep,
+  HardwareSearchingStep,
+  HardwareSuccessStep,
+} from "@/components/hardware-setup/hardware-ui";
 
 type ModalStep = "searching" | "found" | "connecting" | "success" | "error";
-
-function getConnectionTypeLabel(
-  ct: Device["connectionType"],
-  t: (key: string) => string
-): string {
-  if (ct === "webusb") return t("hardware.connectionType.webusb");
-  if (ct === "webhid") return t("hardware.connectionType.webhid");
-  if (ct === "qz") return t("hardware.connectionType.qz");
-  return t("hardware.connectionType.server");
-}
 
 interface DeviceSelectorProps {
   type: "printer" | "scanner" | "pos";
@@ -53,7 +43,7 @@ export function DeviceSelector({
   open,
   onClose,
   onSelect,
-}: DeviceSelectorProps) {
+}: Readonly<DeviceSelectorProps>) {
   const { t } = useTranslation();
   const [step, setStep] = useState<ModalStep>("searching");
   const [devices, setDevices] = useState<Device[]>([]);
@@ -65,6 +55,19 @@ export function DeviceSelector({
   const canRequestDevice =
     ((type === "printer" || type === "pos") && isWebUSBSupported) ||
     (type === "scanner" && isWebHIDSupported);
+
+  const getTypeLabel = () => {
+    switch (type) {
+      case "printer":
+        return t("hardware.deviceSelector.typePrinter");
+      case "scanner":
+        return t("hardware.deviceSelector.typeScanner");
+      case "pos":
+        return t("hardware.deviceSelector.typePos");
+      default:
+        return t("hardware.deviceSelector.typeDefault");
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -200,18 +203,11 @@ export function DeviceSelector({
     }
   };
 
-  const getTypeLabel = () => {
-    switch (type) {
-      case "printer":
-        return t("hardware.deviceSelector.typePrinter");
-      case "scanner":
-        return t("hardware.deviceSelector.typeScanner");
-      case "pos":
-        return t("hardware.deviceSelector.typePos");
-      default:
-        return t("hardware.deviceSelector.typeDefault");
-    }
-  };
+  const typeLabel = getTypeLabel();
+  const foundTitle =
+    devices.length === 1
+      ? t("hardware.found.device")
+      : t("hardware.found.devices", { count: devices.length });
 
   if (!open) return null;
 
@@ -220,144 +216,51 @@ export function DeviceSelector({
       <DialogContent className="w-[95vw] max-w-md mx-2 sm:mx-auto !z-[110]">
         <DialogHeader className="px-2 sm:px-0">
           <DialogTitle className="text-lg sm:text-xl">
-            {t("hardware.deviceSelector.connectTitle", {
-              type: getTypeLabel(),
-            })}
+            {t("hardware.deviceSelector.connectTitle", { type: typeLabel })}
           </DialogTitle>
         </DialogHeader>
 
         <div className="p-4 sm:p-6 md:p-8 flex flex-col items-center text-center min-h-[280px] sm:min-h-[320px] justify-center">
           {step === "searching" && (
-            <div className="animate-in fade-in duration-300 flex flex-col items-center">
-              <div className="relative mb-4 sm:mb-6">
-                <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping opacity-75"></div>
-                <div className="relative bg-primary/10 p-4 sm:p-6 rounded-full">
-                  <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-primary animate-spin" />
-                </div>
-              </div>
-              <h4 className="text-lg sm:text-xl font-medium text-slate-900 mb-2 px-4">
-                {t("hardware.search.lookingForDevices")}
-              </h4>
-              <p className="text-sm sm:text-base text-slate-500 px-4">
-                {t("hardware.search.ensureDeviceOn", {
-                  device: getTypeLabel().toLowerCase(),
-                })}
-              </p>
-            </div>
+            <HardwareSearchingStep
+              titleKey="hardware.search.lookingForDevices"
+              description={t("hardware.search.ensureDeviceOn", {
+                device: typeLabel.toLowerCase(),
+              })}
+            />
           )}
 
           {step === "found" && (
-            <div className="w-full animate-in slide-in-from-bottom-4 fade-in duration-300 px-2 sm:px-0">
-              <div className="text-left mb-4">
-                <h4 className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                  {devices.length === 1
-                    ? t("hardware.found.device")
-                    : t("hardware.found.devices", { count: devices.length })}
-                </h4>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {devices.map((deviceItem) => (
-                    <button
-                      key={deviceItem.id}
-                      onClick={() => connectDevice(deviceItem.id)}
-                      className="w-full group flex items-center justify-between p-3 sm:p-4 border border-slate-200 rounded-xl active:border-primary active:shadow-md active:bg-primary/5 sm:hover:border-primary sm:hover:shadow-md sm:hover:bg-primary/5 transition-all cursor-pointer bg-white touch-target min-h-[60px]"
-                    >
-                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 group-active:bg-primary/10 sm:group-hover:bg-primary/10 transition-colors">
-                          {deviceItem.connectionType === "webusb" ? (
-                            <Usb
-                              size={18}
-                              className="sm:w-5 sm:h-5 text-slate-600 group-active:text-primary sm:group-hover:text-primary"
-                            />
-                          ) : deviceItem.connectionType === "webhid" ? (
-                            <Usb
-                              size={18}
-                              className="sm:w-5 sm:h-5 text-slate-600 group-active:text-primary sm:group-hover:text-primary"
-                            />
-                          ) : (
-                            <Wifi
-                              size={18}
-                              className="sm:w-5 sm:h-5 text-slate-600 group-active:text-primary sm:group-hover:text-primary"
-                            />
-                          )}
-                        </div>
-                        <div className="text-left flex-1 min-w-0">
-                          <p className="font-semibold text-sm sm:text-base text-slate-900 group-active:text-primary sm:group-hover:text-primary truncate">
-                            {deviceItem.name}
-                          </p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {getConnectionTypeLabel(
-                              deviceItem.connectionType,
-                              t
-                            )}{" "}
-                            • {t("hardware.found.readyToPair")}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-xs sm:text-sm font-medium text-primary opacity-100 sm:opacity-0 group-active:opacity-100 sm:group-hover:opacity-100 transition-opacity flex-shrink-0 ml-2">
-                        {t("hardware.found.connect")}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-center text-slate-400 mt-4 sm:mt-8 px-2">
-                {t("hardware.found.dontSeeDevice")}{" "}
-                <button
-                  onClick={searchForDevices}
-                  className="text-primary active:underline sm:hover:underline touch-target min-h-[44px]"
-                >
-                  {t("hardware.found.scanAgain")}
-                </button>
-              </p>
-            </div>
+            <HardwareDeviceListStep
+              devices={devices}
+              foundTitle={foundTitle}
+              notFoundPromptKey="hardware.found.dontSeeDevice"
+              onSelect={connectDevice}
+              onRescan={searchForDevices}
+            />
           )}
 
           {step === "connecting" && (
-            <div className="animate-in fade-in duration-300 flex flex-col items-center px-4">
-              <div className="mb-4 sm:mb-6 relative">
-                <Laptop2 className="w-14 h-14 sm:w-16 sm:h-16 text-slate-300" />
-                <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 shadow-sm">
-                  <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary animate-spin" />
-                </div>
-              </div>
-              <h4 className="text-lg sm:text-xl font-medium text-slate-900 mb-2">
-                {t("hardware.connecting.title")}
-              </h4>
-              <p className="text-sm sm:text-base text-slate-500">
-                {t("hardware.connecting.secureConnection")}
-              </p>
-            </div>
+            <HardwareConnectingStep
+              titleKey="hardware.connecting.title"
+              descriptionKey="hardware.connecting.secureConnection"
+            />
           )}
 
           {step === "success" && (
-            <div className="animate-in zoom-in-95 fade-in duration-300 flex flex-col items-center px-4">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center mb-4 sm:mb-6">
-                <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 text-green-600" />
-              </div>
-              <h4 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
-                {t("hardware.success.title")}
-              </h4>
-              <p className="text-sm sm:text-base text-slate-500">
-                {t("hardware.success.deviceReady", {
-                  device: getTypeLabel().toLowerCase(),
-                })}
-              </p>
-            </div>
+            <HardwareSuccessStep
+              descriptionKey="hardware.success.deviceReady"
+              descriptionValues={{ device: typeLabel.toLowerCase() }}
+            />
           )}
 
           {step === "error" && (
-            <div className="animate-in fade-in duration-300 flex flex-col items-center px-4">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-red-100 rounded-full flex items-center justify-center mb-4 sm:mb-6">
-                <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-red-600" />
-              </div>
-              <h4 className="text-lg sm:text-xl font-bold text-slate-900 mb-2">
-                {t("hardware.error.connectionFailed")}
-              </h4>
-              <p className="text-sm sm:text-base text-slate-500 mb-4 text-center">
-                {error}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                {canRequestDevice && (
+            <HardwareErrorStep
+              error={error}
+              onTryAgain={searchForDevices}
+              actionLayout="column"
+              extraActions={
+                canRequestDevice ? (
                   <Button
                     variant="outline"
                     onClick={handleRequestDevice}
@@ -369,16 +272,9 @@ export function DeviceSelector({
                     ) : null}
                     {t("hardware.deviceSelector.requestDevice")}
                   </Button>
-                )}
-                <Button
-                  onClick={searchForDevices}
-                  variant="outline"
-                  className="min-h-[44px] touch-target w-full sm:w-auto"
-                >
-                  {t("hardware.error.tryAgain")}
-                </Button>
-              </div>
-            </div>
+                ) : null
+              }
+            />
           )}
         </div>
       </DialogContent>

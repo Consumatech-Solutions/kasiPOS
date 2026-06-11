@@ -46,11 +46,11 @@ import {
 } from "@/lib/language-code";
 
 function readInitialLngFromStorage(): "en" | "fr" {
-  if (typeof window === "undefined") {
+  if (typeof globalThis.window === "undefined") {
     return "en";
   }
   try {
-    const raw = window.localStorage.getItem("kasi-pos-settings");
+    const raw = globalThis.window.localStorage.getItem("kasi-pos-settings");
     if (!raw) {
       return "en";
     }
@@ -106,7 +106,7 @@ const frTranslation = {
 };
 
 if (!i18n.isInitialized) {
-  void i18n.use(initReactI18next).init({
+  i18n.use(initReactI18next).init({
     resources: {
       en: { translation: enTranslation },
       fr: { translation: frTranslation },
@@ -114,7 +114,8 @@ if (!i18n.isInitialized) {
     lng: readInitialLngFromStorage(),
     fallbackLng: "en",
     supportedLngs: ["en", "fr"],
-    interpolation: { escapeValue: false },
+    // React escapes text nodes; locale strings are not rendered as HTML.
+    interpolation: { escapeValue: false }, // NOSONAR
     react: { useSuspense: false },
   });
 }

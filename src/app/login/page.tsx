@@ -31,11 +31,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
 import { offlineDetector } from "@/lib/offline-detector";
 import { feedback } from "@/lib/feedback";
-import { ERROR_CODES } from "@/lib/error-codes";
-import {
-  isBackendConnectionError,
-} from "@/lib/backend-connection";
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
+import { resolveLoginErrorFeedback } from "@/lib/login-error";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_INPUT_REGEX = /^[\d\s\-+()]+$/;
@@ -130,76 +127,45 @@ export default function LoginPage() {
     },
   });
 
+  const runPostLoginSync = async (storeId: string) => {
+    try {
+      const isOnline = await offlineDetector.forceCheck();
+      if (isOnline) {
+        await runManualFullCloudSync({ queryClient, storeId });
+      }
+    } catch (syncError) {
+      console.error("Initial sync after login failed:", syncError);
+    }
+  };
+
   const onSubmit = async (values: LoginFormValues) => {
     try {
       const response = await authApi.login(buildLoginPayload(values));
+      const token = response.data?.accessToken;
+      const user = response.data?.user;
+      if (!token || !user) return;
 
-      if (response.data && response.data.accessToken) {
-        feedback.success(
-          t("auth.login.successTitle"),
-          t("auth.login.successDesc")
-        );
-        await login({
-          ...response.data.user,
-          accessToken: response.data.accessToken,
-        });
-
-        try {
-          const isOnline = await offlineDetector.forceCheck();
-          if (isOnline) {
-            await runManualFullCloudSync({
-              queryClient,
-              storeId: response.data.user.storeId,
-            });
-          }
-        } catch (syncError) {
-          console.error("Initial sync after login failed:", syncError);
-        }
+      feedback.success(
+        t("auth.login.successTitle"),
+        t("auth.login.successDesc")
+      );
+      await login({ ...user, accessToken: token });
+      if (user.storeId) {
+        await runPostLoginSync(user.storeId);
       }
     } catch (error: unknown) {
-      const err = error as {
-        code?: string;
-        message?: string;
-        response?: { status?: number; data?: Record<string, unknown> };
-      };
-      const data = err?.response?.data;
-      const status = err?.response?.status;
-
-      if (process.env.NODE_ENV === "development" && err) {
-        console.warn("[Login] Error details:", {
-          status,
-          data,
-          code: err.code,
-          message: err.message,
-        });
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[Login] Error details:", error);
+        console.warn(
+          `[Login] Backend URL: ${getConfiguredApiUrl()}`
+        );
       }
-
-      if (isBackendConnectionError(err)) {
-        if (process.env.NODE_ENV === "development") {
-          console.warn(
-            `[Login] Backend not reachable at ${getConfiguredApiUrl()}`
-          );
-        }
-        feedback.error(t("auth.login.failedConnection"));
-        return;
-      }
-
-      const serverMessage =
-        (typeof data?.message === "string" && data.message) ||
-        (typeof (data as { error?: string })?.error === "string" &&
-          (data as { error: string }).error) ||
-        (typeof (data as { msg?: string })?.msg === "string" &&
-          (data as { msg: string }).msg) ||
-        (status === 401
-          ? t("auth.login.invalidCredentials")
-          : t("auth.login.failedRetry"));
+      const loginError = resolveLoginErrorFeedback(error, t);
       feedback.error(
-        t("auth.login.failedTitle"),
-        serverMessage,
-        status === 401
-          ? t("auth.login.checkCredentials")
-          : t("auth.login.tryAgainOrSignup"),
-        { code: ERROR_CODES.LOGIN }
+        loginError.title,
+        loginError.message,
+        loginError.hint,
+        loginError.code ? { code: loginError.code } : undefined
       );
     }
   };

@@ -638,7 +638,7 @@ export async function getTransactionsFromDexie(
         (t as unknown as Transaction & { storeId?: string }).storeId === storeId
     );
   }
-  const sorted = [...all].sort((a, b) =>
+  const sorted = [...all].toSorted((a, b) =>
     compareTimestampsDesc(
       transactionTimestamp(a as unknown as Transaction),
       transactionTimestamp(b as unknown as Transaction)
