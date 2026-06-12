@@ -28,6 +28,10 @@ import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 import { useSettings } from "@/components/settings-provider";
+import {
+  clearTempAuthToken,
+  readTempAuthToken,
+} from "@/lib/temp-auth-token";
 
 function SetPasswordContent() {
   const { t } = useTranslation();
@@ -69,10 +73,7 @@ function SetPasswordContent() {
       return;
     }
 
-    const tempToken =
-      typeof window !== "undefined"
-        ? localStorage.getItem("kasi-pos-temp-token")
-        : null;
+    const tempToken = readTempAuthToken();
     if (!tempToken) {
       feedback.error(
         t("auth.setPassword.sessionExpiredTitle"),
@@ -92,8 +93,7 @@ function SetPasswordContent() {
           t("auth.setPassword.successTitle"),
           t("auth.setPassword.successDesc")
         );
-        if (typeof window !== "undefined")
-          localStorage.removeItem("kasi-pos-temp-token");
+        clearTempAuthToken();
         await login({
           ...response.data.user,
           accessToken: response.data.accessToken,

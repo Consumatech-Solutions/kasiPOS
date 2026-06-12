@@ -40,28 +40,6 @@ import frReports from "@/locales/fr/reports.json";
 import frPrintTest from "@/locales/fr/printTest.json";
 import frPayment from "@/locales/fr/payment.json";
 import frHardware from "@/locales/fr/hardware.json";
-import {
-  normalizeToSupportedI18nLng,
-  parseStoredAppLanguage,
-} from "@/lib/language-code";
-
-function readInitialLngFromStorage(): "en" | "fr" {
-  if (typeof globalThis.window === "undefined") {
-    return "en";
-  }
-  try {
-    const raw = globalThis.window.localStorage.getItem("kasi-pos-settings");
-    if (!raw) {
-      return "en";
-    }
-    const parsed = JSON.parse(raw) as { language?: unknown };
-    const appLang = parseStoredAppLanguage(parsed.language);
-    return normalizeToSupportedI18nLng(appLang);
-  } catch {
-    return "en";
-  }
-}
-
 function mergeLocaleBundles(
   ...bundles: Record<string, string>[]
 ): Record<string, string> {
@@ -117,10 +95,9 @@ if (!i18n.isInitialized) {
       en: { translation: enTranslation },
       fr: { translation: frTranslation },
     },
-    lng: readInitialLngFromStorage(),
+    lng: "en",
     fallbackLng: "en",
     supportedLngs: ["en", "fr"],
-    interpolation: { escapeValue: true },
     react: { useSuspense: false },
   });
 }

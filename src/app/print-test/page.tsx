@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { buildTestPrintPayload } from "@/lib/device-service";
 import { printViaRawBt, RAWBT_PLAY_STORE_URL } from "@/lib/rawbt-print";
 import { isAndroid } from "@/lib/platform";
+import { openExternalUrl } from "@/lib/open-external-url";
 
 export default function PrintTestPage() {
   const { t } = useTranslation();
@@ -51,15 +52,14 @@ export default function PrintTestPage() {
           <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
             <li>
               {t("printTest.installRawBt")}{" "}
-              <a
-                href={RAWBT_PLAY_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() => openExternalUrl(RAWBT_PLAY_STORE_URL)}
                 className="text-primary underline inline-flex items-center gap-1"
               >
                 RawBT
                 <ExternalLink className="h-3 w-3" />
-              </a>
+              </button>
             </li>
             <li>{t("printTest.pairPrinter")}</li>
             <li>{t("printTest.openOnAndroid")}</li>

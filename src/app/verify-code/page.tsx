@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
+import { storeTempAuthToken } from "@/lib/temp-auth-token";
 import { ERROR_CODES } from "@/lib/error-codes";
 
 function VerifyCodeContent() {
@@ -74,7 +75,7 @@ function VerifyCodeContent() {
         const { tempToken, hasPassword, user } = response.data;
 
         if (tempToken) {
-          localStorage.setItem("kasi-pos-temp-token", tempToken);
+          storeTempAuthToken(tempToken);
         }
 
         if (hasPassword && user) {

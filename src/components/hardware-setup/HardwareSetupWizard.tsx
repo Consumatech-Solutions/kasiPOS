@@ -165,9 +165,7 @@ export const HardwareSetupWizard: React.FC<HardwareSetupWizardProps> = ({
 
         <p className="text-center text-muted-foreground text-xs sm:text-sm mt-4 sm:mt-8 px-4">
           {t("hardware.wizard.needHelp")}{" "}
-          <a href="#" className="text-primary hover:underline">
-            {t("hardware.wizard.viewSetupGuide")}
-          </a>
+          <span className="text-primary">{t("hardware.wizard.viewSetupGuide")}</span>
         </p>
       </div>
 

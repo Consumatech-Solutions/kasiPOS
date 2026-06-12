@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RAWBT_PLAY_STORE_URL } from "@/lib/rawbt-print";
+import { openExternalUrl } from "@/lib/open-external-url";
 import type { Device } from "@/lib/device-service";
 import type { PrintStrategy } from "@/lib/platform";
 import { useTranslation } from "react-i18next";
@@ -89,15 +90,10 @@ export function PrinterConnectionChoice({
                 variant="outline"
                 size="sm"
                 className="min-h-[44px] touch-target"
-                asChild
+                type="button"
+                onClick={() => openExternalUrl(QZ_TRAY_DOWNLOAD_URL)}
               >
-                <a
-                  href={QZ_TRAY_DOWNLOAD_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t("hardware.choice.downloadQz")}
-                </a>
+                {t("hardware.choice.downloadQz")}
               </Button>
               <Button
                 variant="default"
@@ -145,15 +141,10 @@ export function PrinterConnectionChoice({
               variant="outline"
               size="sm"
               className="min-h-[44px] touch-target"
-              asChild
+              type="button"
+              onClick={() => openExternalUrl(RAWBT_PLAY_STORE_URL)}
             >
-              <a
-                href={RAWBT_PLAY_STORE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {t("hardware.choice.getRawBt")}
-              </a>
+              {t("hardware.choice.getRawBt")}
             </Button>
             <Button
               variant="default"
