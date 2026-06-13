@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone, DEFAULT_PHONE_COUNTRY, formatE164 } from "@/lib/phone";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -104,6 +104,13 @@ function buildLoginPayload(values: LoginFormValues) {
   return payload;
 }
 
+const LOGIN_PHONE_EXAMPLE = formatE164(
+  DEFAULT_PHONE_COUNTRY.dialCode,
+  DEFAULT_PHONE_COUNTRY.placeholder ?? "812345678",
+  DEFAULT_PHONE_COUNTRY.iso
+);
+const LOGIN_IDENTIFIER_PLACEHOLDER = `owner@example.com or ${LOGIN_PHONE_EXAMPLE}`;
+
 export default function LoginPage() {
   const { login } = useSettings();
   const queryClient = useQueryClient();
@@ -195,7 +202,8 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
           <CardDescription className="text-sm">
-            Sign in with your email or mobile number and password
+            Sign in with your email or mobile number (digits only, e.g.{" "}
+            {LOGIN_PHONE_EXAMPLE}) and password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -210,7 +218,7 @@ export default function LoginPage() {
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="owner@example.com or 0812345678"
+                        placeholder={LOGIN_IDENTIFIER_PLACEHOLDER}
                         className="touch-target"
                         autoComplete="username"
                         {...field}
