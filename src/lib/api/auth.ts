@@ -17,12 +17,14 @@ export type SignupRequest = {
   name: string;
   storeName: string;
   password: string;
+  countryCode: string;
   phoneNumber: string;
 };
 
 export type SignupResponse = {
   success: boolean;
   message: string;
+  verificationChannel: "sms" | "email";
 };
 
 export type VerifySignupRequest = {
