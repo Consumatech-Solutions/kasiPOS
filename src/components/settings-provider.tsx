@@ -256,19 +256,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const { settingsApi } = await import("@/lib/api/settings");
+        const { mergeStoreSettingsIntoStore, saveStorePermanently } =
+          await import("@/lib/store-persistence");
         const res = await settingsApi.get(storeId);
-        const raw = res.data as {
-          credit?: Store["credit"];
-          data?: { credit?: Store["credit"] };
-        };
-        const credit = raw?.data?.credit ?? raw?.credit;
-        if (credit !== undefined) {
-          const storeWithCredit = { ...store, credit };
-          setSetting("currentStore", storeWithCredit);
-          const { saveStorePermanently } =
-            await import("@/lib/store-persistence");
-          await saveStorePermanently(storeWithCredit, setSetting);
-        }
+        const storeWithSettings = mergeStoreSettingsIntoStore(store, res.data);
+        setSetting("currentStore", storeWithSettings);
+        await saveStorePermanently(storeWithSettings, setSetting);
       } catch (_) {
         creditFetchedForStoreIdRef.current = null;
       }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import type { AppSettings, User } from "@/types";
+import type { AppSettings, User, StoreCurrency } from "@/types";
 import { useTranslation } from "react-i18next";
 import { normalizeToSupportedI18nLng } from "@/lib/language-code";
 
@@ -32,13 +32,14 @@ import {
   CreditCard,
   Loader2,
   Crown,
+  Coins,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/components/settings-provider";
 import { usersApi, settingsApi } from "@/lib/api";
 import { storesApi } from "@/lib/api/stores";
-import { saveStorePermanently } from "@/lib/store-persistence";
+import { saveStorePermanently, mergeStoreSettingsFields } from "@/lib/store-persistence";
 import {
   Select,
   SelectContent,
@@ -95,7 +96,8 @@ import {
   writeStaffPageCache,
 } from "@/lib/settings-staff-cache";
 import { cn } from "@/lib/utils";
-import type { PatchSettingsBody } from "@/lib/api/settings";
+import type { UpdateStoreSettingsDto } from "@/lib/api/settings";
+import { normalizeStoreSettings } from "@/lib/api/settings";
 
 type Feature = "campaigns" | "marketplace" | "boph" | "buyStock";
 
@@ -151,6 +153,16 @@ export default function SettingsPage() {
   const [isUpdatingModules, setIsUpdatingModules] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingCredit, setSavingCredit] = useState(false);
+  const [savingCurrency, setSavingCurrency] = useState(false);
+  const [currencyForm, setCurrencyForm] = useState<{
+    currency: StoreCurrency;
+    cdfUsdExRate: string;
+    zarUsdExRate: string;
+  }>({
+    currency: "USD",
+    cdfUsdExRate: "",
+    zarUsdExRate: "",
+  });
   const [storeSettingsCredit, setStoreSettingsCredit] = useState<{
     creditLimit: number;
     termType: "fixed" | "variable";
@@ -273,6 +285,19 @@ export default function SettingsPage() {
   const settingsStoreId =
     currentUser?.storeId ?? settingsStore?.id ?? undefined;
 
+  const applyCurrencyFromStore = useCallback(
+    (store: typeof settingsStore) => {
+      setCurrencyForm({
+        currency: store?.currency ?? "USD",
+        cdfUsdExRate:
+          store?.cdfUsdExRate != null ? String(store.cdfUsdExRate) : "",
+        zarUsdExRate:
+          store?.zarUsdExRate != null ? String(store.zarUsdExRate) : "",
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== "store_admin") return;
     if (!settingsStoreId) {
@@ -284,6 +309,7 @@ export default function SettingsPage() {
       setLoadingSettings(true);
       const c = settingsStore?.credit;
       const cc = c?.customerCredit;
+      applyCurrencyFromStore(settingsStore);
       if (cc) {
         setStoreSettingsCredit({
           creditLimit: Number(cc.creditLimit ?? 0),
@@ -308,6 +334,31 @@ export default function SettingsPage() {
     settingsApi
       .get(settingsStoreId)
       .then((res) => {
+        const normalized = normalizeStoreSettings(res.data);
+        if (normalized) {
+          applyCurrencyFromStore({
+            ...settingsStore,
+            currency: normalized.currency,
+            cdfUsdExRate: normalized.cdfUsdExRate,
+            zarUsdExRate: normalized.zarUsdExRate,
+          } as typeof settingsStore);
+          if (settingsStore) {
+            const merged = mergeStoreSettingsFields(settingsStore, {
+              currency: normalized.currency,
+              cdfUsdExRate: normalized.cdfUsdExRate,
+              zarUsdExRate: normalized.zarUsdExRate,
+            });
+            if (
+              merged.currency !== settingsStore.currency ||
+              merged.cdfUsdExRate !== settingsStore.cdfUsdExRate ||
+              merged.zarUsdExRate !== settingsStore.zarUsdExRate
+            ) {
+              setSetting("currentStore", merged);
+            }
+          }
+        } else {
+          applyCurrencyFromStore(settingsStore);
+        }
         const credit = res.data?.credit;
         const cc = credit?.customerCredit;
         if (cc) {
@@ -339,6 +390,7 @@ export default function SettingsPage() {
         }
       })
       .catch(() => {
+        applyCurrencyFromStore(settingsStore);
         const fromStore = settingsStore?.credit?.customerCredit;
         if (fromStore) {
           setCreditForm({
@@ -356,7 +408,11 @@ export default function SettingsPage() {
     effectiveOnline,
     settingsStoreId,
     settingsStore?.credit,
+    settingsStore?.currency,
+    settingsStore?.cdfUsdExRate,
+    settingsStore?.zarUsdExRate,
     settingsStore?.id,
+    applyCurrencyFromStore,
   ]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
@@ -432,6 +488,101 @@ export default function SettingsPage() {
     }
   };
 
+  const saveCurrencySettings = async () => {
+    if (!settingsStoreId || !settingsStore) {
+      feedback.error(
+        t("settings.currency.feedback.noStoreTitle"),
+        t("settings.currency.feedback.noStoreDesc"),
+        undefined,
+        { code: "CURRENCY" }
+      );
+      return;
+    }
+
+    if (!effectiveOnline) {
+      feedback.error(
+        t("settings.currency.feedback.serverUnavailableTitle"),
+        t("settings.currency.feedback.serverUnavailableDesc"),
+        undefined,
+        { code: "CURRENCY" }
+      );
+      return;
+    }
+
+    const body: UpdateStoreSettingsDto = { currency: currencyForm.currency };
+
+    if (currencyForm.currency === "CDF") {
+      const rate = Number(currencyForm.cdfUsdExRate);
+      if (currencyForm.cdfUsdExRate !== "" && (Number.isNaN(rate) || rate < 0)) {
+        feedback.error(
+          t("settings.currency.feedback.invalidRateTitle"),
+          t("settings.currency.feedback.invalidRateDesc"),
+          undefined,
+          { code: "CURRENCY" }
+        );
+        return;
+      }
+      body.cdfUsdExRate =
+        currencyForm.cdfUsdExRate === "" ? null : rate;
+    }
+
+    if (currencyForm.currency === "ZAR") {
+      const rate = Number(currencyForm.zarUsdExRate);
+      if (currencyForm.zarUsdExRate !== "" && (Number.isNaN(rate) || rate < 0)) {
+        feedback.error(
+          t("settings.currency.feedback.invalidRateTitle"),
+          t("settings.currency.feedback.invalidRateDesc"),
+          undefined,
+          { code: "CURRENCY" }
+        );
+        return;
+      }
+      body.zarUsdExRate =
+        currencyForm.zarUsdExRate === "" ? null : rate;
+    }
+
+    setSavingCurrency(true);
+    try {
+      const res = await settingsApi.patch(body, settingsStoreId);
+      const normalized = normalizeStoreSettings(res.data);
+      const merged = mergeStoreSettingsFields(settingsStore, {
+        currency: normalized?.currency ?? body.currency ?? "USD",
+        cdfUsdExRate:
+          normalized?.cdfUsdExRate ??
+          (body.cdfUsdExRate !== undefined ? body.cdfUsdExRate : settingsStore.cdfUsdExRate ?? null),
+        zarUsdExRate:
+          normalized?.zarUsdExRate ??
+          (body.zarUsdExRate !== undefined ? body.zarUsdExRate : settingsStore.zarUsdExRate ?? null),
+      });
+      setSetting("currentStore", merged);
+      await saveStorePermanently(merged, setSetting);
+      applyCurrencyFromStore(merged);
+      feedback.success(
+        t("settings.currency.feedback.savedTitle"),
+        t("settings.currency.feedback.savedDesc")
+      );
+    } catch (err: unknown) {
+      const ax = err as {
+        response?: { data?: { message?: string | string[] }; status?: number };
+        message?: string;
+      };
+      let message: string = (err as Error)?.message ?? "Failed to save.";
+      if (ax?.response?.data) {
+        const msg = ax.response.data.message;
+        if (typeof msg === "string") message = msg;
+        else if (Array.isArray(msg) && msg[0]) message = String(msg[0]);
+      }
+      feedback.error(
+        t("settings.currency.feedback.saveFailedTitle"),
+        message,
+        undefined,
+        { code: "CURRENCY" }
+      );
+    } finally {
+      setSavingCurrency(false);
+    }
+  };
+
   const saveCreditSettings = async () => {
     if (!settingsStoreId) {
       feedback.error(
@@ -457,7 +608,7 @@ export default function SettingsPage() {
       creditForm.termType === "fixed"
         ? Math.max(1, Number(creditForm.term) || 7)
         : undefined;
-    const body: PatchSettingsBody = creditForm.enabled
+    const body: UpdateStoreSettingsDto = creditForm.enabled
       ? {
           credit: {
             customerCredit: {
@@ -1212,6 +1363,124 @@ export default function SettingsPage() {
                     disabled={!effectiveOnline || isUpdatingModules}
                   />
                 </div>
+
+                {(isAdmin || currentUser?.role === "store_admin") && (
+                  <>
+                    <div
+                      id="store-currency"
+                      className="space-y-2 pt-4 scroll-mt-4"
+                    >
+                      <h3 className="text-lg font-semibold flex items-center gap-2">
+                        <Coins className="w-5 h-5" />{" "}
+                        {t("settings.currency.title")}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.currency.intro")}
+                      </p>
+                      {!settingsStoreId && (
+                        <p className="text-xs text-amber-600 dark:text-amber-500">
+                          {t("settings.currency.noStoreWarning")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-4 p-4 border rounded-lg">
+                      {!effectiveOnline && (
+                        <p className="text-xs text-muted-foreground">
+                          {t("settings.currency.offlineNote")}
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="store-currency-select">
+                          {t("settings.currency.select.label")}
+                        </Label>
+                        <Select
+                          value={currencyForm.currency}
+                          onValueChange={(v: StoreCurrency) =>
+                            setCurrencyForm((f) => ({ ...f, currency: v }))
+                          }
+                          disabled={loadingSettings}
+                        >
+                          <SelectTrigger id="store-currency-select">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">
+                              {t("settings.currency.options.usd")}
+                            </SelectItem>
+                            <SelectItem value="CDF">
+                              {t("settings.currency.options.cdf")}
+                            </SelectItem>
+                            <SelectItem value="ZAR">
+                              {t("settings.currency.options.zar")}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {currencyForm.currency === "CDF" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="cdf-usd-rate">
+                            {t("settings.currency.cdfRate.label")}
+                          </Label>
+                          <Input
+                            id="cdf-usd-rate"
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder="2850.5"
+                            value={currencyForm.cdfUsdExRate}
+                            onChange={(e) =>
+                              setCurrencyForm((f) => ({
+                                ...f,
+                                cdfUsdExRate: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      {currencyForm.currency === "ZAR" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="zar-usd-rate">
+                            {t("settings.currency.zarRate.label")}
+                          </Label>
+                          <Input
+                            id="zar-usd-rate"
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder="18.25"
+                            value={currencyForm.zarUsdExRate}
+                            onChange={(e) =>
+                              setCurrencyForm((f) => ({
+                                ...f,
+                                zarUsdExRate: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      <Button
+                        type="button"
+                        onClick={() => void saveCurrencySettings()}
+                        disabled={
+                          savingCurrency ||
+                          !settingsStoreId ||
+                          loadingSettings ||
+                          !effectiveOnline
+                        }
+                        className="min-h-[44px] touch-target"
+                      >
+                        {savingCurrency ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {t("settings.currency.saving")}
+                          </>
+                        ) : (
+                          t("settings.currency.save")
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
 
                 {(isAdmin || currentUser?.role === "store_admin") && (
                   <>

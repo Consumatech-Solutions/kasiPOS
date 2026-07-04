@@ -3,6 +3,48 @@
 import type { Store } from "@/types";
 import { getDb } from "@/lib/db";
 import type { StoreRecord } from "@/lib/db";
+import {
+  normalizeStoreSettings,
+  type StoreSettings,
+} from "@/lib/api/settings";
+
+export function mergeStoreSettingsIntoStore(
+  store: Store,
+  rawSettings: unknown
+): Store {
+  const settings = normalizeStoreSettings(rawSettings);
+  if (!settings) return store;
+
+  return {
+    ...store,
+    ...(settings.credit !== undefined && { credit: settings.credit }),
+    currency: settings.currency ?? store.currency ?? "USD",
+    cdfUsdExRate: settings.cdfUsdExRate ?? store.cdfUsdExRate ?? null,
+    zarUsdExRate: settings.zarUsdExRate ?? store.zarUsdExRate ?? null,
+  };
+}
+
+export function mergeStoreSettingsFields(
+  store: Store,
+  settings: Partial<
+    Pick<
+      StoreSettings,
+      "credit" | "currency" | "cdfUsdExRate" | "zarUsdExRate"
+    >
+  >
+): Store {
+  return {
+    ...store,
+    ...(settings.credit !== undefined && { credit: settings.credit }),
+    ...(settings.currency !== undefined && { currency: settings.currency }),
+    ...(settings.cdfUsdExRate !== undefined && {
+      cdfUsdExRate: settings.cdfUsdExRate,
+    }),
+    ...(settings.zarUsdExRate !== undefined && {
+      zarUsdExRate: settings.zarUsdExRate,
+    }),
+  };
+}
 
 export async function saveStorePermanently(
   store: Store,
@@ -100,14 +142,7 @@ export async function fetchAndSaveStore(
       try {
         const { settingsApi } = await import("@/lib/api/settings");
         const settingsRes = await settingsApi.get(store.id);
-        const raw = settingsRes.data as {
-          credit?: Store["credit"];
-          data?: { credit?: Store["credit"] };
-        };
-        const credit = raw?.data?.credit ?? raw?.credit ?? undefined;
-        if (credit !== undefined) {
-          store = { ...store, credit };
-        }
+        store = mergeStoreSettingsIntoStore(store, settingsRes.data);
       } catch (_) {}
       await saveStorePermanently(store, setSetting);
       return store;

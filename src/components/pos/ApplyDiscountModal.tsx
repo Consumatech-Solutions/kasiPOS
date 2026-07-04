@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { X } from "lucide-react";
 import type { TransactionDiscount } from "@/types";
 import { cn } from "@/lib/utils";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const DISCOUNT_REASONS = [
   "Loyal customer",
@@ -41,6 +42,7 @@ export default function ApplyDiscountModal({
   cartSubtotal,
   onApply,
 }: ApplyDiscountModalProps) {
+  const { formatMoney } = useStoreCurrency();
   const [discountType, setDiscountType] = useState<"percentage" | "amount">(
     "percentage"
   );
@@ -257,7 +259,7 @@ export default function ApplyDiscountModal({
                   />
                 </div>
                 <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
-                  Maximum: R {maxAmount.toFixed(2)}
+                  Maximum: {formatMoney(maxAmount)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {AMOUNT_QUICK.map((a) => (
@@ -279,7 +281,7 @@ export default function ApplyDiscountModal({
                       }}
                       onClick={() => setAmount(a)}
                     >
-                      R {a}
+                      {formatMoney(a)}
                     </button>
                   ))}
                 </div>
@@ -331,7 +333,7 @@ export default function ApplyDiscountModal({
             <div className="flex justify-between mb-2 text-xs">
               <span style={{ color: "#888" }}>Cart total</span>
               <span style={{ color: TEXT_DARK }}>
-                R {cartSubtotal.toFixed(2)}
+                {formatMoney(cartSubtotal)}
               </span>
             </div>
             <div className="flex justify-between mb-2 text-xs">
@@ -339,11 +341,11 @@ export default function ApplyDiscountModal({
                 Discount (
                 {discountType === "percentage"
                   ? `${clampedPercentage}%`
-                  : `R ${clampedAmount.toFixed(2)}`}
+                  : formatMoney(clampedAmount)}
                 )
               </span>
               <span className="font-medium" style={{ color: DISCOUNT_RED }}>
-                - R {discountAmountInCurrency.toFixed(2)}
+                - {formatMoney(discountAmountInCurrency)}
               </span>
             </div>
             {discountType === "amount" && equivalentPercent > 0 && (
@@ -361,7 +363,7 @@ export default function ApplyDiscountModal({
             >
               <span className="font-medium text-sm">New total</span>
               <span className="font-semibold text-base">
-                R {newTotal.toFixed(2)}
+                {formatMoney(newTotal)}
               </span>
             </div>
           </div>
