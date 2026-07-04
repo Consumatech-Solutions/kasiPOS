@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 type PosMobileCartSheetProps = {
   open: boolean;
@@ -29,6 +30,7 @@ export function PosMobileCartSheet({
   className,
 }: PosMobileCartSheetProps) {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const prevItemCountRef = useRef(itemCount);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export function PosMobileCartSheet({
 
   const summary = t("pos.cart.sheetSummary", {
     count: itemCount,
-    total: amountToPay.toFixed(2),
+    total: formatMoney(amountToPay),
   });
 
   return (

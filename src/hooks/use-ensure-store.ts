@@ -8,6 +8,7 @@ import { ERROR_CODES } from "@/lib/error-codes";
 import {
   saveStorePermanently,
   loadStoreFromIndexedDB,
+  mergeStoreSettingsIntoStore,
 } from "@/lib/store-persistence";
 import { isNetworkErrorLike } from "@/lib/network-error";
 import type { Store } from "@/types";
@@ -45,12 +46,7 @@ export function useEnsureStore() {
           const { settingsApi } = await import("@/lib/api/settings");
           try {
             const settingsRes = await settingsApi.get(store.id);
-            const raw = settingsRes.data as {
-              credit?: Store["credit"];
-              data?: { credit?: Store["credit"] };
-            };
-            const credit = raw?.data?.credit ?? raw?.credit;
-            if (credit !== undefined) store = { ...store, credit };
+            store = mergeStoreSettingsIntoStore(store, settingsRes.data);
           } catch (_) {}
           await saveStorePermanently(store, setSetting);
           setSetting("currentStore", store);
@@ -89,12 +85,19 @@ export function useEnsureStore() {
     setIsLoading(true);
     try {
       const response = await storesApi.getMyStore();
-      const store = response.data;
-
-      await saveStorePermanently(store, setSetting);
+      let store = response.data;
+      if (store) {
+        try {
+          const { settingsApi } = await import("@/lib/api/settings");
+          const settingsRes = await settingsApi.get(store.id);
+          store = mergeStoreSettingsIntoStore(store, settingsRes.data);
+        } catch (_) {}
+        await saveStorePermanently(store, setSetting);
+        setSetting("currentStore", store);
+      }
 
       setIsLoading(false);
-      return store;
+      return store ?? null;
     } catch (error: unknown) {
       setIsLoading(false);
 

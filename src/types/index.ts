@@ -8,6 +8,8 @@ export interface StoreEnabledModules {
   showVatInCheckout?: boolean;
 }
 
+export type StoreCurrency = "USD" | "CDF" | "ZAR";
+
 /** Store credit settings (from GET/PATCH settings). When null/absent, credit payment is disabled. */
 export interface StoreCreditSetting {
   customerCredit: {
@@ -31,6 +33,12 @@ export interface Store {
   enabledModules?: StoreEnabledModules;
   /** Credit config: when present, Credit payment is available. From store/settings API. */
   credit?: StoreCreditSetting | null;
+  /** Display currency for the store (from GET/PATCH settings). Default USD. */
+  currency?: StoreCurrency;
+  /** Exchange rate: 1 USD = ? CDF */
+  cdfUsdExRate?: number | null;
+  /** Exchange rate: 1 USD = ? ZAR */
+  zarUsdExRate?: number | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -52,6 +52,7 @@ import CreditSaleModal from "@/components/pos/CreditSaleModal";
 import { ReceiptModal, type ReceiptData } from "@/components/pos/ReceiptModal";
 import { BarcodeScanner } from "@/components/barcode-scanner";
 import { useSettings } from "@/components/settings-provider";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { useCustomers } from "@/hooks/use-customers";
 import { useCategories, useProducts, productKeys } from "@/hooks/use-catalogue";
 import {
@@ -89,6 +90,7 @@ type PosAlertTitleKey = "stock" | "credit" | "notice";
 export default function PosPage() {
   const { t } = useTranslation();
   const { settings } = useSettings();
+  const { formatMoney } = useStoreCurrency();
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
@@ -333,7 +335,7 @@ export default function PosPage() {
     feedback.success(
       t("pos.feedback.voucherAppliedTitle"),
       t("pos.feedback.voucherAppliedDescription", {
-        amount: amount.toFixed(2),
+        amount: formatMoney(amount),
       })
     );
   };
@@ -347,7 +349,7 @@ export default function PosPage() {
     feedback.success(
       t("pos.feedback.discountAppliedTitle"),
       t("pos.feedback.discountAppliedDescription", {
-        amount: amount.toFixed(2),
+        amount: formatMoney(amount),
       })
     );
   };
@@ -1003,11 +1005,11 @@ export default function PosPage() {
                                 {product.stock ?? "-"}
                               </TableCell>
                               <TableCell>
-                                R
-                                {(typeof product.price === "number"
-                                  ? product.price
-                                  : parseFloat(product.price || 0)
-                                ).toFixed(2)}
+                                {formatMoney(
+                                  typeof product.price === "number"
+                                    ? product.price
+                                    : parseFloat(product.price || 0)
+                                )}
                               </TableCell>
                               <TableCell className="text-center px-2">
                                 <Button

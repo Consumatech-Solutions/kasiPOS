@@ -34,6 +34,8 @@ import {
   render,
 } from "react-thermal-printer";
 import { feedback } from "@/lib/feedback";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
+import { formatMoney } from "@/lib/format-money";
 
 export interface ReceiptData {
   storeName: string;
@@ -73,6 +75,8 @@ function formatReceiptDate(d: Date): string {
 export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { currency } = useStoreCurrency();
+  const fmt = (amount: number) => formatMoney(amount, currency);
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const [showPrinterSetup, setShowPrinterSetup] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -86,17 +90,17 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
           `<tr>
             <td>${escapeHtml(item.productName)}</td>
             <td style="text-align:center">${item.quantity}</td>
-            <td style="text-align:right">R ${(item.unitPrice ?? 0).toFixed(2)}</td>
-            <td style="text-align:right">R ${(item.totalPrice ?? 0).toFixed(2)}</td>
+            <td style="text-align:right">${escapeHtml(fmt(item.unitPrice ?? 0))}</td>
+            <td style="text-align:right">${escapeHtml(fmt(item.totalPrice ?? 0))}</td>
           </tr>`
       )
       .join("");
     const discountRow =
       d.discountAmount > 0
-        ? `<div class="row"><span>Discount</span><span>-R ${d.discountAmount.toFixed(2)}</span></div>`
+        ? `<div class="row"><span>Discount</span><span>-${escapeHtml(fmt(d.discountAmount))}</span></div>`
         : "";
     const vatRow = d.showVat
-      ? `<div class="row"><span>VAT (15%)</span><span>R ${d.vatAmount.toFixed(2)}</span></div>`
+      ? `<div class="row"><span>VAT (15%)</span><span>${escapeHtml(fmt(d.vatAmount))}</span></div>`
       : "";
     const voucherRow = d.voucherCode
       ? `<div class="row meta"><span>Voucher</span><span>${escapeHtml(d.voucherCode)}</span></div>`
@@ -113,11 +117,11 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         <tbody>${rows}</tbody>
       </table>
       <div class="totals">
-        <div class="row"><span>Subtotal</span><span>R ${d.subtotal.toFixed(2)}</span></div>
+        <div class="row"><span>Subtotal</span><span>${escapeHtml(fmt(d.subtotal))}</span></div>
         ${discountRow}
         ${voucherRow}
         ${vatRow}
-        <div class="row total"><span>Total</span><span>R ${d.total.toFixed(2)}</span></div>
+        <div class="row total"><span>Total</span><span>${escapeHtml(fmt(d.total))}</span></div>
         <div class="row meta"><span>Payment</span><span>${d.paymentMethod}</span></div>
       </div>
       <p class="footer">Thank you for your purchase</p>
@@ -147,8 +151,8 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
               ? item.productName.substring(0, 15) + "..."
               : item.productName.padEnd(18);
           const qty = item.quantity.toString().padStart(3);
-          const price = `R ${(item.unitPrice ?? 0).toFixed(2)}`.padStart(8);
-          const total = `R ${(item.totalPrice ?? 0).toFixed(2)}`.padStart(8);
+          const price = fmt(item.unitPrice ?? 0).padStart(8);
+          const total = fmt(item.totalPrice ?? 0).padStart(8);
           return (
             <React.Fragment key={index}>
               <Text align="left">
@@ -158,11 +162,11 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
           );
         })}
         <Line />
-        <Row left="Subtotal" right={`R ${receiptData.subtotal.toFixed(2)}`} />
+        <Row left="Subtotal" right={fmt(receiptData.subtotal)} />
         {receiptData.discountAmount > 0 && (
           <Row
             left="Discount"
-            right={`-R ${receiptData.discountAmount.toFixed(2)}`}
+            right={`-${fmt(receiptData.discountAmount)}`}
           />
         )}
         {receiptData.voucherCode && (
@@ -170,11 +174,11 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
         )}
         {receiptData.showVat && (
           <Text align="left">
-            VAT (15%) included: {`R ${receiptData.vatAmount.toFixed(2)}`}
+            VAT (15%) included: {fmt(receiptData.vatAmount)}
           </Text>
         )}
         <Line />
-        <Text bold={true}>Total: {`R ${receiptData.total.toFixed(2)}`}</Text>
+        <Text bold={true}>Total: {fmt(receiptData.total)}</Text>
         <Text align="left">Payment: {receiptData.paymentMethod}</Text>
         <Line />
         <Text align="center">Thank you for your purchase</Text>
@@ -416,10 +420,10 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                       </td>
                       <td className="py-2 text-center">{item.quantity}</td>
                       <td className="py-2 text-right whitespace-nowrap">
-                        R {(item.unitPrice ?? 0).toFixed(2)}
+                        {fmt(item.unitPrice ?? 0)}
                       </td>
                       <td className="py-2 text-right font-medium whitespace-nowrap">
-                        R {(item.totalPrice ?? 0).toFixed(2)}
+                        {fmt(item.totalPrice ?? 0)}
                       </td>
                     </tr>
                   ))}
@@ -430,14 +434,14 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground shrink-0">Subtotal</span>
                 <span className="whitespace-nowrap">
-                  R {data.subtotal.toFixed(2)}
+                  {fmt(data.subtotal)}
                 </span>
               </div>
               {data.discountAmount > 0 && (
                 <div className="flex justify-between gap-4 text-green-600">
                   <span className="shrink-0">Discount</span>
                   <span className="whitespace-nowrap">
-                    -R {data.discountAmount.toFixed(2)}
+                    -{fmt(data.discountAmount)}
                   </span>
                 </div>
               )}
@@ -451,14 +455,14 @@ export function ReceiptModal({ open, onClose, data }: ReceiptModalProps) {
                 <div className="flex justify-between gap-4 text-muted-foreground">
                   <span className="shrink-0">VAT (15%)</span>
                   <span className="whitespace-nowrap">
-                    R {data.vatAmount.toFixed(2)}
+                    {fmt(data.vatAmount)}
                   </span>
                 </div>
               )}
               <div className="flex justify-between gap-4 font-bold text-base pt-2 border-t mt-2">
                 <span className="shrink-0">Total</span>
                 <span className="whitespace-nowrap">
-                  R {data.total.toFixed(2)}
+                  {fmt(data.total)}
                 </span>
               </div>
               <div className="flex justify-between gap-4 text-muted-foreground text-xs pt-1">
