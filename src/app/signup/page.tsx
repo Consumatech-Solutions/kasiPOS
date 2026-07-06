@@ -5,8 +5,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { authApi } from "@/lib/api";
-import { normalizePhone } from "@/lib/phone";
+import {
+  DEFAULT_PHONE_COUNTRY,
+  formatE164,
+  getPhoneCountry,
+  validateLocalNumber,
+} from "@/lib/phone";
+import { PhoneNumberField } from "@/components/auth/phone-number-field";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,17 +40,27 @@ import {
 } from "@/lib/backend-connection";
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
-const signupSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  name: z.string().min(1, { message: "Your name is required." }),
-  storeName: z.string().min(1, { message: "Store name is required." }),
-  password: z
-    .string()
-    .min(8, { message: "Password must be at least 8 characters." }),
-  phoneNumber: z.string().min(10, {
-    message: "Please enter a valid mobile number (at least 10 digits).",
-  }),
-});
+const signupSchema = z
+  .object({
+    email: z.string().email({ message: "Please enter a valid email address." }),
+    name: z.string().min(1, { message: "Your name is required." }),
+    storeName: z.string().min(1, { message: "Store name is required." }),
+    password: z
+      .string()
+      .min(8, { message: "Password must be at least 8 characters." }),
+    countryCode: z.string().min(2, { message: "Country is required." }),
+    localNumber: z.string().min(1, { message: "Mobile number is required." }),
+  })
+  .superRefine((data, ctx) => {
+    const result = validateLocalNumber(data.countryCode, data.localNumber);
+    if (!result.valid) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message,
+        path: ["localNumber"],
+      });
+    }
+  });
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -57,21 +74,29 @@ export default function SignupPage() {
       name: "",
       storeName: "",
       password: "",
-      phoneNumber: "",
+      countryCode: DEFAULT_PHONE_COUNTRY.iso,
+      localNumber: "",
     },
   });
 
   const onSubmit = async (values: SignupFormValues) => {
-    const phoneNumber = normalizePhone(values.phoneNumber);
-    if (phoneNumber.length < 10) {
-      feedback.error(
-        "Invalid number",
-        "Please enter at least 10 digits.",
-        undefined,
-        { code: ERROR_CODES.SIGNUP }
-      );
+    const phoneValidation = validateLocalNumber(
+      values.countryCode,
+      values.localNumber
+    );
+    if (!phoneValidation.valid) {
+      feedback.error("Invalid number", phoneValidation.message, undefined, {
+        code: ERROR_CODES.SIGNUP,
+      });
       return;
     }
+
+    const country = getPhoneCountry(values.countryCode)!;
+    const phoneNumber = formatE164(
+      country.dialCode,
+      values.localNumber,
+      values.countryCode
+    );
 
     try {
       const response = await authApi.signup({
@@ -79,14 +104,23 @@ export default function SignupPage() {
         name: values.name.trim(),
         storeName: values.storeName.trim(),
         password: values.password,
+        countryCode: values.countryCode,
         phoneNumber,
       });
 
+      const channel = response.data?.verificationChannel ?? "email";
       const message =
-        response.data?.message ?? "Verification code sent to your email.";
-      feedback.success("Check your email", message);
+        response.data?.message ??
+        (channel === "sms"
+          ? "Verification code sent to your mobile number."
+          : "Verification code sent to your email.");
+
+      feedback.success(
+        channel === "sms" ? "Check your phone" : "Check your email",
+        message
+      );
       router.push(
-        `/signup/verify?email=${encodeURIComponent(values.email.trim())}`
+        `/signup/verify?email=${encodeURIComponent(values.email.trim())}&channel=${channel}`
       );
     } catch (error: unknown) {
       const err = error as {
@@ -133,6 +167,8 @@ export default function SignupPage() {
     }
   };
 
+  const isSubmitting = form.formState.isSubmitting;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
@@ -141,7 +177,8 @@ export default function SignupPage() {
             Create your store
           </CardTitle>
           <CardDescription className="text-sm">
-            Register as a merchant. We will email you a verification code.
+            Register as a merchant. We&apos;ll send a verification code to your
+            mobile (South Africa) or email (other countries).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -203,16 +240,22 @@ export default function SignupPage() {
               />
               <FormField
                 control={form.control}
-                name="phoneNumber"
+                name="localNumber"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Mobile number</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="e.g., 0812345678"
-                        className="touch-target"
-                        autoComplete="tel"
-                        {...field}
+                      <PhoneNumberField
+                        value={{
+                          countryIso: form.watch("countryCode"),
+                          localNumber: field.value,
+                        }}
+                        onChange={({ countryIso, localNumber }) => {
+                          form.setValue("countryCode", countryIso, {
+                            shouldValidate: true,
+                          });
+                          field.onChange(localNumber);
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -240,8 +283,12 @@ export default function SignupPage() {
               <Button
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
+                disabled={isSubmitting}
               >
-                Continue
+                {isSubmitting && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {isSubmitting ? "Continuing..." : "Continue"}
               </Button>
             </form>
           </Form>
