@@ -39,8 +39,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 export default function MarketplaceOrdersPage() {
+  const { formatMoney } = useStoreCurrency();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStore, setSelectedStore] = useState<string | undefined>();
@@ -234,7 +236,7 @@ export default function MarketplaceOrdersPage() {
                           </Badge>
                           <div className="text-right">
                             <p className="font-semibold">
-                              R{(Number(order.total) || 0).toFixed(2)}
+                              {formatMoney(Number(order.total) || 0)}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {format(
@@ -299,13 +301,11 @@ export default function MarketplaceOrdersPage() {
                                     <TableCell>{item.productName}</TableCell>
                                     <TableCell>{item.quantity}</TableCell>
                                     <TableCell className="text-right">
-                                      R
-                                      {(Number(item.unitPrice) || 0).toFixed(2)}
+                                      {formatMoney(Number(item.unitPrice) || 0)}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                      R
-                                      {(Number(item.totalPrice) || 0).toFixed(
-                                        2
+                                      {formatMoney(
+                                        Number(item.totalPrice) || 0
                                       )}
                                     </TableCell>
                                   </TableRow>
@@ -321,14 +321,14 @@ export default function MarketplaceOrdersPage() {
                               Subtotal
                             </span>
                             <span>
-                              R{(Number(order.subtotal) || 0).toFixed(2)}
+                              {formatMoney(Number(order.subtotal) || 0)}
                             </span>
                           </div>
                           {order.vatAmount > 0 && (
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">VAT</span>
                               <span>
-                                R{(Number(order.vatAmount) || 0).toFixed(2)}
+                                {formatMoney(Number(order.vatAmount) || 0)}
                               </span>
                             </div>
                           )}
@@ -338,15 +338,13 @@ export default function MarketplaceOrdersPage() {
                                 Service Fee
                               </span>
                               <span>
-                                R{(Number(order.serviceFee) || 0).toFixed(2)}
+                                {formatMoney(Number(order.serviceFee) || 0)}
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between text-lg font-bold pt-2">
                             <span>Total</span>
-                            <span>
-                              R{(Number(order.total) || 0).toFixed(2)}
-                            </span>
+                            <span>{formatMoney(Number(order.total) || 0)}</span>
                           </div>
                         </div>
                       </div>

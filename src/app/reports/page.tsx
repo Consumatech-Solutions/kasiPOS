@@ -23,9 +23,11 @@ import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import { useMemo } from "react";
 import { format, subDays } from "date-fns";
 import { useSettings } from "@/components/settings-provider";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 export default function ReportsPage() {
   const { settings } = useSettings();
+  const { formatMoney } = useStoreCurrency();
   const { currentStore } = settings;
 
   const transactionsQuery = useQuery({
@@ -112,7 +114,7 @@ export default function ReportsPage() {
                 axisLine={false}
                 tickMargin={8}
               />
-              <YAxis tickFormatter={(value) => `R${value}`} />
+              <YAxis tickFormatter={(value) => formatMoney(value)} />
               <Tooltip
                 cursor={false}
                 content={<ChartTooltipContent indicator="dot" />}

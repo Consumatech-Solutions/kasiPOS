@@ -34,11 +34,13 @@ import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/types/pagination";
 import Select from "react-select";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const PAGE_SIZE = 10;
 
 export default function SalePage() {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const { settings } = useSettings();
   const { currentStore } = settings;
 
@@ -397,7 +399,7 @@ export default function SalePage() {
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-lg">
-                              R{total.toFixed(2)}
+                              {formatMoney(total)}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {transaction.paymentMethod}
@@ -423,12 +425,12 @@ export default function SalePage() {
                                   <div className="text-muted-foreground text-xs mt-0.5">
                                     {t("sales.detail.qtyLine", {
                                       qty: item.quantity,
-                                      unit: Number(item.unitPrice).toFixed(2),
+                                      unit: formatMoney(Number(item.unitPrice)),
                                     })}
                                   </div>
                                 </div>
                                 <span className="font-medium ml-2">
-                                  R{Number(item.totalPrice).toFixed(2)}
+                                  {formatMoney(Number(item.totalPrice))}
                                 </span>
                               </li>
                             ))}
@@ -439,23 +441,23 @@ export default function SalePage() {
                               <span className="text-muted-foreground">
                                 {t("sales.detail.subtotal")}
                               </span>
-                              <span>R{subtotal.toFixed(2)}</span>
+                              <span>{formatMoney(subtotal)}</span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">
                                 {t("sales.detail.tax")}
                               </span>
-                              <span>R{tax.toFixed(2)}</span>
+                              <span>{formatMoney(tax)}</span>
                             </div>
                             {discountAmount > 0 && (
                               <div className="flex justify-between text-sm text-green-600">
                                 <span>{t("sales.detail.discount")}</span>
-                                <span>-R{discountAmount.toFixed(2)}</span>
+                                <span>-{formatMoney(discountAmount)}</span>
                               </div>
                             )}
                             <div className="flex justify-between text-sm font-semibold border-t pt-1">
                               <span>{t("sales.detail.total")}</span>
-                              <span>R{total.toFixed(2)}</span>
+                              <span>{formatMoney(total)}</span>
                             </div>
                           </div>
 

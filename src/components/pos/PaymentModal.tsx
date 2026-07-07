@@ -34,6 +34,7 @@ import {
 } from "@/lib/payment-tendered-input";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { getCurrencySymbol } from "@/lib/format-money";
+import { CurrencyConversionHint } from "@/components/currency-conversion-hint";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -240,7 +241,10 @@ export default function PaymentModal({
             <div className="space-y-4 text-lg">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Due:</span>
-                <span className="font-bold">{formatMoney(cartTotal)}</span>
+                <div className="text-right">
+                  <span className="font-bold">{formatMoney(cartTotal)}</span>
+                  <CurrencyConversionHint amount={cartTotal} className="mt-1" />
+                </div>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Items:</span>
@@ -466,6 +470,10 @@ export default function PaymentModal({
               <p className="text-4xl font-bold text-foreground">
                 {formatMoney(cartTotal)}
               </p>
+              <CurrencyConversionHint
+                amount={cartTotal}
+                className="mt-2 justify-center"
+              />
               <p className="mt-2">
                 {posConnected
                   ? "Waiting for card machine interaction..."

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSettings } from "@/components/settings-provider";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
@@ -59,6 +60,7 @@ import {
 
 export default function BuyStockHistoryPage() {
   const { settings } = useSettings();
+  const { formatMoney } = useStoreCurrency();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
@@ -296,7 +298,7 @@ export default function BuyStockHistoryPage() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-lg">
-                            R{Number(order.total || 0).toFixed(2)}
+                            {formatMoney(Number(order.total || 0))}
                           </p>
                           <p className="text-sm text-muted-foreground capitalize">
                             {order.deliveryMethod}
@@ -320,10 +322,10 @@ export default function BuyStockHistoryPage() {
                               <TableCell>{item.productName}</TableCell>
                               <TableCell>{item.quantity}</TableCell>
                               <TableCell>
-                                R{Number(item.groupPrice || 0).toFixed(2)}
+                                {formatMoney(Number(item.groupPrice || 0))}
                               </TableCell>
                               <TableCell className="text-right">
-                                R{Number(item.totalPrice || 0).toFixed(2)}
+                                {formatMoney(Number(item.totalPrice || 0))}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -334,19 +336,21 @@ export default function BuyStockHistoryPage() {
                           <span className="text-muted-foreground">
                             Subtotal:
                           </span>
-                          <span>R{Number(order.subtotal || 0).toFixed(2)}</span>
+                          <span>
+                            {formatMoney(Number(order.subtotal || 0))}
+                          </span>
                         </div>
                         <div className="flex justify-end gap-4">
                           <span className="text-muted-foreground">
                             Delivery Fee:
                           </span>
                           <span>
-                            R{Number(order.deliveryFee || 0).toFixed(2)}
+                            {formatMoney(Number(order.deliveryFee || 0))}
                           </span>
                         </div>
                         <div className="flex justify-end gap-4 font-bold text-base border-t pt-2 mt-2">
                           <span className="">Total:</span>
-                          <span>R{Number(order.total || 0).toFixed(2)}</span>
+                          <span>{formatMoney(Number(order.total || 0))}</span>
                         </div>
                       </div>
                       {order.id && (

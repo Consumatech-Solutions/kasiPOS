@@ -243,7 +243,9 @@ export default function PosPage() {
     if (cartSubtotal < 5) {
       feedback.error(
         t("pos.feedback.voucherMinTitle"),
-        t("pos.feedback.voucherMinDescription"),
+        t("pos.feedback.voucherMinDescription", {
+          amount: formatMoney(5),
+        }),
         t("pos.feedback.voucherMinHint")
       );
       return;
