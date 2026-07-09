@@ -10,10 +10,17 @@ import {
   PackageCheck,
   ShoppingCart,
   DollarSign,
+  LayoutDashboard,
 } from "lucide-react";
 import { AppSettings, User } from "@/types";
+import {
+  ALL_ROLES,
+  MANAGEMENT_ROLES,
+  STORE_ADMIN_ROLES,
+} from "@/lib/role-permissions";
 
 export const OFFLINE_FIRST_PATHS = [
+  "/dashboard",
   "/",
   "/catalogue",
   "/inventory",
@@ -31,40 +38,70 @@ type NavItem = {
 };
 
 export const navItems: NavItem[] = [
-  { href: "/", labelKey: "nav.home", icon: Home },
-  { href: "/catalogue", labelKey: "nav.catalogue", icon: BookOpen },
-  { href: "/inventory", labelKey: "nav.inventory", icon: LayoutGrid },
-  { href: "/sale", labelKey: "nav.sales", icon: DollarSign },
-  { href: "/transactions", labelKey: "nav.orders", icon: ScrollText },
-  { href: "/customers", labelKey: "nav.customers", icon: Users },
+  {
+    href: "/dashboard",
+    labelKey: "nav.dashboard",
+    icon: LayoutDashboard,
+    roles: STORE_ADMIN_ROLES,
+  },
+  { href: "/", labelKey: "nav.home", icon: Home, roles: ALL_ROLES },
+  {
+    href: "/catalogue",
+    labelKey: "nav.catalogue",
+    icon: BookOpen,
+    roles: MANAGEMENT_ROLES,
+  },
+  {
+    href: "/inventory",
+    labelKey: "nav.inventory",
+    icon: LayoutGrid,
+    roles: MANAGEMENT_ROLES,
+  },
+  { href: "/sale", labelKey: "nav.sales", icon: DollarSign, roles: ALL_ROLES },
+  {
+    href: "/transactions",
+    labelKey: "nav.orders",
+    icon: ScrollText,
+    roles: ALL_ROLES,
+  },
+  {
+    href: "/customers",
+    labelKey: "nav.customers",
+    icon: Users,
+    roles: MANAGEMENT_ROLES,
+  },
   {
     href: "/buy-stock",
     labelKey: "nav.buyStock",
     icon: ShoppingCart,
     featureFlag: "buyStock",
+    roles: MANAGEMENT_ROLES,
   },
   {
     href: "/vouchers",
     labelKey: "nav.campaigns",
     icon: Ticket,
     featureFlag: "campaigns",
+    roles: MANAGEMENT_ROLES,
   },
   {
     href: "/marketplace",
     labelKey: "nav.marketplace",
     icon: ShoppingBasket,
     featureFlag: "marketplace",
+    roles: MANAGEMENT_ROLES,
   },
   {
     href: "/boph",
     labelKey: "nav.boph",
     icon: PackageCheck,
     featureFlag: "boph",
+    roles: MANAGEMENT_ROLES,
   },
   {
     href: "/settings",
     labelKey: "nav.settings",
     icon: Settings,
-    roles: ["admin", "store_admin"],
+    roles: MANAGEMENT_ROLES,
   },
 ];

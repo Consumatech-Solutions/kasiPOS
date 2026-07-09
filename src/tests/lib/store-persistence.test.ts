@@ -9,11 +9,15 @@ vi.mock("@/lib/api/stores", () => ({
   },
 }));
 
-vi.mock("@/lib/api/settings", () => ({
-  settingsApi: {
-    get: () => settingsGetMock(),
-  },
-}));
+vi.mock("@/lib/api/settings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/settings")>();
+  return {
+    ...actual,
+    settingsApi: {
+      get: () => settingsGetMock(),
+    },
+  };
+});
 
 import { getDb, resetDbInstanceForTests } from "@/lib/db";
 import {
@@ -85,7 +89,17 @@ describe("store-persistence", () => {
       customerCredit: { creditLimit: 100, termType: "fixed" as const, term: 7 },
     };
     getMyStoreMock.mockResolvedValue({ data: baseStore });
-    settingsGetMock.mockResolvedValue({ data: { credit } });
+    settingsGetMock.mockResolvedValue({
+      data: {
+        storeId: baseStore.id,
+        vatIncludedInPrice: true,
+        currency: "USD",
+        cdfUsdExRate: null,
+        zarUsdExRate: null,
+        credit,
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
     const result = await fetchAndSaveStore(setSetting);
     expect(result?.id).toBe(baseStore.id);
     expect(result?.credit).toEqual(credit);

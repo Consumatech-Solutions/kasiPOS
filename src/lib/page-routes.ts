@@ -1,6 +1,7 @@
 export function getPageRoutesToPreload(isLoggedIn: boolean): string[] {
   const appRoutes = [
     "/",
+    "/dashboard",
     "/catalogue",
     "/customers",
     "/inventory",
@@ -20,6 +21,9 @@ export function getPageRoutesToPreload(isLoggedIn: boolean): string[] {
 
   const authRoutes = [
     "/login",
+    "/forgot-password",
+    "/reset-password",
+    "/reset-password/verify",
     "/request-access",
     "/verify-code",
     "/set-password",
@@ -34,6 +38,7 @@ export function getPageRoutesToPreload(isLoggedIn: boolean): string[] {
 
 export const ALL_PAGE_ROUTES = [
   "/",
+  "/dashboard",
   "/catalogue",
   "/customers",
   "/inventory",
@@ -50,6 +55,9 @@ export const ALL_PAGE_ROUTES = [
   "/boph",
   "/store-setup",
   "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/reset-password/verify",
   "/request-access",
   "/verify-code",
   "/set-password",

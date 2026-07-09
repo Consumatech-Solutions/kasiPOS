@@ -130,7 +130,7 @@ export default function StoreSetupPage() {
           });
         }
         feedback.success("Store setup completed", "Store setup completed!");
-        router.push("/");
+        router.push("/dashboard");
       }
     } catch (error) {
       console.error("Failed to save store:", error);

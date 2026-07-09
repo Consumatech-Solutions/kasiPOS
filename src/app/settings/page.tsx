@@ -33,13 +33,18 @@ import {
   Loader2,
   Crown,
   Coins,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/components/settings-provider";
 import { usersApi, settingsApi } from "@/lib/api";
 import { storesApi } from "@/lib/api/stores";
-import { saveStorePermanently, mergeStoreSettingsFields } from "@/lib/store-persistence";
+import {
+  saveStorePermanently,
+  mergeStoreSettingsFields,
+} from "@/lib/store-persistence";
 import {
   Select,
   SelectContent,
@@ -180,6 +185,8 @@ export default function SettingsPage() {
 
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [duplicatePhonePopupOpen, setDuplicatePhonePopupOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userForPassword, setUserForPassword] = useState<User | null>(null);
@@ -285,18 +292,15 @@ export default function SettingsPage() {
   const settingsStoreId =
     currentUser?.storeId ?? settingsStore?.id ?? undefined;
 
-  const applyCurrencyFromStore = useCallback(
-    (store: typeof settingsStore) => {
-      setCurrencyForm({
-        currency: store?.currency ?? "USD",
-        cdfUsdExRate:
-          store?.cdfUsdExRate != null ? String(store.cdfUsdExRate) : "",
-        zarUsdExRate:
-          store?.zarUsdExRate != null ? String(store.zarUsdExRate) : "",
-      });
-    },
-    []
-  );
+  const applyCurrencyFromStore = useCallback((store: typeof settingsStore) => {
+    setCurrencyForm({
+      currency: store?.currency ?? "USD",
+      cdfUsdExRate:
+        store?.cdfUsdExRate != null ? String(store.cdfUsdExRate) : "",
+      zarUsdExRate:
+        store?.zarUsdExRate != null ? String(store.zarUsdExRate) : "",
+    });
+  }, []);
 
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== "store_admin") return;
@@ -513,7 +517,10 @@ export default function SettingsPage() {
 
     if (currencyForm.currency === "CDF") {
       const rate = Number(currencyForm.cdfUsdExRate);
-      if (currencyForm.cdfUsdExRate !== "" && (Number.isNaN(rate) || rate < 0)) {
+      if (
+        currencyForm.cdfUsdExRate !== "" &&
+        (Number.isNaN(rate) || rate < 0)
+      ) {
         feedback.error(
           t("settings.currency.feedback.invalidRateTitle"),
           t("settings.currency.feedback.invalidRateDesc"),
@@ -522,13 +529,15 @@ export default function SettingsPage() {
         );
         return;
       }
-      body.cdfUsdExRate =
-        currencyForm.cdfUsdExRate === "" ? null : rate;
+      body.cdfUsdExRate = currencyForm.cdfUsdExRate === "" ? null : rate;
     }
 
     if (currencyForm.currency === "ZAR") {
       const rate = Number(currencyForm.zarUsdExRate);
-      if (currencyForm.zarUsdExRate !== "" && (Number.isNaN(rate) || rate < 0)) {
+      if (
+        currencyForm.zarUsdExRate !== "" &&
+        (Number.isNaN(rate) || rate < 0)
+      ) {
         feedback.error(
           t("settings.currency.feedback.invalidRateTitle"),
           t("settings.currency.feedback.invalidRateDesc"),
@@ -537,8 +546,7 @@ export default function SettingsPage() {
         );
         return;
       }
-      body.zarUsdExRate =
-        currencyForm.zarUsdExRate === "" ? null : rate;
+      body.zarUsdExRate = currencyForm.zarUsdExRate === "" ? null : rate;
     }
 
     setSavingCurrency(true);
@@ -549,10 +557,14 @@ export default function SettingsPage() {
         currency: normalized?.currency ?? body.currency ?? "USD",
         cdfUsdExRate:
           normalized?.cdfUsdExRate ??
-          (body.cdfUsdExRate !== undefined ? body.cdfUsdExRate : settingsStore.cdfUsdExRate ?? null),
+          (body.cdfUsdExRate !== undefined
+            ? body.cdfUsdExRate
+            : (settingsStore.cdfUsdExRate ?? null)),
         zarUsdExRate:
           normalized?.zarUsdExRate ??
-          (body.zarUsdExRate !== undefined ? body.zarUsdExRate : settingsStore.zarUsdExRate ?? null),
+          (body.zarUsdExRate !== undefined
+            ? body.zarUsdExRate
+            : (settingsStore.zarUsdExRate ?? null)),
       });
       setSetting("currentStore", merged);
       await saveStorePermanently(merged, setSetting);
@@ -991,6 +1003,8 @@ export default function SettingsPage() {
   const openPasswordDialog = (user: User) => {
     setUserForPassword(user);
     passwordForm.reset({ password: "", confirmPassword: "" });
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
     setPasswordDialogOpen(true);
   };
 
@@ -1016,6 +1030,8 @@ export default function SettingsPage() {
       setPasswordDialogOpen(false);
       setUserForPassword(null);
       passwordForm.reset();
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     } catch (error: any) {
       console.error("Failed to update password:", error);
       feedback.fromError(
@@ -1922,13 +1938,39 @@ export default function SettingsPage() {
                         {t("settings.staff.password.newLabel")}
                       </FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
-                          {...field}
-                          placeholder={t(
-                            "settings.staff.password.newPlaceholder"
-                          )}
-                        />
+                        <div className="relative">
+                          <Input
+                            type={showNewPassword ? "text" : "password"}
+                            {...field}
+                            placeholder={t(
+                              "settings.staff.password.newPlaceholder"
+                            )}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                            onClick={() => setShowNewPassword((v) => !v)}
+                            aria-label={
+                              showNewPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                            title={
+                              showNewPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showNewPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1943,13 +1985,39 @@ export default function SettingsPage() {
                         {t("settings.staff.password.confirmLabel")}
                       </FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
-                          {...field}
-                          placeholder={t(
-                            "settings.staff.password.confirmPlaceholder"
-                          )}
-                        />
+                        <div className="relative">
+                          <Input
+                            type={showConfirmPassword ? "text" : "password"}
+                            {...field}
+                            placeholder={t(
+                              "settings.staff.password.confirmPlaceholder"
+                            )}
+                            className="pr-10"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            aria-label={
+                              showConfirmPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                            title={
+                              showConfirmPassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showConfirmPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>

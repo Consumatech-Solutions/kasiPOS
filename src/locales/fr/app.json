@@ -1,5 +1,6 @@
 {
   "nav.home": "Accueil",
+  "nav.dashboard": "Tableau de bord",
   "nav.catalogue": "Catalogue",
   "nav.inventory": "Inventaire",
   "nav.sales": "Ventes",

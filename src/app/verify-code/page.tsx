@@ -36,6 +36,8 @@ function VerifyCodeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams ? searchParams.get("phone") : null;
+  const flow = searchParams?.get("flow");
+  const isResetFlow = flow === "reset";
 
   const form = useForm<z.infer<typeof verifyCodeSchema>>({
     resolver: zodResolver(verifyCodeSchema),
@@ -71,6 +73,15 @@ function VerifyCodeContent() {
           localStorage.setItem("kasi-pos-temp-token", tempToken);
         }
 
+        if (isResetFlow) {
+          feedback.success(
+            "Verification successful",
+            "You can now choose a new password."
+          );
+          router.push(`/reset-password?phone=${encodeURIComponent(phone)}`);
+          return;
+        }
+
         if (hasPassword && user) {
           if (hasPassword) {
             router.push("/login");
@@ -99,6 +110,7 @@ function VerifyCodeContent() {
           <CardDescription>
             A 6-digit code was sent to your mobile number
             {phone ? ` ending in ...${phone.slice(-4)}` : ""}.
+            {isResetFlow ? " Use it to reset your password." : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -125,7 +137,9 @@ function VerifyCodeContent() {
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Didn't get a code?{" "}
             <Button variant="link" className="p-0" asChild>
-              <Link href="/request-access">Resend</Link>
+              <Link href={isResetFlow ? "/forgot-password" : "/request-access"}>
+                Resend
+              </Link>
             </Button>
           </p>
         </CardContent>

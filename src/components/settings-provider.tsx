@@ -23,6 +23,12 @@ import {
   resetSessionExpiredNotifyGuard,
 } from "@/lib/auth-session";
 import { feedback } from "@/lib/feedback";
+import {
+  getPostLoginRedirectPath,
+  getStaffRedirectPath,
+  isDashboardAllowedForRole,
+  isPathAllowedForRole,
+} from "@/lib/role-permissions";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -105,6 +111,9 @@ const AUTH_ROUTES = [
   "/login",
   "/signup",
   "/signup/verify",
+  "/forgot-password",
+  "/reset-password",
+  "/reset-password/verify",
   "/request-access",
   "/verify-code",
   "/set-password",
@@ -581,7 +590,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       router.push("/login");
     } else if (settings.isLoggedIn) {
       if (isAuthRoute) {
-        router.push("/");
+        router.push(getPostLoginRedirectPath(settings.currentUser?.role));
         return;
       }
 
@@ -589,12 +598,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (!settings.currentStore.isSetupComplete && !isSetupRoute) {
           router.push(SETUP_ROUTE);
         } else if (settings.currentStore.isSetupComplete && isSetupRoute) {
-          router.push("/");
+          router.push(getPostLoginRedirectPath(settings.currentUser?.role));
         }
 
         if (
           settings.currentUser?.role === "staff" &&
-          pathname.startsWith("/settings")
+          !isPathAllowedForRole(pathname, settings.currentUser.role)
+        ) {
+          router.push(getStaffRedirectPath());
+        }
+
+        if (
+          pathname.startsWith("/dashboard") &&
+          !isDashboardAllowedForRole(settings.currentUser?.role)
         ) {
           router.push("/");
         }
@@ -695,6 +711,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
     if (settings.currentStore && !settings.currentStore.isSetupComplete)
       return pathname === SETUP_ROUTE;
+    if (
+      settings.currentUser?.role === "staff" &&
+      !isPathAllowedForRole(pathname, settings.currentUser.role)
+    ) {
+      return false;
+    }
+    if (
+      pathname.startsWith("/dashboard") &&
+      !isDashboardAllowedForRole(settings.currentUser?.role)
+    ) {
+      return false;
+    }
     return !AUTH_ROUTES.includes(pathname) && pathname !== SETUP_ROUTE;
   };
 
