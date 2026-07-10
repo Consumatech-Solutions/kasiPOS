@@ -25,6 +25,7 @@ import {
 } from "@/lib/dashboard-stats-mapper";
 import { isOfflineError } from "@/lib/api/core";
 import { isNetworkErrorLike } from "@/lib/network-error";
+import { useEffectiveOnline } from "@/hooks/use-effective-online";
 import type { UserRole } from "@/types";
 import type { PaginationMeta } from "@/types/pagination";
 
@@ -47,6 +48,19 @@ interface UseDashboardStatsOptions {
   walkInLabel?: string;
   enabled?: boolean;
 }
+
+export const dashboardStatsKeys = {
+  all: ["dashboardStats"] as const,
+  list: (filters: { storeId?: string | null; page?: number; limit?: number }) =>
+    [...dashboardStatsKeys.all, filters] as const,
+  local: (filters: {
+    storeId?: string | null;
+    page?: number;
+    limit?: number;
+  }) => [...dashboardStatsKeys.list(filters), "local"] as const,
+  api: (filters: { storeId?: string | null; page?: number; limit?: number }) =>
+    [...dashboardStatsKeys.list(filters), "api"] as const,
+};
 
 async function loadDexieDashboardStats(
   storeId: string | null | undefined,
@@ -124,24 +138,44 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
 
   const isStoreAdmin = role === "store_admin";
   const queryEnabled = enabled && isStoreAdmin && Boolean(storeId);
+  const { effectiveOnline } = useEffectiveOnline();
 
-  return useQuery({
-    queryKey: ["dashboardStats", { storeId, page, limit }],
-    queryFn: async (): Promise<DashboardStatsData> => {
-      try {
-        return await loadApiDashboardStats(storeId, page, limit, walkInLabel);
-      } catch (error) {
-        if (isOfflineError(error) || isNetworkErrorLike(error)) {
-          return loadDexieDashboardStats(storeId, page, limit, walkInLabel);
-        }
-        throw error;
-      }
-    },
+  const filters = { storeId, page, limit };
+
+  const localQuery = useQuery({
+    queryKey: dashboardStatsKeys.local(filters),
+    queryFn: () => loadDexieDashboardStats(storeId, page, limit, walkInLabel),
     enabled: queryEnabled,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const apiQuery = useQuery({
+    queryKey: dashboardStatsKeys.api(filters),
+    queryFn: () => loadApiDashboardStats(storeId, page, limit, walkInLabel),
+    enabled: queryEnabled && effectiveOnline,
     staleTime: 30_000,
     retry: (failureCount, error) => {
       if (isOfflineError(error) || isNetworkErrorLike(error)) return false;
       return failureCount < 2;
     },
   });
+
+  const useApiData =
+    effectiveOnline && apiQuery.isSuccess && apiQuery.data != null;
+  const mergedData = useApiData ? apiQuery.data : localQuery.data;
+  const source: DashboardStatsSource = useApiData ? "api" : "dexie";
+
+  return {
+    data: mergedData ? { ...mergedData, source } : undefined,
+    isLoading: localQuery.isLoading && !localQuery.data,
+    isError: localQuery.isError && !localQuery.data,
+    error: localQuery.error ?? apiQuery.error,
+    isFetching: localQuery.isFetching || apiQuery.isFetching,
+    refetch: async () => {
+      await Promise.all([localQuery.refetch(), apiQuery.refetch()]);
+    },
+  };
 }

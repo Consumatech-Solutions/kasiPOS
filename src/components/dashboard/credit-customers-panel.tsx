@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CustomerWithCredit } from "@/lib/dashboard-metrics";
 import { formatDashboardCurrency } from "@/lib/dashboard-metrics";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import {
   Card,
   CardContent,
@@ -29,6 +30,7 @@ export function CreditCustomersPanel({
   className,
 }: CreditCustomersPanelProps) {
   const { t } = useTranslation();
+  const { currency } = useStoreCurrency();
   const visibleCustomers = customers;
 
   return (
@@ -67,7 +69,10 @@ export function CreditCustomersPanel({
                   ) : null}
                 </div>
                 <p className="shrink-0 text-xs font-semibold">
-                  {formatDashboardCurrency(customer.outstandingCredit)}
+                  {formatDashboardCurrency(
+                    customer.outstandingCredit,
+                    currency
+                  )}
                 </p>
               </li>
             ))

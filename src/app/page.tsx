@@ -55,6 +55,7 @@ import { useSettings } from "@/components/settings-provider";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { useCustomers } from "@/hooks/use-customers";
 import { useCategories, useProducts, productKeys } from "@/hooks/use-catalogue";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import {
   transactionsApi,
   toCreateTransactionDto,
@@ -727,6 +728,7 @@ export default function PosPage() {
             t("pos.feedback.saleCompleteTitle"),
             t("pos.feedback.saleCompleteOfflineHint")
           );
+          queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
         } catch (error) {
           if (process.env.NODE_ENV === "development") {
             console.error("[Complete Sale] Failed (offline)", { error });

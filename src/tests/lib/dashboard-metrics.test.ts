@@ -7,6 +7,7 @@ import {
   getSalesTrendData,
   resolveCustomerName,
 } from "@/lib/dashboard-metrics";
+import { formatMoney } from "@/lib/format-money";
 import type { Customer, Transaction } from "@/types";
 
 const referenceDate = new Date("2026-07-08T12:00:00.000Z");
@@ -118,8 +119,10 @@ describe("dashboard-metrics", () => {
     expect(name).toBe("");
   });
 
-  it("formatDashboardCurrency formats amounts", () => {
-    expect(formatDashboardCurrency(12.5)).toBe("R12.50");
+  it("formatDashboardCurrency formats amounts using store currency", () => {
+    expect(formatDashboardCurrency(12.5, "ZAR")).toBe(formatMoney(12.5, "ZAR"));
+    expect(formatDashboardCurrency(12.5, "USD")).toBe(formatMoney(12.5, "USD"));
+    expect(formatDashboardCurrency(12.5, "CDF")).toBe(formatMoney(12.5, "CDF"));
   });
 
   it("getSalesTrendData returns 7 days of sales totals", () => {

@@ -1,5 +1,6 @@
 import { format, isSameDay, parseISO, subDays } from "date-fns";
-import type { Customer, Transaction } from "@/types";
+import { formatMoney } from "@/lib/format-money";
+import type { Customer, Transaction, StoreCurrency } from "@/types";
 
 export interface DashboardSummary {
   todaySales: number;
@@ -28,8 +29,11 @@ export interface SalesTrendPoint {
   total: number;
 }
 
-export function formatDashboardCurrency(amount: number): string {
-  return `R${Number(amount).toFixed(2)}`;
+export function formatDashboardCurrency(
+  amount: number,
+  currency: StoreCurrency = "USD"
+): string {
+  return formatMoney(amount, currency);
 }
 
 export function transactionDate(transaction: Transaction): Date {
