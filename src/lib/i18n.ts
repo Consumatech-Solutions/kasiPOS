@@ -14,6 +14,7 @@ import enCustomers from "@/locales/en/customers.json";
 import enBuyStock from "@/locales/en/buyStock.json";
 import enVouchers from "@/locales/en/vouchers.json";
 import enMarketplace from "@/locales/en/marketplace.json";
+import enDashboard from "@/locales/en/dashboard.json";
 import frApp from "@/locales/fr/app.json";
 import frCommon from "@/locales/fr/common.json";
 import frSettings from "@/locales/fr/settings.json";
@@ -26,6 +27,7 @@ import frCustomers from "@/locales/fr/customers.json";
 import frBuyStock from "@/locales/fr/buyStock.json";
 import frVouchers from "@/locales/fr/vouchers.json";
 import frMarketplace from "@/locales/fr/marketplace.json";
+import frDashboard from "@/locales/fr/dashboard.json";
 import {
   normalizeToSupportedI18nLng,
   parseStoredAppLanguage,
@@ -61,6 +63,7 @@ const enTranslation = {
   ...enBuyStock,
   ...enVouchers,
   ...enMarketplace,
+  ...enDashboard,
 };
 const frTranslation = {
   ...frCommon,
@@ -75,6 +78,7 @@ const frTranslation = {
   ...frBuyStock,
   ...frVouchers,
   ...frMarketplace,
+  ...frDashboard,
 };
 
 if (!i18n.isInitialized) {

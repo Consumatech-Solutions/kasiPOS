@@ -27,6 +27,7 @@ import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 import { useSettings } from "@/components/settings-provider";
 import Link from "next/link";
+import { getPostLoginRedirectPath } from "@/lib/role-permissions";
 
 const setPasswordStoreAdminSchema = z
   .object({
@@ -79,7 +80,7 @@ export default function SetPasswordStoreAdminPage() {
           ...response.data.user,
           accessToken: response.data.accessToken,
         });
-        router.push("/");
+        router.push(getPostLoginRedirectPath(response.data.user.role));
       }
     } catch (error: unknown) {
       const err = error as {

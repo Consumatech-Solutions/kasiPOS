@@ -3,10 +3,73 @@
 import type { Store } from "@/types";
 import { getDb } from "@/lib/db";
 import type { StoreRecord } from "@/lib/db";
+import { normalizeStoreSettings, type StoreSettings } from "@/lib/api/settings";
+
+export function mergeStoreSettingsIntoStore(
+  store: Store,
+  rawSettings: unknown
+): Store {
+  const settings = normalizeStoreSettings(rawSettings);
+  if (!settings) return store;
+
+  return {
+    ...store,
+    ...(settings.credit !== undefined && { credit: settings.credit }),
+    currency: settings.currency ?? store.currency ?? "USD",
+    cdfUsdExRate: settings.cdfUsdExRate ?? store.cdfUsdExRate ?? null,
+    zarUsdExRate: settings.zarUsdExRate ?? store.zarUsdExRate ?? null,
+  };
+}
+
+export function mergeStoreSettingsFields(
+  store: Store,
+  settings: Partial<
+    Pick<StoreSettings, "credit" | "currency" | "cdfUsdExRate" | "zarUsdExRate">
+  >
+): Store {
+  return {
+    ...store,
+    ...(settings.credit !== undefined && { credit: settings.credit }),
+    ...(settings.currency !== undefined && { currency: settings.currency }),
+    ...(settings.cdfUsdExRate !== undefined && {
+      cdfUsdExRate: settings.cdfUsdExRate,
+    }),
+    ...(settings.zarUsdExRate !== undefined && {
+      zarUsdExRate: settings.zarUsdExRate,
+    }),
+  };
+}
+
+function storeCreditEqual(a: Store["credit"], b: Store["credit"]): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return a === b;
+  const ac = a.customerCredit;
+  const bc = b.customerCredit;
+  if (!ac || !bc) return false;
+  return (
+    ac.creditLimit === bc.creditLimit &&
+    ac.termType === bc.termType &&
+    ac.term === bc.term
+  );
+}
+
+/** True when currency, rates, or credit differ between two store snapshots. */
+export function hasStoreSettingsFieldsChanged(
+  before: Store,
+  after: Store
+): boolean {
+  return (
+    before.currency !== after.currency ||
+    before.cdfUsdExRate !== after.cdfUsdExRate ||
+    before.zarUsdExRate !== after.zarUsdExRate ||
+    !storeCreditEqual(before.credit, after.credit)
+  );
+}
 
 export async function saveStorePermanently(
   store: Store,
-  setSetting?: (key: "currentStore", value: Store | null) => void
+  setSetting?: (key: "currentStore", value: Store | null) => void,
+  options?: { skipStateUpdate?: boolean }
 ): Promise<void> {
   if (!store || !store.id) {
     console.warn("[StorePersistence] Cannot save store: invalid store data");
@@ -14,9 +77,9 @@ export async function saveStorePermanently(
   }
 
   try {
-    if (setSetting) {
+    if (setSetting && !options?.skipStateUpdate) {
       setSetting("currentStore", store);
-    } else {
+    } else if (!setSetting) {
       try {
         const settingsItem = localStorage.getItem("kasi-pos-settings");
         const settings = settingsItem ? JSON.parse(settingsItem) : {};
@@ -100,14 +163,7 @@ export async function fetchAndSaveStore(
       try {
         const { settingsApi } = await import("@/lib/api/settings");
         const settingsRes = await settingsApi.get(store.id);
-        const raw = settingsRes.data as {
-          credit?: Store["credit"];
-          data?: { credit?: Store["credit"] };
-        };
-        const credit = raw?.data?.credit ?? raw?.credit ?? undefined;
-        if (credit !== undefined) {
-          store = { ...store, credit };
-        }
+        store = mergeStoreSettingsIntoStore(store, settingsRes.data);
       } catch (_) {}
       await saveStorePermanently(store, setSetting);
       return store;

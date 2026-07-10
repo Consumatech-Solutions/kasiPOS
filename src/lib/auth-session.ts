@@ -2,7 +2,10 @@ const AUTH_PATH_PREFIXES = [
   "/auth/login",
   "/auth/request-otp",
   "/auth/verify-otp",
+  "/auth/forgot-password",
+  "/auth/verify-password-reset",
   "/auth/set-password",
+  "/auth/reset-password",
   "/auth/set-password-store-admin",
 ] as const;
 

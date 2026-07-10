@@ -18,6 +18,7 @@ import { useCustomers } from "@/hooks/use-customers";
 import type { Customer } from "@/types";
 import { addDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const HEADER_BG = "#181F5E";
 
@@ -48,6 +49,7 @@ export default function CreditSaleModal({
   onAddCustomer,
   isLoading = false,
 }: CreditSaleModalProps) {
+  const { formatMoney } = useStoreCurrency();
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null
@@ -154,7 +156,7 @@ export default function CreditSaleModal({
               Amount on credit
             </span>
             <span className="text-base font-semibold">
-              R {amount.toFixed(2)}
+              {formatMoney(amount)}
             </span>
           </div>
 
@@ -252,20 +254,18 @@ export default function CreditSaleModal({
             </div>
             {selectedCustomer && (
               <div className="text-sm text-muted-foreground">
-                Outstanding credit: R {outstandingCredit.toFixed(2)}
+                Outstanding credit: {formatMoney(outstandingCredit)}
                 {limit != null && limit >= 0 && (
                   <span className="block mt-0.5">
-                    Credit available: R{" "}
-                    {Math.max(0, limit - outstandingCredit).toFixed(2)}
+                    Credit available:{" "}
+                    {formatMoney(Math.max(0, limit - outstandingCredit))}
                   </span>
                 )}
               </div>
             )}
             {selectedCustomer && isOverLimit && limit != null && (
               <p className="text-sm font-medium text-destructive">
-                Credit limit exceeded. Outstanding (R{" "}
-                {outstandingCredit.toFixed(2)}) + this sale (R{" "}
-                {amount.toFixed(2)}) exceeds limit (R {limit.toFixed(2)}).
+                Credit limit exceeded. Outstanding ({formatMoney(outstandingCredit)}) + this sale ({formatMoney(amount)}) exceeds limit ({formatMoney(limit)}).
               </p>
             )}
           </div>

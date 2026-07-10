@@ -6,6 +6,11 @@ import * as z from "zod";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
 import { normalizePhone, DEFAULT_PHONE_COUNTRY, formatE164 } from "@/lib/phone";
+import {
+  detectIdentifierType,
+  refineIdentifierField,
+} from "@/lib/auth-identifier";
+import { PasswordInput } from "@/components/auth/password-input";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,19 +41,6 @@ import {
 } from "@/lib/backend-connection";
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_INPUT_REGEX = /^[\d\s\-+()]+$/;
-
-type IdentifierType = "email" | "phone";
-
-function detectIdentifierType(value: string): IdentifierType | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.includes("@") || EMAIL_REGEX.test(trimmed)) return "email";
-  if (PHONE_INPUT_REGEX.test(trimmed)) return "phone";
-  return null;
-}
-
 const loginSchema = z
   .object({
     identifier: z
@@ -57,33 +49,7 @@ const loginSchema = z
     password: z.string().min(1, { message: "Password is required." }),
   })
   .superRefine((data, ctx) => {
-    const trimmed = data.identifier.trim();
-    const type = detectIdentifierType(trimmed);
-
-    if (!type) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Enter a valid email address or mobile number.",
-        path: ["identifier"],
-      });
-      return;
-    }
-
-    if (type === "email" && !z.string().email().safeParse(trimmed).success) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please enter a valid email address.",
-        path: ["identifier"],
-      });
-    }
-
-    if (type === "phone" && normalizePhone(trimmed).length < 10) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please enter a valid mobile number (at least 10 digits).",
-        path: ["identifier"],
-      });
-    }
+    refineIdentifierField(data.identifier, ctx);
   });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -235,13 +201,21 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
+                      <PasswordInput
                         className="touch-target"
                         autoComplete="current-password"
                         {...field}
                       />
                     </FormControl>
+                    <div className="flex justify-end">
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-xs font-normal"
+                        asChild
+                      >
+                        <Link href="/forgot-password">Forgot password?</Link>
+                      </Button>
+                    </div>
                     <FormMessage />
                   </FormItem>
                 )}

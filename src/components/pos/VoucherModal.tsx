@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ticket, XCircle, CheckCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useVouchers } from "@/hooks/use-vouchers";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 interface VoucherModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export default function VoucherModal({
   cartTotal,
   customerId,
 }: VoucherModalProps) {
+  const { formatMoney } = useStoreCurrency();
   const [voucherCode, setVoucherCode] = useState("");
   const [validatedVoucher, setValidatedVoucher] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export default function VoucherModal({
     if (voucher.type === "percentage") {
       return `${Number(voucher.value)}% off your purchase.`;
     }
-    return `R${Number(voucher.value).toFixed(2)} off your purchase.`;
+    return `${formatMoney(Number(voucher.value))} off your purchase.`;
   };
 
   return (
@@ -174,7 +176,7 @@ export default function VoucherModal({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Maximum discount: R{amountToApply.toFixed(2)}
+                  Maximum discount: {formatMoney(amountToApply)}
                 </p>
               </div>
             </div>

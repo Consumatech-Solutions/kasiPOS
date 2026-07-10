@@ -4,8 +4,11 @@ interface OfflineState {
   isChecking: boolean;
 }
 
-const CONNECTIVITY_CHECK_INTERVAL_MS = 10000;
+const CONNECTIVITY_CHECK_INTERVAL_MS = 30000;
 const NETWORK_TEST_TIMEOUT = 5000;
+/** Minimum time between real HEAD probes to the API origin. */
+const MIN_HEAD_PROBE_INTERVAL_MS = 15000;
+
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
 const BACKEND_URL = getConfiguredApiUrl();
@@ -16,6 +19,8 @@ function isDevHost(): boolean {
   return h === "localhost" || h === "127.0.0.1";
 }
 
+type BackendReachabilityListener = (reachable: boolean) => void;
+
 class OfflineDetector {
   private state: OfflineState = {
     isOffline: false,
@@ -25,6 +30,7 @@ class OfflineDetector {
 
   private checkPromise: Promise<boolean> | null = null;
   private listeners: Set<(isOffline: boolean) => void> = new Set();
+  private reachabilityListeners: Set<BackendReachabilityListener> = new Set();
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private forceOffline = false;
   private offlineFirstActive =
@@ -33,6 +39,9 @@ class OfflineDetector {
       ? false
       : true;
 
+  private lastBackendReachable: boolean | null = null;
+  private lastHeadProbeAt = 0;
+
   constructor() {
     if (typeof window !== "undefined") {
       this.state.isOffline = !navigator.onLine;
@@ -40,26 +49,25 @@ class OfflineDetector {
       window.addEventListener("online", this.handleOnline);
       window.addEventListener("offline", this.handleOffline);
 
-      this.checkConnectivity(false);
+      void this.checkConnectivity(false);
       this.intervalId = setInterval(() => {
-        this.checkConnectivity(false);
+        void this.checkConnectivity(false);
       }, CONNECTIVITY_CHECK_INTERVAL_MS);
     }
   }
 
   private handleOnline = () => {
     this.setState(false);
-    this.checkConnectivity(false)
-      .then((isOnline) => {
+    void this.checkConnectivity(false, false, { bypassThrottle: true }).then(
+      (isOnline) => {
         if (!isOnline) this.setState(true);
-      })
-      .catch(() => {
-        this.setState(true);
-      });
+      }
+    );
   };
 
   private handleOffline = () => {
     this.setState(true);
+    this.setBackendReachability(false);
   };
 
   private setState(isOffline: boolean) {
@@ -68,6 +76,12 @@ class OfflineDetector {
       this.state.lastChecked = Date.now();
       this.notifyListeners();
     }
+  }
+
+  private setBackendReachability(reachable: boolean) {
+    if (this.lastBackendReachable === reachable) return;
+    this.lastBackendReachable = reachable;
+    this.reachabilityListeners.forEach((listener) => listener(reachable));
   }
 
   private notifyListeners() {
@@ -79,6 +93,10 @@ class OfflineDetector {
     if (this.forceOffline && isDevHost()) return true;
     if (this.offlineFirstActive) return true;
     return this.state.isOffline;
+  }
+
+  getLastBackendReachable(): boolean {
+    return this.lastBackendReachable ?? false;
   }
 
   isDevHost(): boolean {
@@ -106,12 +124,35 @@ class OfflineDetector {
     return this.offlineFirstActive;
   }
 
+  subscribeToBackendReachability(
+    callback: BackendReachabilityListener
+  ): () => void {
+    this.reachabilityListeners.add(callback);
+    callback(this.getLastBackendReachable());
+    return () => {
+      this.reachabilityListeners.delete(callback);
+    };
+  }
+
+  private shouldThrottleHeadProbe(bypassThrottle: boolean): boolean {
+    if (bypassThrottle) return false;
+    if (this.lastBackendReachable == null) return false;
+    return Date.now() - this.lastHeadProbeAt < MIN_HEAD_PROBE_INTERVAL_MS;
+  }
+
   private async checkConnectivity(
     force: boolean = false,
-    bypassOfflineFirst: boolean = false
+    bypassOfflineFirst: boolean = false,
+    options?: { bypassThrottle?: boolean }
   ): Promise<boolean> {
-    if (this.checkPromise && !force) {
+    if (this.checkPromise) {
       return this.checkPromise;
+    }
+
+    const bypassThrottle = options?.bypassThrottle === true;
+
+    if (this.shouldThrottleHeadProbe(bypassThrottle)) {
+      return this.lastBackendReachable ?? false;
     }
 
     this.checkPromise = (async () => {
@@ -120,6 +161,7 @@ class OfflineDetector {
       try {
         if (this.forceOffline && isDevHost()) {
           this.setState(true);
+          this.setBackendReachability(false);
           return false;
         }
 
@@ -130,6 +172,7 @@ class OfflineDetector {
 
         if (!navigator.onLine) {
           this.setState(true);
+          this.setBackendReachability(false);
           return false;
         }
 
@@ -141,6 +184,7 @@ class OfflineDetector {
         const url = BACKEND_URL.replace(/\/$/, "");
 
         try {
+          this.lastHeadProbeAt = Date.now();
           const response = await fetch(url, {
             method: "HEAD",
             cache: "no-cache",
@@ -150,14 +194,17 @@ class OfflineDetector {
           clearTimeout(timeoutId);
           const isOnline = response.status !== 0;
           this.setState(!isOnline);
+          this.setBackendReachability(isOnline);
           return isOnline;
         } catch {
           clearTimeout(timeoutId);
           this.setState(true);
+          this.setBackendReachability(false);
           return false;
         }
       } finally {
         this.state.isChecking = false;
+        this.state.lastChecked = Date.now();
         this.checkPromise = null;
       }
     })();
@@ -183,8 +230,8 @@ class OfflineDetector {
     };
   }
 
-  async forceCheck(): Promise<boolean> {
-    return await this.checkConnectivity(true, true);
+  async forceCheck(options?: { bypassThrottle?: boolean }): Promise<boolean> {
+    return await this.checkConnectivity(true, true, options);
   }
 
   destroy() {
@@ -197,6 +244,7 @@ class OfflineDetector {
       }
     }
     this.listeners.clear();
+    this.reachabilityListeners.clear();
   }
 }
 

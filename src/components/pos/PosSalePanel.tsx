@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Minus, Trash2, User, Ticket, Percent } from "lucide-react";
 import { getProductInitials } from "@/lib/utils/product-initials";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const VAT_RATE = 15;
 
@@ -55,6 +56,7 @@ export function PosSalePanel({
   className,
 }: PosSalePanelProps) {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
 
   return (
     <div
@@ -232,7 +234,7 @@ export function PosSalePanel({
                           {item.productName}
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground lg:hidden">
-                          R {unitPrice.toFixed(2)}
+                          {formatMoney(unitPrice)}
                         </p>
                       </div>
                       <div className="shrink-0 lg:hidden">{removeButton}</div>
@@ -240,11 +242,11 @@ export function PosSalePanel({
 
                     <div className="flex items-center justify-between gap-2 max-lg:w-full lg:contents">
                       <p className="hidden text-left text-sm text-muted-foreground lg:block lg:self-center">
-                        R {unitPrice.toFixed(2)}
+                        {formatMoney(unitPrice)}
                       </p>
                       {qtyControls}
                       <p className="shrink-0 text-left text-sm font-semibold lg:self-center">
-                        R {lineTotal.toFixed(2)}
+                        {formatMoney(lineTotal)}
                       </p>
                       <div className="hidden lg:block">{removeButton}</div>
                     </div>
@@ -261,19 +263,19 @@ export function PosSalePanel({
           <div className="text-sm space-y-2 mb-4">
             <div className="flex justify-between text-gray-500">
               <span>{t("pos.cart.subtotal")}</span>
-              <span>R {cartSubtotal.toFixed(2)}</span>
+              <span>{formatMoney(cartSubtotal)}</span>
             </div>
             {showVatInCheckout && (
               <div className="flex justify-between text-gray-500">
                 <span>{t("pos.cart.vatLine", { percent: VAT_RATE })}</span>
-                <span>R {vatAmount.toFixed(2)}</span>
+                <span>{formatMoney(vatAmount)}</span>
               </div>
             )}
             {(appliedDiscount > 0 || manualDiscountAmount > 0) && (
               <div className="flex justify-between text-green-600 font-medium">
                 <span>{t("pos.cart.discountApplied")}</span>
                 <span>
-                  -R {(appliedDiscount + manualDiscountAmount).toFixed(2)}
+                  -{formatMoney(appliedDiscount + manualDiscountAmount)}
                 </span>
               </div>
             )}
@@ -300,7 +302,7 @@ export function PosSalePanel({
               {t("pos.cart.totalToPay")}
             </span>
             <span className="text-2xl font-bold">
-              R {amountToPay.toFixed(2)}
+              {formatMoney(amountToPay)}
             </span>
           </div>
 

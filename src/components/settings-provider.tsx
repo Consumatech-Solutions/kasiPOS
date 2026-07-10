@@ -23,6 +23,12 @@ import {
   resetSessionExpiredNotifyGuard,
 } from "@/lib/auth-session";
 import { feedback } from "@/lib/feedback";
+import {
+  getPostLoginRedirectPath,
+  getStaffRedirectPath,
+  isDashboardAllowedForRole,
+  isPathAllowedForRole,
+} from "@/lib/role-permissions";
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -105,6 +111,9 @@ const AUTH_ROUTES = [
   "/login",
   "/signup",
   "/signup/verify",
+  "/forgot-password",
+  "/reset-password",
+  "/reset-password/verify",
   "/request-access",
   "/verify-code",
   "/set-password",
@@ -247,33 +256,50 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const creditFetchedForStoreIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const store = settings.currentStore;
-    const storeId = store?.id;
-    if (!storeId || !store) return;
+    const storeId = settings.currentStore?.id;
+    if (!storeId) return;
     if (creditFetchedForStoreIdRef.current === storeId) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
     creditFetchedForStoreIdRef.current = storeId;
+    let cancelled = false;
+
     (async () => {
       try {
         const { settingsApi } = await import("@/lib/api/settings");
+        const {
+          mergeStoreSettingsIntoStore,
+          saveStorePermanently,
+          hasStoreSettingsFieldsChanged,
+        } = await import("@/lib/store-persistence");
         const res = await settingsApi.get(storeId);
-        const raw = res.data as {
-          credit?: Store["credit"];
-          data?: { credit?: Store["credit"] };
-        };
-        const credit = raw?.data?.credit ?? raw?.credit;
-        if (credit !== undefined) {
-          const storeWithCredit = { ...store, credit };
-          setSetting("currentStore", storeWithCredit);
-          const { saveStorePermanently } =
-            await import("@/lib/store-persistence");
-          await saveStorePermanently(storeWithCredit, setSetting);
+        if (cancelled) return;
+
+        let storeWithSettings: Store | null = null;
+        setSettings((prev) => {
+          const store = prev.currentStore;
+          if (!store || store.id !== storeId) return prev;
+          const merged = mergeStoreSettingsIntoStore(store, res.data);
+          if (!hasStoreSettingsFieldsChanged(store, merged)) return prev;
+          storeWithSettings = merged;
+          return { ...prev, currentStore: merged };
+        });
+
+        if (storeWithSettings) {
+          await saveStorePermanently(storeWithSettings, setSetting, {
+            skipStateUpdate: true,
+          });
         }
       } catch (_) {
-        creditFetchedForStoreIdRef.current = null;
+        // Keep ref set to avoid retry loops; reset only when store id changes.
       }
     })();
-  }, [settings.currentStore, setSetting]);
+
+    return () => {
+      cancelled = true;
+      creditFetchedForStoreIdRef.current = null;
+    };
+  }, [settings.currentStore?.id, setSetting]);
 
   useEffect(() => {
     const loadStoreFromIndexedDB = async () => {
@@ -588,7 +614,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       router.push("/login");
     } else if (settings.isLoggedIn) {
       if (isAuthRoute) {
-        router.push("/");
+        router.push(getPostLoginRedirectPath(settings.currentUser?.role));
         return;
       }
 
@@ -596,12 +622,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (!settings.currentStore.isSetupComplete && !isSetupRoute) {
           router.push(SETUP_ROUTE);
         } else if (settings.currentStore.isSetupComplete && isSetupRoute) {
-          router.push("/");
+          router.push(getPostLoginRedirectPath(settings.currentUser?.role));
         }
 
         if (
           settings.currentUser?.role === "staff" &&
-          pathname.startsWith("/settings")
+          !isPathAllowedForRole(pathname, settings.currentUser.role)
+        ) {
+          router.push(getStaffRedirectPath());
+        }
+
+        if (
+          pathname.startsWith("/dashboard") &&
+          !isDashboardAllowedForRole(settings.currentUser?.role)
         ) {
           router.push("/");
         }
@@ -702,6 +735,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
     if (settings.currentStore && !settings.currentStore.isSetupComplete)
       return pathname === SETUP_ROUTE;
+    if (
+      settings.currentUser?.role === "staff" &&
+      !isPathAllowedForRole(pathname, settings.currentUser.role)
+    ) {
+      return false;
+    }
+    if (
+      pathname.startsWith("/dashboard") &&
+      !isDashboardAllowedForRole(settings.currentUser?.role)
+    ) {
+      return false;
+    }
     return !AUTH_ROUTES.includes(pathname) && pathname !== SETUP_ROUTE;
   };
 

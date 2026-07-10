@@ -32,6 +32,8 @@ import {
   appendTenderedKey,
   sanitizeTenderedInput,
 } from "@/lib/payment-tendered-input";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
+import { getCurrencySymbol } from "@/lib/format-money";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -72,6 +74,8 @@ export default function PaymentModal({
   const [posConnected, setPosConnected] = useState(false);
   const [isConnectingPos, setIsConnectingPos] = useState(false);
   const { toast } = useToast();
+  const { formatMoney, currency } = useStoreCurrency();
+  const currencySymbol = getCurrencySymbol(currency);
 
   const tenderedAmount = parseFloat(tendered) || 0;
   const change = Math.max(0, tenderedAmount - cartTotal);
@@ -236,7 +240,7 @@ export default function PaymentModal({
             <div className="space-y-4 text-lg">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Due:</span>
-                <span className="font-bold">R {cartTotal.toFixed(2)}</span>
+                <span className="font-bold">{formatMoney(cartTotal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Items:</span>
@@ -250,13 +254,13 @@ export default function PaymentModal({
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Tendered:</span>
                 <span className="font-bold text-primary">
-                  R {tenderedAmount.toFixed(2)}
+                  {formatMoney(tenderedAmount)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Change:</span>
                 <span className="font-bold text-green-600">
-                  R {change.toFixed(2)}
+                  {formatMoney(change)}
                 </span>
               </div>
               {tenderedAmount === 0 && (
@@ -267,8 +271,8 @@ export default function PaymentModal({
               )}
               {isInsufficient && (
                 <p className="text-sm text-destructive">
-                  Amount insufficient. Add R{" "}
-                  {(cartTotal - tenderedAmount).toFixed(2)} more to complete.
+                  Amount insufficient. Add{" "}
+                  {formatMoney(cartTotal - tenderedAmount)} more to complete.
                 </p>
               )}
             </div>
@@ -282,7 +286,7 @@ export default function PaymentModal({
             </label>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
-                R
+                {currencySymbol}
               </span>
               <Input
                 id="tendered"
@@ -358,7 +362,7 @@ export default function PaymentModal({
                       onClick={() => setTendered(bill.toString())}
                       disabled={isLoading}
                     >
-                      R{bill}
+                      {formatMoney(bill)}
                     </Button>
                   ))}
                   <Button
@@ -460,7 +464,7 @@ export default function PaymentModal({
 
             <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
               <p className="text-4xl font-bold text-foreground">
-                R {cartTotal.toFixed(2)}
+                {formatMoney(cartTotal)}
               </p>
               <p className="mt-2">
                 {posConnected
@@ -575,7 +579,7 @@ export default function PaymentModal({
                 )}
                 {isLoading
                   ? "Processing..."
-                  : `Send Payment Request for R${cartTotal.toFixed(2)}`}
+                  : `Send Payment Request for ${formatMoney(cartTotal)}`}
               </Button>
             </DialogFooter>
           </div>
