@@ -256,26 +256,50 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const creditFetchedForStoreIdRef = useRef<string | null>(null);
   useEffect(() => {
-    const store = settings.currentStore;
-    const storeId = store?.id;
-    if (!storeId || !store) return;
+    const storeId = settings.currentStore?.id;
+    if (!storeId) return;
     if (creditFetchedForStoreIdRef.current === storeId) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
     creditFetchedForStoreIdRef.current = storeId;
+    let cancelled = false;
+
     (async () => {
       try {
         const { settingsApi } = await import("@/lib/api/settings");
-        const { mergeStoreSettingsIntoStore, saveStorePermanently } =
-          await import("@/lib/store-persistence");
+        const {
+          mergeStoreSettingsIntoStore,
+          saveStorePermanently,
+          hasStoreSettingsFieldsChanged,
+        } = await import("@/lib/store-persistence");
         const res = await settingsApi.get(storeId);
-        const storeWithSettings = mergeStoreSettingsIntoStore(store, res.data);
-        setSetting("currentStore", storeWithSettings);
-        await saveStorePermanently(storeWithSettings, setSetting);
+        if (cancelled) return;
+
+        let storeWithSettings: Store | null = null;
+        setSettings((prev) => {
+          const store = prev.currentStore;
+          if (!store || store.id !== storeId) return prev;
+          const merged = mergeStoreSettingsIntoStore(store, res.data);
+          if (!hasStoreSettingsFieldsChanged(store, merged)) return prev;
+          storeWithSettings = merged;
+          return { ...prev, currentStore: merged };
+        });
+
+        if (storeWithSettings) {
+          await saveStorePermanently(storeWithSettings, setSetting, {
+            skipStateUpdate: true,
+          });
+        }
       } catch (_) {
-        creditFetchedForStoreIdRef.current = null;
+        // Keep ref set to avoid retry loops; reset only when store id changes.
       }
     })();
-  }, [settings.currentStore, setSetting]);
+
+    return () => {
+      cancelled = true;
+      creditFetchedForStoreIdRef.current = null;
+    };
+  }, [settings.currentStore?.id, setSetting]);
 
   useEffect(() => {
     const loadStoreFromIndexedDB = async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,7 +26,6 @@ import {
   Users,
   Key,
   RefreshCw,
-  WifiOff,
   Receipt,
   Printer,
   CreditCard,
@@ -44,6 +43,7 @@ import { storesApi } from "@/lib/api/stores";
 import {
   saveStorePermanently,
   mergeStoreSettingsFields,
+  hasStoreSettingsFieldsChanged,
 } from "@/lib/store-persistence";
 import {
   Select,
@@ -93,14 +93,12 @@ import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffectiveOnline } from "@/hooks/use-effective-online";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
 import { useHardwareSetup } from "@/components/hardware-setup/HardwareSetupProvider";
 import {
   readStaffPageCache,
   writeStaffPageCache,
 } from "@/lib/settings-staff-cache";
-import { cn } from "@/lib/utils";
 import type { UpdateStoreSettingsDto } from "@/lib/api/settings";
 import { normalizeStoreSettings } from "@/lib/api/settings";
 
@@ -153,7 +151,6 @@ export default function SettingsPage() {
     settingsStore?.ownerId === currentUser?.id ||
     currentUser?.role === "store_admin";
   const { ensureStore } = useEnsureStore();
-  const { effectiveOnline, refreshEffectiveOnline } = useEffectiveOnline();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingModules, setIsUpdatingModules] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(false);
@@ -249,17 +246,6 @@ export default function SettingsPage() {
       setTotalPages(0);
       return;
     }
-    if (!effectiveOnline) {
-      const cached = await readStaffPageCache(userManagementStoreId, page);
-      if (cached) {
-        setUsers(cached.users);
-        setTotalPages(cached.totalPages);
-      } else {
-        setUsers([]);
-        setTotalPages(1);
-      }
-      return;
-    }
     try {
       const response = await usersApi.findAll(
         userManagementStoreId,
@@ -280,10 +266,16 @@ export default function SettingsPage() {
       );
     } catch (error) {
       console.error("Failed to fetch users:", error);
-      setUsers([]);
-      setTotalPages(0);
+      const cached = await readStaffPageCache(userManagementStoreId, page);
+      if (cached) {
+        setUsers(cached.users);
+        setTotalPages(cached.totalPages);
+      } else {
+        setUsers([]);
+        setTotalPages(0);
+      }
     }
-  }, [userManagementStoreId, page, effectiveOnline]);
+  }, [userManagementStoreId, page]);
 
   useEffect(() => {
     void fetchUsers();
@@ -302,43 +294,31 @@ export default function SettingsPage() {
     });
   }, []);
 
+  const settingsFetchedForStoreIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!isAdmin && currentUser?.role !== "store_admin") return;
     if (!settingsStoreId) {
       setLoadingSettings(false);
       return;
     }
-
-    if (!effectiveOnline) {
-      setLoadingSettings(true);
-      const c = settingsStore?.credit;
-      const cc = c?.customerCredit;
-      applyCurrencyFromStore(settingsStore);
-      if (cc) {
-        setStoreSettingsCredit({
-          creditLimit: Number(cc.creditLimit ?? 0),
-          termType: cc.termType === "variable" ? "variable" : "fixed",
-          term: cc.term != null ? Number(cc.term) : 7,
-        });
-        setCreditForm({
-          enabled: true,
-          creditLimit: Number(cc.creditLimit ?? 0),
-          termType: cc.termType === "variable" ? "variable" : "fixed",
-          term: cc.term != null ? Number(cc.term) : 7,
-        });
-      } else if (c === null) {
-        setStoreSettingsCredit(null);
-        setCreditForm((f) => ({ ...f, enabled: false }));
-      }
+    if (!settingsStore) {
       setLoadingSettings(false);
       return;
     }
+    if (settingsFetchedForStoreIdRef.current === settingsStoreId) return;
 
+    let cancelled = false;
     setLoadingSettings(true);
+
     settingsApi
       .get(settingsStoreId)
       .then((res) => {
+        if (cancelled) return;
+
         const normalized = normalizeStoreSettings(res.data);
+        const credit = normalized?.credit ?? res.data?.credit;
+
         if (normalized) {
           applyCurrencyFromStore({
             ...settingsStore,
@@ -346,24 +326,10 @@ export default function SettingsPage() {
             cdfUsdExRate: normalized.cdfUsdExRate,
             zarUsdExRate: normalized.zarUsdExRate,
           } as typeof settingsStore);
-          if (settingsStore) {
-            const merged = mergeStoreSettingsFields(settingsStore, {
-              currency: normalized.currency,
-              cdfUsdExRate: normalized.cdfUsdExRate,
-              zarUsdExRate: normalized.zarUsdExRate,
-            });
-            if (
-              merged.currency !== settingsStore.currency ||
-              merged.cdfUsdExRate !== settingsStore.cdfUsdExRate ||
-              merged.zarUsdExRate !== settingsStore.zarUsdExRate
-            ) {
-              setSetting("currentStore", merged);
-            }
-          }
         } else {
           applyCurrencyFromStore(settingsStore);
         }
-        const credit = res.data?.credit;
+
         const cc = credit?.customerCredit;
         if (cc) {
           setStoreSettingsCredit({
@@ -377,9 +343,6 @@ export default function SettingsPage() {
             termType: cc.termType === "variable" ? "variable" : "fixed",
             term: cc.term != null ? Number(cc.term) : 7,
           });
-          if (settingsStore && credit && !settingsStore.credit) {
-            setSetting("currentStore", { ...settingsStore, credit });
-          }
         } else {
           const fromStore = settingsStore?.credit?.customerCredit;
           if (fromStore) {
@@ -392,8 +355,28 @@ export default function SettingsPage() {
             });
           }
         }
+
+        if (settingsStore && normalized) {
+          const merged = mergeStoreSettingsFields(settingsStore, {
+            currency: normalized.currency,
+            cdfUsdExRate: normalized.cdfUsdExRate,
+            zarUsdExRate: normalized.zarUsdExRate,
+            ...(credit !== undefined && { credit }),
+          });
+          if (hasStoreSettingsFieldsChanged(settingsStore, merged)) {
+            setSetting("currentStore", merged);
+          }
+        } else if (settingsStore && credit !== undefined) {
+          const merged = mergeStoreSettingsFields(settingsStore, { credit });
+          if (hasStoreSettingsFieldsChanged(settingsStore, merged)) {
+            setSetting("currentStore", merged);
+          }
+        }
+
+        settingsFetchedForStoreIdRef.current = settingsStoreId;
       })
       .catch(() => {
+        if (cancelled) return;
         applyCurrencyFromStore(settingsStore);
         const fromStore = settingsStore?.credit?.customerCredit;
         if (fromStore) {
@@ -405,18 +388,20 @@ export default function SettingsPage() {
           });
         }
       })
-      .finally(() => setLoadingSettings(false));
+      .finally(() => {
+        if (!cancelled) setLoadingSettings(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     isAdmin,
     currentUser?.role,
-    effectiveOnline,
     settingsStoreId,
-    settingsStore?.credit,
-    settingsStore?.currency,
-    settingsStore?.cdfUsdExRate,
-    settingsStore?.zarUsdExRate,
-    settingsStore?.id,
+    settingsStore,
     applyCurrencyFromStore,
+    setSetting,
   ]);
 
   const userForm = useForm<z.infer<typeof userManagementSchema>>({
@@ -503,16 +488,6 @@ export default function SettingsPage() {
       return;
     }
 
-    if (!effectiveOnline) {
-      feedback.error(
-        t("settings.currency.feedback.serverUnavailableTitle"),
-        t("settings.currency.feedback.serverUnavailableDesc"),
-        undefined,
-        { code: "CURRENCY" }
-      );
-      return;
-    }
-
     const body: UpdateStoreSettingsDto = { currency: currencyForm.currency };
 
     if (currencyForm.currency === "CDF") {
@@ -567,7 +542,7 @@ export default function SettingsPage() {
             : (settingsStore.zarUsdExRate ?? null)),
       });
       setSetting("currentStore", merged);
-      await saveStorePermanently(merged, setSetting);
+      await saveStorePermanently(merged, setSetting, { skipStateUpdate: true });
       applyCurrencyFromStore(merged);
       feedback.success(
         t("settings.currency.feedback.savedTitle"),
@@ -641,7 +616,8 @@ export default function SettingsPage() {
       });
       await saveStorePermanently(
         { ...settingsStore, credit: normalizedCredit },
-        setSetting
+        setSetting,
+        { skipStateUpdate: true }
       );
       const cc =
         normalizedCredit &&
@@ -677,16 +653,6 @@ export default function SettingsPage() {
           : { ...f, enabled: false }
       );
     };
-
-    if (!effectiveOnline) {
-      feedback.error(
-        t("settings.credit.feedback.serverUnavailableTitle"),
-        t("settings.credit.feedback.serverUnavailableDesc"),
-        undefined,
-        { code: "CREDIT" }
-      );
-      return;
-    }
 
     setSavingCredit(true);
     try {
@@ -841,15 +807,6 @@ export default function SettingsPage() {
   const handleUserSubmit = async (
     values: z.infer<typeof userManagementSchema>
   ) => {
-    if (!effectiveOnline) {
-      feedback.error(
-        t("settings.staff.feedback.staffServerUnavailableTitle"),
-        t("settings.staff.feedback.staffServerUnavailableDesc"),
-        undefined,
-        { code: "USER" }
-      );
-      return;
-    }
     const storeId =
       userManagementStoreId ??
       (await ensureStore())?.id ??
@@ -922,15 +879,6 @@ export default function SettingsPage() {
   };
 
   const deleteUser = async (id: string) => {
-    if (!effectiveOnline) {
-      feedback.error(
-        t("settings.staff.feedback.deleteServerUnavailableTitle"),
-        t("settings.staff.feedback.deleteServerUnavailableDesc"),
-        undefined,
-        { code: "USER" }
-      );
-      return;
-    }
     try {
       if (id === currentUser?.id) {
         feedback.error(
@@ -964,14 +912,6 @@ export default function SettingsPage() {
 
   const confirmTransferRole = async () => {
     if (!transferTargetUser?.id) return;
-    const ok = await refreshEffectiveOnline();
-    if (!ok) {
-      feedback.error(
-        t("settings.staff.feedback.transferServerUnavailableTitle"),
-        t("settings.staff.feedback.transferServerUnavailableDesc")
-      );
-      return;
-    }
     setIsTransferringRole(true);
     try {
       await storesApi.transferStoreRole({
@@ -1012,15 +952,6 @@ export default function SettingsPage() {
     values: z.infer<typeof passwordSchema>
   ) => {
     if (!userForPassword?.id) return;
-    if (!effectiveOnline) {
-      feedback.error(
-        t("settings.staff.feedback.passwordServerUnavailableTitle"),
-        t("settings.staff.feedback.passwordServerUnavailableDesc"),
-        undefined,
-        { code: "USER" }
-      );
-      return;
-    }
     try {
       await usersApi.update(userForPassword.id, { password: values.password });
       feedback.success(
@@ -1045,15 +976,6 @@ export default function SettingsPage() {
   const featureDetails = getFeatureDetails(selectedFeature);
 
   const handleUpdateApp = async () => {
-    if (!effectiveOnline) {
-      feedback.error(
-        t("settings.updateApp.feedback.serverUnavailableTitle"),
-        t("settings.updateApp.feedback.serverUnavailableDesc"),
-        t("settings.updateApp.feedback.serverUnavailableHint")
-      );
-      return;
-    }
-
     setIsUpdating(true);
     try {
       if ("caches" in window) {
@@ -1131,7 +1053,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex flex-col gap-4 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label
                   htmlFor="language-select"
@@ -1154,7 +1076,7 @@ export default function SettingsPage() {
               >
                 <SelectTrigger
                   id="language-select"
-                  className="w-[180px]"
+                  className="w-full sm:w-[180px]"
                   aria-label={t("settings.language.label")}
                 >
                   <SelectValue
@@ -1172,7 +1094,7 @@ export default function SettingsPage() {
               </Select>
             </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex flex-col gap-4 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label
                   htmlFor="update-app"
@@ -1188,9 +1110,9 @@ export default function SettingsPage() {
               <Button
                 id="update-app"
                 onClick={handleUpdateApp}
-                disabled={!effectiveOnline || isUpdating}
+                disabled={isUpdating}
                 variant="outline"
-                className="min-h-[44px] touch-target"
+                className="w-full min-h-[44px] touch-target sm:w-auto"
               >
                 {isUpdating ? (
                   <>
@@ -1199,23 +1121,14 @@ export default function SettingsPage() {
                   </>
                 ) : (
                   <>
-                    {effectiveOnline ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t("settings.updateApp.button.update")}
-                      </>
-                    ) : (
-                      <>
-                        <WifiOff className="mr-2 h-4 w-4" />
-                        {t("settings.updateApp.button.offline")}
-                      </>
-                    )}
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {t("settings.updateApp.button.update")}
                   </>
                 )}
               </Button>
             </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div className="flex flex-col gap-4 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Label
                   htmlFor="hardware-setup"
@@ -1232,19 +1145,14 @@ export default function SettingsPage() {
                 id="hardware-setup"
                 onClick={openHardwareSetup}
                 variant="outline"
-                className="min-h-[44px] touch-target"
+                className="w-full min-h-[44px] touch-target sm:w-auto"
               >
                 <Printer className="mr-2 h-4 w-4" />
                 {t("settings.hardware.launch")}
               </Button>
             </div>
 
-            <div
-              className={cn(
-                "space-y-2 pt-4 transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none"
-              )}
-            >
+            <div className="space-y-2 pt-4">
               <h3 className="text-lg font-semibold">
                 {t("settings.features.sectionTitle")}
               </h3>
@@ -1253,12 +1161,7 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div
-              className={cn(
-                "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none"
-              )}
-            >
+            <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
                 <Label htmlFor="campaigns-toggle" className="font-semibold">
                   {t("settings.features.campaigns.label")}
@@ -1273,16 +1176,11 @@ export default function SettingsPage() {
                 onCheckedChange={(checked) =>
                   handleToggle("campaigns", checked)
                 }
-                disabled={!effectiveOnline || isUpdatingModules}
+                disabled={isUpdatingModules}
               />
             </div>
 
-            <div
-              className={cn(
-                "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none"
-              )}
-            >
+            <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
                 <Label htmlFor="marketplace-toggle" className="font-semibold">
                   {t("settings.features.marketplace.label")}
@@ -1297,16 +1195,11 @@ export default function SettingsPage() {
                 onCheckedChange={(checked) =>
                   handleToggle("marketplace", checked)
                 }
-                disabled={!effectiveOnline || isUpdatingModules}
+                disabled={isUpdatingModules}
               />
             </div>
 
-            <div
-              className={cn(
-                "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none"
-              )}
-            >
+            <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
                 <Label htmlFor="boph-toggle" className="font-semibold">
                   {t("settings.features.boph.label")}
@@ -1319,16 +1212,11 @@ export default function SettingsPage() {
                 id="boph-toggle"
                 checked={settings.boph}
                 onCheckedChange={(checked) => handleToggle("boph", checked)}
-                disabled={!effectiveOnline || isUpdatingModules}
+                disabled={isUpdatingModules}
               />
             </div>
 
-            <div
-              className={cn(
-                "flex items-center justify-between p-4 border rounded-lg transition-opacity",
-                !effectiveOnline && "opacity-60 pointer-events-none"
-              )}
-            >
+            <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
                 <Label htmlFor="buy-stock-toggle" className="font-semibold">
                   {t("settings.features.buyStock.label")}
@@ -1341,7 +1229,7 @@ export default function SettingsPage() {
                 id="buy-stock-toggle"
                 checked={settings.buyStock}
                 onCheckedChange={(checked) => handleToggle("buyStock", checked)}
-                disabled={!effectiveOnline || isUpdatingModules}
+                disabled={isUpdatingModules}
               />
             </div>
 
@@ -1376,7 +1264,7 @@ export default function SettingsPage() {
                     onCheckedChange={(checked) =>
                       updateShowVatInCheckout(checked)
                     }
-                    disabled={!effectiveOnline || isUpdatingModules}
+                    disabled={isUpdatingModules}
                   />
                 </div>
 
@@ -1400,11 +1288,6 @@ export default function SettingsPage() {
                       )}
                     </div>
                     <div className="space-y-4 p-4 border rounded-lg">
-                      {!effectiveOnline && (
-                        <p className="text-xs text-muted-foreground">
-                          {t("settings.currency.offlineNote")}
-                        </p>
-                      )}
                       <div className="space-y-2">
                         <Label htmlFor="store-currency-select">
                           {t("settings.currency.select.label")}
@@ -1478,10 +1361,7 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => void saveCurrencySettings()}
                         disabled={
-                          savingCurrency ||
-                          !settingsStoreId ||
-                          loadingSettings ||
-                          !effectiveOnline
+                          savingCurrency || !settingsStoreId || loadingSettings
                         }
                         className="min-h-[44px] touch-target"
                       >
@@ -1518,11 +1398,6 @@ export default function SettingsPage() {
                       )}
                     </div>
                     <div className="space-y-4 p-4 border rounded-lg">
-                      {!effectiveOnline && (
-                        <p className="text-xs text-muted-foreground">
-                          {t("settings.credit.offlineNote")}
-                        </p>
-                      )}
                       <div className="flex items-center justify-between">
                         <Label
                           htmlFor="credit-enabled"
@@ -1604,10 +1479,7 @@ export default function SettingsPage() {
                         type="button"
                         onClick={() => void saveCreditSettings()}
                         disabled={
-                          savingCredit ||
-                          !settingsStoreId ||
-                          loadingSettings ||
-                          !effectiveOnline
+                          savingCredit || !settingsStoreId || loadingSettings
                         }
                         className="min-h-[44px] touch-target"
                       >
@@ -1648,7 +1520,7 @@ export default function SettingsPage() {
               <div className="flex justify-end mb-4">
                 <Button
                   type="button"
-                  disabled={!userManagementStoreId || !effectiveOnline}
+                  disabled={!userManagementStoreId}
                   onClick={(e) => {
                     e.stopPropagation();
                     openUserDialog();
@@ -1656,9 +1528,7 @@ export default function SettingsPage() {
                   title={
                     !userManagementStoreId
                       ? t("settings.staff.addTitleNoStore")
-                      : !effectiveOnline
-                        ? t("settings.staff.addTitleOffline")
-                        : t("settings.staff.addTitleOnline")
+                      : t("settings.staff.addTitleOnline")
                   }
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />{" "}
@@ -1683,9 +1553,7 @@ export default function SettingsPage() {
                         colSpan={4}
                         className="text-center text-muted-foreground py-8"
                       >
-                        {effectiveOnline
-                          ? t("settings.staff.empty.online")
-                          : t("settings.staff.empty.offline")}
+                        {t("settings.staff.empty.online")}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1714,7 +1582,6 @@ export default function SettingsPage() {
                             size="icon"
                             onClick={() => openUserDialog(user)}
                             title={t("settings.staff.action.editTitle")}
-                            disabled={!effectiveOnline}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -1723,7 +1590,6 @@ export default function SettingsPage() {
                             size="icon"
                             onClick={() => openPasswordDialog(user)}
                             title={t("settings.staff.action.setPasswordTitle")}
-                            disabled={!effectiveOnline}
                           >
                             <Key className="h-4 w-4" />
                           </Button>
@@ -1734,7 +1600,7 @@ export default function SettingsPage() {
                               size="icon"
                               onClick={() => openTransferRoleDialog(user)}
                               title={t("settings.staff.action.transferTitle")}
-                              disabled={!effectiveOnline || isTransferringRole}
+                              disabled={isTransferringRole}
                             >
                               <Crown className="h-4 w-4 text-amber-600" />
                             </Button>
@@ -1744,10 +1610,7 @@ export default function SettingsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                disabled={
-                                  user.id === currentUser?.id ||
-                                  !effectiveOnline
-                                }
+                                disabled={user.id === currentUser?.id}
                                 title={t("settings.staff.action.deleteTitle")}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -1901,9 +1764,7 @@ export default function SettingsPage() {
                     {t("settings.staff.dialog.cancel")}
                   </Button>
                 </DialogClose>
-                <Button type="submit" disabled={!effectiveOnline}>
-                  {t("settings.staff.dialog.save")}
-                </Button>
+                <Button type="submit">{t("settings.staff.dialog.save")}</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -2029,7 +1890,7 @@ export default function SettingsPage() {
                       {t("settings.staff.password.cancel")}
                     </Button>
                   </DialogClose>
-                  <Button type="submit" disabled={!effectiveOnline}>
+                  <Button type="submit">
                     {t("settings.staff.password.submit")}
                   </Button>
                 </DialogFooter>
@@ -2153,7 +2014,7 @@ export default function SettingsPage() {
             <Button
               type="button"
               onClick={() => void confirmTransferRole()}
-              disabled={isTransferringRole || !effectiveOnline}
+              disabled={isTransferringRole}
             >
               {isTransferringRole && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
