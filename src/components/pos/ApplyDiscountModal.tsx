@@ -9,6 +9,7 @@ import { X } from "lucide-react";
 import type { TransactionDiscount } from "@/types";
 import { cn } from "@/lib/utils";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
+import { getCurrencySymbol } from "@/lib/format-money";
 
 const DISCOUNT_REASONS = [
   "Loyal customer",
@@ -42,7 +43,8 @@ export default function ApplyDiscountModal({
   cartSubtotal,
   onApply,
 }: ApplyDiscountModalProps) {
-  const { formatMoney } = useStoreCurrency();
+  const { formatMoney, currency } = useStoreCurrency();
+  const currencySymbol = getCurrencySymbol(currency);
   const [discountType, setDiscountType] = useState<"percentage" | "amount">(
     "percentage"
   );
@@ -159,7 +161,7 @@ export default function ApplyDiscountModal({
                 fontWeight: discountType === "amount" ? 500 : 400,
               }}
             >
-              Amount (R)
+              Amount ({currencySymbol})
             </button>
           </div>
 
@@ -245,7 +247,7 @@ export default function ApplyDiscountModal({
                     className="flex items-center px-3 text-sm font-medium bg-white border-r border-gray-200"
                     style={{ color: TEXT_MUTED }}
                   >
-                    R
+                    {currencySymbol}
                   </span>
                   <Input
                     type="number"

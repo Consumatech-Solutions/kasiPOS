@@ -41,6 +41,7 @@ import type {
   MarketplaceOrderItem,
 } from "@/lib/api/marketplace-orders";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 function paymentMethodLabel(
   t: (key: string) => string,
@@ -53,6 +54,7 @@ function paymentMethodLabel(
 
 export default function MarketplacePage() {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const { isOnline } = useNetworkStatus();
   const [orderCode, setOrderCode] = useState("");
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
@@ -284,10 +286,10 @@ export default function MarketplacePage() {
                             <TableCell>{item.productName}</TableCell>
                             <TableCell>{item.quantity}</TableCell>
                             <TableCell className="text-right">
-                              R{(Number(item.unitPrice) || 0).toFixed(2)}
+                              {formatMoney(Number(item.unitPrice) || 0)}
                             </TableCell>
                             <TableCell className="text-right">
-                              R{(Number(item.totalPrice) || 0).toFixed(2)}
+                              {formatMoney(Number(item.totalPrice) || 0)}
                             </TableCell>
                           </TableRow>
                         )
@@ -301,9 +303,7 @@ export default function MarketplacePage() {
                     <span className="text-gray-500">
                       {t("marketplace.summary.subtotal")}
                     </span>
-                    <span>
-                      R{(Number(foundOrder.subtotal) || 0).toFixed(2)}
-                    </span>
+                    <span>{formatMoney(Number(foundOrder.subtotal) || 0)}</span>
                   </div>
                   {foundOrder.vatAmount > 0 && (
                     <div className="flex justify-between text-sm">
@@ -311,7 +311,7 @@ export default function MarketplacePage() {
                         {t("marketplace.summary.vat")}
                       </span>
                       <span>
-                        R{(Number(foundOrder.vatAmount) || 0).toFixed(2)}
+                        {formatMoney(Number(foundOrder.vatAmount) || 0)}
                       </span>
                     </div>
                   )}
@@ -321,13 +321,13 @@ export default function MarketplacePage() {
                         {t("marketplace.summary.serviceFee")}
                       </span>
                       <span>
-                        R{(Number(foundOrder.serviceFee) || 0).toFixed(2)}
+                        {formatMoney(Number(foundOrder.serviceFee) || 0)}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between text-lg font-bold pt-2">
                     <span>{t("marketplace.summary.total")}</span>
-                    <span>R{(Number(foundOrder.total) || 0).toFixed(2)}</span>
+                    <span>{formatMoney(Number(foundOrder.total) || 0)}</span>
                   </div>
                 </div>
               </div>

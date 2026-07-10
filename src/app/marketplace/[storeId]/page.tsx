@@ -47,6 +47,7 @@ import {
 import { Eye } from "lucide-react";
 import PaymentModal from "@/components/pos/PaymentModal";
 import { useSettings } from "@/components/settings-provider";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { useCustomers } from "@/hooks/use-customers";
 import { useProducts, useCategories } from "@/hooks/use-catalogue";
 import { useMarketplaceOrders } from "@/hooks/use-marketplace-orders";
@@ -76,6 +77,7 @@ export default function StorePosPage(props: PageProps) {
     ? String(resolvedParams.storeId)
     : null;
   const { settings } = useSettings();
+  const { formatMoney } = useStoreCurrency();
   const { currentStore } = settings;
   const { isOnline } = useNetworkStatus();
   const { stores: marketplaceStores } = useMarketplaceStores({
@@ -520,11 +522,11 @@ export default function StorePosPage(props: PageProps) {
                           {product.stock}
                         </TableCell>
                         <TableCell>
-                          R
-                          {(typeof product.price === "number"
-                            ? product.price
-                            : parseFloat(String(product.price)) || 0
-                          ).toFixed(2)}
+                          {formatMoney(
+                            typeof product.price === "number"
+                              ? product.price
+                              : parseFloat(String(product.price)) || 0
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -672,7 +674,7 @@ export default function StorePosPage(props: PageProps) {
                           {item.productName}
                         </p>
                         <p className="text-xs text-gray-500">
-                          R {(Number(item.unitPrice) || 0).toFixed(2)}
+                          {formatMoney(Number(item.unitPrice) || 0)}
                         </p>
                       </div>
                       <div className="flex items-center gap-1 sm:gap-2">
@@ -701,7 +703,7 @@ export default function StorePosPage(props: PageProps) {
                         </Button>
                       </div>
                       <p className="font-semibold text-xs sm:text-sm w-16 sm:w-20 text-right">
-                        R{item.totalPrice.toFixed(2)}
+                        {formatMoney(item.totalPrice)}
                       </p>
                       <Button
                         variant="ghost"
@@ -723,22 +725,22 @@ export default function StorePosPage(props: PageProps) {
               <div className="text-sm space-y-2 mb-4">
                 <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span>R {cartSubtotal.toFixed(2)}</span>
+                  <span>{formatMoney(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
                   <span>VAT (15%)</span>
-                  <span>R {vat.toFixed(2)}</span>
+                  <span>{formatMoney(vat)}</span>
                 </div>
                 <div className="flex justify-between text-gray-500">
                   <span>Service Fee</span>
-                  <span>R {serviceFee.toFixed(2)}</span>
+                  <span>{formatMoney(serviceFee)}</span>
                 </div>
               </div>
 
               <div className="flex justify-between items-center mb-4 p-3 bg-gray-100 rounded-lg">
                 <span className="text-lg font-bold">Total to Pay</span>
                 <span className="text-2xl font-bold">
-                  R {cartTotal.toFixed(2)}
+                  {formatMoney(cartTotal)}
                 </span>
               </div>
 

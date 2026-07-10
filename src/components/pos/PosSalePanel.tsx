@@ -9,6 +9,7 @@ import { Plus, Minus, Trash2, User, Ticket, Percent } from "lucide-react";
 import { getProductInitials } from "@/lib/utils/product-initials";
 import { useTranslation } from "react-i18next";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
+import { CurrencyConversionHint } from "@/components/currency-conversion-hint";
 
 const VAT_RATE = 15;
 
@@ -301,9 +302,12 @@ export function PosSalePanel({
             <span className="text-lg font-bold">
               {t("pos.cart.totalToPay")}
             </span>
-            <span className="text-2xl font-bold">
-              {formatMoney(amountToPay)}
-            </span>
+            <div className="text-right">
+              <span className="text-2xl font-bold">
+                {formatMoney(amountToPay)}
+              </span>
+              <CurrencyConversionHint amount={amountToPay} className="mt-1" />
+            </div>
           </div>
 
           <div className="grid grid-cols-4 gap-2 sm:gap-3">
