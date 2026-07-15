@@ -3,6 +3,8 @@
 import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from "recharts";
 import { useTranslation } from "react-i18next";
 import type { SalesTrendPoint } from "@/lib/dashboard-metrics";
+import { getCurrencySymbol } from "@/lib/format-money";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import {
   Card,
   CardContent,
@@ -30,6 +32,8 @@ export function DashboardChartsPanel({
   className,
 }: DashboardChartsPanelProps) {
   const { t } = useTranslation();
+  const { currency, formatMoney } = useStoreCurrency();
+  const currencySymbol = getCurrencySymbol(currency);
 
   return (
     <Card className={cn("flex h-full flex-col", className)}>
@@ -57,10 +61,18 @@ export function DashboardChartsPanel({
               axisLine={false}
               tickMargin={8}
             />
-            <YAxis tickFormatter={(value) => `R${value}`} width={48} />
+            <YAxis
+              tickFormatter={(value) => `${currencySymbol}${value}`}
+              width={48}
+            />
             <Tooltip
               cursor={false}
-              content={<ChartTooltipContent indicator="dot" />}
+              content={
+                <ChartTooltipContent
+                  indicator="dot"
+                  formatter={(value) => formatMoney(Number(value))}
+                />
+              }
             />
             <Bar dataKey="total" fill="var(--color-total)" radius={6} />
           </BarChart>

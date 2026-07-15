@@ -12,6 +12,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useSettings } from "@/components/settings-provider";
 import { useDashboardStats } from "@/hooks/use-dashboard-stats";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { formatDashboardCurrency } from "@/lib/dashboard-metrics";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { CreditCustomersPanel } from "@/components/dashboard/credit-customers-panel";
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const { settings } = useSettings();
   const storeId = settings.currentStore?.id;
   const role = settings.currentUser?.role;
+  const { currency } = useStoreCurrency();
   const [creditPage, setCreditPage] = useState(1);
   const creditLimit = 10;
 
@@ -97,7 +99,7 @@ export default function DashboardPage() {
           type="button"
           variant="outline"
           className="min-h-[44px] touch-target"
-          onClick={() => refetch()}
+          onClick={() => void refetch()}
         >
           <RefreshCw className="mr-2 h-4 w-4" />
           {t("dashboard.page.retry", { defaultValue: "Try again" })}
@@ -127,12 +129,12 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label={t("dashboard.stats.todaySales")}
-          value={formatDashboardCurrency(summary.todaySales)}
+          value={formatDashboardCurrency(summary.todaySales, currency)}
           icon={DollarSign}
         />
         <StatCard
           label={t("dashboard.stats.totalSales")}
-          value={formatDashboardCurrency(summary.totalSales)}
+          value={formatDashboardCurrency(summary.totalSales, currency)}
           icon={DollarSign}
           accentClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
         />
@@ -144,7 +146,7 @@ export default function DashboardPage() {
         />
         <StatCard
           label={t("dashboard.stats.outstandingCredit")}
-          value={formatDashboardCurrency(summary.outstandingCredit)}
+          value={formatDashboardCurrency(summary.outstandingCredit, currency)}
           icon={Wallet}
           accentClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
         />

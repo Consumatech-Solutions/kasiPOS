@@ -11,7 +11,10 @@ import {
   purgeTempIdCatalogueRowsAfterCloudSync,
 } from "@/lib/entity-cache";
 import { mutationQueue } from "@/lib/mutation-queue";
-import { offlineDetector } from "@/lib/offline-detector";
+import {
+  getCloudSyncUnavailableMessage,
+  offlineDetector,
+} from "@/lib/offline-detector";
 import {
   pullAllProductsFromApi,
   pullAllCategoriesFromApi,
@@ -278,13 +281,22 @@ export async function needsInitialCloudHydration(): Promise<boolean> {
   return t == null || t === "";
 }
 
+async function assertCloudSyncConnectivity(): Promise<void> {
+  const hasConnectivity = await offlineDetector.forceCheck({
+    bypassThrottle: true,
+  });
+  if (!hasConnectivity) {
+    const reason =
+      offlineDetector.getLastConnectivityFailureReason() ??
+      "server_unreachable";
+    throw new Error(getCloudSyncUnavailableMessage(reason));
+  }
+}
+
 export async function runManualFullCloudSync(
   options: RunCloudDataPullOptions
 ): Promise<void> {
-  const hasConnectivity = await offlineDetector.forceCheck();
-  if (!hasConnectivity) {
-    throw new Error("No internet connection available for cloud sync.");
-  }
+  await assertCloudSyncConnectivity();
   offlineDetector.setOfflineFirstActive(false);
   try {
     await mutationQueue.processQueue({ force: true });
@@ -295,9 +307,6 @@ export async function runManualFullCloudSync(
 }
 
 export async function runManualPushSync() {
-  const hasConnectivity = await offlineDetector.forceCheck();
-  if (!hasConnectivity) {
-    throw new Error("No internet connection available for cloud sync.");
-  }
+  await assertCloudSyncConnectivity();
   return await mutationQueue.processQueue({ force: true });
 }

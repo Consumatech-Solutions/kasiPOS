@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 import { cn } from "@/lib/utils";
 
 const MAX_SALES = 6;
@@ -28,6 +29,7 @@ function paymentMethodKey(method: RecentSaleRow["paymentMethod"]): string {
 
 export function RecentSalesPanel({ sales, className }: RecentSalesPanelProps) {
   const { t } = useTranslation();
+  const { currency } = useStoreCurrency();
   const visibleSales = sales.slice(0, MAX_SALES);
 
   return (
@@ -63,7 +65,7 @@ export function RecentSalesPanel({ sales, className }: RecentSalesPanelProps) {
                   </p>
                 </div>
                 <p className="shrink-0 text-xs font-semibold">
-                  {formatDashboardCurrency(sale.total)}
+                  {formatDashboardCurrency(sale.total, currency)}
                 </p>
               </li>
             ))

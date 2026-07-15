@@ -11,6 +11,7 @@ import {
   getTransactionsFromDexie,
   saveTransactionsToDexie,
 } from "@/lib/entity-cache";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import { mutationQueue } from "@/lib/mutation-queue";
 import type { Transaction } from "@/types";
 import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
@@ -147,6 +148,7 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
         }
       );
       queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
     },
   });
 

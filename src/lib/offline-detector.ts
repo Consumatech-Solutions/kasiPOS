@@ -6,12 +6,26 @@ interface OfflineState {
 
 const CONNECTIVITY_CHECK_INTERVAL_MS = 30000;
 const NETWORK_TEST_TIMEOUT = 5000;
-/** Minimum time between real HEAD probes to the API origin. */
+/** Minimum time between real backend probes to the API origin. */
 const MIN_HEAD_PROBE_INTERVAL_MS = 15000;
+const CONNECTIVITY_PROBE_PATHS = ["/health", "/"] as const;
 
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
 const BACKEND_URL = getConfiguredApiUrl();
+
+export type ConnectivityFailureReason =
+  | "browser_offline"
+  | "server_unreachable";
+
+export function getCloudSyncUnavailableMessage(
+  reason: ConnectivityFailureReason = "server_unreachable"
+): string {
+  if (reason === "browser_offline") {
+    return "This device appears to be offline. Connect to the internet and try again.";
+  }
+  return "Cannot reach the server. Check your network and that the API is available, then try again.";
+}
 
 function isDevHost(): boolean {
   if (typeof window === "undefined") return false;
@@ -41,6 +55,8 @@ class OfflineDetector {
 
   private lastBackendReachable: boolean | null = null;
   private lastHeadProbeAt = 0;
+  private lastConnectivityFailureReason: ConnectivityFailureReason | null =
+    null;
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -97,6 +113,10 @@ class OfflineDetector {
 
   getLastBackendReachable(): boolean {
     return this.lastBackendReachable ?? false;
+  }
+
+  getLastConnectivityFailureReason(): ConnectivityFailureReason | null {
+    return this.lastConnectivityFailureReason;
   }
 
   isDevHost(): boolean {
@@ -171,37 +191,16 @@ class OfflineDetector {
         }
 
         if (!navigator.onLine) {
+          this.lastConnectivityFailureReason = "browser_offline";
           this.setState(true);
           this.setBackendReachability(false);
           return false;
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          NETWORK_TEST_TIMEOUT
-        );
-        const url = BACKEND_URL.replace(/\/$/, "");
-
-        try {
-          this.lastHeadProbeAt = Date.now();
-          const response = await fetch(url, {
-            method: "HEAD",
-            cache: "no-cache",
-            signal: controller.signal,
-            mode: "cors",
-          });
-          clearTimeout(timeoutId);
-          const isOnline = response.status !== 0;
-          this.setState(!isOnline);
-          this.setBackendReachability(isOnline);
-          return isOnline;
-        } catch {
-          clearTimeout(timeoutId);
-          this.setState(true);
-          this.setBackendReachability(false);
-          return false;
-        }
+        const isReachable = await this.probeBackend();
+        this.setState(!isReachable);
+        this.setBackendReachability(isReachable);
+        return isReachable;
       } finally {
         this.state.isChecking = false;
         this.state.lastChecked = Date.now();
@@ -210,6 +209,39 @@ class OfflineDetector {
     })();
 
     return this.checkPromise;
+  }
+
+  private async probeBackend(): Promise<boolean> {
+    const baseUrl = BACKEND_URL.replace(/\/$/, "");
+
+    for (const path of CONNECTIVITY_PROBE_PATHS) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        NETWORK_TEST_TIMEOUT
+      );
+
+      try {
+        this.lastHeadProbeAt = Date.now();
+        const response = await fetch(`${baseUrl}${path}`, {
+          method: path === "/health" ? "GET" : "HEAD",
+          cache: "no-cache",
+          signal: controller.signal,
+          mode: "cors",
+        });
+        clearTimeout(timeoutId);
+
+        if (response.status !== 0) {
+          this.lastConnectivityFailureReason = null;
+          return true;
+        }
+      } catch {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    this.lastConnectivityFailureReason = "server_unreachable";
+    return false;
   }
 
   isOffline(): boolean {
