@@ -170,140 +170,145 @@ export default function SignupPage() {
   const isSubmitting = form.formState.isSubmitting;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-lg sm:text-xl">
-            Create your store
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Register as a merchant. We&apos;ll send a verification code to your
-            mobile (South Africa) or email (other countries).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="owner@example.com"
-                        className="touch-target"
-                        autoComplete="email"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Jane Doe"
-                        className="touch-target"
-                        autoComplete="name"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="storeName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Store name</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Jane's Shop"
-                        className="touch-target"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="localNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mobile number</FormLabel>
-                    <FormControl>
-                      <PhoneNumberField
-                        value={{
-                          countryIso: form.watch("countryCode"),
-                          localNumber: field.value,
-                        }}
-                        onChange={({ countryIso, localNumber }) => {
-                          form.setValue("countryCode", countryIso, {
-                            shouldValidate: true,
-                          });
-                          field.onChange(localNumber);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        className="touch-target"
-                        autoComplete="new-password"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button
-                type="submit"
-                className="w-full min-h-[44px] touch-target"
-                disabled={isSubmitting}
+    <div className="min-h-[100dvh] overflow-y-auto bg-muted p-4">
+      <div className="mx-auto flex w-full max-w-sm flex-col justify-center py-6 sm:min-h-[calc(100dvh-2rem)]">
+        <Card className="w-full">
+          <CardHeader className="text-center">
+            <CardTitle className="text-lg sm:text-xl">
+              Create your store
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Register as a merchant. We&apos;ll send a verification code to
+              your mobile (South Africa) or email (other countries).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
               >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                {isSubmitting ? "Continuing..." : "Continue"}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="owner@example.com"
+                          className="touch-target"
+                          autoComplete="email"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Your name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Jane Doe"
+                          className="touch-target"
+                          autoComplete="name"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="storeName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Store name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Jane's Shop"
+                          className="touch-target"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="localNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Mobile number</FormLabel>
+                      <FormControl>
+                        <PhoneNumberField
+                          value={{
+                            countryIso: form.watch("countryCode"),
+                            localNumber: field.value,
+                          }}
+                          onChange={({ countryIso, localNumber }) => {
+                            form.setValue("countryCode", countryIso, {
+                              shouldValidate: true,
+                            });
+                            field.onChange(localNumber);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          className="touch-target"
+                          autoComplete="new-password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full min-h-[44px] touch-target"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {isSubmitting ? "Continuing..." : "Continue"}
+                </Button>
+              </form>
+            </Form>
+            <p className="mt-4 text-center text-sm text-muted-foreground">
+              Already have an account?{" "}
+              <Button
+                variant="link"
+                className="p-0 min-h-[44px] touch-target"
+                asChild
+              >
+                <Link href="/login">Sign in</Link>
               </Button>
-            </form>
-          </Form>
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Button
-              variant="link"
-              className="p-0 min-h-[44px] touch-target"
-              asChild
-            >
-              <Link href="/login">Sign in</Link>
-            </Button>
-          </p>
-        </CardContent>
-      </Card>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,7 @@ export default defineConfig({
       ["src/tests/lib/store-persistence.test.ts", "jsdom"],
       ["src/tests/lib/mutation-queue.test.ts", "jsdom"],
       ["src/tests/lib/mutation-registry.test.ts", "jsdom"],
+      ["src/tests/lib/offline-detector.test.ts", "jsdom"],
       ["src/tests/lib/auth-session.test.ts", "jsdom"],
     ],
     coverage: {
