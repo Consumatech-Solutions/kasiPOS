@@ -175,7 +175,7 @@ class OfflineDetector {
       return this.lastBackendReachable ?? false;
     }
 
-    this.checkPromise = (async () => {
+    const promise = (async () => {
       this.state.isChecking = true;
 
       try {
@@ -204,11 +204,16 @@ class OfflineDetector {
       } finally {
         this.state.isChecking = false;
         this.state.lastChecked = Date.now();
-        this.checkPromise = null;
       }
     })();
 
-    return this.checkPromise;
+    this.checkPromise = promise;
+    void promise.finally(() => {
+      if (this.checkPromise === promise) {
+        this.checkPromise = null;
+      }
+    });
+    return promise;
   }
 
   private async probeBackend(): Promise<boolean> {
