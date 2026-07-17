@@ -30,9 +30,11 @@ import { useSettings } from "@/components/settings-provider";
 import { useCustomers } from "@/hooks/use-customers";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 export default function TransactionsPage() {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const { settings } = useSettings();
   const { currentStore } = settings;
 
@@ -203,7 +205,7 @@ export default function TransactionsPage() {
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-lg">
-                              R{Number(transaction.total).toFixed(2)}
+                              {formatMoney(Number(transaction.total))}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {t("transactions.accordion.customer", {
@@ -227,12 +229,12 @@ export default function TransactionsPage() {
                                 <span className="text-muted-foreground ml-2">
                                   {t("transactions.detail.itemMeta", {
                                     qty: item.quantity,
-                                    unit: Number(item.unitPrice).toFixed(2),
+                                    unit: formatMoney(Number(item.unitPrice)),
                                   })}
                                 </span>
                               </div>
                               <span className="font-medium">
-                                R{Number(item.totalPrice).toFixed(2)}
+                                {formatMoney(Number(item.totalPrice))}
                               </span>
                             </li>
                           ))}

@@ -9,6 +9,7 @@ import {
   deleteCustomerFromDexie,
 } from "@/lib/entity-cache";
 import { mutationQueue } from "@/lib/mutation-queue";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "@/types";
 import type {
   PaginationMeta,
@@ -147,6 +148,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
       );
       await saveCustomersToDexie([newCustomer]);
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
     },
   });
 
@@ -200,6 +202,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     onSuccess: async (updated) => {
       await updateCustomerInDexie(String(updated.id), updated);
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
     },
   });
 
@@ -242,6 +245,7 @@ export function useCustomers(options: UseCustomersOptions = {}) {
     onSuccess: async (_data, id) => {
       await deleteCustomerFromDexie(String(id));
       queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
     },
   });
 

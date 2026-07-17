@@ -36,6 +36,7 @@ const API_CACHE = "kasipos-api-cache";
 // All page routes to precache (aligned with src/lib/page-routes.ts)
 const PRECACHE_PAGES = [
   "/",
+  "/dashboard",
   "/catalogue",
   "/customers",
   "/inventory",
@@ -52,6 +53,9 @@ const PRECACHE_PAGES = [
   "/boph",
   "/store-setup",
   "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/reset-password/verify",
   "/request-access",
   "/verify-code",
   "/set-password",

@@ -1,5 +1,6 @@
 {
   "nav.home": "Home",
+  "nav.dashboard": "Dashboard",
   "nav.catalogue": "Catalogue",
   "nav.inventory": "Inventory",
   "nav.sales": "Sales",

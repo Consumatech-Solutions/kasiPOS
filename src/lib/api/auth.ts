@@ -44,10 +44,40 @@ export type LoginRequest = {
   password: string;
 };
 
+export type ForgotPasswordRequest = {
+  email?: string;
+  phone?: string;
+};
+
+export type VerifyPasswordResetRequest = {
+  email?: string;
+  phone?: string;
+  code: string;
+};
+
+export type VerifyPasswordResetResponse = {
+  tempToken: string;
+};
+
+export type ResetPasswordRequest = {
+  token: string;
+  newPassword: string;
+};
+
+export type ResetPasswordResponse = {
+  message?: string;
+};
+
 export const authApi = {
   requestOtp: (phone: string) => api.post("/auth/request-otp", { phone }),
   verifyOtp: (phone: string, code: string) =>
     api.post("/auth/verify-otp", { phone, code }),
+  forgotPassword: (data: ForgotPasswordRequest) =>
+    api.post("/auth/forgot-password", data),
+  verifyPasswordReset: (data: VerifyPasswordResetRequest) =>
+    api.post<VerifyPasswordResetResponse>("/auth/verify-password-reset", data),
+  resetPassword: (data: ResetPasswordRequest) =>
+    api.post<ResetPasswordResponse>("/auth/reset-password", data),
   setPassword: (password: string, tempToken: string) =>
     api.post<AuthResponse>(
       "/auth/set-password",

@@ -48,7 +48,9 @@ export function useEnsureStore() {
             const settingsRes = await settingsApi.get(store.id);
             store = mergeStoreSettingsIntoStore(store, settingsRes.data);
           } catch (_) {}
-          await saveStorePermanently(store, setSetting);
+          await saveStorePermanently(store, setSetting, {
+            skipStateUpdate: true,
+          });
           setSetting("currentStore", store);
           setIsLoading(false);
           return store;
@@ -92,7 +94,9 @@ export function useEnsureStore() {
           const settingsRes = await settingsApi.get(store.id);
           store = mergeStoreSettingsIntoStore(store, settingsRes.data);
         } catch (_) {}
-        await saveStorePermanently(store, setSetting);
+        await saveStorePermanently(store, setSetting, {
+          skipStateUpdate: true,
+        });
         setSetting("currentStore", store);
       }
 

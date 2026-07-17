@@ -37,6 +37,7 @@ import {
   X,
   Home,
   DollarSign,
+  LayoutDashboard,
   AlertCircle,
   Info,
   CheckCircle,
@@ -64,6 +65,7 @@ import { useTranslation } from "react-i18next";
 /** Pathname → i18n key (default namespace `translation`) */
 const PAGE_TITLE_KEYS: Record<string, string> = {
   "/": "nav.home",
+  "/dashboard": "nav.dashboard",
   "/catalogue": "nav.catalogue",
   "/inventory": "nav.inventory",
   "/sale": "nav.sales",
@@ -79,6 +81,7 @@ const PAGE_TITLE_KEYS: Record<string, string> = {
 
 const pageIcons: Record<string, React.ElementType> = {
   "/": Home,
+  "/dashboard": LayoutDashboard,
   "/catalogue": BookOpen,
   "/inventory": LayoutGrid,
   "/sale": DollarSign,

@@ -69,6 +69,7 @@ import type { Voucher } from "@/types";
 import { format } from "date-fns";
 import { enUS, fr as frDateFns } from "date-fns/locale";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const voucherSchema = z.object({
   code: z.string().min(1, { message: "Voucher code is required" }),
@@ -87,6 +88,7 @@ const voucherSchema = z.object({
 
 export default function VouchersPage() {
   const { t, i18n } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const dateLocale = i18n.language?.startsWith("fr") ? frDateFns : enUS;
   const { isOnline, hasInternet } = useNetworkStatus();
   const {
@@ -391,10 +393,10 @@ export default function VouchersPage() {
                             <TableCell>
                               {voucher.type === "percentage"
                                 ? `${value}%`
-                                : `R${value.toFixed(2)}`}
+                                : formatMoney(value)}
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
-                              R{minPurchase.toFixed(2)}
+                              {formatMoney(minPurchase)}
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
                               {expirationStatus ? (

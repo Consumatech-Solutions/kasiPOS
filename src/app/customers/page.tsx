@@ -68,9 +68,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Pagination } from "@/components/ui/pagination";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 export default function CustomersPage() {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const queryClient = useQueryClient();
   const { settings } = useSettings();
   const { currentStore, currentUser } = settings;
@@ -572,7 +574,7 @@ export default function CustomersPage() {
                       <TableCell>{format(txDate, "PPP")}</TableCell>
                       <TableCell>{transaction.items.length}</TableCell>
                       <TableCell className="text-right">
-                        R{transaction.total.toFixed(2)}
+                        {formatMoney(transaction.total)}
                       </TableCell>
                     </TableRow>
                   );

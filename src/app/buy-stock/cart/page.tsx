@@ -41,11 +41,13 @@ import { purchaseOrdersApi } from "@/lib/api/purchase-orders";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { useEnsureStore } from "@/hooks/use-ensure-store";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const DELIVERY_FEE = 150.0;
 
 export default function BuyStockCartPage() {
   const router = useRouter();
+  const { formatMoney } = useStoreCurrency();
   const { ensureStore } = useEnsureStore();
   const { isOnline } = useNetworkStatus();
 
@@ -234,7 +236,7 @@ export default function BuyStockCartPage() {
                           <TableCell className="font-medium">
                             {item.productName}
                           </TableCell>
-                          <TableCell>R{item.groupPrice.toFixed(2)}</TableCell>
+                          <TableCell>{formatMoney(item.groupPrice)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Button
@@ -278,7 +280,7 @@ export default function BuyStockCartPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-medium">
-                            R{item.totalPrice.toFixed(2)}
+                            {formatMoney(item.totalPrice)}
                           </TableCell>
                           <TableCell>
                             <Button
@@ -337,7 +339,7 @@ export default function BuyStockCartPage() {
                             >
                               Delivery
                               <span className="text-xs font-normal">
-                                R{DELIVERY_FEE.toFixed(2)}
+                                {formatMoney(DELIVERY_FEE)}
                               </span>
                             </Label>
                           </div>
@@ -346,21 +348,19 @@ export default function BuyStockCartPage() {
                       <div className="text-sm space-y-2">
                         <div className="flex justify-between">
                           <span>Subtotal</span>
-                          <span>R{subtotal.toFixed(2)}</span>
+                          <span>{formatMoney(subtotal)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span>Delivery Fee</span>
                           <span>
-                            R
-                            {(deliveryMethod === "delivery"
-                              ? DELIVERY_FEE
-                              : 0
-                            ).toFixed(2)}
+                            {formatMoney(
+                              deliveryMethod === "delivery" ? DELIVERY_FEE : 0
+                            )}
                           </span>
                         </div>
                         <div className="flex justify-between font-bold text-lg border-t pt-2">
                           <span>Total</span>
-                          <span>R{total.toFixed(2)}</span>
+                          <span>{formatMoney(total)}</span>
                         </div>
                       </div>
                       <Button

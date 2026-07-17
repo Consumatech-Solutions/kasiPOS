@@ -425,7 +425,10 @@ class MutationQueue {
   }
 
   add(
-    mutation: Omit<QueuedMutation, "id" | "timestamp" | "retries" | "status" | "mutationFn"> & { mutationFn?: () => Promise<any> }
+    mutation: Omit<
+      QueuedMutation,
+      "id" | "timestamp" | "retries" | "status" | "mutationFn"
+    > & { mutationFn?: () => Promise<any> }
   ) {
     const [type, action] = mutation.mutationKey;
     const inferredKey =
@@ -487,7 +490,9 @@ class MutationQueue {
       timestamp: Date.now(),
       retries: 0,
       status: "pending",
-      mutationFn: mutation.mutationFn ?? (() => executeMutation(mutation.mutationKey, mutation.variables)),
+      mutationFn:
+        mutation.mutationFn ??
+        (() => executeMutation(mutation.mutationKey, mutation.variables)),
       ...(inferredKey !== undefined && inferredKey !== ""
         ? { idempotencyKey: inferredKey }
         : {}),
@@ -543,7 +548,9 @@ class MutationQueue {
 
     if (typeof window !== "undefined") {
       if (force) {
-        const hasConnectivity = await offlineDetector.forceCheck();
+        const hasConnectivity = await offlineDetector.forceCheck({
+          bypassThrottle: true,
+        });
         if (!hasConnectivity) {
           console.log(
             "[MutationQueue] No connectivity for forced sync - skipping queue processing"

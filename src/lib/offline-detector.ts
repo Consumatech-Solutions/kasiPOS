@@ -4,17 +4,36 @@ interface OfflineState {
   isChecking: boolean;
 }
 
-const CONNECTIVITY_CHECK_INTERVAL_MS = 10000;
+const CONNECTIVITY_CHECK_INTERVAL_MS = 30000;
 const NETWORK_TEST_TIMEOUT = 5000;
+/** Minimum time between real backend probes to the API origin. */
+const MIN_HEAD_PROBE_INTERVAL_MS = 15000;
+const CONNECTIVITY_PROBE_PATHS = ["/health", "/"] as const;
+
 import { getConfiguredApiUrl } from "@/lib/api/resolve-api-base-url";
 
 const BACKEND_URL = getConfiguredApiUrl();
+
+export type ConnectivityFailureReason =
+  | "browser_offline"
+  | "server_unreachable";
+
+export function getCloudSyncUnavailableMessage(
+  reason: ConnectivityFailureReason = "server_unreachable"
+): string {
+  if (reason === "browser_offline") {
+    return "This device appears to be offline. Connect to the internet and try again.";
+  }
+  return "Cannot reach the server. Check your network and that the API is available, then try again.";
+}
 
 function isDevHost(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location.hostname;
   return h === "localhost" || h === "127.0.0.1";
 }
+
+type BackendReachabilityListener = (reachable: boolean) => void;
 
 class OfflineDetector {
   private state: OfflineState = {
@@ -25,6 +44,7 @@ class OfflineDetector {
 
   private checkPromise: Promise<boolean> | null = null;
   private listeners: Set<(isOffline: boolean) => void> = new Set();
+  private reachabilityListeners: Set<BackendReachabilityListener> = new Set();
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private forceOffline = false;
   private offlineFirstActive =
@@ -33,6 +53,11 @@ class OfflineDetector {
       ? false
       : true;
 
+  private lastBackendReachable: boolean | null = null;
+  private lastHeadProbeAt = 0;
+  private lastConnectivityFailureReason: ConnectivityFailureReason | null =
+    null;
+
   constructor() {
     if (typeof window !== "undefined") {
       this.state.isOffline = !navigator.onLine;
@@ -40,26 +65,25 @@ class OfflineDetector {
       window.addEventListener("online", this.handleOnline);
       window.addEventListener("offline", this.handleOffline);
 
-      this.checkConnectivity(false);
+      void this.checkConnectivity(false);
       this.intervalId = setInterval(() => {
-        this.checkConnectivity(false);
+        void this.checkConnectivity(false);
       }, CONNECTIVITY_CHECK_INTERVAL_MS);
     }
   }
 
   private handleOnline = () => {
     this.setState(false);
-    this.checkConnectivity(false)
-      .then((isOnline) => {
+    void this.checkConnectivity(false, false, { bypassThrottle: true }).then(
+      (isOnline) => {
         if (!isOnline) this.setState(true);
-      })
-      .catch(() => {
-        this.setState(true);
-      });
+      }
+    );
   };
 
   private handleOffline = () => {
     this.setState(true);
+    this.setBackendReachability(false);
   };
 
   private setState(isOffline: boolean) {
@@ -68,6 +92,12 @@ class OfflineDetector {
       this.state.lastChecked = Date.now();
       this.notifyListeners();
     }
+  }
+
+  private setBackendReachability(reachable: boolean) {
+    if (this.lastBackendReachable === reachable) return;
+    this.lastBackendReachable = reachable;
+    this.reachabilityListeners.forEach((listener) => listener(reachable));
   }
 
   private notifyListeners() {
@@ -79,6 +109,14 @@ class OfflineDetector {
     if (this.forceOffline && isDevHost()) return true;
     if (this.offlineFirstActive) return true;
     return this.state.isOffline;
+  }
+
+  getLastBackendReachable(): boolean {
+    return this.lastBackendReachable ?? false;
+  }
+
+  getLastConnectivityFailureReason(): ConnectivityFailureReason | null {
+    return this.lastConnectivityFailureReason;
   }
 
   isDevHost(): boolean {
@@ -106,20 +144,44 @@ class OfflineDetector {
     return this.offlineFirstActive;
   }
 
+  subscribeToBackendReachability(
+    callback: BackendReachabilityListener
+  ): () => void {
+    this.reachabilityListeners.add(callback);
+    callback(this.getLastBackendReachable());
+    return () => {
+      this.reachabilityListeners.delete(callback);
+    };
+  }
+
+  private shouldThrottleHeadProbe(bypassThrottle: boolean): boolean {
+    if (bypassThrottle) return false;
+    if (this.lastBackendReachable == null) return false;
+    return Date.now() - this.lastHeadProbeAt < MIN_HEAD_PROBE_INTERVAL_MS;
+  }
+
   private async checkConnectivity(
     force: boolean = false,
-    bypassOfflineFirst: boolean = false
+    bypassOfflineFirst: boolean = false,
+    options?: { bypassThrottle?: boolean }
   ): Promise<boolean> {
-    if (this.checkPromise && !force) {
+    if (this.checkPromise) {
       return this.checkPromise;
     }
 
-    this.checkPromise = (async () => {
+    const bypassThrottle = options?.bypassThrottle === true;
+
+    if (this.shouldThrottleHeadProbe(bypassThrottle)) {
+      return this.lastBackendReachable ?? false;
+    }
+
+    const promise = (async () => {
       this.state.isChecking = true;
 
       try {
         if (this.forceOffline && isDevHost()) {
           this.setState(true);
+          this.setBackendReachability(false);
           return false;
         }
 
@@ -129,40 +191,62 @@ class OfflineDetector {
         }
 
         if (!navigator.onLine) {
+          this.lastConnectivityFailureReason = "browser_offline";
           this.setState(true);
+          this.setBackendReachability(false);
           return false;
         }
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          NETWORK_TEST_TIMEOUT
-        );
-        const url = BACKEND_URL.replace(/\/$/, "");
-
-        try {
-          const response = await fetch(url, {
-            method: "HEAD",
-            cache: "no-cache",
-            signal: controller.signal,
-            mode: "cors",
-          });
-          clearTimeout(timeoutId);
-          const isOnline = response.status !== 0;
-          this.setState(!isOnline);
-          return isOnline;
-        } catch {
-          clearTimeout(timeoutId);
-          this.setState(true);
-          return false;
-        }
+        const isReachable = await this.probeBackend();
+        this.setState(!isReachable);
+        this.setBackendReachability(isReachable);
+        return isReachable;
       } finally {
         this.state.isChecking = false;
-        this.checkPromise = null;
+        this.state.lastChecked = Date.now();
       }
     })();
 
-    return this.checkPromise;
+    this.checkPromise = promise;
+    void promise.finally(() => {
+      if (this.checkPromise === promise) {
+        this.checkPromise = null;
+      }
+    });
+    return promise;
+  }
+
+  private async probeBackend(): Promise<boolean> {
+    const baseUrl = BACKEND_URL.replace(/\/$/, "");
+
+    for (const path of CONNECTIVITY_PROBE_PATHS) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        NETWORK_TEST_TIMEOUT
+      );
+
+      try {
+        this.lastHeadProbeAt = Date.now();
+        const response = await fetch(`${baseUrl}${path}`, {
+          method: path === "/health" ? "GET" : "HEAD",
+          cache: "no-cache",
+          signal: controller.signal,
+          mode: "cors",
+        });
+        clearTimeout(timeoutId);
+
+        if (response.status !== 0) {
+          this.lastConnectivityFailureReason = null;
+          return true;
+        }
+      } catch {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    this.lastConnectivityFailureReason = "server_unreachable";
+    return false;
   }
 
   isOffline(): boolean {
@@ -183,8 +267,8 @@ class OfflineDetector {
     };
   }
 
-  async forceCheck(): Promise<boolean> {
-    return await this.checkConnectivity(true, true);
+  async forceCheck(options?: { bypassThrottle?: boolean }): Promise<boolean> {
+    return await this.checkConnectivity(true, true, options);
   }
 
   destroy() {
@@ -197,6 +281,7 @@ class OfflineDetector {
       }
     }
     this.listeners.clear();
+    this.reachabilityListeners.clear();
   }
 }
 

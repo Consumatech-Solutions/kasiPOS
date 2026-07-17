@@ -105,6 +105,7 @@ import { ImageUpload } from "@/components/catalogue/image-upload";
 import { ProductImage } from "@/components/catalogue/product-image";
 import { AddTemplatesModal } from "@/components/catalogue/add-templates-modal";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 const categorySchema = z.object({
   name: z
@@ -143,6 +144,7 @@ const productSchema = z.object({
 
 export default function CataloguePage() {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
 
@@ -847,9 +849,9 @@ export default function CataloguePage() {
                                   ? p.category
                                   : t("catalogue.products.noCategory"))}
                             </TableCell>
-                            <TableCell>R{price.toFixed(2)}</TableCell>
+                            <TableCell>{formatMoney(price)}</TableCell>
                             <TableCell className="hidden md:table-cell">
-                              R{costPrice.toFixed(2)}
+                              {formatMoney(costPrice)}
                             </TableCell>
                             <TableCell className="hidden sm:table-cell">
                               {p.stock}

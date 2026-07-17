@@ -31,9 +31,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useTranslation } from "react-i18next";
+import { useStoreCurrency } from "@/hooks/use-store-currency";
 
 export default function BuyStockPage() {
   const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
   const { settings } = useSettings();
   const { hasInternet } = useNetworkStatus();
   const { currentStore } = settings;
@@ -228,10 +230,9 @@ export default function BuyStockPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-semibold text-green-600">
-                            R
-                            {getGroupPrice(
-                              Number(product.costPrice) || 0
-                            ).toFixed(2)}
+                            {formatMoney(
+                              getGroupPrice(Number(product.costPrice) || 0)
+                            )}
                           </TableCell>
                           <TableCell>
                             <Input
@@ -313,13 +314,12 @@ export default function BuyStockPage() {
                             {product.stock ?? 0}
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            R{(Number(product.costPrice) || 0).toFixed(2)}
+                            {formatMoney(Number(product.costPrice) || 0)}
                           </TableCell>
                           <TableCell className="font-semibold text-green-600">
-                            R
-                            {getGroupPrice(
-                              Number(product.costPrice) || 0
-                            ).toFixed(2)}
+                            {formatMoney(
+                              getGroupPrice(Number(product.costPrice) || 0)
+                            )}
                           </TableCell>
                           <TableCell>
                             <Input
