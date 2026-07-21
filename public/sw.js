@@ -54,6 +54,7 @@ const PRECACHE_PAGES = [
   "/store-setup",
   "/login",
   "/forgot-password",
+  "/forgot-password/sent",
   "/reset-password",
   "/reset-password/verify",
   "/request-access",

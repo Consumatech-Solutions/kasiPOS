@@ -22,6 +22,7 @@ export function getPageRoutesToPreload(isLoggedIn: boolean): string[] {
   const authRoutes = [
     "/login",
     "/forgot-password",
+    "/forgot-password/sent",
     "/reset-password",
     "/reset-password/verify",
     "/request-access",
@@ -56,6 +57,7 @@ export const ALL_PAGE_ROUTES = [
   "/store-setup",
   "/login",
   "/forgot-password",
+  "/forgot-password/sent",
   "/reset-password",
   "/reset-password/verify",
   "/request-access",

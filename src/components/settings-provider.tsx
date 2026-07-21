@@ -112,6 +112,7 @@ const AUTH_ROUTES = [
   "/signup",
   "/signup/verify",
   "/forgot-password",
+  "/forgot-password/sent",
   "/reset-password",
   "/reset-password/verify",
   "/request-access",
