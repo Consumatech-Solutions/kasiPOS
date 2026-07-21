@@ -2,5 +2,14 @@
   "requireOnlineBanner.cloudTitle": "Cloud unavailable",
   "requireOnlineBanner.offlineTitle": "Offline",
   "requireOnlineBanner.cloudDescription": "Internet is available, but the cloud/backend is unreachable. This section is temporarily disabled.",
-  "requireOnlineBanner.offlineDescription": "This section requires an internet connection. It is disabled while you are offline. Reconnect to use it."
+  "requireOnlineBanner.offlineDescription": "This section requires an internet connection. It is disabled while you are offline. Reconnect to use it.",
+  "forgotPassword.sent.title": "Check your inbox",
+  "forgotPassword.sent.descriptionEmail": "If an account exists for that email address, we sent a password reset link. Check your email and follow the link to reset your password.",
+  "forgotPassword.sent.descriptionSms": "If an account exists for that mobile number, we sent a password reset link by SMS. Open the message and follow the link to reset your password.",
+  "forgotPassword.sent.hintEmail": "The link may take a few minutes to arrive. If you do not see it, check your spam folder.",
+  "forgotPassword.sent.hintSms": "The link may take a few minutes to arrive. If you do not see it, check your spam folder or message filters.",
+  "forgotPassword.sent.backToSignIn": "Back to sign in",
+  "forgotPassword.sent.wrongDetails": "Wrong details?",
+  "forgotPassword.sent.tryAgain": "Try again",
+  "forgotPassword.sent.loading": "Loading..."
 }

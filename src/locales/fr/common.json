@@ -2,5 +2,14 @@
   "requireOnlineBanner.cloudTitle": "Cloud indisponible",
   "requireOnlineBanner.offlineTitle": "Hors ligne",
   "requireOnlineBanner.cloudDescription": "Internet est disponible, mais le cloud / le serveur est injoignable. Cette section est temporairement désactivée.",
-  "requireOnlineBanner.offlineDescription": "Cette section nécessite une connexion Internet. Elle est désactivée hors ligne. Reconnectez-vous pour l’utiliser."
+  "requireOnlineBanner.offlineDescription": "Cette section nécessite une connexion Internet. Elle est désactivée hors ligne. Reconnectez-vous pour l’utiliser.",
+  "forgotPassword.sent.title": "Vérifiez votre boîte de réception",
+  "forgotPassword.sent.descriptionEmail": "Si un compte existe pour cette adresse e-mail, nous avons envoyé un lien de réinitialisation du mot de passe. Consultez votre e-mail et suivez le lien pour réinitialiser votre mot de passe.",
+  "forgotPassword.sent.descriptionSms": "Si un compte existe pour ce numéro de téléphone, nous avons envoyé un lien de réinitialisation du mot de passe par SMS. Ouvrez le message et suivez le lien pour réinitialiser votre mot de passe.",
+  "forgotPassword.sent.hintEmail": "Le lien peut prendre quelques minutes à arriver. Si vous ne le voyez pas, vérifiez votre dossier indésirables (spam).",
+  "forgotPassword.sent.hintSms": "Le lien peut prendre quelques minutes à arriver. Si vous ne le voyez pas, vérifiez vos indésirables ou les filtres de messages.",
+  "forgotPassword.sent.backToSignIn": "Retour à la connexion",
+  "forgotPassword.sent.wrongDetails": "Mauvaises informations ?",
+  "forgotPassword.sent.tryAgain": "Réessayer",
+  "forgotPassword.sent.loading": "Chargement..."
 }

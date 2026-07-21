@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { DEFAULT_PHONE_COUNTRY, formatE164 } from "@/lib/phone";
 import {
@@ -43,6 +44,7 @@ const PHONE_EXAMPLE = formatE164(
 const IDENTIFIER_PLACEHOLDER = `owner@example.com or ${PHONE_EXAMPLE}`;
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const form = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -50,20 +52,21 @@ export default function ForgotPasswordPage() {
     },
   });
 
+  const goToSentPage = (channel: "email" | "sms") => {
+    router.push(`/forgot-password/sent?channel=${channel}`);
+  };
+
   const onSubmit = async (values: ForgotPasswordFormValues) => {
+    const parsed = parseAuthIdentifier(values.identifier);
+    const channel = parsed.type === "email" ? "email" : "sms";
+    const payload =
+      parsed.type === "email"
+        ? { email: parsed.email }
+        : { phone: parsed.phone };
+
     try {
-      const parsed = parseAuthIdentifier(values.identifier);
-      const payload =
-        parsed.type === "email"
-          ? { email: parsed.email }
-          : { phone: parsed.phone };
-
       await authApi.forgotPassword(payload);
-
-      feedback.success(
-        "Reset link sent",
-        "If an account exists for the provided details, a password reset link has been sent."
-      );
+      goToSentPage(channel);
     } catch (error: unknown) {
       const err = error as {
         response?: { status?: number; data?: { message?: string } };
@@ -72,10 +75,7 @@ export default function ForgotPasswordPage() {
       const serverMessage = err?.response?.data?.message;
 
       if (status === 404) {
-        feedback.success(
-          "Reset link sent",
-          "If an account exists for the provided details, a password reset link has been sent."
-        );
+        goToSentPage(channel);
         return;
       }
 
