@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ export default function CreditSaleModal({
   onAddCustomer,
   isLoading = false,
 }: CreditSaleModalProps) {
+  const { t } = useTranslation();
   const { formatMoney } = useStoreCurrency();
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -124,7 +126,7 @@ export default function CreditSaleModal({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
-        title="Sell on credit"
+        title={t("pos.creditSale.title")}
         className="!flex !flex-col w-[380px] max-w-[95vw] !p-0 !gap-0 overflow-hidden border-0 shadow-xl bg-white rounded-xl [&>button]:hidden"
         style={{
           borderRadius: "12px",
@@ -137,14 +139,14 @@ export default function CreditSaleModal({
           style={{ backgroundColor: HEADER_BG }}
         >
           <span className="text-base font-semibold text-white">
-            Sell on credit
+            {t("pos.creditSale.title")}
           </span>
           <button
             type="button"
             onClick={handleClose}
             className="rounded-full w-8 h-8 flex items-center justify-center text-white hover:bg-white/20 transition-colors cursor-pointer shrink-0"
             style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
-            aria-label="Close"
+            aria-label={t("pos.creditSale.closeAria")}
           >
             <X className="h-4 w-4" strokeWidth={1.8} />
           </button>
@@ -153,7 +155,7 @@ export default function CreditSaleModal({
         <div className="flex flex-col p-5 gap-4 bg-white">
           <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100">
             <span className="text-sm font-medium text-gray-700">
-              Amount on credit
+              {t("pos.creditSale.amountOnCredit")}
             </span>
             <span className="text-base font-semibold">
               {formatMoney(amount)}
@@ -161,7 +163,9 @@ export default function CreditSaleModal({
           </div>
 
           <div className="space-y-2" ref={customerDropdownRef}>
-            <Label className="text-sm font-medium">Customer</Label>
+            <Label className="text-sm font-medium">
+              {t("pos.creditSale.customer")}
+            </Label>
             <div className="relative">
               <button
                 type="button"
@@ -174,7 +178,7 @@ export default function CreditSaleModal({
                   <span className="truncate">{selectedCustomer.name}</span>
                 ) : (
                   <span className="text-muted-foreground">
-                    Select customer...
+                    {t("pos.creditSale.selectCustomer")}
                   </span>
                 )}
                 <ChevronDown
@@ -190,7 +194,7 @@ export default function CreditSaleModal({
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Search by name or phone..."
+                        placeholder={t("pos.creditSale.searchCustomer")}
                         className="pl-9 h-9"
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
@@ -201,11 +205,11 @@ export default function CreditSaleModal({
                   <ScrollArea className="max-h-[220px]">
                     {customersLoading ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">
-                        Loading...
+                        {t("pos.creditSale.loadingCustomers")}
                       </div>
                     ) : filteredCustomers.length === 0 ? (
                       <div className="p-4 text-center text-sm text-muted-foreground">
-                        No customers found.
+                        {t("pos.creditSale.noCustomers")}
                       </div>
                     ) : (
                       <div className="p-1">
@@ -245,7 +249,7 @@ export default function CreditSaleModal({
                         }}
                       >
                         <UserPlus className="h-4 w-4" />
-                        Add Customer
+                        {t("pos.creditSale.addCustomer")}
                       </Button>
                     </div>
                   )}
@@ -254,18 +258,27 @@ export default function CreditSaleModal({
             </div>
             {selectedCustomer && (
               <div className="text-sm text-muted-foreground">
-                Outstanding credit: {formatMoney(outstandingCredit)}
+                {t("pos.creditSale.outstandingCredit", {
+                  amount: formatMoney(outstandingCredit),
+                })}
                 {limit != null && limit >= 0 && (
                   <span className="block mt-0.5">
-                    Credit available:{" "}
-                    {formatMoney(Math.max(0, limit - outstandingCredit))}
+                    {t("pos.creditSale.creditAvailable", {
+                      amount: formatMoney(
+                        Math.max(0, limit - outstandingCredit)
+                      ),
+                    })}
                   </span>
                 )}
               </div>
             )}
             {selectedCustomer && isOverLimit && limit != null && (
               <p className="text-sm font-medium text-destructive">
-                Credit limit exceeded. Outstanding ({formatMoney(outstandingCredit)}) + this sale ({formatMoney(amount)}) exceeds limit ({formatMoney(limit)}).
+                {t("pos.creditSale.limitExceeded", {
+                  outstanding: formatMoney(outstandingCredit),
+                  sale: formatMoney(amount),
+                  limit: formatMoney(limit),
+                })}
               </p>
             )}
           </div>
@@ -275,7 +288,7 @@ export default function CreditSaleModal({
               htmlFor="credit-payment-date"
               className="text-sm font-medium"
             >
-              Payment due date (optional)
+              {t("pos.creditSale.paymentDueDate")}
             </Label>
             <div className="relative flex items-center">
               <CalendarIcon className="absolute left-3 h-4 w-4 shrink-0 text-muted-foreground pointer-events-none" />
@@ -297,9 +310,11 @@ export default function CreditSaleModal({
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Note (optional)</Label>
+            <Label className="text-sm font-medium">
+              {t("pos.creditSale.note")}
+            </Label>
             <Textarea
-              placeholder="Add a note..."
+              placeholder={t("pos.creditSale.notePlaceholder")}
               className="min-h-[80px] resize-none"
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -315,7 +330,7 @@ export default function CreditSaleModal({
             className="!h-11 w-full rounded-md font-medium text-sm cursor-pointer border-gray-300 bg-white hover:bg-gray-50"
             onClick={handleClose}
           >
-            Cancel
+            {t("pos.creditSale.cancel")}
           </Button>
           <Button
             type="button"
@@ -325,7 +340,7 @@ export default function CreditSaleModal({
             style={{ backgroundColor: HEADER_BG }}
             onClick={handleConfirm}
           >
-            Confirm credit sale
+            {t("pos.creditSale.confirm")}
           </Button>
         </div>
       </DialogContent>

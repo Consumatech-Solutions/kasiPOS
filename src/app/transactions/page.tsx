@@ -31,12 +31,16 @@ import { useCustomers } from "@/hooks/use-customers";
 import { useTransactions } from "@/hooks/use-transactions";
 import { useTranslation } from "react-i18next";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
+import { ClearCreditButton } from "@/components/transactions/clear-credit-button";
+import { canClearCreditTransaction } from "@/lib/clear-credit";
+import type { Transaction } from "@/types";
 
 export default function TransactionsPage() {
   const { t } = useTranslation();
   const { formatMoney } = useStoreCurrency();
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const role = settings.currentUser?.role;
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,6 +57,8 @@ export default function TransactionsPage() {
     transactions: allTransactions,
     loading,
     error,
+    clearCredit,
+    isClearingCredit,
   } = useTransactions({
     page: 1,
     limit: 10,
@@ -83,8 +89,18 @@ export default function TransactionsPage() {
     [t]
   );
 
+  const statusLabel = useCallback(
+    (status: Transaction["status"]) => {
+      const key = String(status ?? "").toLowerCase();
+      if (key === "pending") return t("transactions.status.pending");
+      if (key === "paid") return t("transactions.status.paid");
+      return status ? String(status) : null;
+    },
+    [t]
+  );
+
   const filteredTransactions =
-    allTransactions?.filter((transaction: any) => {
+    allTransactions?.filter((transaction: Transaction) => {
       if (!searchTerm) return true;
 
       const searchLower = searchTerm.toLowerCase();
@@ -93,12 +109,11 @@ export default function TransactionsPage() {
         transaction.customerId
       ).toLowerCase();
 
-      const isTransactionIdSearch = /^[0-9a-f-]{0,36}$/i.test(searchTerm);
-      if (isTransactionIdSearch) {
+      const isIdSearch = /^[0-9a-f-]{0,36}$/i.test(searchTerm);
+      if (isIdSearch) {
         return transactionId.includes(searchLower);
-      } else {
-        return customerName.includes(searchLower);
       }
+      return customerName.includes(searchLower);
     }) || [];
 
   const clearFilters = () => {
@@ -123,7 +138,7 @@ export default function TransactionsPage() {
               <Button
                 variant={"outline"}
                 className={cn(
-                  "w-full sm:w-[240px] justify-start text-left font-normal",
+                  "w-full sm:w-[280px] justify-start text-left font-normal min-h-[44px] touch-target",
                   !selectedDate && "text-muted-foreground"
                 )}
               >
@@ -135,7 +150,7 @@ export default function TransactionsPage() {
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto p-0">
               <Calendar
                 mode="single"
                 selected={selectedDate}
@@ -144,29 +159,28 @@ export default function TransactionsPage() {
               />
             </PopoverContent>
           </Popover>
-
-          <div className="relative w-full sm:w-[280px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <div className="relative w-full sm:flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder={t("transactions.filter.searchPlaceholder")}
-              className="pl-10"
+              className="pl-10 min-h-[44px] touch-target"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-
           {(selectedDate || searchTerm) && (
             <Button
               variant="ghost"
               onClick={clearFilters}
-              className="min-h-[44px] touch-target w-full sm:w-auto"
+              className="min-h-[44px] touch-target"
             >
-              <X className="mr-2 h-4 w-4" /> {t("transactions.filter.clear")}
+              <X className="mr-2 h-4 w-4" />
+              {t("transactions.filter.clear")}
             </Button>
           )}
         </div>
 
-        <ScrollArea className="h-[calc(100vh-18rem)]">
+        <ScrollArea className="h-[60vh] sm:h-[70vh]">
           {loading ? (
             <div className="text-center h-24 flex items-center justify-center text-muted-foreground">
               {t("transactions.loading")}
@@ -177,23 +191,28 @@ export default function TransactionsPage() {
             </div>
           ) : (
             <Accordion type="single" collapsible className="w-full">
-              {filteredTransactions && filteredTransactions.length > 0 ? (
-                filteredTransactions.map((transaction: any) => {
+              {filteredTransactions.length > 0 ? (
+                filteredTransactions.map((transaction: Transaction) => {
                   const transactionDate = transaction.createdAt
                     ? new Date(transaction.createdAt)
                     : transaction.date
                       ? new Date(transaction.date)
                       : new Date();
-                  const transactionId = String(transaction.id ?? "");
+                  const customerName = getCustomerName(transaction.customerId);
+                  const statusText = statusLabel(transaction.status);
+                  const showClear = canClearCreditTransaction(
+                    role,
+                    transaction
+                  );
 
                   return (
                     <AccordionItem
-                      value={`item-${transactionId}`}
-                      key={transactionId}
+                      value={String(transaction.id)}
+                      key={String(transaction.id)}
                     >
                       <AccordionTrigger>
                         <div className="flex justify-between w-full pr-4">
-                          <div className="text-left">
+                          <div>
                             <p className="font-medium">
                               {t("transactions.accordion.transactionNumber", {
                                 id: formatTransactionIdLabel(transaction.id),
@@ -209,7 +228,7 @@ export default function TransactionsPage() {
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {t("transactions.accordion.customer", {
-                                name: getCustomerName(transaction.customerId),
+                                name: customerName,
                               })}
                             </p>
                           </div>
@@ -217,7 +236,7 @@ export default function TransactionsPage() {
                       </AccordionTrigger>
                       <AccordionContent>
                         <ul className="space-y-2 pl-2">
-                          {transaction.items?.map((item: any) => (
+                          {transaction.items?.map((item) => (
                             <li
                               key={item.productId}
                               className="flex justify-between items-center text-sm"
@@ -239,10 +258,43 @@ export default function TransactionsPage() {
                             </li>
                           ))}
                         </ul>
-                        <div className="mt-2 text-right">
-                          <Badge variant="secondary">
-                            {transaction.paymentMethod}
-                          </Badge>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">
+                              {transaction.paymentMethod}
+                            </Badge>
+                            {statusText ? (
+                              <Badge
+                                variant={
+                                  String(transaction.status).toLowerCase() ===
+                                  "paid"
+                                    ? "default"
+                                    : "outline"
+                                }
+                              >
+                                {statusText}
+                              </Badge>
+                            ) : null}
+                            {transaction.creditSettledAt ? (
+                              <span className="text-xs text-muted-foreground">
+                                {t("transactions.clearCredit.settledAt", {
+                                  date: format(
+                                    new Date(transaction.creditSettledAt),
+                                    "PPP p"
+                                  ),
+                                })}
+                              </span>
+                            ) : null}
+                          </div>
+                          {showClear ? (
+                            <ClearCreditButton
+                              transaction={transaction}
+                              role={role}
+                              customerName={customerName}
+                              onClearCredit={clearCredit}
+                              isClearing={isClearingCredit}
+                            />
+                          ) : null}
                         </div>
                       </AccordionContent>
                     </AccordionItem>

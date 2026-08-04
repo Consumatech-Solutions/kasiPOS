@@ -21,5 +21,8 @@
   "sales.detail.tax": "Tax",
   "sales.detail.discount": "Discount",
   "sales.detail.total": "Total",
-  "sales.detail.voucher": "Voucher: {{code}}"
+  "sales.detail.voucher": "Voucher: {{code}}",
+  "sales.status.pending": "Pending",
+  "sales.status.paid": "Paid",
+  "sales.clearCredit.settledAt": "Settled {{date}}"
 }

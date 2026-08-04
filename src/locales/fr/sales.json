@@ -21,5 +21,8 @@
   "sales.detail.tax": "TVA",
   "sales.detail.discount": "Remise",
   "sales.detail.total": "Total",
-  "sales.detail.voucher": "Bon : {{code}}"
+  "sales.detail.voucher": "Bon : {{code}}",
+  "sales.status.pending": "En attente",
+  "sales.status.paid": "Payé",
+  "sales.clearCredit.settledAt": "Soldé le {{date}}"
 }
