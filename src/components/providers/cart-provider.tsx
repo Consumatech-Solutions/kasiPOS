@@ -30,6 +30,8 @@ interface CartContextValue {
   setCart: React.Dispatch<React.SetStateAction<CartMap>>;
   addToCart: (product: Product) => void;
   updateQuantity: (productId: string, newQuantity: number) => void;
+  /** Override unit price for this sale only (does not change catalog product price). */
+  updateUnitPrice: (productId: string, newUnitPrice: number) => void;
   clearCart: () => void;
   cartItemCount: number;
   isCartHydrated: boolean;
@@ -172,6 +174,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const updateUnitPrice = useCallback(
+    (productId: string, newUnitPrice: number) => {
+      const price = Number(newUnitPrice);
+      if (!Number.isFinite(price) || price < 0) return;
+      const unitPrice = Math.round(price * 100) / 100;
+      setCartState((prev) => {
+        const newCart = new Map(prev);
+        const item = newCart.get(productId);
+        if (!item) return prev;
+        newCart.set(productId, {
+          ...item,
+          unitPrice,
+          totalPrice: Math.round(item.quantity * unitPrice * 100) / 100,
+        });
+        return newCart;
+      });
+    },
+    []
+  );
+
   const clearCart = useCallback(() => {
     cartMemoryCache = null;
     setCartState(new Map());
@@ -190,6 +212,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setCart,
       addToCart,
       updateQuantity,
+      updateUnitPrice,
       clearCart,
       cartItemCount,
       isCartHydrated: hydrated,
@@ -199,6 +222,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setCart,
       addToCart,
       updateQuantity,
+      updateUnitPrice,
       clearCart,
       cartItemCount,
       hydrated,

@@ -33,6 +33,8 @@
   "pos.cart.headers.price": "Prix",
   "pos.cart.headers.qty": "Qté",
   "pos.cart.headers.total": "Total",
+  "pos.cart.editPriceHint": "Appuyer pour modifier le prix pour cette vente uniquement",
+  "pos.cart.editPriceAria": "Modifier le prix unitaire de {{product}}",
   "pos.cart.subtotal": "Sous-total",
   "pos.cart.vatLine": "TVA ({{percent}} %)",
   "pos.cart.discountApplied": "Remise appliquée",

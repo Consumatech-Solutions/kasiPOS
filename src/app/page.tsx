@@ -96,8 +96,14 @@ export default function PosPage() {
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
 
-  const { cart, addToCart, updateQuantity, clearCart, isCartHydrated } =
-    useCart();
+  const {
+    cart,
+    addToCart,
+    updateQuantity,
+    updateUnitPrice,
+    clearCart,
+    isCartHydrated,
+  } = useCart();
   const [selectedCustomerId, setSelectedCustomerId] = useState<
     string | undefined
   >();
@@ -303,6 +309,7 @@ export default function PosPage() {
     onCheckout: handleCheckout,
     onClearCart: () => setIsClearCartDialogOpen(true),
     updateQuantity,
+    updateUnitPrice,
     onInsufficientStock: (message) =>
       setInsufficientStockPopup({
         open: true,
