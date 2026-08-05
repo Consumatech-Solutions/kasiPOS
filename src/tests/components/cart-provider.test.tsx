@@ -37,6 +37,7 @@ function Harness() {
     cart,
     addToCart,
     updateQuantity,
+    updateUnitPrice,
     clearCart,
     cartItemCount,
     isCartHydrated,
@@ -47,6 +48,7 @@ function Harness() {
       <span data-testid="count">{cartItemCount}</span>
       <span data-testid="size">{cart.size}</span>
       <span data-testid="qty-p1">{cart.get("p1")?.quantity ?? 0}</span>
+      <span data-testid="unit-p1">{cart.get("p1")?.unitPrice ?? 0}</span>
       <span data-testid="total-p1">{cart.get("p1")?.totalPrice ?? 0}</span>
       <button
         type="button"
@@ -77,6 +79,20 @@ function Harness() {
         onClick={() => updateQuantity("p1", 5)}
       >
         set qty 5
+      </button>
+      <button
+        type="button"
+        data-testid="set-price-9.5"
+        onClick={() => updateUnitPrice("p1", 9.5)}
+      >
+        set price 9.5
+      </button>
+      <button
+        type="button"
+        data-testid="set-price-invalid"
+        onClick={() => updateUnitPrice("p1", -3)}
+      >
+        set price invalid
       </button>
       <button
         type="button"
@@ -243,5 +259,41 @@ describe("CartProvider", () => {
     });
     expect(screen.getByTestId("qty-p1").textContent).toBe("1");
     await waitFor(() => expect(feedbackError).toHaveBeenCalled());
+  });
+
+  it("updateUnitPrice changes line price without affecting quantity", async () => {
+    render(
+      <CartProvider>
+        <Harness />
+      </CartProvider>
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("add-p1"));
+    await user.click(screen.getByTestId("inc-qty"));
+    expect(screen.getByTestId("qty-p1").textContent).toBe("2");
+    expect(screen.getByTestId("total-p1").textContent).toBe("24");
+    await user.click(screen.getByTestId("set-price-9.5"));
+    expect(screen.getByTestId("unit-p1").textContent).toBe("9.5");
+    expect(screen.getByTestId("total-p1").textContent).toBe("19");
+    expect(screen.getByTestId("qty-p1").textContent).toBe("2");
+  });
+
+  it("updateUnitPrice ignores negative prices", async () => {
+    render(
+      <CartProvider>
+        <Harness />
+      </CartProvider>
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("hydrated").textContent).toBe("yes")
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("add-p1"));
+    await user.click(screen.getByTestId("set-price-invalid"));
+    expect(screen.getByTestId("unit-p1").textContent).toBe("12");
+    expect(screen.getByTestId("total-p1").textContent).toBe("12");
   });
 });

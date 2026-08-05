@@ -112,6 +112,8 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
           discountAmount: newTransaction.discountAmount || null,
           storeId: newTransaction.storeId,
           createdAt: new Date().toISOString(),
+          status:
+            newTransaction.paymentMethod === "Credit" ? "pending" : "paid",
         };
         queryClient.setQueryData<{ data: Transaction[]; meta: PaginationMeta }>(
           queryKey,
@@ -152,6 +154,36 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
     },
   });
 
+  const clearCreditMutation = useMutation({
+    mutationFn: async (transactionId: string) => {
+      const response = await transactionsApi.clearCredit(transactionId);
+      return response.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<{ data: Transaction[]; meta: PaginationMeta }>(
+        queryKey,
+        (old) => {
+          if (!old || !updated?.id) return old;
+          return {
+            ...old,
+            data: old.data.map((t) =>
+              String(t.id) === String(updated.id) ? { ...t, ...updated } : t
+            ),
+          };
+        }
+      );
+      if (updated?.id) {
+        queryClient.setQueryData(transactionKeys.detail(String(updated.id)), {
+          data: updated,
+        });
+        void saveTransactionsToDexie([updated]);
+      }
+      void queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+  });
+
   return {
     transactions: query.data?.data || [],
     pagination: query.data?.meta || {
@@ -166,6 +198,8 @@ export function useTransactions(options: UseTransactionsOptions = {}) {
       : null,
     createTransaction: createMutation.mutateAsync,
     isCreating: createMutation.isPending,
+    clearCredit: clearCreditMutation.mutateAsync,
+    isClearingCredit: clearCreditMutation.isPending,
     refresh: () => query.refetch(),
     loadTransactions: async (loadParams?: GetTransactionsParams) => {
       const newParams = { ...params, ...loadParams };

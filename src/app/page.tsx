@@ -96,8 +96,14 @@ export default function PosPage() {
   const { isOnline } = useNetworkStatus();
   const queryClient = useQueryClient();
 
-  const { cart, addToCart, updateQuantity, clearCart, isCartHydrated } =
-    useCart();
+  const {
+    cart,
+    addToCart,
+    updateQuantity,
+    updateUnitPrice,
+    clearCart,
+    isCartHydrated,
+  } = useCart();
   const [selectedCustomerId, setSelectedCustomerId] = useState<
     string | undefined
   >();
@@ -303,6 +309,7 @@ export default function PosPage() {
     onCheckout: handleCheckout,
     onClearCart: () => setIsClearCartDialogOpen(true),
     updateQuantity,
+    updateUnitPrice,
     onInsufficientStock: (message) =>
       setInsufficientStockPopup({
         open: true,
@@ -471,6 +478,8 @@ export default function PosPage() {
         total: amountToPay,
         storeId: currentStore.id!,
         idempotencyKey,
+        status:
+          transactionDetails.paymentMethod === "Credit" ? "pending" : "paid",
       };
 
       const toReceiptData = (saleId: string): ReceiptData =>
@@ -547,14 +556,47 @@ export default function PosPage() {
           });
 
           const resData = response.data as
-            | { id?: string; data?: { id?: string } }
+            | {
+                id?: string;
+                data?: Transaction & { id?: string };
+                createdAt?: string;
+                status?: string;
+              }
+            | (Transaction & { id?: string })
             | undefined;
+          const createdPayload =
+            resData &&
+            typeof resData === "object" &&
+            "data" in resData &&
+            resData.data &&
+            typeof resData.data === "object"
+              ? resData.data
+              : resData;
           const createdId =
-            resData?.id ?? resData?.data?.id ?? `TXN-${Date.now()}`;
-          await db.transactions.add({
+            createdPayload?.id != null
+              ? String(createdPayload.id)
+              : `TXN-${Date.now()}`;
+          const savedTransaction = {
             ...newTransaction,
-            id: String(createdId),
-          } as Transaction);
+            ...createdPayload,
+            id: createdId,
+            serverId: createdId,
+            status:
+              (createdPayload as Transaction | undefined)?.status ??
+              newTransaction.status,
+            createdAt:
+              (createdPayload as Transaction | undefined)?.createdAt ??
+              new Date().toISOString(),
+          } as Transaction;
+
+          // Dexie `transactions` uses ++id — keep the backend UUID on serverId.
+          const localRow = {
+            ...savedTransaction,
+            serverId: createdId,
+          } as Transaction & { id?: string };
+          delete localRow.id;
+          await db.transactions.add(localRow as Transaction);
+          await saveTransactionsToDexie([savedTransaction]);
 
           for (const [pid, soldQty] of soldQuantityByProduct.entries()) {
             const product = await getDb().productCache.get(pid);

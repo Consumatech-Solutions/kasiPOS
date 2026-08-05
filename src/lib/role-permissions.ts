@@ -31,6 +31,11 @@ export function isDashboardAllowedForRole(role: UserRole | undefined): boolean {
   return role === "store_admin";
 }
 
+/** Roles allowed to clear / settle pending credit sales. */
+export function canManageCreditClearance(role: UserRole | undefined): boolean {
+  return role === "store_admin" || role === "admin";
+}
+
 export function getPostLoginRedirectPath(role: UserRole | undefined): string {
   return isDashboardAllowedForRole(role) ? "/dashboard" : "/";
 }

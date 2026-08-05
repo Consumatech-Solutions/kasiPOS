@@ -147,4 +147,9 @@ export const transactionsApi = {
       params: Object.keys(requestParams).length > 0 ? requestParams : undefined,
     });
   },
+
+  clearCredit: (transactionId: string) =>
+    api.post<Transaction>("/transactions/clear-credit", {
+      id: transactionId,
+    }),
 };

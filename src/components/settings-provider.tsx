@@ -514,9 +514,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                   await db.transactions.bulkPut(
                     allTransactions.map((t) => ({
                       ...t,
+                      serverId: t.id,
                       id: t.id ?? `server-${Date.now()}-${Math.random()}`,
                     }))
                   );
+                  const { saveTransactionsToDexie } =
+                    await import("@/lib/entity-cache");
+                  await saveTransactionsToDexie(allTransactions);
                 }
               }
             } catch (err) {

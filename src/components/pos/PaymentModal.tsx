@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Transaction, TransactionItem, Customer } from "@/types";
+import { Transaction, TransactionItem, Customer, StoreCurrency } from "@/types";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -26,15 +27,20 @@ import {
   Settings,
 } from "lucide-react";
 import { DeviceSelector } from "@/components/device-selector";
-import { getStoredDevice, connectPos, getDevices } from "@/lib/device-service";
+import { getStoredDevice, connectPos } from "@/lib/device-service";
 import { useToast } from "@/hooks/use-toast";
 import {
   appendTenderedKey,
   sanitizeTenderedInput,
 } from "@/lib/payment-tendered-input";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
-import { getCurrencySymbol } from "@/lib/format-money";
+import { formatMoney, getCurrencySymbol } from "@/lib/format-money";
 import { CurrencyConversionHint } from "@/components/currency-conversion-hint";
+import { PaymentCurrencySelect } from "@/components/pos/PaymentCurrencySelect";
+import {
+  convertCurrency,
+  getMissingExchangeRate,
+} from "@/lib/currency-conversion";
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -68,22 +74,61 @@ export default function PaymentModal({
   customer,
   isLoading = false,
 }: PaymentModalProps) {
+  const { t } = useTranslation();
   const [tendered, setTendered] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [selectedMobileProvider, setSelectedMobileProvider] = useState("");
   const [showPosDeviceSelector, setShowPosDeviceSelector] = useState(false);
   const [posConnected, setPosConnected] = useState(false);
   const [isConnectingPos, setIsConnectingPos] = useState(false);
+  const [paymentCurrency, setPaymentCurrency] = useState<StoreCurrency>("USD");
   const { toast } = useToast();
-  const { formatMoney, currency } = useStoreCurrency();
-  const currencySymbol = getCurrencySymbol(currency);
+  const {
+    currency: storeCurrency,
+    cdfUsdExRate,
+    zarUsdExRate,
+  } = useStoreCurrency();
+  const rates = useMemo(
+    () => ({ cdfUsdExRate, zarUsdExRate }),
+    [cdfUsdExRate, zarUsdExRate]
+  );
+
+  const missingRate = getMissingExchangeRate(
+    storeCurrency,
+    paymentCurrency,
+    rates
+  );
+  const amountDueInPaymentCurrency = convertCurrency(
+    cartTotal,
+    storeCurrency,
+    paymentCurrency,
+    rates
+  );
+  const canConvert =
+    paymentCurrency === storeCurrency ||
+    (missingRate == null && amountDueInPaymentCurrency != null);
+
+  const paymentCurrencySymbol = getCurrencySymbol(paymentCurrency);
+  const formatPayment = useCallback(
+    (amount: number) => formatMoney(amount, paymentCurrency),
+    [paymentCurrency]
+  );
+  const formatStore = useCallback(
+    (amount: number) => formatMoney(amount, storeCurrency),
+    [storeCurrency]
+  );
 
   const tenderedAmount = parseFloat(tendered) || 0;
-  const change = Math.max(0, tenderedAmount - cartTotal);
-  const canCompleteCashSale = tenderedAmount >= cartTotal;
-  const isInsufficient = tenderedAmount > 0 && tenderedAmount < cartTotal;
+  const dueInPayment = amountDueInPaymentCurrency ?? cartTotal;
+  const change = Math.max(0, tenderedAmount - dueInPayment);
+  const canCompleteCashSale =
+    canConvert && tenderedAmount >= dueInPayment - 1e-9;
+  const isInsufficient =
+    canConvert && tenderedAmount > 0 && tenderedAmount < dueInPayment;
   const canCompleteMobileSale =
-    (customer?.contact || mobileNumber.length > 10) && selectedMobileProvider;
+    canConvert &&
+    Boolean(customer?.contact || mobileNumber.length > 10) &&
+    Boolean(selectedMobileProvider);
 
   useEffect(() => {
     if (isOpen) {
@@ -91,15 +136,22 @@ export default function PaymentModal({
       setMobileNumber(customer?.contact || "");
       setSelectedMobileProvider("");
       setPosConnected(false);
+      setPaymentCurrency(storeCurrency);
 
       if (method === "Card") {
         const deviceId = getStoredDevice("pos");
         if (deviceId) {
-          handleConnectPos(deviceId);
+          void handleConnectPos(deviceId);
         }
       }
     }
-  }, [isOpen, method, customer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when modal opens / method changes
+  }, [isOpen, method, customer, storeCurrency]);
+
+  const handlePaymentCurrencyChange = (next: StoreCurrency) => {
+    setPaymentCurrency(next);
+    setTendered("");
+  };
 
   const handleConnectPos = async (deviceId: string) => {
     setIsConnectingPos(true);
@@ -107,15 +159,17 @@ export default function PaymentModal({
       await connectPos(deviceId);
       setPosConnected(true);
       toast({
-        title: "POS device connected",
-        description: "Card reader is ready to process payments.",
+        title: t("pos.payment.posConnectedTitle"),
+        description: t("pos.payment.posConnectedDesc"),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setPosConnected(false);
+      const message =
+        error instanceof Error ? error.message : t("pos.payment.posFailedDesc");
       toast({
         variant: "destructive",
-        title: "POS connection failed",
-        description: error.message || "Failed to connect to POS device.",
+        title: t("pos.payment.posFailedTitle"),
+        description: message,
       });
     } finally {
       setIsConnectingPos(false);
@@ -137,13 +191,20 @@ export default function PaymentModal({
   }, []);
 
   const handleCompleteCashSale = useCallback(() => {
-    if (isLoading || !canCompleteCashSale) return;
+    if (isLoading || !canCompleteCashSale || !canConvert) return;
     onCompleteSale({
       items: cartItems,
       total: cartTotal,
       paymentMethod: "Cash",
     });
-  }, [isLoading, canCompleteCashSale, onCompleteSale, cartItems, cartTotal]);
+  }, [
+    isLoading,
+    canCompleteCashSale,
+    canConvert,
+    onCompleteSale,
+    cartItems,
+    cartTotal,
+  ]);
 
   const canCompleteCashSaleRef = useRef(canCompleteCashSale);
   canCompleteCashSaleRef.current = canCompleteCashSale;
@@ -161,7 +222,6 @@ export default function PaymentModal({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isLoading) return;
-      // Below lg: use the device keyboard only (no on-screen numpad).
       if (!window.matchMedia("(min-width: 1024px)").matches) return;
 
       const target = event.target;
@@ -209,7 +269,7 @@ export default function PaymentModal({
   }, [isOpen, method, isLoading, handleBackspace, handleClear, handleKeyPress]);
 
   const handlePlaceholderComplete = () => {
-    if (isLoading || !method) return;
+    if (isLoading || !method || !canConvert) return;
     if (method === "Mobile Money" && !canCompleteMobileSale) return;
     onCompleteSale({
       items: cartItems,
@@ -218,9 +278,21 @@ export default function PaymentModal({
     });
   };
 
+  const currencySelector = (
+    <div className="mb-4">
+      <PaymentCurrencySelect
+        value={paymentCurrency}
+        storeCurrency={storeCurrency}
+        onChange={handlePaymentCurrencyChange}
+        missingRate={missingRate}
+        disabled={isLoading}
+      />
+    </div>
+  );
+
   const renderContent = () => {
     switch (method) {
-      case "Cash":
+      case "Cash": {
         const quickBills = [50, 100, 200];
         const keypadKeys = [
           "1",
@@ -240,14 +312,39 @@ export default function PaymentModal({
           <>
             <div className="space-y-4 text-lg">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Due:</span>
+                <span className="text-muted-foreground">
+                  {t("pos.paymentCurrency.storeTotal", {
+                    currency: storeCurrency,
+                  })}
+                  :
+                </span>
                 <div className="text-right">
-                  <span className="font-bold">{formatMoney(cartTotal)}</span>
-                  <CurrencyConversionHint amount={cartTotal} className="mt-1" />
+                  <span className="font-bold">{formatStore(cartTotal)}</span>
+                  {paymentCurrency === storeCurrency ? (
+                    <CurrencyConversionHint
+                      amount={cartTotal}
+                      className="mt-1"
+                    />
+                  ) : null}
                 </div>
               </div>
+              {paymentCurrency !== storeCurrency && canConvert ? (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {t("pos.paymentCurrency.amountDueIn", {
+                      currency: paymentCurrency,
+                    })}
+                    :
+                  </span>
+                  <span className="font-bold text-primary">
+                    {formatPayment(dueInPayment)}
+                  </span>
+                </div>
+              ) : null}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Items:</span>
+                <span className="text-muted-foreground">
+                  {t("pos.payment.items")}:
+                </span>
                 <span className="font-bold">
                   {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
                 </span>
@@ -256,27 +353,31 @@ export default function PaymentModal({
             <Separator className="my-6" />
             <div className="space-y-4 text-lg">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Tendered:</span>
+                <span className="text-muted-foreground">
+                  {t("pos.payment.tendered")}:
+                </span>
                 <span className="font-bold text-primary">
-                  {formatMoney(tenderedAmount)}
+                  {formatPayment(tenderedAmount)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Change:</span>
+                <span className="text-muted-foreground">
+                  {t("pos.payment.change")}:
+                </span>
                 <span className="font-bold text-green-600">
-                  {formatMoney(change)}
+                  {formatPayment(change)}
                 </span>
               </div>
-              {tenderedAmount === 0 && (
+              {tenderedAmount === 0 && canConvert && (
                 <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-                  No amount entered. Enter the amount received from the
-                  customer.
+                  {t("pos.payment.noAmountEntered")}
                 </p>
               )}
               {isInsufficient && (
                 <p className="text-sm text-destructive">
-                  Amount insufficient. Add{" "}
-                  {formatMoney(cartTotal - tenderedAmount)} more to complete.
+                  {t("pos.payment.insufficient", {
+                    amount: formatPayment(dueInPayment - tenderedAmount),
+                  })}
                 </p>
               )}
             </div>
@@ -286,11 +387,13 @@ export default function PaymentModal({
         const tenderedInput = (
           <div className="mb-4">
             <label htmlFor="tendered" className="text-sm text-muted-foreground">
-              Amount Tendered
+              {t("pos.payment.amountTenderedLabel", {
+                currency: paymentCurrency,
+              })}
             </label>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">
-                {currencySymbol}
+                {paymentCurrencySymbol}
               </span>
               <Input
                 id="tendered"
@@ -310,8 +413,8 @@ export default function PaymentModal({
                 }}
                 placeholder="0.00"
                 className="text-2xl h-14 pl-8 text-right font-mono"
-                disabled={isLoading}
-                aria-label="Amount tendered"
+                disabled={isLoading || !canConvert}
+                aria-label={t("pos.payment.amountTenderedAria")}
               />
             </div>
           </div>
@@ -326,7 +429,7 @@ export default function PaymentModal({
               onClick={handleClear}
               disabled={isLoading}
             >
-              Clear
+              {t("pos.payment.clear")}
             </Button>
             <Button
               type="button"
@@ -339,7 +442,9 @@ export default function PaymentModal({
               {isLoading && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
               )}
-              {isLoading ? "Processing..." : "Complete Sale"}
+              {isLoading
+                ? t("pos.payment.processing")
+                : t("pos.payment.completeSale")}
             </Button>
           </DialogFooter>
         );
@@ -348,8 +453,11 @@ export default function PaymentModal({
           <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2">
             <div className="flex flex-col">
               <DialogHeader className="mb-4">
-                <DialogTitle className="text-2xl">Cash Payment</DialogTitle>
+                <DialogTitle className="text-2xl">
+                  {t("pos.payment.cashTitle")}
+                </DialogTitle>
               </DialogHeader>
+              {currencySelector}
               {cashSummary}
             </div>
 
@@ -364,19 +472,25 @@ export default function PaymentModal({
                       variant="outline"
                       className="h-12"
                       onClick={() => setTendered(bill.toString())}
-                      disabled={isLoading}
+                      disabled={isLoading || !canConvert}
                     >
-                      {formatMoney(bill)}
+                      {formatPayment(bill)}
                     </Button>
                   ))}
                   <Button
                     type="button"
                     variant="outline"
                     className="h-12"
-                    onClick={() => setTendered(cartTotal.toFixed(2))}
-                    disabled={isLoading}
+                    onClick={() =>
+                      setTendered(
+                        canConvert
+                          ? dueInPayment.toFixed(2)
+                          : cartTotal.toFixed(2)
+                      )
+                    }
+                    disabled={isLoading || !canConvert}
                   >
-                    EXACT
+                    {t("pos.payment.exact")}
                   </Button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -387,7 +501,7 @@ export default function PaymentModal({
                       variant="outline"
                       className="h-12 text-xl"
                       onClick={() => handleKeyPress(key)}
-                      disabled={isLoading}
+                      disabled={isLoading || !canConvert}
                     >
                       {key}
                     </Button>
@@ -397,7 +511,7 @@ export default function PaymentModal({
                     variant="outline"
                     className="h-12 text-xl"
                     onClick={handleBackspace}
-                    disabled={isLoading}
+                    disabled={isLoading || !canConvert}
                   >
                     &larr;
                   </Button>
@@ -407,25 +521,34 @@ export default function PaymentModal({
             </div>
           </div>
         );
-      case "Card":
+      }
+      case "Card": {
         const posDeviceId = getStoredDevice("pos");
         return (
           <div>
             <DialogHeader className="text-center mb-6">
-              <DialogTitle className="text-2xl">Card Payment</DialogTitle>
+              <DialogTitle className="text-2xl">
+                {t("pos.payment.cardTitle")}
+              </DialogTitle>
               <DialogDescription>
-                Total amount to be charged to the card.
+                {t("pos.payment.cardDescription")}
               </DialogDescription>
             </DialogHeader>
+
+            {currencySelector}
 
             <div className="mb-6">
               <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
                 <div className="flex items-center gap-3">
                   <CreditCard className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-semibold text-sm">POS Device</p>
+                    <p className="font-semibold text-sm">
+                      {t("pos.payment.posDevice")}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {posDeviceId ? "Device selected" : "No device selected"}
+                      {posDeviceId
+                        ? t("pos.payment.deviceSelected")
+                        : t("pos.payment.noDeviceSelected")}
                     </p>
                   </div>
                 </div>
@@ -434,21 +557,21 @@ export default function PaymentModal({
                     <>
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">
-                        Connecting...
+                        {t("pos.payment.connecting")}
                       </span>
                     </>
                   ) : posConnected ? (
                     <>
                       <CheckCircle2 className="h-5 w-5 text-green-600" />
                       <span className="text-xs text-green-600 font-medium">
-                        Connected
+                        {t("pos.payment.connected")}
                       </span>
                     </>
                   ) : (
                     <>
                       <XCircle className="h-5 w-5 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">
-                        Not Connected
+                        {t("pos.payment.notConnected")}
                       </span>
                     </>
                   )}
@@ -460,7 +583,9 @@ export default function PaymentModal({
                     disabled={isConnectingPos}
                   >
                     <Settings className="h-4 w-4 mr-1" />
-                    {posDeviceId ? "Change" : "Select"}
+                    {posDeviceId
+                      ? t("pos.payment.changeDevice")
+                      : t("pos.payment.selectDevice")}
                   </Button>
                 </div>
               </div>
@@ -468,18 +593,24 @@ export default function PaymentModal({
 
             <div className="py-8 text-center text-muted-foreground bg-slate-50 rounded-lg">
               <p className="text-4xl font-bold text-foreground">
-                {formatMoney(cartTotal)}
+                {formatStore(cartTotal)}
               </p>
-              <CurrencyConversionHint
-                amount={cartTotal}
-                className="mt-2 justify-center"
-              />
+              {paymentCurrency !== storeCurrency && canConvert ? (
+                <p className="mt-2 text-lg font-semibold text-foreground">
+                  {formatPayment(dueInPayment)}
+                </p>
+              ) : (
+                <CurrencyConversionHint
+                  amount={cartTotal}
+                  className="mt-2 justify-center"
+                />
+              )}
               <p className="mt-2">
                 {posConnected
-                  ? "Waiting for card machine interaction..."
+                  ? t("pos.payment.waitingCardMachine")
                   : posDeviceId
-                    ? "Connect to POS device to process payment"
-                    : "Select a POS device to process payment"}
+                    ? t("pos.payment.connectPosToProcess")
+                    : t("pos.payment.selectPosToProcess")}
               </p>
             </div>
             <DialogFooter className="mt-6">
@@ -490,56 +621,62 @@ export default function PaymentModal({
                   className="w-full min-h-[44px] touch-target"
                   disabled={isLoading}
                 >
-                  Cancel
+                  {t("pos.payment.cancel")}
                 </Button>
               </DialogClose>
               <Button
                 type="button"
                 onClick={handlePlaceholderComplete}
                 className="w-full min-h-[44px] touch-target"
-                disabled={isLoading || !posConnected}
+                disabled={isLoading || !posConnected || !canConvert}
                 aria-busy={isLoading}
               >
                 {isLoading && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
                 )}
                 {isLoading
-                  ? "Processing..."
+                  ? t("pos.payment.processing")
                   : posConnected
-                    ? "Process Payment"
-                    : "Connect POS Device First"}
+                    ? t("pos.payment.processPayment")
+                    : t("pos.payment.connectPosFirst")}
               </Button>
             </DialogFooter>
           </div>
         );
+      }
       case "Mobile Money":
         return (
           <div>
             <DialogHeader className="mb-6">
-              <DialogTitle className="text-2xl">Mobile Money</DialogTitle>
+              <DialogTitle className="text-2xl">
+                {t("pos.payment.mobileTitle")}
+              </DialogTitle>
               <DialogDescription>
-                Select a provider and confirm the mobile number to send the USSD
-                push to.
+                {t("pos.payment.mobileDescription")}
               </DialogDescription>
             </DialogHeader>
+            {currencySelector}
             <div className="space-y-6">
               {customer ? (
                 <Alert>
                   <Phone className="h-4 w-4" />
-                  <AlertTitle>Confirm Customer</AlertTitle>
+                  <AlertTitle>{t("pos.payment.confirmCustomer")}</AlertTitle>
                   <AlertDescription>
-                    The payment request will be sent to{" "}
-                    <strong>{customer.name}</strong> at{" "}
-                    <strong>{customer.contact}</strong>.
+                    {t("pos.payment.paymentRequestTo", {
+                      name: customer.name,
+                      contact: customer.contact,
+                    })}
                   </AlertDescription>
                 </Alert>
               ) : (
                 <div>
-                  <Label htmlFor="mobileNumber">Mobile Number</Label>
+                  <Label htmlFor="mobileNumber">
+                    {t("pos.payment.mobileNumber")}
+                  </Label>
                   <Input
                     id="mobileNumber"
                     type="tel"
-                    placeholder="Enter mobile number"
+                    placeholder={t("pos.payment.mobileNumberPlaceholder")}
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
                   />
@@ -547,7 +684,7 @@ export default function PaymentModal({
               )}
 
               <div>
-                <Label>Select Provider</Label>
+                <Label>{t("pos.payment.selectProvider")}</Label>
                 <RadioGroup
                   value={selectedMobileProvider}
                   onValueChange={setSelectedMobileProvider}
@@ -572,7 +709,7 @@ export default function PaymentModal({
                   className="w-full min-h-[44px] touch-target"
                   disabled={isLoading}
                 >
-                  Cancel
+                  {t("pos.payment.cancel")}
                 </Button>
               </DialogClose>
               <Button
@@ -586,8 +723,12 @@ export default function PaymentModal({
                   <Loader2 className="mr-2 h-4 w-4 animate-spin shrink-0" />
                 )}
                 {isLoading
-                  ? "Processing..."
-                  : `Send Payment Request for ${formatMoney(cartTotal)}`}
+                  ? t("pos.payment.processing")
+                  : t("pos.payment.sendPaymentRequest", {
+                      amount: canConvert
+                        ? formatPayment(dueInPayment)
+                        : formatStore(cartTotal),
+                    })}
               </Button>
             </DialogFooter>
           </div>
