@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { feedback } from "@/lib/feedback";
+import { useTranslation } from "react-i18next";
 import { ERROR_CODES } from "@/lib/error-codes";
 
 const forgotPasswordSchema = authIdentifierSchema;
@@ -45,6 +46,7 @@ const IDENTIFIER_PLACEHOLDER = `owner@example.com or ${PHONE_EXAMPLE}`;
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const form = useForm<ForgotPasswordFormValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
@@ -103,10 +105,11 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-lg sm:text-xl">Forgot password?</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">
+            {t("auth.forgotPassword.title")}
+          </CardTitle>
           <CardDescription className="text-sm">
-            Enter your email or mobile number and we will send you a password
-            reset link.
+            {t("auth.forgotPassword.description")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -117,7 +120,9 @@ export default function ForgotPasswordPage() {
                 name="identifier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email or mobile number</FormLabel>
+                    <FormLabel>
+                      {t("auth.forgotPassword.identifierLabel")}
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="text"
@@ -135,18 +140,18 @@ export default function ForgotPasswordPage() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                Send reset link
+                {t("auth.forgotPassword.sendResetLink")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            Remember your password?{" "}
+            {t("auth.forgotPassword.rememberPassword")}{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/login">Back to sign in</Link>
+              <Link href="/login">{t("auth.forgotPassword.backToSignIn")}</Link>
             </Button>
           </p>
         </CardContent>

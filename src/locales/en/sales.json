@@ -7,6 +7,11 @@
   "sales.filter.selectProduct": "Select product",
   "sales.filter.allCustomers": "All Customers",
   "sales.filter.selectCustomer": "Select customer",
+  "sales.filter.allStatuses": "All statuses",
+  "sales.filter.selectStatus": "Filter by status",
+  "sales.filter.statusPaid": "Paid",
+  "sales.filter.statusPending": "On credit",
+  "sales.filter.statusFailed": "Failed",
   "sales.filter.clear": "Clear Filters",
   "sales.summary.showing": "Showing {{pageCount}} of {{total}} sales",
   "sales.loading": "Loading sales...",
@@ -24,5 +29,6 @@
   "sales.detail.voucher": "Voucher: {{code}}",
   "sales.status.pending": "Pending",
   "sales.status.paid": "Paid",
+  "sales.status.failed": "Failed",
   "sales.clearCredit.settledAt": "Settled {{date}}"
 }

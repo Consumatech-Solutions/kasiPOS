@@ -27,12 +27,16 @@ export type CreateTransactionDto = {
   creditDetails?: TransactionCreditDetails;
 };
 
+export type TransactionStatusFilter = "paid" | "pending" | "failed";
+
 export interface GetTransactionsParams extends PaginationParams {
   page?: number;
   limit?: number;
   date?: string;
   customerId?: string;
   search?: string;
+  /** paid = completed; pending = open credit; failed = failed sales */
+  status?: TransactionStatusFilter;
 }
 
 export function toCreateTransactionDto(raw: {
@@ -127,6 +131,7 @@ export const transactionsApi = {
     if (params?.customerId !== undefined)
       requestParams.customerId = params.customerId;
     if (params?.search !== undefined) requestParams.search = params.search;
+    if (params?.status !== undefined) requestParams.status = params.status;
     if (params?.storeId != null && params.storeId !== "")
       requestParams.storeId = params.storeId;
 

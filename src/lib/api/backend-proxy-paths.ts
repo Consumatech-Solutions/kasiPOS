@@ -17,4 +17,5 @@ export const API_PROXY_PREFIXES = [
   "marketplace-stores",
   "purchase-orders",
   "settings",
+  "dashboard-stats",
 ] as const;

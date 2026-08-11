@@ -13,11 +13,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { AppSettings, User } from "@/types";
-import {
-  ALL_ROLES,
-  MANAGEMENT_ROLES,
-  STORE_ADMIN_ROLES,
-} from "@/lib/role-permissions";
+import { ALL_ROLES, MANAGEMENT_ROLES } from "@/lib/role-permissions";
 
 export const OFFLINE_FIRST_PATHS = [
   "/dashboard",
@@ -42,7 +38,7 @@ export const navItems: NavItem[] = [
     href: "/dashboard",
     labelKey: "nav.dashboard",
     icon: LayoutDashboard,
-    roles: STORE_ADMIN_ROLES,
+    roles: MANAGEMENT_ROLES,
   },
   { href: "/", labelKey: "nav.home", icon: Home, roles: ALL_ROLES },
   {
