@@ -149,7 +149,7 @@ export interface Transaction {
   /** Present when paymentMethod is 'Credit'. */
   creditDetails?: TransactionCreditDetails | null;
   /** Backend payment status (e.g. pending credit vs paid). */
-  status?: "pending" | "paid" | string | null;
+  status?: "pending" | "paid" | "failed" | string | null;
   /** ISO timestamp when a credit sale was cleared / marked paid. */
   creditSettledAt?: string | null;
 }

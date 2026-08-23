@@ -28,7 +28,7 @@ export function getStaffRedirectPath(): string {
 }
 
 export function isDashboardAllowedForRole(role: UserRole | undefined): boolean {
-  return role === "store_admin";
+  return role === "store_admin" || role === "admin";
 }
 
 /** Roles allowed to clear / settle pending credit sales. */

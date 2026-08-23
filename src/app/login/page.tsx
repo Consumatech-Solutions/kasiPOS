@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/components/settings-provider";
+import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { runManualFullCloudSync } from "@/lib/cloud-data-pull";
 import { offlineDetector } from "@/lib/offline-detector";
@@ -78,8 +79,9 @@ const LOGIN_PHONE_EXAMPLE = formatE164(
 const LOGIN_IDENTIFIER_PLACEHOLDER = `owner@example.com or ${LOGIN_PHONE_EXAMPLE}`;
 
 export default function LoginPage() {
-  const { login } = useSettings();
+  const { login, settings, setSetting } = useSettings();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -166,10 +168,29 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-lg sm:text-xl">Welcome Back!</CardTitle>
+          <div className="mb-3 flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant={settings.language === "en" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSetting("language", "en")}
+            >
+              EN
+            </Button>
+            <Button
+              type="button"
+              variant={settings.language === "fr" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSetting("language", "fr")}
+            >
+              FR
+            </Button>
+          </div>
+          <CardTitle className="text-lg sm:text-xl">
+            {t("auth.login.title")}
+          </CardTitle>
           <CardDescription className="text-sm">
-            Sign in with your email or mobile number (digits only, e.g.{" "}
-            {LOGIN_PHONE_EXAMPLE}) and password
+            {t("auth.login.description", { example: LOGIN_PHONE_EXAMPLE })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -180,11 +201,13 @@ export default function LoginPage() {
                 name="identifier"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email or mobile number</FormLabel>
+                    <FormLabel>{t("auth.login.identifierLabel")}</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder={LOGIN_IDENTIFIER_PLACEHOLDER}
+                        placeholder={t("auth.login.identifierPlaceholder", {
+                          example: LOGIN_PHONE_EXAMPLE,
+                        })}
                         className="touch-target"
                         autoComplete="username"
                         {...field}
@@ -199,7 +222,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>{t("auth.login.passwordLabel")}</FormLabel>
                     <FormControl>
                       <PasswordInput
                         className="touch-target"
@@ -213,7 +236,9 @@ export default function LoginPage() {
                         className="h-auto p-0 text-xs font-normal"
                         asChild
                       >
-                        <Link href="/forgot-password">Forgot password?</Link>
+                        <Link href="/forgot-password">
+                          {t("auth.login.forgotPassword")}
+                        </Link>
                       </Button>
                     </div>
                     <FormMessage />
@@ -224,18 +249,18 @@ export default function LoginPage() {
                 type="submit"
                 className="w-full min-h-[44px] touch-target"
               >
-                Sign In
+                {t("auth.login.signIn")}
               </Button>
             </form>
           </Form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
-            New here?{" "}
+            {t("auth.login.newHere")}{" "}
             <Button
               variant="link"
               className="p-0 min-h-[44px] touch-target"
               asChild
             >
-              <Link href="/signup">Create an account</Link>
+              <Link href="/signup">{t("auth.login.createAccount")}</Link>
             </Button>
           </p>
         </CardContent>

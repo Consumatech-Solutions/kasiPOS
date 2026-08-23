@@ -14,7 +14,9 @@ import {
   validateLocalNumber,
 } from "@/lib/phone";
 import { PhoneNumberField } from "@/components/auth/phone-number-field";
+import { PasswordInput } from "@/components/auth/password-input";
 
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -66,6 +68,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -175,11 +178,10 @@ export default function SignupPage() {
         <Card className="w-full">
           <CardHeader className="text-center">
             <CardTitle className="text-lg sm:text-xl">
-              Create your store
+              {t("auth.signup.title")}
             </CardTitle>
             <CardDescription className="text-sm">
-              Register as a merchant. We&apos;ll send a verification code to
-              your mobile (South Africa) or email (other countries).
+              {t("auth.signup.description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -193,7 +195,7 @@ export default function SignupPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>{t("auth.signup.emailLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           type="email"
@@ -212,7 +214,7 @@ export default function SignupPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Your name</FormLabel>
+                      <FormLabel>{t("auth.signup.nameLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Jane Doe"
@@ -230,7 +232,7 @@ export default function SignupPage() {
                   name="storeName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Store name</FormLabel>
+                      <FormLabel>{t("auth.signup.storeNameLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="Jane's Shop"
@@ -247,7 +249,9 @@ export default function SignupPage() {
                   name="localNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Mobile number</FormLabel>
+                      <FormLabel>
+                        {t("auth.signup.mobileNumberLabel")}
+                      </FormLabel>
                       <FormControl>
                         <PhoneNumberField
                           value={{
@@ -271,10 +275,9 @@ export default function SignupPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel>{t("auth.signup.passwordLabel")}</FormLabel>
                       <FormControl>
-                        <Input
-                          type="password"
+                        <PasswordInput
                           className="touch-target"
                           autoComplete="new-password"
                           {...field}
@@ -292,18 +295,20 @@ export default function SignupPage() {
                   {isSubmitting && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {isSubmitting ? "Continuing..." : "Continue"}
+                  {isSubmitting
+                    ? t("auth.signup.continuing")
+                    : t("auth.signup.continue")}
                 </Button>
               </form>
             </Form>
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
+              {t("auth.signup.alreadyHave")}{" "}
               <Button
                 variant="link"
                 className="p-0 min-h-[44px] touch-target"
                 asChild
               >
-                <Link href="/login">Sign in</Link>
+                <Link href="/login">{t("auth.signup.signIn")}</Link>
               </Button>
             </p>
           </CardContent>

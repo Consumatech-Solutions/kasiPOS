@@ -39,6 +39,7 @@ import { ClearCreditButton } from "@/components/transactions/clear-credit-button
 import { canClearCreditTransaction } from "@/lib/clear-credit";
 import { getTransactionApiId } from "@/lib/transaction-id";
 import { transactionsApi } from "@/lib/api/transactions";
+import type { TransactionStatusFilter } from "@/lib/api/transactions";
 import { useQueryClient } from "@tanstack/react-query";
 import { transactionKeys } from "@/hooks/use-transactions";
 import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
@@ -71,6 +72,10 @@ export default function SalePage() {
     value: string;
     label: string;
   } | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<{
+    value: TransactionStatusFilter | "";
+    label: string;
+  } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const { customers: allCustomersList } = useCustomers({ initialLimit: 1000 });
@@ -93,6 +98,41 @@ export default function SalePage() {
       label: c.name,
     }));
   }, [allCustomersList]);
+
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: "" as const, label: t("sales.filter.allStatuses") },
+      {
+        value: "paid" as const,
+        label: t("sales.filter.statusPaid"),
+      },
+      {
+        value: "pending" as const,
+        label: t("sales.filter.statusPending"),
+      },
+      {
+        value: "failed" as const,
+        label: t("sales.filter.statusFailed"),
+      },
+    ],
+    [t]
+  );
+
+  const matchesStatusFilter = useCallback(
+    (transaction: Transaction, status: TransactionStatusFilter) => {
+      const key = String(transaction.status ?? "").toLowerCase();
+      if (status === "pending") {
+        // Open credit: explicit pending, or legacy credit without status
+        if (key === "pending") return true;
+        if (!key && transaction.paymentMethod === "Credit") return true;
+        return false;
+      }
+      if (status === "paid") return key === "paid";
+      if (status === "failed") return key === "failed";
+      return true;
+    },
+    []
+  );
 
   const getCustomerName = useCallback(
     (customerId: string | undefined | null, tempCustomerId?: string | null) => {
@@ -134,6 +174,9 @@ export default function SalePage() {
                 storeId,
                 limit,
                 page,
+                ...(selectedStatus?.value
+                  ? { status: selectedStatus.value }
+                  : {}),
               });
               const raw = res.data;
               const data = Array.isArray(raw)
@@ -200,7 +243,7 @@ export default function SalePage() {
       }
     };
     void loadTransactions();
-  }, [currentStore?.id, effectiveOnline]);
+  }, [currentStore?.id, effectiveOnline, selectedStatus?.value]);
 
   const filteredTransactions = useMemo(() => {
     return allTransactions.filter((transaction) => {
@@ -213,6 +256,13 @@ export default function SalePage() {
       if (
         selectedDate &&
         transactionDate !== format(selectedDate, "yyyy-MM-dd")
+      ) {
+        return false;
+      }
+
+      if (
+        selectedStatus?.value &&
+        !matchesStatusFilter(transaction, selectedStatus.value)
       ) {
         return false;
       }
@@ -262,10 +312,12 @@ export default function SalePage() {
   }, [
     allTransactions,
     selectedDate,
+    selectedStatus,
     searchTerm,
     selectedProduct,
     selectedCustomer,
     getCustomerName,
+    matchesStatusFilter,
   ]);
 
   const paginationMeta: PaginationMeta = useMemo(() => {
@@ -285,13 +337,20 @@ export default function SalePage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedDate, searchTerm, selectedProduct, selectedCustomer]);
+  }, [
+    selectedDate,
+    searchTerm,
+    selectedProduct,
+    selectedCustomer,
+    selectedStatus,
+  ]);
 
   const clearFilters = () => {
     setSelectedDate(undefined);
     setSearchTerm("");
     setSelectedProduct(null);
     setSelectedCustomer(null);
+    setSelectedStatus(null);
     setCurrentPage(1);
   };
 
@@ -345,6 +404,7 @@ export default function SalePage() {
     const key = String(status ?? "").toLowerCase();
     if (key === "pending" || key === "") return t("sales.status.pending");
     if (key === "paid") return t("sales.status.paid");
+    if (key === "failed") return t("sales.status.failed");
     return status ? String(status) : null;
   };
 
@@ -448,10 +508,36 @@ export default function SalePage() {
             />
           </div>
 
+          <div className="w-full sm:w-[200px]">
+            <Select
+              options={statusFilterOptions}
+              value={
+                selectedStatus ?? {
+                  value: "",
+                  label: t("sales.filter.allStatuses"),
+                }
+              }
+              onChange={(opt) =>
+                setSelectedStatus(
+                  opt?.value
+                    ? {
+                        value: opt.value as TransactionStatusFilter,
+                        label: opt.label,
+                      }
+                    : null
+                )
+              }
+              isSearchable={false}
+              placeholder={t("sales.filter.selectStatus")}
+              className="text-sm"
+            />
+          </div>
+
           {(selectedDate ||
             searchTerm ||
             selectedProduct ||
-            selectedCustomer) && (
+            selectedCustomer ||
+            selectedStatus) && (
             <Button
               variant="ghost"
               onClick={clearFilters}
