@@ -149,46 +149,176 @@ function productImageFromCache(
   return image ? String(image) : undefined;
 }
 
+function unwrapApiProduct(raw: unknown): {
+  id?: string;
+  name?: string;
+  productImage?: string | null;
+  imageUrl?: string | null;
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.name === "string" || typeof obj.id === "string") {
+    return obj as {
+      id?: string;
+      name?: string;
+      productImage?: string | null;
+      imageUrl?: string | null;
+    };
+  }
+  if (obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)) {
+    return unwrapApiProduct(obj.data);
+  }
+  return null;
+}
+
+function detailFromRecord(
+  id: string,
+  row: Record<string, unknown>
+): { name: string; imageUrl?: string } | null {
+  const name = row.name != null ? String(row.name).trim() : "";
+  if (!name) return null;
+  return {
+    name,
+    imageUrl: productImageFromCache(row),
+  };
+}
+
+async function warmProductCache(
+  id: string,
+  name: string,
+  imageUrl?: string | null
+): Promise<void> {
+  try {
+    const db = getDb();
+    const existing = await db.productCache.get(id);
+    await db.productCache.put({
+      ...(existing ?? {}),
+      id,
+      name,
+      ...(imageUrl ? { productImage: String(imageUrl) } : {}),
+    });
+  } catch {
+    // Cache write is best-effort
+  }
+}
+
+/**
+ * Resolve product names/images for dashboard performance rows.
+ * Order: Dexie productCache → legacy products table → GET /products/:id →
+ * catalogue list scan → friendly fallback.
+ */
 export async function resolveProductDetails(
   productIds: string[]
 ): Promise<Map<string, { name: string; imageUrl?: string }>> {
-  const unique = [...new Set(productIds.filter(Boolean))];
+  const unique = [...new Set(productIds.filter(Boolean).map(String))];
   const result = new Map<string, { name: string; imageUrl?: string }>();
   if (unique.length === 0) return result;
 
-  const db = getDb();
-  const missing: string[] = [];
+  let missing: string[] = [];
 
-  for (const id of unique) {
-    try {
-      const cached = await db.productCache.get(id);
+  try {
+    const db = getDb();
+    // Bulk index avoids N Dexie gets and catches id type/string mismatches.
+    const allCached = await db.productCache.toArray();
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of allCached) {
+      if (row?.id == null) continue;
+      byId.set(String(row.id), row as unknown as Record<string, unknown>);
+    }
+
+    for (const id of unique) {
+      const cached = byId.get(id);
       if (cached) {
-        const row = cached as unknown as Record<string, unknown>;
-        result.set(id, {
-          name: String(row.name ?? id),
-          imageUrl: productImageFromCache(row),
-        });
-      } else {
-        missing.push(id);
+        const detail = detailFromRecord(id, cached);
+        if (detail) {
+          result.set(id, detail);
+          continue;
+        }
       }
-    } catch {
       missing.push(id);
     }
+
+    if (missing.length > 0) {
+      const legacy = await db.products.toArray();
+      const stillMissing: string[] = [];
+      for (const id of missing) {
+        const row = legacy.find((p) => p.id != null && String(p.id) === id);
+        if (row?.name?.trim()) {
+          const imageUrl = row.imageUrl ? String(row.imageUrl) : undefined;
+          result.set(id, { name: row.name.trim(), imageUrl });
+          void warmProductCache(id, row.name.trim(), imageUrl);
+        } else {
+          stillMissing.push(id);
+        }
+      }
+      missing = stillMissing;
+    }
+  } catch {
+    missing = unique.filter((id) => !result.has(id));
   }
+
+  const stillMissingAfterGet: string[] = [];
 
   await Promise.all(
     missing.map(async (id) => {
       try {
-        const product = await catalogueApi.products.getById(id);
-        result.set(id, {
-          name: product.name,
-          imageUrl: product.productImage ?? undefined,
-        });
+        const raw = await catalogueApi.products.getById(id);
+        const product = unwrapApiProduct(raw);
+        const name = product?.name?.trim();
+        if (name) {
+          const imageUrl =
+            product.productImage ?? product.imageUrl ?? undefined;
+          result.set(id, {
+            name,
+            imageUrl: imageUrl ? String(imageUrl) : undefined,
+          });
+          await warmProductCache(id, name, imageUrl);
+          return;
+        }
       } catch {
-        result.set(id, { name: id });
+        // fall through
       }
+      stillMissingAfterGet.push(id);
     })
   );
+
+  if (stillMissingAfterGet.length > 0) {
+    try {
+      const listed = await catalogueApi.products.getAll({
+        page: 1,
+        limit: 500,
+      });
+      const list = Array.isArray(listed)
+        ? listed
+        : Array.isArray(listed?.data)
+          ? listed.data
+          : [];
+      const byId = new Map(
+        list.filter((p) => p?.id != null).map((p) => [String(p.id), p] as const)
+      );
+      for (const id of stillMissingAfterGet) {
+        const product = byId.get(id);
+        const name = product?.name?.trim();
+        if (name) {
+          const imageUrl =
+            product.productImage ?? product.imageUrl ?? undefined;
+          result.set(id, {
+            name,
+            imageUrl: imageUrl ? String(imageUrl) : undefined,
+          });
+          await warmProductCache(id, name, imageUrl);
+        } else {
+          result.set(id, { name: "Unknown product" });
+        }
+      }
+    } catch {
+      for (const id of stillMissingAfterGet) {
+        if (!result.has(id)) {
+          result.set(id, { name: "Unknown product" });
+        }
+      }
+    }
+  }
 
   return result;
 }
@@ -255,10 +385,13 @@ export async function enrichDashboardStats(
     row: DashboardProductPerformance
   ): EnrichedProductPerformance => {
     const info = details.get(row.productId);
+    const apiName =
+      typeof row.name === "string" && row.name.trim() ? row.name.trim() : null;
+    const apiImage = row.productImage ?? row.imageUrl ?? undefined;
     return {
       ...row,
-      name: info?.name ?? row.productId,
-      imageUrl: info?.imageUrl,
+      name: apiName ?? info?.name ?? "Unknown product",
+      imageUrl: info?.imageUrl ?? (apiImage ? String(apiImage) : undefined),
     };
   };
 

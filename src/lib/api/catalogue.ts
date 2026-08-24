@@ -93,7 +93,18 @@ export const catalogueApi = {
 
     getById: async (id: string): Promise<ApiProduct> => {
       const response = await api.get(`${API_BASE_PATH}/products/${id}`);
-      return response.data;
+      const raw = response.data as ApiProduct | { data: ApiProduct };
+      if (
+        raw &&
+        typeof raw === "object" &&
+        "data" in raw &&
+        raw.data &&
+        typeof raw.data === "object" &&
+        !Array.isArray(raw.data)
+      ) {
+        return raw.data;
+      }
+      return raw as ApiProduct;
     },
 
     create: async (data: CreateProductDto): Promise<ApiProduct> => {

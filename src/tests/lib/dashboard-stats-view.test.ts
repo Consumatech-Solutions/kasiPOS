@@ -12,6 +12,11 @@ vi.mock("@/lib/db", () => ({
   getDb: () => ({
     productCache: {
       get: vi.fn(async () => undefined),
+      toArray: vi.fn(async () => []),
+      put: vi.fn(async () => undefined),
+    },
+    products: {
+      toArray: vi.fn(async () => []),
     },
   }),
 }));
@@ -24,6 +29,7 @@ vi.mock("@/lib/api/catalogue", () => ({
         name: `Product ${id}`,
         productImage: `https://img.test/${id}.png`,
       })),
+      getAll: vi.fn(async () => []),
     },
   },
 }));
@@ -116,6 +122,39 @@ describe("dashboard-stats-view", () => {
     expect(view.lowStockProducts.data[0].imageUrl).toBe(
       "https://img.test/p1.png"
     );
+  });
+
+  it("enrichDashboardStats prefers names already present on performance rows", async () => {
+    const view = await enrichDashboardStats({
+      ...sampleResponse,
+      mostSoldProducts: [
+        {
+          productId: "uuid-1",
+          name: "Bar Soap",
+          unitsSold: 5,
+          revenue: 50,
+        },
+      ],
+      mostProfitableProduct: null,
+    });
+
+    expect(view.mostSoldProducts[0].name).toBe("Bar Soap");
+  });
+
+  it("resolveProductDetails unwraps nested getById payloads", async () => {
+    const { catalogueApi } = await import("@/lib/api/catalogue");
+    vi.mocked(catalogueApi.products.getById).mockResolvedValueOnce({
+      data: {
+        id: "nested-1",
+        name: "Nested Soap",
+        productImage: null,
+      },
+    } as never);
+
+    const { resolveProductDetails } =
+      await import("@/lib/dashboard-stats-view");
+    const details = await resolveProductDetails(["nested-1"]);
+    expect(details.get("nested-1")?.name).toBe("Nested Soap");
   });
 
   it("enrichDashboardStats tolerates legacy API payloads without new lists", async () => {

@@ -33,6 +33,10 @@ export type DashboardProductPerformance = {
   productId: string;
   unitsSold: number;
   revenue: number;
+  /** Optional — some backends include these; otherwise we enrich client-side. */
+  name?: string;
+  productImage?: string | null;
+  imageUrl?: string | null;
 };
 
 export type DashboardStatsResponse = {
