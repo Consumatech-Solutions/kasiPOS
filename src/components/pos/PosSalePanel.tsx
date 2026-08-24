@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { TransactionItem, Customer } from "@/types";
 import type { AppSettings } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Minus, Trash2, User, Ticket, Percent } from "lucide-react";
 import { getProductInitials } from "@/lib/utils/product-initials";
@@ -31,9 +33,91 @@ export type PosSalePanelProps = {
   onCheckout: (method: "Cash" | "Card" | "Mobile Money" | "Credit") => void;
   onClearCart: () => void;
   updateQuantity: (productId: string, quantity: number) => void;
+  updateUnitPrice: (productId: string, unitPrice: number) => void;
   onInsufficientStock: (message: string) => void;
   className?: string;
 };
+
+function CartLineUnitPrice({
+  productId,
+  productName,
+  unitPrice,
+  updateUnitPrice,
+  className,
+}: {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  updateUnitPrice: (productId: string, unitPrice: number) => void;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const { formatMoney } = useStoreCurrency();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(unitPrice));
+
+  useEffect(() => {
+    if (!editing) setDraft(String(unitPrice));
+  }, [unitPrice, editing]);
+
+  const commit = () => {
+    const normalized = draft.replace(",", ".").trim();
+    const parsed = Number.parseFloat(normalized);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setDraft(String(unitPrice));
+      setEditing(false);
+      return;
+    }
+    updateUnitPrice(productId, parsed);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <Input
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step="0.01"
+        value={draft}
+        autoFocus
+        aria-label={t("pos.cart.editPriceAria", { product: productName })}
+        data-testid="pos-cart-unit-price-input"
+        className={`h-8 w-[4.75rem] px-1.5 text-sm tabular-nums ${className ?? ""}`}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          }
+          if (e.key === "Escape") {
+            e.preventDefault();
+            setDraft(String(unitPrice));
+            setEditing(false);
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      data-testid="pos-cart-unit-price"
+      className={`rounded px-1 py-0.5 text-left text-sm text-muted-foreground underline-offset-2 hover:bg-muted hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className ?? ""}`}
+      title={t("pos.cart.editPriceHint")}
+      aria-label={t("pos.cart.editPriceAria", { product: productName })}
+      onClick={() => {
+        setDraft(String(unitPrice));
+        setEditing(true);
+      }}
+    >
+      {formatMoney(unitPrice)}
+    </button>
+  );
+}
 
 export function PosSalePanel({
   cartItems,
@@ -53,6 +137,7 @@ export function PosSalePanel({
   onCheckout,
   onClearCart,
   updateQuantity,
+  updateUnitPrice,
   onInsufficientStock,
   className,
 }: PosSalePanelProps) {
@@ -123,7 +208,7 @@ export function PosSalePanel({
             </div>
           ) : (
             <div className="space-y-1 w-full min-w-0">
-              <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left w-full min-w-0">
+              <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_6rem_8rem_5rem_2.75rem] gap-3 items-center px-2 py-1 text-xs text-muted-foreground text-left w-full min-w-0">
                 <span className="min-w-0">{t("pos.cart.headers.product")}</span>
                 <span className="shrink-0">{t("pos.cart.headers.price")}</span>
                 <span className="shrink-0">{t("pos.cart.headers.qty")}</span>
@@ -221,12 +306,29 @@ export function PosSalePanel({
                   </Button>
                 );
 
+                const priceEditorMobile = (
+                  <CartLineUnitPrice
+                    productId={item.productId}
+                    productName={item.productName}
+                    unitPrice={unitPrice}
+                    updateUnitPrice={updateUnitPrice}
+                  />
+                );
+                const priceEditorDesktop = (
+                  <CartLineUnitPrice
+                    productId={item.productId}
+                    productName={item.productName}
+                    unitPrice={unitPrice}
+                    updateUnitPrice={updateUnitPrice}
+                  />
+                );
+
                 return (
                   <div
                     key={item.productId}
                     data-testid="pos-cart-line"
                     data-product-name={item.productName}
-                    className="w-full min-w-0 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-muted/50 max-lg:flex max-lg:flex-col max-lg:gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_5rem_8rem_5rem_2.75rem] lg:items-start lg:gap-3"
+                    className="w-full min-w-0 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-muted/50 max-lg:flex max-lg:flex-col max-lg:gap-2 lg:grid lg:grid-cols-[minmax(0,1fr)_6rem_8rem_5rem_2.75rem] lg:items-start lg:gap-3"
                   >
                     <div className="flex min-w-0 w-full items-start gap-2 lg:col-span-1">
                       {productAvatar}
@@ -234,17 +336,17 @@ export function PosSalePanel({
                         <p className="text-sm font-medium leading-snug break-words">
                           {item.productName}
                         </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground lg:hidden">
-                          {formatMoney(unitPrice)}
-                        </p>
+                        <div className="mt-0.5 lg:hidden">
+                          {priceEditorMobile}
+                        </div>
                       </div>
                       <div className="shrink-0 lg:hidden">{removeButton}</div>
                     </div>
 
                     <div className="flex items-center justify-between gap-2 max-lg:w-full lg:contents">
-                      <p className="hidden text-left text-sm text-muted-foreground lg:block lg:self-center">
-                        {formatMoney(unitPrice)}
-                      </p>
+                      <div className="hidden lg:block lg:self-center">
+                        {priceEditorDesktop}
+                      </div>
                       {qtyControls}
                       <p className="shrink-0 text-left text-sm font-semibold lg:self-center">
                         {formatMoney(lineTotal)}

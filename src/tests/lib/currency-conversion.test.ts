@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  convertCurrency,
   convertFromUsd,
   convertToUsd,
   getCurrencyConversionLines,
+  getMissingExchangeRate,
 } from "@/lib/currency-conversion";
 
 describe("currency conversion", () => {
@@ -18,6 +20,27 @@ describe("currency conversion", () => {
 
   it("converts USD to CDF", () => {
     expect(convertFromUsd(1, "CDF", rates)).toBe(2850);
+  });
+
+  it("converts between CDF and ZAR via USD", () => {
+    expect(convertCurrency(2850, "CDF", "ZAR", rates)).toBe(18.25);
+    expect(convertCurrency(18.25, "ZAR", "CDF", rates)).toBe(2850);
+  });
+
+  it("returns same amount when currencies match", () => {
+    expect(convertCurrency(100, "USD", "USD", rates)).toBe(100);
+  });
+
+  it("returns null when a required rate is missing", () => {
+    expect(convertCurrency(100, "USD", "CDF", {})).toBeNull();
+    expect(convertCurrency(100, "CDF", "USD", { zarUsdExRate: 18 })).toBeNull();
+  });
+
+  it("reports missing exchange rate keys", () => {
+    expect(getMissingExchangeRate("USD", "USD", {})).toBeNull();
+    expect(getMissingExchangeRate("USD", "CDF", {})).toBe("cdfUsdExRate");
+    expect(getMissingExchangeRate("ZAR", "USD", {})).toBe("zarUsdExRate");
+    expect(getMissingExchangeRate("USD", "CDF", rates)).toBeNull();
   });
 
   it("returns USD reference line for CDF store currency", () => {

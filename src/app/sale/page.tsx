@@ -35,6 +35,17 @@ import type { PaginationMeta } from "@/types/pagination";
 import Select from "react-select";
 import { useTranslation } from "react-i18next";
 import { useStoreCurrency } from "@/hooks/use-store-currency";
+import { ClearCreditButton } from "@/components/transactions/clear-credit-button";
+import { canClearCreditTransaction } from "@/lib/clear-credit";
+import { getTransactionApiId } from "@/lib/transaction-id";
+import { transactionsApi } from "@/lib/api/transactions";
+import type { TransactionStatusFilter } from "@/lib/api/transactions";
+import { useQueryClient } from "@tanstack/react-query";
+import { transactionKeys } from "@/hooks/use-transactions";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
+import { customerKeys } from "@/hooks/use-customers";
+import { saveTransactionsToDexie } from "@/lib/entity-cache";
+import { useEffectiveOnline } from "@/hooks/use-effective-online";
 
 const PAGE_SIZE = 10;
 
@@ -43,9 +54,13 @@ export default function SalePage() {
   const { formatMoney } = useStoreCurrency();
   const { settings } = useSettings();
   const { currentStore } = settings;
+  const role = settings.currentUser?.role;
+  const queryClient = useQueryClient();
+  const { effectiveOnline } = useEffectiveOnline();
 
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearingCreditId, setClearingCreditId] = useState<string | null>(null);
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,6 +70,10 @@ export default function SalePage() {
   } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<{
     value: string;
+    label: string;
+  } | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<{
+    value: TransactionStatusFilter | "";
     label: string;
   } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -80,6 +99,41 @@ export default function SalePage() {
     }));
   }, [allCustomersList]);
 
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: "" as const, label: t("sales.filter.allStatuses") },
+      {
+        value: "paid" as const,
+        label: t("sales.filter.statusPaid"),
+      },
+      {
+        value: "pending" as const,
+        label: t("sales.filter.statusPending"),
+      },
+      {
+        value: "failed" as const,
+        label: t("sales.filter.statusFailed"),
+      },
+    ],
+    [t]
+  );
+
+  const matchesStatusFilter = useCallback(
+    (transaction: Transaction, status: TransactionStatusFilter) => {
+      const key = String(transaction.status ?? "").toLowerCase();
+      if (status === "pending") {
+        // Open credit: explicit pending, or legacy credit without status
+        if (key === "pending") return true;
+        if (!key && transaction.paymentMethod === "Credit") return true;
+        return false;
+      }
+      if (status === "paid") return key === "paid";
+      if (status === "failed") return key === "failed";
+      return true;
+    },
+    []
+  );
+
   const getCustomerName = useCallback(
     (customerId: string | undefined | null, tempCustomerId?: string | null) => {
       if (!customers) return t("sales.notApplicable");
@@ -104,12 +158,79 @@ export default function SalePage() {
       setLoading(true);
       try {
         const db = getDb();
-        const txns = await db.transactions.toArray();
-        const filtered = txns.filter(
-          (t) =>
-            t.storeId != null && String(t.storeId) === String(currentStore.id)
-        );
-        const sorted = filtered.sort((a, b) => {
+        const storeId = String(currentStore.id);
+
+        // Prefer transactionCache (string backend ids). Dexie `transactions` uses ++id
+        // and can replace UUIDs with local auto-increment numbers.
+        let cached = (await db.transactionCache.toArray()) as Transaction[];
+
+        if (effectiveOnline) {
+          try {
+            let page = 1;
+            const limit = 100;
+            const fromApi: Transaction[] = [];
+            while (fromApi.length < 10000) {
+              const res = await transactionsApi.getAll({
+                storeId,
+                limit,
+                page,
+                ...(selectedStatus?.value
+                  ? { status: selectedStatus.value }
+                  : {}),
+              });
+              const raw = res.data;
+              const data = Array.isArray(raw)
+                ? raw
+                : raw && typeof raw === "object" && "data" in raw
+                  ? (raw as { data: Transaction[] }).data
+                  : [];
+              if (!data.length) break;
+              fromApi.push(...data);
+              if (data.length < limit) break;
+              page += 1;
+            }
+            if (fromApi.length > 0) {
+              await saveTransactionsToDexie(fromApi);
+              cached = (await db.transactionCache.toArray()) as Transaction[];
+            }
+          } catch (apiError) {
+            console.warn(
+              "Failed to refresh sales from API; using local cache:",
+              apiError
+            );
+          }
+        }
+
+        const legacyRows = await db.transactions.toArray();
+        const byApiId = new Map<string, Transaction>();
+
+        for (const t of cached) {
+          const apiId = getTransactionApiId(t) ?? String(t.id ?? "");
+          if (!apiId) continue;
+          if (t.storeId != null && String(t.storeId) !== storeId) {
+            continue;
+          }
+          byApiId.set(apiId, {
+            ...t,
+            id: getTransactionApiId(t) ?? t.id,
+            serverId: getTransactionApiId(t) ?? t.serverId,
+          });
+        }
+
+        for (const t of legacyRows) {
+          if (t.storeId == null || String(t.storeId) !== storeId) continue;
+          const apiId = getTransactionApiId(t);
+          if (!apiId) continue;
+          if (!byApiId.has(apiId)) {
+            byApiId.set(apiId, {
+              ...t,
+              id: apiId,
+              serverId: apiId,
+            });
+          }
+        }
+
+        const sorted = [...byApiId.values()].sort((a, b) => {
           const aT = a.createdAt ?? String(a.date ?? "");
           const bT = b.createdAt ?? String(b.date ?? "");
           return String(bT).localeCompare(String(aT));
@@ -121,8 +242,8 @@ export default function SalePage() {
         setLoading(false);
       }
     };
-    loadTransactions();
-  }, [currentStore?.id]);
+    void loadTransactions();
+  }, [currentStore?.id, effectiveOnline, selectedStatus?.value]);
 
   const filteredTransactions = useMemo(() => {
     return allTransactions.filter((transaction) => {
@@ -135,6 +256,13 @@ export default function SalePage() {
       if (
         selectedDate &&
         transactionDate !== format(selectedDate, "yyyy-MM-dd")
+      ) {
+        return false;
+      }
+
+      if (
+        selectedStatus?.value &&
+        !matchesStatusFilter(transaction, selectedStatus.value)
       ) {
         return false;
       }
@@ -184,10 +312,12 @@ export default function SalePage() {
   }, [
     allTransactions,
     selectedDate,
+    selectedStatus,
     searchTerm,
     selectedProduct,
     selectedCustomer,
     getCustomerName,
+    matchesStatusFilter,
   ]);
 
   const paginationMeta: PaginationMeta = useMemo(() => {
@@ -207,14 +337,75 @@ export default function SalePage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedDate, searchTerm, selectedProduct, selectedCustomer]);
+  }, [
+    selectedDate,
+    searchTerm,
+    selectedProduct,
+    selectedCustomer,
+    selectedStatus,
+  ]);
 
   const clearFilters = () => {
     setSelectedDate(undefined);
     setSearchTerm("");
     setSelectedProduct(null);
     setSelectedCustomer(null);
+    setSelectedStatus(null);
     setCurrentPage(1);
+  };
+
+  const handleClearCredit = async (transactionId: string) => {
+    setClearingCreditId(transactionId);
+    try {
+      const response = await transactionsApi.clearCredit(transactionId);
+      const updated = response.data;
+      const updatedApiId = getTransactionApiId(updated) ?? String(updated.id);
+      setAllTransactions((prev) =>
+        prev.map((t) =>
+          getTransactionApiId(t) === updatedApiId ||
+          String(t.id) === String(updated.id)
+            ? { ...t, ...updated, id: updatedApiId, serverId: updatedApiId }
+            : t
+        )
+      );
+      try {
+        await saveTransactionsToDexie([
+          {
+            ...updated,
+            id: updatedApiId,
+            serverId: updatedApiId,
+          },
+        ]);
+        const db = getDb();
+        const localRows = await db.transactions.toArray();
+        const existing = localRows.find(
+          (t) => getTransactionApiId(t) === updatedApiId
+        );
+        if (existing) {
+          await db.transactions.put({
+            ...existing,
+            ...updated,
+            serverId: updatedApiId,
+          });
+        }
+      } catch (cacheError) {
+        console.error("Failed to update local credit sale cache:", cacheError);
+      }
+      void queryClient.invalidateQueries({ queryKey: transactionKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
+      void queryClient.invalidateQueries({ queryKey: customerKeys.lists() });
+      return updated;
+    } finally {
+      setClearingCreditId(null);
+    }
+  };
+
+  const statusLabel = (status: Transaction["status"]) => {
+    const key = String(status ?? "").toLowerCase();
+    if (key === "pending" || key === "") return t("sales.status.pending");
+    if (key === "paid") return t("sales.status.paid");
+    if (key === "failed") return t("sales.status.failed");
+    return status ? String(status) : null;
   };
 
   const calculateSubtotal = (items: TransactionItem[]) => {
@@ -317,10 +508,36 @@ export default function SalePage() {
             />
           </div>
 
+          <div className="w-full sm:w-[200px]">
+            <Select
+              options={statusFilterOptions}
+              value={
+                selectedStatus ?? {
+                  value: "",
+                  label: t("sales.filter.allStatuses"),
+                }
+              }
+              onChange={(opt) =>
+                setSelectedStatus(
+                  opt?.value
+                    ? {
+                        value: opt.value as TransactionStatusFilter,
+                        label: opt.label,
+                      }
+                    : null
+                )
+              }
+              isSearchable={false}
+              placeholder={t("sales.filter.selectStatus")}
+              className="text-sm"
+            />
+          </div>
+
           {(selectedDate ||
             searchTerm ||
             selectedProduct ||
-            selectedCustomer) && (
+            selectedCustomer ||
+            selectedStatus) && (
             <Button
               variant="ghost"
               onClick={clearFilters}
@@ -382,10 +599,10 @@ export default function SalePage() {
                             <p className="font-medium">
                               {t("sales.accordion.saleNumber", {
                                 id:
-                                  String(transaction.id ?? "").substring(
-                                    0,
-                                    8
-                                  ) || t("sales.notApplicable"),
+                                  (
+                                    getTransactionApiId(transaction) ??
+                                    String(transaction.id ?? "")
+                                  ).substring(0, 8) || t("sales.notApplicable"),
                               })}
                             </p>
                             <p className="text-sm text-muted-foreground">
@@ -461,17 +678,62 @@ export default function SalePage() {
                             </div>
                           </div>
 
-                          <div className="flex gap-2 pt-1">
-                            <Badge variant="secondary">
-                              {transaction.paymentMethod}
-                            </Badge>
-                            {transaction.voucherCode && (
-                              <Badge variant="outline">
-                                {t("sales.detail.voucher", {
-                                  code: transaction.voucherCode,
-                                })}
-                              </Badge>
-                            )}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {canClearCreditTransaction(role, transaction) ? (
+                                <ClearCreditButton
+                                  transaction={transaction}
+                                  role={role}
+                                  customerName={customerName}
+                                  onClearCredit={handleClearCredit}
+                                  isClearing={
+                                    clearingCreditId ===
+                                    getTransactionApiId(transaction)
+                                  }
+                                />
+                              ) : (
+                                <>
+                                  <Badge variant="secondary">
+                                    {transaction.paymentMethod}
+                                  </Badge>
+                                  {transaction.paymentMethod === "Credit" ? (
+                                    <Badge
+                                      variant={
+                                        String(
+                                          transaction.status ?? ""
+                                        ).toLowerCase() === "paid" ||
+                                        Boolean(transaction.creditSettledAt)
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                    >
+                                      {statusLabel(
+                                        transaction.creditSettledAt
+                                          ? "paid"
+                                          : (transaction.status ?? "pending")
+                                      )}
+                                    </Badge>
+                                  ) : null}
+                                </>
+                              )}
+                              {transaction.voucherCode && (
+                                <Badge variant="outline">
+                                  {t("sales.detail.voucher", {
+                                    code: transaction.voucherCode,
+                                  })}
+                                </Badge>
+                              )}
+                              {transaction.creditSettledAt ? (
+                                <span className="text-xs text-muted-foreground">
+                                  {t("sales.clearCredit.settledAt", {
+                                    date: format(
+                                      new Date(transaction.creditSettledAt),
+                                      "PPP p"
+                                    ),
+                                  })}
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </AccordionContent>

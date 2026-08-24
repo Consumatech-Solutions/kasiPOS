@@ -113,11 +113,9 @@ export default function RootLayout({
         <Script id="benign-browser-errors" strategy="beforeInteractive">
           {benignBrowserErrorScript}
         </Script>
-        {process.env.NODE_ENV === "production" ? (
-          <Script id="chunk-recovery" strategy="beforeInteractive">
-            {chunkRecoveryScript}
-          </Script>
-        ) : null}
+        <Script id="chunk-recovery" strategy="beforeInteractive">
+          {chunkRecoveryScript}
+        </Script>
       </head>
       <body className={`${inter.variable} font-body antialiased bg-background`}>
         <I18nProvider>

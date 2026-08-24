@@ -126,7 +126,9 @@ export interface TransactionCreditDetails {
 }
 
 export interface Transaction {
-  id?: string; // UUID (backend)
+  id?: string; // UUID (backend). Dexie `transactions` (++id) may overwrite with a local number.
+  /** Backend UUID when `id` is a local Dexie auto-increment key. */
+  serverId?: string;
   customerId?: string | null;
   /** Client-only: references the customer's tempId when the customer was created offline and hasn't synced yet */
   tempCustomerId?: string | null;
@@ -146,6 +148,10 @@ export interface Transaction {
   storeId: string;
   /** Present when paymentMethod is 'Credit'. */
   creditDetails?: TransactionCreditDetails | null;
+  /** Backend payment status (e.g. pending credit vs paid). */
+  status?: "pending" | "paid" | "failed" | string | null;
+  /** ISO timestamp when a credit sale was cleared / marked paid. */
+  creditSettledAt?: string | null;
 }
 
 export interface Voucher {

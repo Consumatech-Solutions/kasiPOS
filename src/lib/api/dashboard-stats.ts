@@ -1,25 +1,65 @@
 import { api } from "./core";
-import type { PaginatedResponse } from "@/types/pagination";
+import type { StoreCurrency } from "@/types";
+import type { PaginationMeta, PaginatedResponse } from "@/types/pagination";
 
-export type DashboardSalesTrendPoint = {
-  date: string;
-  sales: number;
+export type DashboardApproachingDueDate = {
+  dueDate: string;
+  credits: Array<{ id: string; customerId: string }>;
+  clientsOwingCount: number;
+  totalAmount: number;
+};
+
+export type DashboardCreditRow = {
+  id: string;
+  clientName: string;
+  totalAmount: number;
+  dueDate: string;
+};
+
+export type DashboardLowStockProduct = {
+  id: string;
+  name: string;
+  stock: number;
+  lowStockThreshold: number;
+};
+
+export type DashboardNoStockProduct = {
+  id: string;
+  name: string;
+  stock: number;
+};
+
+export type DashboardProductPerformance = {
+  productId: string;
+  unitsSold: number;
+  revenue: number;
+  /** Optional — some backends include these; otherwise we enrich client-side. */
+  name?: string;
+  productImage?: string | null;
+  imageUrl?: string | null;
 };
 
 export type DashboardStatsResponse = {
+  currency: StoreCurrency;
   totalSales: number;
   todaySales: number;
   totalCustomers: number;
   outstandingCredits: number;
-  customersOnCredit: PaginatedResponse<string>;
-  recentSales: string[];
-  salesTrend: DashboardSalesTrendPoint[];
+  approachingDueDates: DashboardApproachingDueDate[];
+  creditsToRecover: PaginatedResponse<DashboardCreditRow>;
+  overdueCredits: PaginatedResponse<DashboardCreditRow>;
+  lowStockProducts: PaginatedResponse<DashboardLowStockProduct>;
+  noStockProducts: PaginatedResponse<DashboardNoStockProduct>;
+  mostSoldProducts: DashboardProductPerformance[];
+  mostProfitableProduct: DashboardProductPerformance | null;
 };
 
 export type GetDashboardStatsParams = {
   page?: number;
   limit?: number;
 };
+
+export type { PaginationMeta };
 
 export const dashboardStatsApi = {
   get: (params?: GetDashboardStatsParams) => {

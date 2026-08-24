@@ -7,6 +7,11 @@
   "sales.filter.selectProduct": "Choisir un produit",
   "sales.filter.allCustomers": "Tous les clients",
   "sales.filter.selectCustomer": "Choisir un client",
+  "sales.filter.allStatuses": "Tous les statuts",
+  "sales.filter.selectStatus": "Filtrer par statut",
+  "sales.filter.statusPaid": "Payé",
+  "sales.filter.statusPending": "À crédit",
+  "sales.filter.statusFailed": "Échoué",
   "sales.filter.clear": "Effacer les filtres",
   "sales.summary.showing": "Affichage de {{pageCount}} sur {{total}} ventes",
   "sales.loading": "Chargement des ventes…",
@@ -21,5 +26,9 @@
   "sales.detail.tax": "TVA",
   "sales.detail.discount": "Remise",
   "sales.detail.total": "Total",
-  "sales.detail.voucher": "Bon : {{code}}"
+  "sales.detail.voucher": "Bon : {{code}}",
+  "sales.status.pending": "En attente",
+  "sales.status.paid": "Payé",
+  "sales.status.failed": "Échoué",
+  "sales.clearCredit.settledAt": "Soldé le {{date}}"
 }

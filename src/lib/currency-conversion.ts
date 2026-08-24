@@ -12,6 +12,12 @@ export interface CurrencyConversionLine {
   formatted: string;
 }
 
+export type ExchangeRateKey = "cdfUsdExRate" | "zarUsdExRate";
+
+function isPositiveRate(rate: number | null | undefined): rate is number {
+  return rate != null && Number.isFinite(rate) && rate > 0;
+}
+
 /** Convert an amount in store currency to USD using configured rates. */
 export function convertToUsd(
   amount: number,
@@ -24,13 +30,13 @@ export function convertToUsd(
 
   if (storeCurrency === "CDF") {
     const rate = rates.cdfUsdExRate;
-    if (rate == null || rate <= 0) return null;
+    if (!isPositiveRate(rate)) return null;
     return amount / rate;
   }
 
   if (storeCurrency === "ZAR") {
     const rate = rates.zarUsdExRate;
-    if (rate == null || rate <= 0) return null;
+    if (!isPositiveRate(rate)) return null;
     return amount / rate;
   }
 
@@ -49,16 +55,58 @@ export function convertFromUsd(
 
   if (targetCurrency === "CDF") {
     const rate = rates.cdfUsdExRate;
-    if (rate == null || rate <= 0) return null;
+    if (!isPositiveRate(rate)) return null;
     return amountUsd * rate;
   }
 
   if (targetCurrency === "ZAR") {
     const rate = rates.zarUsdExRate;
-    if (rate == null || rate <= 0) return null;
+    if (!isPositiveRate(rate)) return null;
     return amountUsd * rate;
   }
 
+  return null;
+}
+
+/**
+ * Convert an amount between any two supported currencies via USD.
+ * Returns null when a required exchange rate is missing.
+ */
+export function convertCurrency(
+  amount: number,
+  from: StoreCurrency,
+  to: StoreCurrency,
+  rates: StoreExchangeRates
+): number | null {
+  if (from === to) {
+    return Number.isFinite(amount) ? amount : null;
+  }
+  const usd = convertToUsd(amount, from, rates);
+  if (usd == null) return null;
+  return convertFromUsd(usd, to, rates);
+}
+
+/**
+ * Which rate must be configured to convert between `from` and `to`.
+ * Returns null when no rate is needed or all required rates are present.
+ */
+export function getMissingExchangeRate(
+  from: StoreCurrency,
+  to: StoreCurrency,
+  rates: StoreExchangeRates
+): ExchangeRateKey | null {
+  if (from === to) return null;
+
+  const needed = new Set<StoreCurrency>();
+  if (from !== "USD") needed.add(from);
+  if (to !== "USD") needed.add(to);
+
+  if (needed.has("CDF") && !isPositiveRate(rates.cdfUsdExRate)) {
+    return "cdfUsdExRate";
+  }
+  if (needed.has("ZAR") && !isPositiveRate(rates.zarUsdExRate)) {
+    return "zarUsdExRate";
+  }
   return null;
 }
 

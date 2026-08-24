@@ -1,56 +1,34 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { dashboardStatsApi } from "@/lib/api/dashboard-stats";
 import {
-  getCustomersFromDexie,
-  getTransactionsFromDexie,
-} from "@/lib/entity-cache";
-import {
-  buildDashboardMetrics,
-  getCustomersWithCredit,
-  getRecentTransactions,
-  getSalesTrendData,
-  type CustomerWithCredit,
-  type RecentSaleRow,
-  type SalesTrendPoint,
-} from "@/lib/dashboard-metrics";
-import {
-  enrichCreditCustomers,
-  enrichRecentSales,
-  mapApiSalesTrend,
-  mapApiStatsToSummary,
-  paginateCreditCustomersLocally,
-  type DashboardApiSummary,
-} from "@/lib/dashboard-stats-mapper";
+  loadApiDashboardStatsView,
+  loadDexieDashboardStatsView,
+  type DashboardStatsView,
+} from "@/lib/dashboard-stats-view";
+import { isDashboardAllowedForRole } from "@/lib/role-permissions";
 import { isOfflineError } from "@/lib/api/core";
 import { isNetworkErrorLike } from "@/lib/network-error";
 import { useEffectiveOnline } from "@/hooks/use-effective-online";
-import type { UserRole } from "@/types";
-import type { PaginationMeta } from "@/types/pagination";
+import type { StoreCurrency, UserRole } from "@/types";
 
 export type DashboardStatsSource = "api" | "dexie";
 
-export interface DashboardStatsData {
-  summary: DashboardApiSummary;
-  salesTrend: SalesTrendPoint[];
-  creditCustomers: CustomerWithCredit[];
-  creditMeta: PaginationMeta;
-  recentSales: RecentSaleRow[];
-  source: DashboardStatsSource;
-}
+export type DashboardStatsData = DashboardStatsView;
 
 interface UseDashboardStatsOptions {
   storeId?: string | null;
   role?: UserRole;
   page?: number;
   limit?: number;
-  walkInLabel?: string;
+  /** Used for offline Dexie fallback when API currency is unavailable. */
+  fallbackCurrency?: StoreCurrency;
   enabled?: boolean;
 }
 
 export const dashboardStatsKeys = {
-  all: ["dashboardStats"] as const,
+  /** v2 avoids serving pre-`/dashboard-stats` cache shapes that crash the page. */
+  all: ["dashboardStats", "v2"] as const,
   list: (filters: { storeId?: string | null; page?: number; limit?: number }) =>
     [...dashboardStatsKeys.all, filters] as const,
   local: (filters: {
@@ -62,102 +40,45 @@ export const dashboardStatsKeys = {
     [...dashboardStatsKeys.list(filters), "api"] as const,
 };
 
-async function loadDexieDashboardStats(
-  storeId: string | null | undefined,
-  page: number,
-  limit: number,
-  walkInLabel: string
-): Promise<DashboardStatsData> {
-  const [customersResult, transactionsResult] = await Promise.all([
-    getCustomersFromDexie(1, 10000, undefined, storeId),
-    getTransactionsFromDexie(1, 10000, storeId),
-  ]);
-
-  const customers = customersResult.data;
-  const transactions = transactionsResult.data;
-  const summaryMetrics = buildDashboardMetrics(customers, transactions);
-
-  const allCreditCustomers = getCustomersWithCredit(customers, 10000);
-  const paginatedCredit = paginateCreditCustomersLocally(
-    allCreditCustomers,
-    page,
-    limit
-  );
-
-  return {
-    summary: {
-      todaySales: summaryMetrics.todaySales,
-      totalSales: transactions.reduce(
-        (sum, t) => sum + Number(t.total ?? 0),
-        0
-      ),
-      totalCustomers: summaryMetrics.totalCustomers,
-      outstandingCredit: summaryMetrics.outstandingCredit,
-    },
-    salesTrend: getSalesTrendData(transactions),
-    creditCustomers: paginatedCredit.data,
-    creditMeta: paginatedCredit.meta,
-    recentSales: getRecentTransactions(transactions, customers, 5, walkInLabel),
-    source: "dexie",
-  };
-}
-
-async function loadApiDashboardStats(
-  storeId: string | null | undefined,
-  page: number,
-  limit: number,
-  walkInLabel: string
-): Promise<DashboardStatsData> {
-  const response = await dashboardStatsApi.get({ page, limit });
-  const stats = response.data;
-
-  const [creditCustomers, recentSales] = await Promise.all([
-    enrichCreditCustomers(stats.customersOnCredit.data, storeId),
-    enrichRecentSales(stats.recentSales, storeId, walkInLabel),
-  ]);
-
-  return {
-    summary: mapApiStatsToSummary(stats),
-    salesTrend: mapApiSalesTrend(stats.salesTrend),
-    creditCustomers,
-    creditMeta: stats.customersOnCredit.meta,
-    recentSales,
-    source: "api",
-  };
-}
-
 export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
   const {
     storeId,
     role,
     page = 1,
-    limit = 10,
-    walkInLabel = "Walk-in",
+    limit = 5,
+    fallbackCurrency = "USD",
     enabled = true,
   } = options;
 
-  const isStoreAdmin = role === "store_admin";
-  const queryEnabled = enabled && isStoreAdmin && Boolean(storeId);
+  const canViewDashboard = isDashboardAllowedForRole(role);
+  const queryEnabled = enabled && canViewDashboard;
   const { effectiveOnline } = useEffectiveOnline();
 
   const filters = { storeId, page, limit };
 
   const localQuery = useQuery({
     queryKey: dashboardStatsKeys.local(filters),
-    queryFn: () => loadDexieDashboardStats(storeId, page, limit, walkInLabel),
-    enabled: queryEnabled,
-    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: () =>
+      loadDexieDashboardStatsView(storeId, page, limit, fallbackCurrency),
+    enabled: queryEnabled && Boolean(storeId),
+    staleTime: 60_000,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    placeholderData: (previousData) => previousData,
   });
 
   const apiQuery = useQuery({
     queryKey: dashboardStatsKeys.api(filters),
-    queryFn: () => loadApiDashboardStats(storeId, page, limit, walkInLabel),
+    queryFn: () =>
+      loadApiDashboardStatsView(page, limit, {
+        storeId,
+        fallbackCurrency,
+      }),
     enabled: queryEnabled && effectiveOnline,
     staleTime: 30_000,
     retry: (failureCount, error) => {
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 400 || status === 401 || status === 403) return false;
       if (isOfflineError(error) || isNetworkErrorLike(error)) return false;
       return failureCount < 2;
     },
@@ -168,14 +89,39 @@ export function useDashboardStats(options: UseDashboardStatsOptions = {}) {
   const mergedData = useApiData ? apiQuery.data : localQuery.data;
   const source: DashboardStatsSource = useApiData ? "api" : "dexie";
 
+  const apiBlocked =
+    apiQuery.isError &&
+    [400, 401, 403].includes(
+      (apiQuery.error as { response?: { status?: number } })?.response
+        ?.status ?? 0
+    );
+
+  const isLoading =
+    (localQuery.isLoading && !localQuery.data && !apiQuery.data) ||
+    (effectiveOnline &&
+      apiQuery.isLoading &&
+      !apiQuery.data &&
+      !localQuery.data &&
+      !storeId);
+
+  const isError =
+    apiBlocked ||
+    ((localQuery.isError || (!storeId && apiQuery.isError)) && !mergedData);
+
   return {
     data: mergedData ? { ...mergedData, source } : undefined,
-    isLoading: localQuery.isLoading && !localQuery.data,
-    isError: localQuery.isError && !localQuery.data,
-    error: localQuery.error ?? apiQuery.error,
+    dataUpdatedAt: useApiData
+      ? apiQuery.dataUpdatedAt
+      : localQuery.dataUpdatedAt,
+    isLoading,
+    isError,
+    error: apiBlocked ? apiQuery.error : (localQuery.error ?? apiQuery.error),
     isFetching: localQuery.isFetching || apiQuery.isFetching,
     refetch: async () => {
-      await Promise.all([localQuery.refetch(), apiQuery.refetch()]);
+      await Promise.all([
+        storeId ? localQuery.refetch() : Promise.resolve(),
+        effectiveOnline ? apiQuery.refetch() : Promise.resolve(),
+      ]);
     },
   };
 }
