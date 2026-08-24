@@ -1,5 +1,4 @@
 import { parseISO, startOfDay } from "date-fns";
-import { catalogueApi } from "@/lib/api/catalogue";
 import { dashboardStatsApi } from "@/lib/api/dashboard-stats";
 import type {
   DashboardApproachingDueDate,
@@ -149,138 +148,100 @@ function productImageFromCache(
   return image ? String(image) : undefined;
 }
 
-function unwrapApiProduct(raw: unknown): {
-  id?: string;
-  name?: string;
-  productImage?: string | null;
-  imageUrl?: string | null;
-} | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-  if (typeof obj.name === "string" || typeof obj.id === "string") {
-    return obj as {
-      id?: string;
-      name?: string;
-      productImage?: string | null;
-      imageUrl?: string | null;
-    };
-  }
-  if (obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)) {
-    return unwrapApiProduct(obj.data);
-  }
-  return null;
+function trimmedName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
 
-function detailFromRecord(
-  id: string,
-  row: Record<string, unknown>
-): { name: string; imageUrl?: string } | null {
-  const name = row.name != null ? String(row.name).trim() : "";
-  if (!name) return null;
-  return {
-    name,
-    imageUrl: productImageFromCache(row),
-  };
+function performanceRowId(row: DashboardProductPerformance): string {
+  return String(row.productId || (row as { id?: string }).id || "");
 }
 
-async function warmProductCache(
-  id: string,
-  name: string,
-  imageUrl?: string | null
-): Promise<void> {
-  try {
-    const db = getDb();
-    const existing = await db.productCache.get(id);
-    await db.productCache.put({
-      ...(existing ?? {}),
-      id,
-      name,
-      ...(imageUrl ? { productImage: String(imageUrl) } : {}),
-    });
-  } catch {
-    // Cache write is best-effort
-  }
-}
+type ProductNameSources = {
+  fromProduct?: { name: string; imageUrl?: string };
+  fromSaleLine?: { name: string; imageUrl?: string };
+};
 
 /**
- * Resolve product names/images for dashboard performance rows.
- * Order: Dexie productCache → legacy products table → GET /products/:id →
- * catalogue list scan → friendly fallback.
+ * Name sources for dashboard product rows:
+ * 1. current product name from `products`
+ * 2. else `productName` stored on the sale line item
  */
 export async function resolveProductDetails(
   productIds: string[]
-): Promise<Map<string, { name: string; imageUrl?: string }>> {
+): Promise<Map<string, ProductNameSources>> {
   const unique = [...new Set(productIds.filter(Boolean).map(String))];
-  const result = new Map<string, { name: string; imageUrl?: string }>();
+  const result = new Map<string, ProductNameSources>();
   if (unique.length === 0) return result;
 
-  let missing: string[] = [];
+  for (const id of unique) {
+    result.set(id, {});
+  }
 
   try {
     const db = getDb();
-    // Bulk index avoids N Dexie gets and catches id type/string mismatches.
-    const allCached = await db.productCache.toArray();
+    const cachedRows = await db.productCache.toArray();
     const byId = new Map<string, Record<string, unknown>>();
-    for (const row of allCached) {
+    for (const row of cachedRows) {
       if (row?.id == null) continue;
       byId.set(String(row.id), row as unknown as Record<string, unknown>);
     }
 
     for (const id of unique) {
-      const cached = byId.get(id);
-      if (cached) {
-        const detail = detailFromRecord(id, cached);
-        if (detail) {
-          result.set(id, detail);
-          continue;
-        }
-      }
-      missing.push(id);
-    }
-
-    if (missing.length > 0) {
-      const legacy = await db.products.toArray();
-      const stillMissing: string[] = [];
-      for (const id of missing) {
-        const row = legacy.find((p) => p.id != null && String(p.id) === id);
-        if (row?.name?.trim()) {
-          const imageUrl = row.imageUrl ? String(row.imageUrl) : undefined;
-          result.set(id, { name: row.name.trim(), imageUrl });
-          void warmProductCache(id, row.name.trim(), imageUrl);
-        } else {
-          stillMissing.push(id);
-        }
-      }
-      missing = stillMissing;
+      const cached = byId.get(id) ?? (await db.productCache.get(id));
+      if (!cached) continue;
+      const row = cached as unknown as Record<string, unknown>;
+      const name = trimmedName(row.name);
+      if (!name) continue;
+      result.set(id, {
+        ...result.get(id),
+        fromProduct: {
+          name,
+          imageUrl: productImageFromCache(row),
+        },
+      });
     }
   } catch {
-    missing = unique.filter((id) => !result.has(id));
+    // Product cache is optional.
   }
 
-  const stillMissingAfterGet: string[] = [];
+  const missingSaleLine = unique.filter((id) => !result.get(id)?.fromProduct);
+  if (missingSaleLine.length === 0) return result;
 
-  await Promise.all(
-    missing.map(async (id) => {
-      try {
-        const raw = await catalogueApi.products.getById(id);
-        const product = unwrapApiProduct(raw);
-        const name = product?.name?.trim();
-        if (name) {
-          const imageUrl =
-            product.productImage ?? product.imageUrl ?? undefined;
-          result.set(id, {
-            name,
-            imageUrl: imageUrl ? String(imageUrl) : undefined,
-          });
-          await warmProductCache(id, name, imageUrl);
-          return;
-        }
-      } catch {
-        // fall through
+  try {
+    const db = getDb();
+    const txRows = await db.transactionCache.toArray();
+
+    for (const tx of txRows) {
+      const items = Array.isArray((tx as { items?: unknown[] }).items)
+        ? ((tx as { items?: unknown[] }).items as Array<
+            Record<string, unknown>
+          >)
+        : [];
+
+      for (const item of items) {
+        const productId =
+          item.productId != null ? String(item.productId) : null;
+        if (!productId) continue;
+        const sources = result.get(productId);
+        if (!sources || sources.fromSaleLine) continue;
+
+        const productName = trimmedName(item.productName);
+        if (!productName) continue;
+
+        sources.fromSaleLine = {
+          name: productName,
+          imageUrl:
+            typeof item.imageUrl === "string" && item.imageUrl.trim()
+              ? item.imageUrl.trim()
+              : undefined,
+        };
       }
-      stillMissingAfterGet.push(id);
-    })
-  );
+    }
+  } catch {
+    // Sale-line cache is optional.
+  }
 
   if (stillMissingAfterGet.length > 0) {
     try {
@@ -371,10 +332,11 @@ export async function enrichDashboardStats(
     page,
     limit
   );
+
   const productIds = [
-    ...stats.mostSoldProducts.map((p) => p.productId),
+    ...stats.mostSoldProducts.map((p) => performanceRowId(p)),
     ...(stats.mostProfitableProduct
-      ? [stats.mostProfitableProduct.productId]
+      ? [performanceRowId(stats.mostProfitableProduct)]
       : []),
     ...stats.lowStockProducts.data.map((p) => p.id),
     ...stats.noStockProducts.data.map((p) => p.id),
@@ -384,14 +346,17 @@ export async function enrichDashboardStats(
   const enrichPerf = (
     row: DashboardProductPerformance
   ): EnrichedProductPerformance => {
-    const info = details.get(row.productId);
-    const apiName =
-      typeof row.name === "string" && row.name.trim() ? row.name.trim() : null;
-    const apiImage = row.productImage ?? row.imageUrl ?? undefined;
+    const id = performanceRowId(row);
+    const sources = details.get(id);
+    const fromProducts = sources?.fromProduct?.name ?? trimmedName(row.name);
+    const fromSaleLine =
+      sources?.fromSaleLine?.name ?? trimmedName(row.productName);
     return {
       ...row,
-      name: apiName ?? info?.name ?? "Unknown product",
-      imageUrl: info?.imageUrl ?? (apiImage ? String(apiImage) : undefined),
+      productId: id || row.productId,
+      name: fromProducts ?? fromSaleLine ?? "Unknown product",
+      imageUrl:
+        sources?.fromProduct?.imageUrl ?? sources?.fromSaleLine?.imageUrl,
     };
   };
 
@@ -407,7 +372,7 @@ export async function enrichDashboardStats(
     stock: row.stock,
     lowStockThreshold:
       row.lowStockThreshold != null ? Number(row.lowStockThreshold) : undefined,
-    imageUrl: details.get(row.id)?.imageUrl,
+    imageUrl: details.get(row.id)?.fromProduct?.imageUrl,
   });
 
   return {
@@ -641,7 +606,7 @@ export async function loadApiDashboardStatsView(
   const raw = unwrapDashboardStatsPayload(response.data);
   const enriched = await enrichDashboardStats(raw, { page, limit });
 
-  // New contract: use API panels as-is.
+  // New contract: use API panels as-is (names resolved from products, then sale line).
   if (isNewDashboardStatsContract(raw)) {
     return { ...enriched, source: "api" };
   }

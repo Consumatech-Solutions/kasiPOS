@@ -93,18 +93,28 @@ export const catalogueApi = {
 
     getById: async (id: string): Promise<ApiProduct> => {
       const response = await api.get(`${API_BASE_PATH}/products/${id}`);
-      const raw = response.data as ApiProduct | { data: ApiProduct };
-      if (
-        raw &&
-        typeof raw === "object" &&
-        "data" in raw &&
-        raw.data &&
-        typeof raw.data === "object" &&
-        !Array.isArray(raw.data)
-      ) {
-        return raw.data;
-      }
-      return raw as ApiProduct;
+
+      const unwrap = (raw: unknown): unknown => {
+        if (!raw || typeof raw !== "object") return raw;
+        const obj = raw as Record<string, unknown>;
+
+        // Handle common backend wrapper: { data: { ...product } }
+        if (
+          "data" in obj &&
+          obj.data &&
+          typeof obj.data === "object" &&
+          !Array.isArray(obj.data)
+        ) {
+          const inner = obj.data as Record<string, unknown>;
+          if ("name" in inner || "id" in inner || "productImage" in inner) {
+            return unwrap(inner);
+          }
+        }
+
+        return raw;
+      };
+
+      return unwrap(response.data) as ApiProduct;
     },
 
     create: async (data: CreateProductDto): Promise<ApiProduct> => {

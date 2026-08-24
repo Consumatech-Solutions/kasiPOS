@@ -33,10 +33,10 @@ export type DashboardProductPerformance = {
   productId: string;
   unitsSold: number;
   revenue: number;
-  /** Optional — some backends include these; otherwise we enrich client-side. */
+  /** Current catalogue product name from `products`. */
   name?: string;
-  productImage?: string | null;
-  imageUrl?: string | null;
+  /** Sale line item name, used when the product no longer exists. */
+  productName?: string;
 };
 
 export type DashboardStatsResponse = {
