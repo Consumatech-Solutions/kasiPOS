@@ -243,6 +243,44 @@ export async function resolveProductDetails(
     // Sale-line cache is optional.
   }
 
+  if (stillMissingAfterGet.length > 0) {
+    try {
+      const listed = await catalogueApi.products.getAll({
+        page: 1,
+        limit: 500,
+      });
+      const list = Array.isArray(listed)
+        ? listed
+        : Array.isArray(listed?.data)
+          ? listed.data
+          : [];
+      const byId = new Map(
+        list.filter((p) => p?.id != null).map((p) => [String(p.id), p] as const)
+      );
+      for (const id of stillMissingAfterGet) {
+        const product = byId.get(id);
+        const name = product?.name?.trim();
+        if (name) {
+          const imageUrl =
+            product.productImage ?? product.imageUrl ?? undefined;
+          result.set(id, {
+            name,
+            imageUrl: imageUrl ? String(imageUrl) : undefined,
+          });
+          await warmProductCache(id, name, imageUrl);
+        } else {
+          result.set(id, { name: "Unknown product" });
+        }
+      }
+    } catch {
+      for (const id of stillMissingAfterGet) {
+        if (!result.has(id)) {
+          result.set(id, { name: "Unknown product" });
+        }
+      }
+    }
+  }
+
   return result;
 }
 
