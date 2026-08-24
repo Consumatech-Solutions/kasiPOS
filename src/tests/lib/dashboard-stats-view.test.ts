@@ -3,29 +3,26 @@ import {
   buildApproachingDueDates,
   enrichDashboardStats,
   isNewDashboardStatsContract,
+  resolveProductDetails,
   unwrapDashboardStatsPayload,
 } from "@/lib/dashboard-stats-view";
 import type { DashboardStatsResponse } from "@/lib/api/dashboard-stats";
 import type { Transaction } from "@/types";
 
+const productCacheGetMock = vi.fn(async () => undefined);
+const productCacheToArrayMock = vi.fn(async () => []);
+const transactionCacheToArrayMock = vi.fn(async () => []);
+
 vi.mock("@/lib/db", () => ({
   getDb: () => ({
     productCache: {
-      get: vi.fn(async () => undefined),
+      get: productCacheGetMock,
+      toArray: productCacheToArrayMock,
+    },
+    transactionCache: {
+      toArray: transactionCacheToArrayMock,
     },
   }),
-}));
-
-vi.mock("@/lib/api/catalogue", () => ({
-  catalogueApi: {
-    products: {
-      getById: vi.fn(async (id: string) => ({
-        id,
-        name: `Product ${id}`,
-        productImage: `https://img.test/${id}.png`,
-      })),
-    },
-  },
 }));
 
 const emptyPage = <T>(data: T[] = []) => ({
@@ -60,13 +57,23 @@ const sampleResponse: DashboardStatsResponse = {
     { id: "p1", name: "Soap", stock: 2, lowStockThreshold: 5 },
   ]),
   noStockProducts: emptyPage([{ id: "p2", name: "Oil", stock: 0 }]),
-  mostSoldProducts: [{ productId: "p1", unitsSold: 12, revenue: 240 }],
-  mostProfitableProduct: { productId: "p2", unitsSold: 3, revenue: 900 },
+  mostSoldProducts: [
+    { productId: "p1", name: "Sugar 1kg", unitsSold: 12, revenue: 240 },
+  ],
+  mostProfitableProduct: {
+    productId: "p2",
+    name: "Sugar 1kg",
+    unitsSold: 3,
+    revenue: 900,
+  },
 };
 
 describe("dashboard-stats-view", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    productCacheGetMock.mockResolvedValue(undefined);
+    productCacheToArrayMock.mockResolvedValue([]);
+    transactionCacheToArrayMock.mockResolvedValue([]);
   });
 
   it("detects new vs legacy dashboard-stats contracts", () => {
@@ -94,7 +101,7 @@ describe("dashboard-stats-view", () => {
     });
   });
 
-  it("enrichDashboardStats maps summary and enriches product names/images", async () => {
+  it("enrichDashboardStats maps summary and uses product name from stats payload", async () => {
     const view = await enrichDashboardStats(sampleResponse);
 
     expect(view.currency).toBe("USD");
@@ -104,18 +111,96 @@ describe("dashboard-stats-view", () => {
     expect(view.totalCustomers).toBe(84);
     expect(view.mostSoldProducts[0]).toMatchObject({
       productId: "p1",
-      name: "Product p1",
-      imageUrl: "https://img.test/p1.png",
+      name: "Sugar 1kg",
       unitsSold: 12,
     });
     expect(view.mostProfitableProduct).toMatchObject({
       productId: "p2",
-      name: "Product p2",
+      name: "Sugar 1kg",
       revenue: 900,
     });
-    expect(view.lowStockProducts.data[0].imageUrl).toBe(
-      "https://img.test/p1.png"
-    );
+    expect(view.lowStockProducts.data[0].name).toBe("Soap");
+    expect(view.noStockProducts.data[0].name).toBe("Oil");
+  });
+
+  it("prefers current product name from products over API name", async () => {
+    productCacheToArrayMock.mockResolvedValueOnce([
+      {
+        id: "p1",
+        name: "Sugar 2kg",
+        productImage: "https://img.test/p1.png",
+      },
+    ]);
+
+    const view = await enrichDashboardStats(sampleResponse);
+
+    expect(view.mostSoldProducts[0]).toMatchObject({
+      name: "Sugar 2kg",
+      imageUrl: "https://img.test/p1.png",
+    });
+  });
+
+  it("falls back to sale line productName when the product is gone", async () => {
+    transactionCacheToArrayMock.mockResolvedValueOnce([
+      {
+        items: [
+          {
+            productId: "gone-1",
+            productName: "Old Sugar",
+            imageUrl: "https://img.test/gone-1.png",
+          },
+        ],
+      },
+    ]);
+
+    const view = await enrichDashboardStats({
+      ...sampleResponse,
+      mostSoldProducts: [
+        { productId: "gone-1", unitsSold: 52, revenue: 26000 },
+      ],
+      mostProfitableProduct: {
+        productId: "gone-1",
+        unitsSold: 52,
+        revenue: 26000,
+      },
+    });
+
+    expect(view.mostSoldProducts[0]).toMatchObject({
+      name: "Old Sugar",
+      imageUrl: "https://img.test/gone-1.png",
+    });
+    expect(view.mostProfitableProduct?.name).toBe("Old Sugar");
+  });
+
+  it("uses Unknown product when products and sale line names are missing", async () => {
+    const view = await enrichDashboardStats({
+      ...sampleResponse,
+      mostSoldProducts: [{ productId: "missing-1", unitsSold: 1, revenue: 1 }],
+      mostProfitableProduct: null,
+    });
+
+    expect(view.mostSoldProducts[0].name).toBe("Unknown product");
+  });
+
+  it("resolveProductDetails reads sale line productName from cached transactions", async () => {
+    transactionCacheToArrayMock.mockResolvedValueOnce([
+      {
+        items: [
+          {
+            productId: "p-tx-1",
+            productName: "Transaction Product",
+            imageUrl: "https://img.test/p-tx-1.png",
+          },
+        ],
+      },
+    ]);
+
+    const details = await resolveProductDetails(["p-tx-1"]);
+
+    expect(details.get("p-tx-1")?.fromSaleLine).toMatchObject({
+      name: "Transaction Product",
+      imageUrl: "https://img.test/p-tx-1.png",
+    });
   });
 
   it("enrichDashboardStats tolerates legacy API payloads without new lists", async () => {

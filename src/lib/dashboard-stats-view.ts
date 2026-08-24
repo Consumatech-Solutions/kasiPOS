@@ -1,5 +1,4 @@
 import { parseISO, startOfDay } from "date-fns";
-import { catalogueApi } from "@/lib/api/catalogue";
 import { dashboardStatsApi } from "@/lib/api/dashboard-stats";
 import type {
   DashboardApproachingDueDate,
@@ -149,46 +148,100 @@ function productImageFromCache(
   return image ? String(image) : undefined;
 }
 
+function trimmedName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function performanceRowId(row: DashboardProductPerformance): string {
+  return String(row.productId || (row as { id?: string }).id || "");
+}
+
+type ProductNameSources = {
+  fromProduct?: { name: string; imageUrl?: string };
+  fromSaleLine?: { name: string; imageUrl?: string };
+};
+
+/**
+ * Name sources for dashboard product rows:
+ * 1. current product name from `products`
+ * 2. else `productName` stored on the sale line item
+ */
 export async function resolveProductDetails(
   productIds: string[]
-): Promise<Map<string, { name: string; imageUrl?: string }>> {
-  const unique = [...new Set(productIds.filter(Boolean))];
-  const result = new Map<string, { name: string; imageUrl?: string }>();
+): Promise<Map<string, ProductNameSources>> {
+  const unique = [...new Set(productIds.filter(Boolean).map(String))];
+  const result = new Map<string, ProductNameSources>();
   if (unique.length === 0) return result;
 
-  const db = getDb();
-  const missing: string[] = [];
-
   for (const id of unique) {
-    try {
-      const cached = await db.productCache.get(id);
-      if (cached) {
-        const row = cached as unknown as Record<string, unknown>;
-        result.set(id, {
-          name: String(row.name ?? id),
-          imageUrl: productImageFromCache(row),
-        });
-      } else {
-        missing.push(id);
-      }
-    } catch {
-      missing.push(id);
-    }
+    result.set(id, {});
   }
 
-  await Promise.all(
-    missing.map(async (id) => {
-      try {
-        const product = await catalogueApi.products.getById(id);
-        result.set(id, {
-          name: product.name,
-          imageUrl: product.productImage ?? undefined,
-        });
-      } catch {
-        result.set(id, { name: id });
+  try {
+    const db = getDb();
+    const cachedRows = await db.productCache.toArray();
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of cachedRows) {
+      if (row?.id == null) continue;
+      byId.set(String(row.id), row as unknown as Record<string, unknown>);
+    }
+
+    for (const id of unique) {
+      const cached = byId.get(id) ?? (await db.productCache.get(id));
+      if (!cached) continue;
+      const row = cached as unknown as Record<string, unknown>;
+      const name = trimmedName(row.name);
+      if (!name) continue;
+      result.set(id, {
+        ...result.get(id),
+        fromProduct: {
+          name,
+          imageUrl: productImageFromCache(row),
+        },
+      });
+    }
+  } catch {
+    // Product cache is optional.
+  }
+
+  const missingSaleLine = unique.filter((id) => !result.get(id)?.fromProduct);
+  if (missingSaleLine.length === 0) return result;
+
+  try {
+    const db = getDb();
+    const txRows = await db.transactionCache.toArray();
+
+    for (const tx of txRows) {
+      const items = Array.isArray((tx as { items?: unknown[] }).items)
+        ? ((tx as { items?: unknown[] }).items as Array<
+            Record<string, unknown>
+          >)
+        : [];
+
+      for (const item of items) {
+        const productId =
+          item.productId != null ? String(item.productId) : null;
+        if (!productId) continue;
+        const sources = result.get(productId);
+        if (!sources || sources.fromSaleLine) continue;
+
+        const productName = trimmedName(item.productName);
+        if (!productName) continue;
+
+        sources.fromSaleLine = {
+          name: productName,
+          imageUrl:
+            typeof item.imageUrl === "string" && item.imageUrl.trim()
+              ? item.imageUrl.trim()
+              : undefined,
+        };
       }
-    })
-  );
+    }
+  } catch {
+    // Sale-line cache is optional.
+  }
 
   return result;
 }
@@ -241,10 +294,11 @@ export async function enrichDashboardStats(
     page,
     limit
   );
+
   const productIds = [
-    ...stats.mostSoldProducts.map((p) => p.productId),
+    ...stats.mostSoldProducts.map((p) => performanceRowId(p)),
     ...(stats.mostProfitableProduct
-      ? [stats.mostProfitableProduct.productId]
+      ? [performanceRowId(stats.mostProfitableProduct)]
       : []),
     ...stats.lowStockProducts.data.map((p) => p.id),
     ...stats.noStockProducts.data.map((p) => p.id),
@@ -254,11 +308,17 @@ export async function enrichDashboardStats(
   const enrichPerf = (
     row: DashboardProductPerformance
   ): EnrichedProductPerformance => {
-    const info = details.get(row.productId);
+    const id = performanceRowId(row);
+    const sources = details.get(id);
+    const fromProducts = sources?.fromProduct?.name ?? trimmedName(row.name);
+    const fromSaleLine =
+      sources?.fromSaleLine?.name ?? trimmedName(row.productName);
     return {
       ...row,
-      name: info?.name ?? row.productId,
-      imageUrl: info?.imageUrl,
+      productId: id || row.productId,
+      name: fromProducts ?? fromSaleLine ?? "Unknown product",
+      imageUrl:
+        sources?.fromProduct?.imageUrl ?? sources?.fromSaleLine?.imageUrl,
     };
   };
 
@@ -274,7 +334,7 @@ export async function enrichDashboardStats(
     stock: row.stock,
     lowStockThreshold:
       row.lowStockThreshold != null ? Number(row.lowStockThreshold) : undefined,
-    imageUrl: details.get(row.id)?.imageUrl,
+    imageUrl: details.get(row.id)?.fromProduct?.imageUrl,
   });
 
   return {
@@ -508,7 +568,7 @@ export async function loadApiDashboardStatsView(
   const raw = unwrapDashboardStatsPayload(response.data);
   const enriched = await enrichDashboardStats(raw, { page, limit });
 
-  // New contract: use API panels as-is.
+  // New contract: use API panels as-is (names resolved from products, then sale line).
   if (isNewDashboardStatsContract(raw)) {
     return { ...enriched, source: "api" };
   }
