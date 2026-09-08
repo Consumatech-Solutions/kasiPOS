@@ -176,145 +176,158 @@ export default function Header({ onOpenMobileNav }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center justify-between gap-2 sm:gap-4 border-b bg-white dark:bg-card px-2 sm:px-4 lg:px-6 shadow-sm w-full max-w-full min-w-0">
-      <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-        {onOpenMobileNav && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="md:hidden h-9 w-9 touch-target shrink-0"
-            onClick={onOpenMobileNav}
-            aria-label={t("header.menu.navigation")}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        )}
-        <Link
-          href="/"
-          className="flex items-center gap-1 sm:gap-2 flex-shrink-0"
-        >
-          {!logoError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src="/logo.png"
-              alt="kasiPOS"
-              className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain"
-              onError={() => setLogoError(true)}
-            />
-          ) : (
-            <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
-              <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-            </div>
-          )}
-          <span className="text-base sm:text-lg font-bold hidden sm:inline">
-            kasiPOS
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-2 text-muted-foreground min-w-0 flex-1 md:flex-none">
-          <div className="hidden md:block h-6 w-px bg-border" />
-          <PageIcon className="h-4 w-4 shrink-0" />
-          <span className="text-sm font-medium truncate">
-            {currentPageTitle}
-          </span>
-        </div>
-
-        {currentStore && (
-          <div className="hidden lg:flex items-center gap-2 ml-auto mr-4">
-            <div className="h-6 w-px bg-border" />
-            <div className="flex items-center gap-2 text-sm">
-              <Store className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-foreground truncate max-w-[200px]">
-                {currentStore.name}
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-        {mounted &&
-          process.env.NODE_ENV === "development" &&
-          offlineDetector.isDevHost() && (
-            <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
-              <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
-                {t("header.dev.simulateOffline")}
-              </span>
-              <Switch
-                checked={offlineDetector.getForceOffline()}
-                onCheckedChange={(checked) =>
-                  offlineDetector.setForceOffline(checked)
-                }
-                aria-label={t("header.dev.simulateOffline")}
-              />
-            </div>
-          )}
-
-        <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
-          <PopoverTrigger asChild>
+    <header className="sticky top-0 z-30 w-full max-w-full min-w-0 overflow-visible border-b bg-white dark:bg-card shadow-sm safe-top safe-left safe-right">
+      <div className="flex h-14 sm:h-16 min-w-0 items-center justify-between gap-2 sm:gap-4 px-2 sm:px-4 lg:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+          {onOpenMobileNav && (
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="relative h-9 w-9 sm:h-10 sm:w-10 touch-target"
+              className="relative z-10 lg:hidden h-11 w-11 touch-target shrink-0"
+              onClick={onOpenMobileNav}
+              aria-label={t("header.menu.navigation")}
             >
-              <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-              {unreadCount > 0 && (
-                <Badge
-                  className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 hover:bg-red-600"
-                  variant="destructive"
-                >
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </Badge>
-              )}
+              <Menu className="h-5 w-5" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[90vw] sm:w-80 p-0" align="end">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-sm">
-                  {t("header.notifications.title")}
-                </h3>
+          )}
+          <Link
+            href="/"
+            className="flex items-center gap-1 sm:gap-2 flex-shrink-0"
+          >
+            {!logoError ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src="/logo.png"
+                alt="kasiPOS"
+                className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg object-contain"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="bg-green-500 p-1.5 sm:p-2 rounded-md">
+                <Store className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+              </div>
+            )}
+            <span className="text-base sm:text-lg font-bold hidden sm:inline">
+              kasiPOS
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-2 text-muted-foreground min-w-0 flex-1 md:flex-none">
+            <div className="hidden md:block h-6 w-px bg-border" />
+            <PageIcon className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-medium truncate">
+              {currentPageTitle}
+            </span>
+          </div>
+
+          {currentStore && (
+            <div className="hidden lg:flex items-center gap-2 ml-auto mr-4">
+              <div className="h-6 w-px bg-border" />
+              <div className="flex items-center gap-2 text-sm">
+                <Store className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-foreground truncate max-w-[200px]">
+                  {currentStore.name}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {mounted &&
+            process.env.NODE_ENV === "development" &&
+            offlineDetector.isDevHost() && (
+              <div className="hidden sm:flex items-center gap-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30">
+                <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">
+                  {t("header.dev.simulateOffline")}
+                </span>
+                <Switch
+                  checked={offlineDetector.getForceOffline()}
+                  onCheckedChange={(checked) =>
+                    offlineDetector.setForceOffline(checked)
+                  }
+                  aria-label={t("header.dev.simulateOffline")}
+                />
+              </div>
+            )}
+
+          <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-9 w-9 sm:h-10 sm:w-10 touch-target"
+              >
+                <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
                 {unreadCount > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {t("header.notifications.new", { count: unreadCount })}
+                  <Badge
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 hover:bg-red-600"
+                    variant="destructive"
+                  >
+                    {unreadCount > 9 ? "9+" : unreadCount}
                   </Badge>
                 )}
-              </div>
-              {unreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={markAllAsRead}
-                >
-                  <CheckCheck className="h-3 w-3 mr-1" />
-                  {t("header.notifications.markAllRead")}
-                </Button>
-              )}
-            </div>
-            <ScrollArea className="h-[400px]">
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                  <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-sm text-muted-foreground">
-                    {t("header.notifications.empty")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("header.notifications.emptyHint")}
-                  </p>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[90vw] sm:w-80 p-0" align="end">
+              <div className="flex items-center justify-between px-4 py-3 border-b">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-sm">
+                    {t("header.notifications.title")}
+                  </h3>
+                  {unreadCount > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {t("header.notifications.new", { count: unreadCount })}
+                    </Badge>
+                  )}
                 </div>
-              ) : (
-                <div className="divide-y">
-                  {notifications.map((notification) => {
-                    const Icon = getNotificationIcon(notification.type);
-                    const colorClass = getNotificationColor(notification.type);
-                    const content = notification.link ? (
-                      <Link
-                        href={notification.link}
-                        onClick={() => handleNotificationClick(notification)}
-                        className="block"
-                      >
+                {unreadCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={markAllAsRead}
+                  >
+                    <CheckCheck className="h-3 w-3 mr-1" />
+                    {t("header.notifications.markAllRead")}
+                  </Button>
+                )}
+              </div>
+              <ScrollArea className="h-[400px]">
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <Bell className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
+                    <p className="text-sm text-muted-foreground">
+                      {t("header.notifications.empty")}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t("header.notifications.emptyHint")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {notifications.map((notification) => {
+                      const Icon = getNotificationIcon(notification.type);
+                      const colorClass = getNotificationColor(
+                        notification.type
+                      );
+                      const content = notification.link ? (
+                        <Link
+                          href={notification.link}
+                          onClick={() => handleNotificationClick(notification)}
+                          className="block"
+                        >
+                          <NotificationItem
+                            notification={notification}
+                            Icon={Icon}
+                            colorClass={colorClass}
+                            dateLocale={dateLocale}
+                            onMarkRead={() => markAsRead(notification.id)}
+                            onRemove={() => removeNotification(notification.id)}
+                          />
+                        </Link>
+                      ) : (
                         <NotificationItem
                           notification={notification}
                           Icon={Icon}
@@ -323,105 +336,96 @@ export default function Header({ onOpenMobileNav }: HeaderProps) {
                           onMarkRead={() => markAsRead(notification.id)}
                           onRemove={() => removeNotification(notification.id)}
                         />
-                      </Link>
-                    ) : (
-                      <NotificationItem
-                        notification={notification}
-                        Icon={Icon}
-                        colorClass={colorClass}
-                        dateLocale={dateLocale}
-                        onMarkRead={() => markAsRead(notification.id)}
-                        onRemove={() => removeNotification(notification.id)}
-                      />
-                    );
-                    return <div key={notification.id}>{content}</div>;
-                  })}
-                </div>
-              )}
-            </ScrollArea>
-          </PopoverContent>
-        </Popover>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full touch-target"
-            >
-              <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-border">
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                  {currentUser?.name ? (
-                    currentUser.name
-                      .split(" ")
-                      .map((n) => n.charAt(0))
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)
-                  ) : (
-                    <User className="h-4 w-4" />
-                  )}
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-56 sm:w-56 p-2"
-            align="end"
-            sideOffset={8}
-            alignOffset={-4}
-            collisionPadding={8}
-          >
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">
-                  {currentUser?.name || t("header.user.fallbackName")}
-                </p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {currentUser?.phone || t("header.user.noPhone")}
-                </p>
-                {currentUser?.role && (
-                  <Badge
-                    variant="secondary"
-                    className="w-fit mt-1 text-[10px] px-1.5 py-0"
-                  >
-                    {roleLabel(currentUser.role)}
-                  </Badge>
+                      );
+                      return <div key={notification.id}>{content}</div>;
+                    })}
+                  </div>
                 )}
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <Link href="/profile">
-              <DropdownMenuItem className="min-h-[44px] touch-target">
-                <User className="mr-2 h-4 w-4" />
-                {t("header.menu.profile")}
-              </DropdownMenuItem>
-            </Link>
-            <DropdownMenuItem
-              onClick={openHardwareSetup}
-              className="min-h-[44px] touch-target"
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full touch-target"
+              >
+                <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-border">
+                  <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                    {currentUser?.name ? (
+                      currentUser.name
+                        .split(" ")
+                        .map((n) => n.charAt(0))
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)
+                    ) : (
+                      <User className="h-4 w-4" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="w-56 sm:w-56 p-2"
+              align="end"
+              sideOffset={8}
+              alignOffset={-4}
+              collisionPadding={8}
             >
-              <Printer className="mr-2 h-4 w-4" />
-              {t("settings.hardware.label")}
-            </DropdownMenuItem>
-            {(currentUser?.role === "admin" ||
-              currentStore?.ownerId === currentUser?.id ||
-              currentUser?.role === "store_admin") && (
-              <Link href="/settings">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {currentUser?.name || t("header.user.fallbackName")}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {currentUser?.phone || t("header.user.noPhone")}
+                  </p>
+                  {currentUser?.role && (
+                    <Badge
+                      variant="secondary"
+                      className="w-fit mt-1 text-[10px] px-1.5 py-0"
+                    >
+                      {roleLabel(currentUser.role)}
+                    </Badge>
+                  )}
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <Link href="/profile">
                 <DropdownMenuItem className="min-h-[44px] touch-target">
-                  <Store className="mr-2 h-4 w-4" />
-                  {t("nav.settings")}
+                  <User className="mr-2 h-4 w-4" />
+                  {t("header.menu.profile")}
                 </DropdownMenuItem>
               </Link>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={logout}
-              className="text-destructive focus:text-destructive min-h-[44px] touch-target"
-            >
-              {t("header.menu.logout")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem
+                onClick={openHardwareSetup}
+                className="min-h-[44px] touch-target"
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                {t("settings.hardware.label")}
+              </DropdownMenuItem>
+              {(currentUser?.role === "admin" ||
+                currentStore?.ownerId === currentUser?.id ||
+                currentUser?.role === "store_admin") && (
+                <Link href="/settings">
+                  <DropdownMenuItem className="min-h-[44px] touch-target">
+                    <Store className="mr-2 h-4 w-4" />
+                    {t("nav.settings")}
+                  </DropdownMenuItem>
+                </Link>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={logout}
+                className="text-destructive focus:text-destructive min-h-[44px] touch-target"
+              >
+                {t("header.menu.logout")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );
