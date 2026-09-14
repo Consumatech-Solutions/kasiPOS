@@ -208,4 +208,28 @@ describe("dashboard-stats-view", () => {
     expect(buckets[0].totalAmount).toBe(150);
     expect(buckets[1].totalAmount).toBe(75);
   });
+
+  it("buildApproachingDueDates prefers backend UUIDs for Dexie credit rows", () => {
+    const transactions = [
+      {
+        id: 42 as unknown as string,
+        serverId: "550e8400-e29b-41d4-a716-446655440000",
+        paymentMethod: "Credit",
+        status: "pending",
+        total: 100,
+        customerId: "c1",
+        creditDetails: { paymentDate: "2026-08-10T00:00:00.000Z" },
+      },
+    ] as Transaction[];
+
+    const buckets = buildApproachingDueDates(
+      transactions,
+      new Date("2026-08-07T12:00:00.000Z")
+    );
+
+    expect(buckets).toHaveLength(1);
+    expect(buckets[0].credits[0].id).toBe(
+      "550e8400-e29b-41d4-a716-446655440000"
+    );
+  });
 });

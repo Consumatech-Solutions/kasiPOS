@@ -8,6 +8,7 @@ import type { StockAdjustmentReason, Product, StockAdjustment } from "@/types";
 import type { ApiProduct } from "@/types/catalogue";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProducts, useCategories, productKeys } from "@/hooks/use-catalogue";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import { useStockAdjustments } from "@/hooks/use-stock-adjustments";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
@@ -381,6 +382,9 @@ export default function InventoryPage() {
 
         await updateProductStockInDexie(productId, newStock);
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+        void queryClient.invalidateQueries({
+          queryKey: dashboardStatsKeys.all,
+        });
 
         const variables = {
           productId: selectedProduct.id!,
@@ -407,6 +411,9 @@ export default function InventoryPage() {
         const { productId, previousStock } = offlineRollback;
         await updateProductStockInDexie(productId, previousStock);
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+        void queryClient.invalidateQueries({
+          queryKey: dashboardStatsKeys.all,
+        });
       }
       feedback.fromError(
         error,
@@ -437,6 +444,7 @@ export default function InventoryPage() {
     const applyThresholdToCaches = async (nextThreshold: number) => {
       await updateProductInDexie(id, { lowStockThreshold: nextThreshold });
       queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
     };
 
     try {

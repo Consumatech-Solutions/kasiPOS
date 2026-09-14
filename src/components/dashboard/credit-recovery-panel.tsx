@@ -10,6 +10,7 @@ import { transactionsApi } from "@/lib/api/transactions";
 import { formatDueDateLabel } from "@/lib/dashboard-insights";
 import { formatDashboardCurrency } from "@/lib/dashboard-metrics";
 import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
+import { getTransactionApiId } from "@/lib/transaction-id";
 import { useEffectiveOnline } from "@/hooks/use-effective-online";
 import { feedback } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
@@ -70,9 +71,24 @@ export function CreditRecoveryPanel({
       return;
     }
 
+    const transactionId = getTransactionApiId({
+      id: pendingCredit.id,
+      serverId: undefined,
+    });
+
+    if (!transactionId) {
+      feedback.error(
+        t("transactions.clearCredit.errorTitle"),
+        t("transactions.clearCredit.invalidIdDesc"),
+        undefined,
+        { code: ERROR_CODES.APP_UPDATE }
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await transactionsApi.clearCredit(pendingCredit.id);
+      await transactionsApi.clearCredit(transactionId);
       await queryClient.invalidateQueries({
         queryKey: dashboardStatsKeys.all,
       });

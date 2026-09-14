@@ -37,12 +37,23 @@ export function formatDashboardCurrency(
 }
 
 export function transactionDate(transaction: Transaction): Date {
-  if (transaction.date instanceof Date) {
-    return transaction.date;
+  const rawDate = transaction.date ?? transaction.createdAt;
+
+  if (rawDate instanceof Date) {
+    return rawDate;
   }
-  if (transaction.createdAt) {
-    return parseISO(transaction.createdAt);
+
+  if (typeof rawDate === "string" && rawDate.trim()) {
+    const parsed = parseISO(rawDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
   }
+
+  if (typeof rawDate === "number" && Number.isFinite(rawDate)) {
+    return new Date(rawDate);
+  }
+
   return new Date();
 }
 
@@ -64,10 +75,12 @@ export function buildDashboardMetrics(
     0
   );
 
-  const outstandingCredit = customers.reduce(
-    (sum, c) => sum + Number(c.outstandingCredit ?? 0),
-    0
-  );
+  const outstandingCredit = transactions.reduce((sum, t) => {
+    if (t.paymentMethod !== "Credit") return sum;
+    const status = String(t.status ?? "").toLowerCase();
+    if (status === "paid" || t.creditSettledAt) return sum;
+    return sum + Number(t.total ?? 0);
+  }, 0);
 
   return {
     todaySales,

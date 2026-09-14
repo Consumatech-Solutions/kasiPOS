@@ -72,6 +72,56 @@ function normalizeProductPayload(
   return out;
 }
 
+function looksLikeLocalId(id: string | null | undefined): boolean {
+  if (id == null || id === "") return false;
+  const normalized = String(id).trim();
+  if (normalized.startsWith("temp-") || normalized.startsWith("local-")) {
+    return true;
+  }
+  if (/^\d+$/.test(normalized)) return true;
+  return false;
+}
+
+function throwIfUnresolvedTransactionIds(
+  raw: Parameters<typeof toCreateTransactionDto>[0] & {
+    items?: Array<{
+      productId: string;
+      productName: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+      imageUrl?: string;
+    }>;
+    customerId?: string;
+  },
+  mapping: Map<string, string>
+): void {
+  const unresolvedProductIds = raw.items
+    ?.map((item) => String(item.productId))
+    .filter((productId) => {
+      if (mapping.has(productId)) return false;
+      return looksLikeLocalId(productId);
+    });
+
+  if (unresolvedProductIds && unresolvedProductIds.length > 0) {
+    throw new Error(
+      `Cannot sync transaction: unresolved local productId(s) (${unresolvedProductIds.join(", ")}).`
+    );
+  }
+
+  const customerId = raw.customerId ? String(raw.customerId) : undefined;
+  if (
+    customerId &&
+    looksLikeLocalId(customerId) &&
+    !mapping.has(customerId) &&
+    customerId !== ""
+  ) {
+    throw new Error(
+      `Cannot sync transaction: unresolved local customerId (${customerId}).`
+    );
+  }
+}
+
 export async function executeMutation(
   mutationKey: string[],
   variables: unknown
@@ -96,6 +146,7 @@ export async function executeMutation(
       };
       const mappings = await getDb().syncIdMapping.toArray();
       const map = new Map(mappings.map((m) => [m.tempId, m.serverId]));
+      throwIfUnresolvedTransactionIds(raw, map);
 
       const resolvedItems: CreateTransactionItemDto[] | undefined =
         raw.items?.map((item) => ({

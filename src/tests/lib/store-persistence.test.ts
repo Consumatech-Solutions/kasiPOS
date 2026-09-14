@@ -75,6 +75,45 @@ describe("store-persistence", () => {
     expect(parsed.currentStore?.id).toBe(baseStore.id);
   });
 
+  it("saveStorePermanently preserves persisted currency settings when saving a raw store response", async () => {
+    const rawStore = {
+      ...baseStore,
+      currency: undefined,
+      cdfUsdExRate: undefined,
+      zarUsdExRate: undefined,
+    } as Store;
+
+    const persistedStore = {
+      ...baseStore,
+      currency: "USD",
+      cdfUsdExRate: 2850,
+      zarUsdExRate: 18.25,
+    };
+
+    globalThis.localStorage.setItem(
+      "kasi-pos-settings",
+      JSON.stringify({ currentStore: persistedStore })
+    );
+
+    const setSetting = vi.fn();
+    await saveStorePermanently(rawStore, setSetting);
+
+    expect(setSetting).toHaveBeenCalledWith(
+      "currentStore",
+      expect.objectContaining({
+        id: baseStore.id,
+        currency: "USD",
+        cdfUsdExRate: 2850,
+        zarUsdExRate: 18.25,
+      })
+    );
+
+    const row = await getDb().stores.get(baseStore.id);
+    expect(row?.currency).toBe("USD");
+    expect(row?.cdfUsdExRate).toBe(2850);
+    expect(row?.zarUsdExRate).toBe(18.25);
+  });
+
   it("loadStoreFromIndexedDB returns store by id or first store", async () => {
     await saveStorePermanently(baseStore);
     const byId = await loadStoreFromIndexedDB(baseStore.id);

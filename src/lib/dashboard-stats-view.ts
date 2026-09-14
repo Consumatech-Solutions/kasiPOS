@@ -16,6 +16,7 @@ import {
   getTransactionsFromDexie,
 } from "@/lib/entity-cache";
 import { getDb } from "@/lib/db";
+import { getTransactionApiId } from "@/lib/transaction-id";
 import type { StoreCurrency, Transaction } from "@/types";
 import type { PaginatedResponse, PaginationMeta } from "@/types/pagination";
 
@@ -38,6 +39,8 @@ export type DashboardStatsView = {
   todaySales: number;
   /** KPI: all paid sales for the store (already in `currency`). */
   totalSales: number;
+  /** KPI: locally stored sales that have not been synced to the backend yet. */
+  offlineOnlySales?: number;
   /** KPI: non-deleted customers for the store. */
   totalCustomers: number;
   /** KPI: sum of pending credit totals (already in `currency`). */
@@ -331,7 +334,7 @@ function creditRowsFromTransactions(
       (cid && customersById.get(String(cid))?.name) || "Customer";
 
     rows.push({
-      id: String(tx.id ?? tx.idempotencyKey ?? ""),
+      id: getTransactionApiId(tx) ?? String(tx.id ?? tx.idempotencyKey ?? ""),
       clientName,
       totalAmount: Number(tx.total ?? 0),
       dueDate: dueRaw,
@@ -373,7 +376,8 @@ export function buildApproachingDueDates(
     if (startOfDay(due).getTime() < today.getTime()) continue;
     const key = dueRaw.slice(0, 10);
     const cid = String(tx.customerId ?? tx.tempCustomerId ?? "");
-    const id = String(tx.id ?? "");
+    const id =
+      getTransactionApiId(tx) ?? String(tx.id ?? tx.idempotencyKey ?? "");
     if (!id) continue;
     const existing = buckets.get(key);
     if (existing) {
@@ -422,6 +426,10 @@ export async function loadDexieDashboardStatsView(
   );
 
   const summaryMetrics = buildDashboardMetrics(customers, transactions);
+  const offlineOnlySales = transactions.reduce((sum, tx) => {
+    if (getTransactionApiId(tx)) return sum;
+    return sum + Number(tx.total ?? 0);
+  }, 0);
   const productsForInsights = products.map((p) => ({
     id: p.id,
     name: p.name,
@@ -451,6 +459,7 @@ export async function loadDexieDashboardStatsView(
     currency,
     todaySales: summaryMetrics.todaySales,
     totalSales: transactions.reduce((sum, t) => sum + Number(t.total ?? 0), 0),
+    offlineOnlySales,
     totalCustomers: summaryMetrics.totalCustomers,
     outstandingCredits: summaryMetrics.outstandingCredit,
     approachingDueDates: buildApproachingDueDates(transactions),

@@ -304,6 +304,15 @@ class MutationQueue {
     );
   }
 
+  private isNonRetryableMutationError(error: any): boolean {
+    const message = String(error?.message ?? "");
+    return (
+      message.includes("Cannot sync transaction: unresolved local") ||
+      message.includes("Cannot sync transaction: unresolved local productId") ||
+      message.includes("Cannot sync transaction: unresolved local customerId")
+    );
+  }
+
   private async processSingleMutationWithRetries(
     mutation: QueuedMutation
   ): Promise<SingleMutationOutcome> {
@@ -328,6 +337,21 @@ class MutationQueue {
           console.log("[MutationQueue] Server error (5xx) - will retry");
           mutation.status = "pending";
           return "server_retry";
+        }
+
+        if (this.isNonRetryableMutationError(error)) {
+          mutation.status = "failed";
+          console.error(
+            "[MutationQueue] Dropping non-retryable mutation:",
+            mutation.mutationKey,
+            error
+          );
+          feedback.error(
+            "Sync failed",
+            error?.message ?? "Changes could not be synced to the server.",
+            "The queued change was invalid and cannot be retried. Please refresh and retry the action."
+          );
+          return "failed_removed";
         }
 
         if (mutation.retries < MAX_RETRIES) {
