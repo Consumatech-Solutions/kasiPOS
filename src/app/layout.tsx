@@ -99,6 +99,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
+  viewportFit: "cover",
   themeColor: "#2563EB",
 };
 
@@ -108,8 +109,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      translate="no"
+      className="notranslate"
+      suppressHydrationWarning
+    >
       <head>
+        <meta name="google" content="notranslate" />
         <Script id="benign-browser-errors" strategy="beforeInteractive">
           {benignBrowserErrorScript}
         </Script>
@@ -117,7 +124,10 @@ export default function RootLayout({
           {chunkRecoveryScript}
         </Script>
       </head>
-      <body className={`${inter.variable} font-body antialiased bg-background`}>
+      <body
+        className={`${inter.variable} font-body antialiased bg-background notranslate`}
+        translate="no"
+      >
         <I18nProvider>
           <QueryProvider>
             <ClientDbProvider>

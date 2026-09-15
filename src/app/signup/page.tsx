@@ -34,6 +34,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useSettings } from "@/components/settings-provider";
 import { feedback, getErrorMessage } from "@/lib/feedback";
 import { ERROR_CODES } from "@/lib/error-codes";
 import {
@@ -69,6 +70,7 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 export default function SignupPage() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { settings, setSetting } = useSettings();
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -173,146 +175,166 @@ export default function SignupPage() {
   const isSubmitting = form.formState.isSubmitting;
 
   return (
-    <div className="min-h-[100dvh] overflow-y-auto bg-muted p-4">
-      <div className="mx-auto flex w-full max-w-sm flex-col justify-center py-6 sm:min-h-[calc(100dvh-2rem)]">
-        <Card className="w-full">
-          <CardHeader className="text-center">
-            <CardTitle className="text-lg sm:text-xl">
-              {t("auth.signup.title")}
-            </CardTitle>
-            <CardDescription className="text-sm">
-              {t("auth.signup.description")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4"
-              >
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("auth.signup.emailLabel")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="owner@example.com"
-                          className="touch-target"
-                          autoComplete="email"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("auth.signup.nameLabel")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Jane Doe"
-                          className="touch-target"
-                          autoComplete="name"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="storeName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("auth.signup.storeNameLabel")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Jane's Shop"
-                          className="touch-target"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="localNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {t("auth.signup.mobileNumberLabel")}
-                      </FormLabel>
-                      <FormControl>
-                        <PhoneNumberField
-                          value={{
-                            countryIso: form.watch("countryCode"),
-                            localNumber: field.value,
-                          }}
-                          onChange={({ countryIso, localNumber }) => {
-                            form.setValue("countryCode", countryIso, {
-                              shouldValidate: true,
-                            });
-                            field.onChange(localNumber);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("auth.signup.passwordLabel")}</FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          className="touch-target"
-                          autoComplete="new-password"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+    <div className="flex h-[100dvh] max-h-[100dvh] min-h-0 flex-col overflow-hidden bg-muted">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex min-h-full w-full max-w-sm flex-col justify-center py-6">
+          <Card className="w-full">
+            <CardHeader className="text-center">
+              <div className="mb-3 flex items-center justify-end gap-2">
                 <Button
-                  type="submit"
-                  className="w-full min-h-[44px] touch-target"
-                  disabled={isSubmitting}
+                  type="button"
+                  variant={settings.language === "en" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSetting("language", "en")}
                 >
-                  {isSubmitting && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  {isSubmitting
-                    ? t("auth.signup.continuing")
-                    : t("auth.signup.continue")}
+                  EN
                 </Button>
-              </form>
-            </Form>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              {t("auth.signup.alreadyHave")}{" "}
-              <Button
-                variant="link"
-                className="p-0 min-h-[44px] touch-target"
-                asChild
-              >
-                <Link href="/login">{t("auth.signup.signIn")}</Link>
-              </Button>
-            </p>
-          </CardContent>
-        </Card>
+                <Button
+                  type="button"
+                  variant={settings.language === "fr" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSetting("language", "fr")}
+                >
+                  FR
+                </Button>
+              </div>
+              <CardTitle className="text-lg sm:text-xl">
+                {t("auth.signup.title")}
+              </CardTitle>
+              <CardDescription className="text-sm">
+                {t("auth.signup.description")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("auth.signup.emailLabel")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="email"
+                            placeholder="owner@example.com"
+                            className="touch-target"
+                            autoComplete="email"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("auth.signup.nameLabel")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Jane Doe"
+                            className="touch-target"
+                            autoComplete="name"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="storeName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("auth.signup.storeNameLabel")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Jane's Shop"
+                            className="touch-target"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="localNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          {t("auth.signup.mobileNumberLabel")}
+                        </FormLabel>
+                        <FormControl>
+                          <PhoneNumberField
+                            value={{
+                              countryIso: form.watch("countryCode"),
+                              localNumber: field.value,
+                            }}
+                            onChange={({ countryIso, localNumber }) => {
+                              form.setValue("countryCode", countryIso, {
+                                shouldValidate: true,
+                              });
+                              field.onChange(localNumber);
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t("auth.signup.passwordLabel")}</FormLabel>
+                        <FormControl>
+                          <PasswordInput
+                            className="touch-target"
+                            autoComplete="new-password"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="submit"
+                    className="w-full min-h-[44px] touch-target"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {isSubmitting
+                      ? t("auth.signup.continuing")
+                      : t("auth.signup.continue")}
+                  </Button>
+                </form>
+              </Form>
+              <p className="mt-4 text-center text-sm text-muted-foreground">
+                {t("auth.signup.alreadyHave")}{" "}
+                <Button
+                  variant="link"
+                  className="p-0 min-h-[44px] touch-target"
+                  asChild
+                >
+                  <Link href="/login">{t("auth.signup.signIn")}</Link>
+                </Button>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
