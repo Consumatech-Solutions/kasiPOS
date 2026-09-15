@@ -490,6 +490,36 @@ export default function SettingsPage() {
 
     const body: UpdateStoreSettingsDto = { currency: currencyForm.currency };
 
+    if (currencyForm.currency === "USD") {
+      if (currencyForm.cdfUsdExRate !== "") {
+        const rate = Number(currencyForm.cdfUsdExRate);
+        if (Number.isNaN(rate) || rate < 0) {
+          feedback.error(
+            t("settings.currency.feedback.invalidRateTitle"),
+            t("settings.currency.feedback.invalidRateDesc"),
+            undefined,
+            { code: "CURRENCY" }
+          );
+          return;
+        }
+        body.cdfUsdExRate = rate;
+      }
+
+      if (currencyForm.zarUsdExRate !== "") {
+        const rate = Number(currencyForm.zarUsdExRate);
+        if (Number.isNaN(rate) || rate < 0) {
+          feedback.error(
+            t("settings.currency.feedback.invalidRateTitle"),
+            t("settings.currency.feedback.invalidRateDesc"),
+            undefined,
+            { code: "CURRENCY" }
+          );
+          return;
+        }
+        body.zarUsdExRate = rate;
+      }
+    }
+
     if (currencyForm.currency === "CDF") {
       const rate = Number(currencyForm.cdfUsdExRate);
       if (
@@ -1315,7 +1345,8 @@ export default function SettingsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      {currencyForm.currency === "CDF" && (
+                      {(currencyForm.currency === "USD" ||
+                        currencyForm.currency === "CDF") && (
                         <div className="space-y-2">
                           <Label htmlFor="cdf-usd-rate">
                             {t("settings.currency.cdfRate.label")}
@@ -1336,7 +1367,8 @@ export default function SettingsPage() {
                           />
                         </div>
                       )}
-                      {currencyForm.currency === "ZAR" && (
+                      {(currencyForm.currency === "USD" ||
+                        currencyForm.currency === "ZAR") && (
                         <div className="space-y-2">
                           <Label htmlFor="zar-usd-rate">
                             {t("settings.currency.zarRate.label")}

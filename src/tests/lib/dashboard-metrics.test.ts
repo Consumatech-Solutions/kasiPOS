@@ -82,7 +82,28 @@ describe("dashboard-metrics", () => {
     expect(metrics.todaySales).toBe(175.5);
     expect(metrics.todayOrders).toBe(2);
     expect(metrics.totalCustomers).toBe(3);
-    expect(metrics.outstandingCredit).toBe(200);
+    expect(metrics.outstandingCredit).toBe(75.5);
+  });
+
+  it("buildDashboardMetrics uses Dexie string dates for today sales", () => {
+    const metrics = buildDashboardMetrics(
+      customers,
+      [
+        {
+          id: "t4",
+          customerId: "c1",
+          date: "2026-07-07T15:00:00.000Z",
+          items: [],
+          total: 40,
+          paymentMethod: "Card",
+          storeId: "store-1",
+        },
+      ],
+      referenceDate
+    );
+
+    expect(metrics.todaySales).toBe(0);
+    expect(metrics.todayOrders).toBe(0);
   });
 
   it("getCustomersWithCredit sorts by highest outstanding credit", () => {

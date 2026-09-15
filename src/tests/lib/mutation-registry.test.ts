@@ -152,6 +152,27 @@ describe("executeMutation", () => {
     );
   });
 
+  it("transactions/create rejects unresolved local ids instead of replaying invalid payloads", async () => {
+    await expect(
+      executeMutation(["transactions", "create"], {
+        storeId: "store-1",
+        items: [
+          {
+            productId: "1",
+            productName: "X",
+            quantity: 1,
+            unitPrice: 5,
+            totalPrice: 5,
+          },
+        ],
+        total: 5,
+        paymentMethod: "Cash",
+        customerId: "local-customer-id",
+      })
+    ).rejects.toThrow(/unresolved local|local ids|productId/i);
+    expect(mocks.transactionsCreate).not.toHaveBeenCalled();
+  });
+
   it("transactions/create passes idempotencyKey to API", async () => {
     await executeMutation(["transactions", "create"], {
       storeId: "store-1",

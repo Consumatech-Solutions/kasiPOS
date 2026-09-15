@@ -6,6 +6,7 @@ import type { Customer } from "@/types";
 import { feedback } from "@/lib/feedback";
 import { useSettings } from "@/components/settings-provider";
 import { useCustomers, customerKeys } from "@/hooks/use-customers";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import { executeMutation } from "@/lib/mutation-registry";
@@ -169,6 +170,9 @@ export default function CustomersPage() {
             }
           });
           await updateCustomerInDexie(editingCustomer.id, data);
+          void queryClient.invalidateQueries({
+            queryKey: dashboardStatsKeys.all,
+          });
           mutationQueue.add({
             mutationKey: ["customers", "update"],
             mutationFn: () => customersApi.update(editingCustomer.id, data),
@@ -218,6 +222,9 @@ export default function CustomersPage() {
             }
           });
           await saveCustomersToDexie([optimisticCustomer]);
+          void queryClient.invalidateQueries({
+            queryKey: dashboardStatsKeys.all,
+          });
           mutationQueue.add({
             mutationKey: ["customers", "create"],
             mutationFn: () =>
@@ -278,6 +285,9 @@ export default function CustomersPage() {
           }
         });
         await deleteCustomerFromDexie(id);
+        void queryClient.invalidateQueries({
+          queryKey: dashboardStatsKeys.all,
+        });
         mutationQueue.add({
           mutationKey: ["customers", "delete"],
           mutationFn: () => customersApi.delete(id),

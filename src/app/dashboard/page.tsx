@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  AlertCircle,
-  DollarSign,
-  Loader2,
-  RefreshCw,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { DollarSign, Loader2, RefreshCw, Users, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { useSettings } from "@/components/settings-provider";
@@ -139,7 +132,6 @@ export default function DashboardPage() {
     noStockProducts,
     mostSoldProducts = [],
     mostProfitableProduct = null,
-    source,
   } = data;
 
   const currency: StoreCurrency = apiCurrency || storeCurrency;
@@ -164,13 +156,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-4 p-2 sm:space-y-6 sm:p-4">
-      {source === "dexie" ? (
-        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>{t("dashboard.page.offlineFallback")}</p>
-        </div>
-      ) : null}
-
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label={t("dashboard.stats.todaySales")}

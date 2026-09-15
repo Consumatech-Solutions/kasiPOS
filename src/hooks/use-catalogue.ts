@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import { catalogueApi } from "@/lib/api/catalogue";
 import { checkOfflineStatus } from "@/lib/offline-detector";
 import {
@@ -80,7 +81,7 @@ export function useCategories(
   const createMutation = useMutation({
     mutationFn: async (data: CreateCategoryDto) => {
       const tempId = `temp-${Date.now()}`;
-      
+
       mutationQueue.add({
         mutationKey: ["categories", "create"],
         variables: data,
@@ -91,7 +92,7 @@ export function useCategories(
         id: tempId,
         ...data,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
     },
     onMutate: async (newCategory) => {
@@ -153,12 +154,23 @@ export function useCategories(
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateCategoryDto }) => {
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateCategoryDto;
+    }) => {
       mutationQueue.add({
         mutationKey: ["categories", "update", id],
         variables: { id, ...data },
       });
-      return { id, ...data, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as ApiCategory;
+      return {
+        id,
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as ApiCategory;
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: categoryKeys.lists() });
@@ -340,7 +352,11 @@ export function useProducts(
       if ("categoryId" in data) {
         createDto = data as CreateProductDto;
       } else {
-        const categoriesResp = await getCategoriesFromDexie(1, 10000, storeIdForOffline);
+        const categoriesResp = await getCategoriesFromDexie(
+          1,
+          10000,
+          storeIdForOffline
+        );
         const categories = categoriesResp.data;
         const category = categories.find((c) => c.name === data.category);
 
@@ -359,9 +375,9 @@ export function useProducts(
           categoryId: category.id,
         };
       }
-      
+
       const tempId = `temp-${Date.now()}`;
-      
+
       mutationQueue.add({
         mutationKey: ["products", "create"],
         variables: createDto,
@@ -375,7 +391,7 @@ export function useProducts(
         barCode: createDto.barCode ?? null,
         productImage: createDto.productImage ?? null,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       } as ApiProduct;
     },
     onMutate: async (newProduct) => {
@@ -438,6 +454,7 @@ export function useProducts(
       await saveProductsToDexie([newProduct], storeIdForOffline ?? undefined);
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
       });
     },
   });
@@ -457,7 +474,11 @@ export function useProducts(
         typeof data.category === "string" &&
         !data.categoryId
       ) {
-        const categoriesResp = await getCategoriesFromDexie(1, 10000, storeIdForOffline);
+        const categoriesResp = await getCategoriesFromDexie(
+          1,
+          10000,
+          storeIdForOffline
+        );
         const categories = categoriesResp.data;
         const category = categories.find((c) => c.name === data.category);
 
@@ -482,8 +503,13 @@ export function useProducts(
         mutationKey: ["products", "update", id],
         variables: { id, ...updateDto },
       });
-      
-      return { id, ...updateDto, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as ApiProduct;
+
+      return {
+        id,
+        ...updateDto,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as ApiProduct;
     },
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: productKeys.lists() });
@@ -520,6 +546,7 @@ export function useProducts(
       );
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
       });
     },
   });
@@ -565,6 +592,7 @@ export function useProducts(
       await deleteProductFromDexie(String(productId));
       queueMicrotask(() => {
         queryClient.invalidateQueries({ queryKey: productKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: dashboardStatsKeys.all });
       });
     },
   });

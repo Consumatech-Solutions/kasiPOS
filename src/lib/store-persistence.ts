@@ -66,6 +66,37 @@ export function hasStoreSettingsFieldsChanged(
   );
 }
 
+function mergeStoreWithPersistedSettings(store: Store): Store {
+  if (typeof window === "undefined") return store;
+
+  try {
+    const settingsItem = window.localStorage.getItem("kasi-pos-settings");
+    if (!settingsItem) return store;
+
+    const parsed = JSON.parse(settingsItem) as {
+      currentStore?: Partial<Store>;
+    };
+    const persistedStore = parsed.currentStore;
+    if (!persistedStore || typeof persistedStore !== "object") return store;
+
+    const mergedStore: Store = {
+      ...store,
+      currency: store.currency ?? persistedStore.currency ?? "USD",
+      cdfUsdExRate: store.cdfUsdExRate ?? persistedStore.cdfUsdExRate ?? null,
+      zarUsdExRate: store.zarUsdExRate ?? persistedStore.zarUsdExRate ?? null,
+      credit: store.credit ?? persistedStore.credit ?? null,
+    };
+
+    return mergedStore;
+  } catch (error) {
+    console.warn(
+      "[StorePersistence] Failed to merge persisted store settings:",
+      error
+    );
+    return store;
+  }
+}
+
 export async function saveStorePermanently(
   store: Store,
   setSetting?: (key: "currentStore", value: Store | null) => void,
@@ -76,14 +107,16 @@ export async function saveStorePermanently(
     return;
   }
 
+  const mergedStore = mergeStoreWithPersistedSettings(store);
+
   try {
     if (setSetting && !options?.skipStateUpdate) {
-      setSetting("currentStore", store);
+      setSetting("currentStore", mergedStore);
     } else if (!setSetting) {
       try {
         const settingsItem = localStorage.getItem("kasi-pos-settings");
         const settings = settingsItem ? JSON.parse(settingsItem) : {};
-        settings.currentStore = store;
+        settings.currentStore = mergedStore;
         localStorage.setItem("kasi-pos-settings", JSON.stringify(settings));
       } catch (error) {
         console.warn(
@@ -97,7 +130,7 @@ export async function saveStorePermanently(
       try {
         const db = getDb();
         const storeRecord: StoreRecord = {
-          ...store,
+          ...mergedStore,
           synced: true,
           lastSyncedAt: new Date().toISOString(),
         };

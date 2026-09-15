@@ -11,6 +11,7 @@ import {
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCategories, useProducts } from "@/hooks/use-catalogue";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import { resetDbInstanceForTests } from "@/lib/db";
 import { mutationQueue } from "@/lib/mutation-queue";
 import * as entityCache from "@/lib/entity-cache";
@@ -27,8 +28,10 @@ const productsGetAll = vi.fn();
 vi.mock("@/lib/offline-detector", () => ({
   offlineDetector: {
     subscribe: vi.fn(() => () => {}),
+    subscribeToBackendReachability: vi.fn(() => () => {}),
     setOfflineFirstActive: vi.fn(),
     getOfflineFirstActive: vi.fn(() => false),
+    getLastBackendReachable: vi.fn(() => false),
     forceCheck: vi.fn(() => Promise.resolve(false)),
   },
   isOffline: vi.fn(() => false),
@@ -333,5 +336,40 @@ describe("useProducts", () => {
     const { getDb } = await import("@/lib/db");
     expect((await getDb().productCache.get("prod-1"))?.name).toBe("Widget");
     getDb().close();
+  });
+
+  it("invalidates dashboard stats after product updates", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        children
+      );
+
+    const { result } = renderHook(
+      () => useProducts(1, 10, { storeIdForOffline: "s1" }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    checkOffline.mockResolvedValue(false);
+
+    await act(async () => {
+      await result.current.updateProduct("prod-1", { stock: 5 });
+    });
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: dashboardStatsKeys.all,
+      })
+    );
   });
 });

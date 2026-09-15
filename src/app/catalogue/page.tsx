@@ -15,6 +15,7 @@ import {
   productKeys,
   categoryKeys,
 } from "@/hooks/use-catalogue";
+import { dashboardStatsKeys } from "@/hooks/use-dashboard-stats";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { mutationQueue } from "@/lib/mutation-queue";
 import {
@@ -391,6 +392,9 @@ export default function CataloguePage() {
               name: optimisticUpdates.category,
             },
           });
+          void queryClient.invalidateQueries({
+            queryKey: dashboardStatsKeys.all,
+          });
           mutationQueue.add({
             mutationKey: ["products", "update"],
             mutationFn: () =>
@@ -481,6 +485,9 @@ export default function CataloguePage() {
             createdAt: optimisticProduct.createdAt,
             ...(sid != null && sid !== "" ? { storeId: String(sid) } : {}),
           });
+          void queryClient.invalidateQueries({
+            queryKey: dashboardStatsKeys.all,
+          });
           mutationQueue.add({
             mutationKey: ["products", "create"],
             mutationFn: () =>
@@ -538,6 +545,9 @@ export default function CataloguePage() {
           }
         });
         await deleteProductFromDexie(productId);
+        void queryClient.invalidateQueries({
+          queryKey: dashboardStatsKeys.all,
+        });
         mutationQueue.add({
           mutationKey: ["products", "delete"],
           mutationFn: () => catalogueApi.products.delete(productId),
